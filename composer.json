@@ -1,0 +1,90 @@
+{
+    "name": "pushery/webhooks-for-laravel",
+    "description": "Customer-configurable outgoing webhooks for Laravel — endpoint subscriptions, signed delivery with retries, and a searchable delivery log.",
+    "keywords": [
+        "laravel"
+    ],
+    "license": "MIT",
+    "type": "library",
+    "homepage": "https://github.com/pushery/webhooks-for-laravel",
+    "support": {
+        "issues": "https://github.com/pushery/webhooks-for-laravel/issues",
+        "source": "https://github.com/pushery/webhooks-for-laravel"
+    },
+    "require": {
+        "php": "^8.4",
+        "ext-curl": "*",
+        "ext-json": "*",
+        "illuminate/console": "^13.0",
+        "illuminate/contracts": "^13.0",
+        "illuminate/database": "^13.0",
+        "illuminate/support": "^13.0",
+        "opis/json-schema": "^2.6",
+        "spatie/laravel-webhook-server": "^3.10"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.0",
+        "livewire/livewire": "^4.0",
+        "orchestra/testbench": "^11.0",
+        "pestphp/pest": "^4.0",
+        "pestphp/pest-plugin-browser": "^4.3",
+        "pestphp/pest-plugin-laravel": "^4.0",
+        "pestphp/pest-plugin-type-coverage": "^4.0",
+        "pushery/wirekit": "^2.10",
+        "rector/rector": "^2.0",
+        "spaze/phpstan-disallowed-calls": "^4.12"
+    },
+    "autoload": {
+        "psr-4": {
+            "Webhooks\\": "src/",
+            "Webhooks\\Database\\Factories\\": "database/factories/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Webhooks\\Tests\\": "tests/",
+            "Workbench\\App\\": "workbench/app/",
+            "Workbench\\Database\\Factories\\": "workbench/database/factories/",
+            "Workbench\\Database\\Seeders\\": "workbench/database/seeders/"
+        }
+    },
+    "scripts": {
+        "test": "pest",
+        "test:coverage": "pest --coverage --min=100",
+        "test:type-coverage": "pest --type-coverage --min=100",
+        "test:browser": "pest tests/Browser",
+        "analyse": "phpstan analyse",
+        "format": "pint",
+        "format:test": "pint --test",
+        "rector": "rector process",
+        "rector:test": "rector process --dry-run",
+        "mutate": "pest --mutate --everything --covered-only --parallel --min=85",
+        "qa": [
+            "@format:test",
+            "@rector:test",
+            "@analyse",
+            "@test:type-coverage",
+            "@test:coverage"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Webhooks\\WebhooksServiceProvider"
+            ]
+        }
+    },
+    "suggest": {
+        "livewire/livewire": "Required for the optional management UI (Webhooks\\WebhooksUiServiceProvider).",
+        "pushery/wirekit": "Recommended design system for styling the published UI stubs."
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
