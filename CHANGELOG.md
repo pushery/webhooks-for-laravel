@@ -4,6 +4,14 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-07-02
+
+### Changed
+
+- Issue templates (bug report + feature request) now ship to the public repository
+  automatically with each release, and a lean `.gitattributes` keeps the Composer
+  dist minimal.
+
 ## [0.1.0] - 2026-07-02
 
 ### Added
