@@ -4,6 +4,20 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-07-05
+
+### Added
+
+- Migrating the package against a non-PostgreSQL connection (MySQL or SQLite) now
+  fails with one clear, actionable error instead of a cryptic SQL syntax failure —
+  it names the offending driver and points to provisioning a Neon (PostgreSQL)
+  database on Laravel Cloud. The package remains PostgreSQL-only by design.
+
+### Changed
+
+- Documented the Laravel Cloud database choice in the requirements: use the Neon
+  (PostgreSQL) option rather than MySQL.
+
 ## [0.1.1] - 2026-07-02
 
 ### Changed
