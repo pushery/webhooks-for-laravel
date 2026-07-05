@@ -32,6 +32,11 @@ It is **not** an inbound webhook handler (for that, see spatie/laravel-webhook-c
 - PostgreSQL 13+ (the delivery log uses `jsonb`, GIN indexes and declarative range partitioning)
 - A queue worker is required; Redis is recommended so retry backoff does not block other work
 
+> **Deploying to [Laravel Cloud](https://cloud.laravel.com)?** Provision a **Neon
+> (PostgreSQL)** database, not the MySQL option. This package is PostgreSQL-only by
+> design; the migrations refuse to run on any other driver with a clear error
+> pointing you here.
+
 ## Installation
 
 ```bash

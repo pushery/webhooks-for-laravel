@@ -6,11 +6,14 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Webhooks\Database\PostgresRequirement;
 
 return new class extends Migration
 {
     public function up(): void
     {
+        PostgresRequirement::ensure($this->getConnection());
+
         Schema::create('webhook_subscriptions', function (Blueprint $table): void {
             $table->id();
             $table->nullableMorphs('owner');

@@ -6,11 +6,14 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Webhooks\Database\PartitionManager;
+use Webhooks\Database\PostgresRequirement;
 
 return new class extends Migration
 {
     public function up(): void
     {
+        PostgresRequirement::ensure($this->getConnection());
+
         // Range-partitioned by month: the delivery log grows fast, so old data is
         // dropped a partition at a time (webhooks:partition-maintenance) instead of
         // with an expensive DELETE. A partitioned table's primary key must include
