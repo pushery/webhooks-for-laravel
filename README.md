@@ -7,7 +7,7 @@
 # Webhooks for Laravel
 
 [![Latest Version](https://img.shields.io/packagist/v/pushery/webhooks-for-laravel.svg)](https://packagist.org/packages/pushery/webhooks-for-laravel)
-[![PHP Version](https://img.shields.io/packagist/php-v/pushery/webhooks-for-laravel.svg)](https://packagist.org/packages/pushery/webhooks-for-laravel)
+[![PHP Version](https://img.shields.io/packagist/dependency-v/pushery/webhooks-for-laravel/php.svg)](https://packagist.org/packages/pushery/webhooks-for-laravel)
 [![PHPStan](https://img.shields.io/badge/PHPStan-max-blue.svg)](https://phpstan.org)
 [![Code Style](https://img.shields.io/badge/code%20style-pint-orange.svg)](https://laravel.com/docs/pint)
 [![License](https://img.shields.io/packagist/l/pushery/webhooks-for-laravel.svg)](LICENSE)
