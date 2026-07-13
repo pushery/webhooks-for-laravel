@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Carbon;
 use Override;
+use Webhooks\Database\Concerns\HasZonedTimestamps;
 use Webhooks\Database\Factories\WebhookSubscriptionFactory;
 
 /**
@@ -19,7 +20,7 @@ use Webhooks\Database\Factories\WebhookSubscriptionFactory;
  *
  * @property int $id
  * @property string|null $owner_type
- * @property int|null $owner_id
+ * @property int|string|null $owner_id
  * @property string|null $name
  * @property string $url
  * @property string $secret
@@ -29,6 +30,11 @@ use Webhooks\Database\Factories\WebhookSubscriptionFactory;
  * @property bool $is_active
  * @property Carbon|null $disabled_at
  * @property int $consecutive_failures
+ * @property string|null $payload_version
+ * @property array<string, mixed>|null $transform
+ * @property int|null $health_score
+ * @property string|null $health_status
+ * @property Carbon|null $health_calculated_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Model|null $owner
@@ -39,10 +45,23 @@ final class WebhookSubscription extends Model
     /** @use HasFactory<WebhookSubscriptionFactory> */
     use HasFactory;
 
+    use HasZonedTimestamps;
+
     protected $table = 'webhook_subscriptions';
 
-    /** @var list<string> */
-    protected $fillable = ['name', 'url', 'event_types', 'is_active'];
+    /**
+     * The endpoint's own descriptive columns — the only ones a host may mass-assign.
+     *
+     * is_active, disabled_at and consecutive_failures are DELIBERATELY absent: the three
+     * move together and only through WebhookManager::enable() / disable(), because
+     * re-activating an endpoint without clearing the failure streak that disabled it
+     * re-trips the circuit breaker on the very next failure. Guarding the column makes
+     * `$subscription->update(['is_active' => true])` — the obvious, wrong recipe —
+     * impossible rather than subtly broken.
+     *
+     * @var list<string>
+     */
+    protected $fillable = ['name', 'url', 'event_types'];
 
     /**
      * @return array<string, string>
@@ -58,6 +77,9 @@ final class WebhookSubscription extends Model
             'is_active' => 'boolean',
             'disabled_at' => 'datetime',
             'consecutive_failures' => 'integer',
+            'transform' => 'array',
+            'health_score' => 'integer',
+            'health_calculated_at' => 'datetime',
         ];
     }
 
@@ -75,21 +97,6 @@ final class WebhookSubscription extends Model
     public function deliveries(): HasMany
     {
         return $this->hasMany(WebhookDelivery::class, 'subscription_id');
-    }
-
-    /**
-     * The secrets to sign a delivery with — the current secret plus, during a
-     * rotation window, the previous one, so consumers can update at their leisure.
-     */
-    public function signingSecrets(): string
-    {
-        $secrets = [$this->secret];
-
-        if ($this->previous_secret !== null) {
-            $secrets[] = $this->previous_secret;
-        }
-
-        return implode("\n", $secrets);
     }
 
     /**

@@ -2,12 +2,13 @@
 
 ## Supported versions
 
-While this package is in its `0.x` line, security fixes are released against the latest minor version only.
+Security fixes are released against the latest `1.x` minor version. Upgrade to it to stay covered — under Semantic Versioning a minor release never breaks a `1.x` integration.
 
 | Version | Supported |
 |---|---|
-| `0.x` (latest) | :white_check_mark: |
-| older | :x: |
+| `1.x` (latest minor) | :white_check_mark: |
+| `1.x` (older minor) | :x: — upgrade to the latest `1.x` |
+| `0.x` | :x: — end of life since `1.0.0` |
 
 ## Reporting a vulnerability
 

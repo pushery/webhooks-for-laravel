@@ -1,47 +1,88 @@
 # Contributing
 
-Thanks for considering a contribution. This package holds itself to a strict quality
-bar, and every change is expected to keep all of the gates green.
+Thanks for taking the time. Feedback, bug reports and feature ideas are genuinely
+welcome — here is how this repository works, so you know exactly where your
+contribution lands.
 
-## Getting started
+## How this repository works
 
-```bash
-git clone git@github.com:pushery/webhooks-for-laravel.git
-cd webhooks-for-laravel
-composer install
-just setup   # one-time: wires the release-gate git hook
-```
+This repository is a **published mirror**. The package is developed in a private
+upstream repository, and every release replaces this tree wholesale with the
+sanitized public build (source, config, migrations, routes, views, translations and
+these documents — the development harness stays upstream).
 
-## Quality gates
+Two consequences worth knowing before you start:
 
-All of the following must pass. The aggregate static + test gate is:
+- **Pull requests cannot be merged here.** The next release would overwrite them.
+  That is a property of the mirror, not a judgement on the change.
+- **Issues are the real channel** — and they are read. A bug report or a feature
+  request here is what drives the upstream backlog.
 
-```bash
-composer qa
-```
+## Reporting a bug
 
-which runs, and each can be run on its own:
+Open an issue with the bug template and include:
 
-| Command | Gate |
+- the package version, the PHP version and the Laravel version,
+- which layers are switched on (`server`, `platform`, `client`, `dashboard`) and any
+  non-default `config/webhooks.php` values that matter,
+- what you expected, what happened, and the smallest reproduction you can manage —
+  a failing snippet beats a description,
+- the full exception and stack trace, if there was one.
+
+**Never report a security vulnerability in a public issue.** Use the private channel
+described in [SECURITY.md](SECURITY.md).
+
+## Proposing a feature
+
+Open an issue with the feature template and describe the problem before the
+solution: what you are trying to do, why the current API cannot do it, and what you
+would expect the smallest version of the feature to look like. Because every layer of
+this package is config-gated, it helps to say which layer the feature belongs to.
+
+## Sending a patch
+
+If you already have the fix, include it in the issue — a diff, a patch, or a link to
+a branch on your fork. It is applied upstream with the same review as any internal
+change, and you are credited in the [changelog](CHANGELOG.md) entry that ships it. If
+you open a pull request instead, it is read as a patch and then closed with a link to
+the release that carries the change; nothing is lost, it simply cannot land through
+this repository's git history.
+
+## The bar a change has to clear
+
+Every change — internal or contributed — passes the same gates upstream before it can
+ship. They are listed here so you know what the code you are reading is held to, and
+what a patch will be measured against:
+
+| Gate | Standard |
 |---|---|
-| `composer format:test` | Code style — Laravel Pint, zero diffs (`composer format` to fix). |
-| `composer rector:test` | Refactoring — Rector with the PHP rule set, dry-run clean (`composer rector` to apply). |
-| `composer analyse` | Static analysis — Larastan at `max` level, no errors. |
-| `composer test:type-coverage` | 100% type coverage of `src/`. |
-| `composer test:coverage` | 100% line coverage of `src/`. |
+| Code style | Laravel Pint, zero diffs. |
+| Refactoring | Rector, dry-run clean. |
+| Static analysis | Larastan at `max`, no errors, no baseline. |
+| Types | 100% type coverage. |
+| Tests | [Pest](https://pestphp.com) against a real PostgreSQL, 100% line coverage, plus mutation testing and a real-browser end-to-end suite. |
+| Public surface | Every user-visible string translated (English and German), the public tree free of internal references, the `CHANGELOG.md` updated. |
 
-The suite uses [Pest](https://pestphp.com) and Orchestra Testbench.
+A behavior change without a test does not ship, and a config key that nothing reads
+does not ship either — so a patch that adds one should wire it and prove it.
 
-The full local gate — including the real-browser end-to-end suite and mutation
-testing — is `just all`. It runs on **your machine**, not GitHub Actions (a private
-package should not burn Actions minutes on every push). A pre-push hook, wired once
-by `just setup`, blocks a push to `main` unless `just all` last passed on exactly
-that commit. Emergency bypass: `git push --no-verify`.
+### What those gates run against
 
-## Pull request expectations
+The harness itself stays upstream (this tree carries the package, not the test suite),
+but the environment it needs is worth knowing before you write a patch — it is what your
+change will be measured in, and it is what a fork has to stand up:
 
-- Keep `composer qa` green.
-- Add tests for behavior changes.
-- Update `README.md` and `CHANGELOG.md` (`## [Unreleased]`) when behavior or
-  configuration changes.
-- Keep commits focused and the public API stable, or call out the break explicitly.
+- **PHP 8.4+** with `ext-curl`, `ext-json` and `ext-sodium`.
+- **A real PostgreSQL 16+ server.** There is no SQLite fallback: the delivery log uses
+  `jsonb`, GIN and partial indexes, declarative range partitioning and a materialized
+  view, and every migration refuses outright to run on another driver. The suite connects
+  to `127.0.0.1:5432`, database `webhooks_for_laravel_test`, user `postgres`, no password —
+  each of which is overridable with `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME` and
+  `DB_PASSWORD`.
+- **Node 22+ and a Chromium** (`npx playwright install chromium`) for the real-browser
+  end-to-end suite, which drives the dashboard and the self-service portal for real.
+
+## License
+
+By contributing you agree that your contribution is licensed under the MIT License,
+the same as the rest of the package.

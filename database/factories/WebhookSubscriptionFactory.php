@@ -16,13 +16,10 @@ final class WebhookSubscriptionFactory extends Factory
 {
     protected $model = WebhookSubscription::class;
 
-    /**
-     * @return array<string, mixed>
-     */
     public function definition(): array
     {
         return [
-            'name' => (string) $this->faker->words(2, true),
+            'name' => $this->faker->word().' '.$this->faker->word(),
             'url' => 'https://'.$this->faker->domainName().'/webhooks',
             'secret' => 'whsec_'.Str::random(40),
             'event_types' => ['invoice.paid'],

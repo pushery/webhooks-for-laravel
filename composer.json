@@ -1,8 +1,17 @@
 {
     "name": "pushery/webhooks-for-laravel",
-    "description": "Customer-configurable outgoing webhooks for Laravel — endpoint subscriptions, signed delivery with retries, and a searchable delivery log.",
+    "description": "An all-in-one, config-gated webhooks toolkit for Laravel: send signed outbound webhooks (Standard Webhooks signatures by default, Ed25519 optional), receive and verify inbound ones, let customers self-serve their endpoints, and observe every delivery on a dashboard — switch on only the layers you need.",
     "keywords": [
-        "laravel"
+        "laravel",
+        "webhooks",
+        "standard-webhooks",
+        "webhook-signing",
+        "webhook-delivery",
+        "hmac",
+        "ed25519",
+        "ssrf",
+        "livewire",
+        "postgres"
     ],
     "license": "MIT",
     "type": "library",
@@ -15,58 +24,22 @@
         "php": "^8.4",
         "ext-curl": "*",
         "ext-json": "*",
+        "ext-sodium": "*",
+        "guzzlehttp/guzzle": "^7.8",
+        "guzzlehttp/psr7": "^2.7",
         "illuminate/console": "^13.0",
         "illuminate/contracts": "^13.0",
         "illuminate/database": "^13.0",
         "illuminate/support": "^13.0",
+        "laravel/framework": "^13.0",
         "opis/json-schema": "^2.6",
-        "spatie/laravel-webhook-server": "^3.10"
-    },
-    "require-dev": {
-        "larastan/larastan": "^3.0",
-        "laravel/pint": "^1.0",
-        "livewire/livewire": "^4.0",
-        "orchestra/testbench": "^11.0",
-        "pestphp/pest": "^4.0",
-        "pestphp/pest-plugin-browser": "^4.3",
-        "pestphp/pest-plugin-laravel": "^4.0",
-        "pestphp/pest-plugin-type-coverage": "^4.0",
-        "pushery/wirekit": "^2.10",
-        "rector/rector": "^2.0",
-        "spaze/phpstan-disallowed-calls": "^4.12"
+        "psr/http-message": "^2.0"
     },
     "autoload": {
         "psr-4": {
             "Webhooks\\": "src/",
             "Webhooks\\Database\\Factories\\": "database/factories/"
         }
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "Webhooks\\Tests\\": "tests/",
-            "Workbench\\App\\": "workbench/app/",
-            "Workbench\\Database\\Factories\\": "workbench/database/factories/",
-            "Workbench\\Database\\Seeders\\": "workbench/database/seeders/"
-        }
-    },
-    "scripts": {
-        "test": "pest",
-        "test:coverage": "pest --coverage --min=100",
-        "test:type-coverage": "pest --type-coverage --min=100",
-        "test:browser": "pest tests/Browser",
-        "analyse": "phpstan analyse",
-        "format": "pint",
-        "format:test": "pint --test",
-        "rector": "rector process",
-        "rector:test": "rector process --dry-run",
-        "mutate": "pest --mutate --everything --covered-only --parallel --processes=4 --min=85",
-        "qa": [
-            "@format:test",
-            "@rector:test",
-            "@analyse",
-            "@test:type-coverage",
-            "@test:coverage"
-        ]
     },
     "config": {
         "sort-packages": true,
@@ -77,13 +50,20 @@
     "extra": {
         "laravel": {
             "providers": [
+                "Webhooks\\Core\\CoreServiceProvider",
+                "Webhooks\\Server\\ServerServiceProvider",
+                "Webhooks\\Client\\WebhookClientServiceProvider",
                 "Webhooks\\WebhooksServiceProvider"
             ]
         }
     },
     "suggest": {
-        "livewire/livewire": "Required for the optional management UI (Webhooks\\WebhooksUiServiceProvider).",
-        "pushery/wirekit": "Recommended design system for styling the published UI stubs."
+        "laravel/pulse": "Enables the opt-in internal-ops delivery monitor (Webhooks\\Pulse\\WebhookPulseServiceProvider) — a Pulse recorder and card for throughput, failure rate and latency.",
+        "laravel/scout": "Enables the opt-in searchable delivery and inbound-call logs (use the ready-made Webhooks\\Search\\SearchableWebhookDelivery / SearchableWebhookCall models — or apply the Webhooks\\Search\\SearchableDelivery / SearchableCall traits to your own — and set webhooks.search.enabled).",
+        "livewire/livewire": "Required to render any UI this package ships: the observability dashboard, the self-service endpoint portal, and the optional management components (Webhooks\\WebhooksUiServiceProvider).",
+        "pushery/wirekit": "Required to render the dashboard and the self-service portal AS SHIPPED — their views are built from WireKit components. A host on another UI kit must publish the views (--tag=webhooks-dashboard-views / --tag=webhooks-self-service-views) and restyle them instead.",
+        "blade-ui-kit/blade-icons": "Renders the icons the shipped screens ask WireKit for (empty states, primary actions). Without it WireKit draws an inert placeholder in their place.",
+        "blade-ui-kit/blade-heroicons": "The icon set the shipped screens are drawn against (WireKit's default preset)."
     },
     "minimum-stability": "stable",
     "prefer-stable": true

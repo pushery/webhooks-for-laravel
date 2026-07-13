@@ -1,0 +1,21 @@
+/*
+ * The package's Tailwind source registration.
+ *
+ * Every shipped Blade view — the dashboard, the self-service portal, the pagination
+ * control and the publishable stubs — is styled with Tailwind utilities over WireKit's
+ * design tokens. Those utilities are compiled by the HOST application's Tailwind build:
+ * this package ships no compiled stylesheet, and WireKit's dist stylesheet carries the
+ * token definitions, not the utilities that consume them.
+ *
+ * Import this file from your app's Tailwind entrypoint so the compiler scans the
+ * package's views. WireKit's own source glob stays in your entrypoint next to it — it is
+ * required by every WireKit consumer, not just by this package, and hard-coding a
+ * sibling package's vendor path from inside this file would break any install layout
+ * that is not the default one. The README's "Styling the UI" section has the exact
+ * copy-pasteable block; both globs are required.
+ *
+ * The path below is resolved relative to THIS file, so it keeps pointing at the
+ * package's views wherever Composer installs it.
+ */
+
+@source '../views';
