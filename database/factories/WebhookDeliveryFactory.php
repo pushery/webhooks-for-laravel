@@ -17,13 +17,12 @@ final class WebhookDeliveryFactory extends Factory
 {
     protected $model = WebhookDelivery::class;
 
-    /**
-     * @return array<string, mixed>
-     */
     public function definition(): array
     {
         return [
             'subscription_id' => WebhookSubscription::factory(),
+            'owner_type' => null,
+            'owner_id' => null,
             'event_type' => 'invoice.paid',
             'event_id' => (string) Str::uuid7(),
             'payload' => ['invoice_id' => 'in_123'],
@@ -38,7 +37,7 @@ final class WebhookDeliveryFactory extends Factory
             'status' => DeliveryStatus::Succeeded,
             'attempt' => 1,
             'response_code' => 200,
-            'response_ms' => 42,
+            'duration_ms' => 42,
             'delivered_at' => now(),
         ]);
     }

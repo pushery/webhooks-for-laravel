@@ -1,0 +1,66 @@
+{
+  "_comment": "Golden known-answer vectors for the signature dialects this package sends. 'vectors' holds the symmetric Standard Webhooks (v1) case — the canonical example published in the Standard Webhooks specification and reproduced by every official SDK, so it is an external, non-circular oracle for byte-compatibility. 'ed25519_vectors' holds the asymmetric v1a case: Ed25519 signing is deterministic (RFC 8032), so signing the same content with the same key reproduces the same signature byte for byte. 'negative_vectors' MUST FAIL to verify — an implementation that accepts everything passes every positive vector too, so a correct port has to reject these. Every key here is test material published on purpose; never use one for real traffic. See README.md in this directory for the wire format and the verification recipe.",
+  "vectors": [
+    {
+      "name": "standard-webhooks-spec-example",
+      "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+      "id": "msg_p5jXN8AQM9LWM0D4loKWxJek",
+      "timestamp": 1614265330,
+      "payload": "{\"test\": 2432232314}",
+      "signature": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE="
+    }
+  ],
+  "ed25519_vectors": [
+    {
+      "name": "ed25519-v1a-known-answer",
+      "public_key": "whpk_iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w=",
+      "secret_key": "whsk_AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQGKiOPddAnxlf1S2y08ul1yymcJvx2UEhvzdIgBtA9vXA==",
+      "id": "msg_2sQ8v4bWq7tHf1Nn9YkPzR3c",
+      "timestamp": 1614265330,
+      "payload": "{\"test\": 2432232314}",
+      "signature": "v1a,2mI3zbNZoXpClSTCyCOzPPzRZuGeBwEXJKdwCEau0PTusHGInHfOuH90VLfvc1dsJA1h+Y9hdJNPt2tnkByUCg=="
+    }
+  ],
+  "negative_vectors": [
+    {
+      "name": "v1-tampered-payload",
+      "dialect": "v1",
+      "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+      "id": "msg_p5jXN8AQM9LWM0D4loKWxJek",
+      "timestamp": 1614265330,
+      "payload": "{\"test\": 2432232315}",
+      "signature": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=",
+      "reason": "The signature is the spec example's, but one byte of the payload changed. A verifier must sign the body it actually received, so this cannot verify."
+    },
+    {
+      "name": "v1-wrong-secret",
+      "dialect": "v1",
+      "secret": "whsec_aW50ZXJvcC1uZWdhdGl2ZS13cm9uZy1zZWNyZXQhIQ==",
+      "id": "msg_p5jXN8AQM9LWM0D4loKWxJek",
+      "timestamp": 1614265330,
+      "payload": "{\"test\": 2432232314}",
+      "signature": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=",
+      "reason": "The content is the spec example's, but the signature was produced under a different key. Verifying it with this secret must fail."
+    },
+    {
+      "name": "v1-flipped-signature-byte",
+      "dialect": "v1",
+      "secret": "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw",
+      "id": "msg_p5jXN8AQM9LWM0D4loKWxJek",
+      "timestamp": 1614265330,
+      "payload": "{\"test\": 2432232314}",
+      "signature": "v1,h0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=",
+      "reason": "One character of the base64 signature differs from the spec example's. A near miss must be rejected as firmly as a wild one — compare the whole digest, in constant time."
+    },
+    {
+      "name": "v1a-wrong-public-key",
+      "dialect": "v1a",
+      "public_key": "whpk_gTl3Dqh9F19Wo1Rmw0x+zMuNipG07jeiXfYPW4/Js5Q=",
+      "id": "msg_2sQ8v4bWq7tHf1Nn9YkPzR3c",
+      "timestamp": 1614265330,
+      "payload": "{\"test\": 2432232314}",
+      "signature": "v1a,2mI3zbNZoXpClSTCyCOzPPzRZuGeBwEXJKdwCEau0PTusHGInHfOuH90VLfvc1dsJA1h+Y9hdJNPt2tnkByUCg==",
+      "reason": "A valid Ed25519 signature from the vector above, checked against a DIFFERENT signer's public key. Only the key that signed may verify it."
+    }
+  ]
+}

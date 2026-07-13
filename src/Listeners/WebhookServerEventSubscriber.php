@@ -6,55 +6,60 @@ namespace Webhooks\Listeners;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Facades\Event;
-use Spatie\WebhookServer\Events\FinalWebhookCallFailedEvent;
-use Spatie\WebhookServer\Events\WebhookCallEvent;
-use Spatie\WebhookServer\Events\WebhookCallFailedEvent;
-use Spatie\WebhookServer\Events\WebhookCallSucceededEvent;
 use Webhooks\Enums\DeliveryStatus;
 use Webhooks\Events\WebhookDeliveryFailed;
 use Webhooks\Events\WebhookDeliverySucceeded;
 use Webhooks\Events\WebhookEndpointAutoDisabled;
 use Webhooks\Models\WebhookDelivery;
 use Webhooks\Models\WebhookSubscription;
-use Webhooks\Support\WebhookConfig;
+use Webhooks\Server\Data\WebhookDeliveryData;
+use Webhooks\Server\Events\WebhookAttemptFailed;
+use Webhooks\Server\Events\WebhookAttemptsExhausted;
+use Webhooks\Server\Events\WebhookAttemptSucceeded;
+use Webhooks\Support\Settings;
 
 /**
- * Translates spatie's per-call events into delivery-log updates and drives the
- * circuit breaker. Every handler locates its row by the delivery id carried in
- * the call's meta and is idempotent: it never re-processes a delivery that is
- * already in a terminal state (Succeeded or Exhausted), so a duplicated or
+ * Translates the delivery engine's lifecycle events into delivery-log updates and
+ * drives the circuit breaker. Every handler locates its row by the delivery id
+ * carried in the delivery meta and is idempotent: it never re-processes a delivery
+ * that is already in a terminal state (Succeeded or Exhausted), so a duplicated or
  * out-of-order event — a known at-least-once queue edge case — can neither
  * downgrade a success nor double-count a failure.
+ *
+ * @internal
  */
 final readonly class WebhookServerEventSubscriber
 {
+    private const string DEFAULT_ERROR = 'Webhook delivery failed.';
+
     public function __construct(
-        private WebhookConfig $config,
+        private Settings $config,
     ) {}
 
     public function subscribe(Dispatcher $events): void
     {
-        $events->listen(WebhookCallSucceededEvent::class, [self::class, 'onSucceeded']);
-        $events->listen(WebhookCallFailedEvent::class, [self::class, 'onFailed']);
-        $events->listen(FinalWebhookCallFailedEvent::class, [self::class, 'onFinalFailed']);
+        $events->listen(WebhookAttemptSucceeded::class, [self::class, 'onSucceeded']);
+        $events->listen(WebhookAttemptFailed::class, [self::class, 'onFailed']);
+        $events->listen(WebhookAttemptsExhausted::class, [self::class, 'onFinalFailed']);
     }
 
-    public function onSucceeded(WebhookCallSucceededEvent $event): void
+    public function onSucceeded(WebhookAttemptSucceeded $event): void
     {
-        $delivery = $this->resolveDelivery($event);
+        $delivery = $this->resolveDelivery($event->data);
 
         if (! $delivery instanceof WebhookDelivery || $this->isTerminal($delivery)) {
             return;
         }
 
-        $delivery->update([
+        // Outcome columns are guarded (engine-owned), so write them via forceFill.
+        $delivery->forceFill([
             'status' => DeliveryStatus::Succeeded,
             'attempt' => $event->attempt,
-            'response_code' => $event->response?->getStatusCode(),
-            'response_ms' => $this->responseMs($event),
+            'response_code' => $event->response->status,
+            'duration_ms' => $event->response->durationMs,
             'delivered_at' => now(),
             'error' => null,
-        ]);
+        ])->save();
 
         $subscription = $delivery->subscription;
 
@@ -67,9 +72,9 @@ final readonly class WebhookServerEventSubscriber
         Event::dispatch(new WebhookDeliverySucceeded($delivery));
     }
 
-    public function onFailed(WebhookCallFailedEvent $event): void
+    public function onFailed(WebhookAttemptFailed $event): void
     {
-        $delivery = $this->resolveDelivery($event);
+        $delivery = $this->resolveDelivery($event->data);
 
         // A failed attempt that will be retried. Leave terminal rows untouched so a
         // duplicated or out-of-order event cannot downgrade a success or an exhaustion.
@@ -77,38 +82,48 @@ final readonly class WebhookServerEventSubscriber
             return;
         }
 
-        $delivery->update([
+        $delivery->forceFill([
             'status' => DeliveryStatus::Failed,
             'attempt' => $event->attempt,
-            'response_code' => $event->response?->getStatusCode(),
-            'response_ms' => $this->responseMs($event),
-            'error' => $event->errorMessage,
-        ]);
+            'response_code' => $event->response?->status,
+            'duration_ms' => $event->response?->durationMs,
+            'error' => $event->exception?->getMessage() ?? self::DEFAULT_ERROR,
+        ])->save();
     }
 
-    public function onFinalFailed(FinalWebhookCallFailedEvent $event): void
+    public function onFinalFailed(WebhookAttemptsExhausted $event): void
     {
-        $delivery = $this->resolveDelivery($event);
+        $delivery = $this->resolveDelivery($event->data);
 
         if (! $delivery instanceof WebhookDelivery || $this->isTerminal($delivery)) {
             return;
         }
 
-        $delivery->update([
+        $reason = $event->exception?->getMessage() ?? self::DEFAULT_ERROR;
+
+        $delivery->forceFill([
             'status' => DeliveryStatus::Exhausted,
             'attempt' => $event->attempt,
-            'response_code' => $event->response?->getStatusCode(),
-            'response_ms' => $this->responseMs($event),
-            'error' => $event->errorMessage,
-        ]);
+            'response_code' => $event->response?->status,
+            'duration_ms' => $event->response?->durationMs,
+            'error' => $reason,
+        ])->save();
 
         $subscription = $delivery->subscription;
-        $subscription->increment('consecutive_failures');
-        $subscription->refresh();
 
-        $this->maybeAutoDisable($subscription);
+        // Only a real failure of a LIVE endpoint feeds the breaker. A delivery refused
+        // because its endpoint is already disabled (or deleted) is our own decision, not
+        // the endpoint's fault, and charging it would inflate the streak of an endpoint
+        // that is not even being called — so a re-enabled endpoint would trip the breaker
+        // again on its first hiccup.
+        if ($subscription->is_active) {
+            $subscription->increment('consecutive_failures');
+            $subscription->refresh();
 
-        Event::dispatch(new WebhookDeliveryFailed($delivery, $event->errorMessage ?? 'Webhook delivery failed.'));
+            $this->maybeAutoDisable($subscription);
+        }
+
+        Event::dispatch(new WebhookDeliveryFailed($delivery, $reason));
     }
 
     private function maybeAutoDisable(WebhookSubscription $subscription): void
@@ -136,21 +151,28 @@ final readonly class WebhookServerEventSubscriber
         return in_array($delivery->status, [DeliveryStatus::Succeeded, DeliveryStatus::Exhausted], true);
     }
 
-    private function resolveDelivery(WebhookCallEvent $event): ?WebhookDelivery
+    private function resolveDelivery(WebhookDeliveryData $data): ?WebhookDelivery
     {
-        $deliveryId = $event->meta['delivery_id'] ?? null;
+        $deliveryId = $data->meta['delivery_id'] ?? null;
 
         if (! is_string($deliveryId)) {
             return null;
         }
 
-        return WebhookDelivery::query()->find($deliveryId);
-    }
+        $createdAt = $data->meta['delivery_created_at'] ?? null;
 
-    private function responseMs(WebhookCallEvent $event): ?int
-    {
-        $seconds = $event->transferStats?->getTransferTime();
+        // The log is PARTITIONED BY RANGE (created_at) and keyed by (id, created_at).
+        // A lookup by id alone gives the planner nothing to prune with, so it probes the
+        // primary-key index of every partition that exists — three times per delivery, on
+        // the engine's hot path, and worse every month the log survives. The delivery
+        // carries its own partition key, so the planner goes straight to the one
+        // partition that can hold the row.
+        $query = WebhookDelivery::query()->whereKey($deliveryId);
 
-        return $seconds === null ? null : (int) round($seconds * 1000);
+        if (is_string($createdAt)) {
+            $query->where('created_at', $createdAt);
+        }
+
+        return $query->first();
     }
 }

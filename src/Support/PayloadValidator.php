@@ -12,13 +12,15 @@ use Webhooks\Exceptions\InvalidPayloadException;
 
 /**
  * Validates an event payload against the JSON Schema declared for its type in the
- * event catalog. Validation only runs when 'webhooks.validate_payloads' is enabled
+ * event catalog. Validation only runs when 'webhooks.platform.validate_payloads' is enabled
  * and the event type declares a 'schema'; otherwise the payload passes untouched,
  * so the catalog stays a pure documentation aid unless a schema is opted in.
+ *
+ * @internal
  */
 final readonly class PayloadValidator
 {
-    public function __construct(private WebhookConfig $config) {}
+    public function __construct(private Settings $config) {}
 
     /**
      * @param  array<array-key, mixed>  $payload

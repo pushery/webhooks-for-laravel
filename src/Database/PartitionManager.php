@@ -7,26 +7,56 @@ namespace Webhooks\Database;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
+use Webhooks\Support\Timestamp;
 
 /**
  * Creates and drops the monthly range partitions behind the webhook_deliveries
  * table. Shared by the create migration and the webhooks:partition-maintenance
  * command so the partition scheme has a single source of truth.
+ *
+ * Months are UTC months. The partition key is a timestamptz, so a bound is an
+ * INSTANT, not a wall-clock string: anchoring the boundaries to a local calendar
+ * would shift them by the local offset and — because that offset changes twice a
+ * year — leave a one-hour gap or overlap between two adjacent partitions.
+ *
+ * The catch-all default partition is a safety net, not a resting place. A row that
+ * lands in it blocks the creation of the partition that should have held it
+ * ("updated partition constraint for default partition would be violated by some
+ * row"), which would stop partition creation AND retention pruning dead. So the
+ * manager drains it: creating a month whose rows sit in the default detaches the
+ * default, creates the partition, moves those rows across and re-attaches — the
+ * canonical PostgreSQL drain, in one transaction.
  */
 final class PartitionManager
 {
     private const string TABLE = 'webhook_deliveries';
 
+    private const string DEFAULT_PARTITION = self::TABLE.'_default';
+
     public function partitionName(CarbonInterface $month): string
     {
-        return self::TABLE.'_'.CarbonImmutable::parse($month)->format('Y_m');
+        return self::TABLE.'_'.$this->monthStart($month)->format('Y_m');
     }
 
+    /**
+     * Ensure the partition for one month exists, draining any rows the default
+     * partition is already holding for it. Returns the partition name.
+     */
     public function ensureMonthlyPartition(CarbonInterface $month): string
     {
-        $start = CarbonImmutable::parse($month)->startOfMonth();
+        $start = $this->monthStart($month);
         $end = $start->addMonth();
         $name = $this->partitionName($start);
+
+        if ($this->tableExists($name)) {
+            return $name;
+        }
+
+        if ($this->defaultPartitionCount($start, $end) > 0) {
+            $this->drainDefaultPartitionInto($name, $start, $end);
+
+            return $name;
+        }
 
         DB::statement(sprintf(
             'CREATE TABLE IF NOT EXISTS %s PARTITION OF %s FOR VALUES FROM (%s) TO (%s)',
@@ -41,7 +71,7 @@ final class PartitionManager
 
     public function ensureWindow(CarbonInterface $from, int $months): void
     {
-        $cursor = CarbonImmutable::parse($from)->startOfMonth();
+        $cursor = $this->monthStart($from);
 
         for ($i = 0; $i < $months; $i++) {
             $this->ensureMonthlyPartition($cursor);
@@ -52,10 +82,54 @@ final class PartitionManager
     public function ensureDefaultPartition(): void
     {
         DB::statement(sprintf(
-            'CREATE TABLE IF NOT EXISTS %s_default PARTITION OF %s DEFAULT',
-            self::TABLE,
+            'CREATE TABLE IF NOT EXISTS %s PARTITION OF %s DEFAULT',
+            self::DEFAULT_PARTITION,
             self::TABLE,
         ));
+    }
+
+    /**
+     * Give every month currently stranded in the default partition its own monthly
+     * partition, moving its rows across. This is the self-heal: a gap in the schedule
+     * (a paused worker, a forgotten cron, a long deploy freeze) lets deliveries land in
+     * the default, and from then on nothing else can be provisioned until they are
+     * drained. Returns the months that were drained, oldest first.
+     *
+     * @return list<string> the drained partition names
+     */
+    public function drainDefaultPartition(): array
+    {
+        $drained = [];
+
+        foreach ($this->defaultPartitionMonths() as $month) {
+            $drained[] = $this->ensureMonthlyPartition($month);
+        }
+
+        return $drained;
+    }
+
+    /**
+     * How many rows sit in the default partition — the drift signal an operator needs:
+     * anything above zero means deliveries are landing outside the provisioned window.
+     * Bounded to one month when a range is given.
+     */
+    public function defaultPartitionCount(?CarbonInterface $from = null, ?CarbonInterface $to = null): int
+    {
+        if (! $this->tableExists(self::DEFAULT_PARTITION)) {
+            return 0;
+        }
+
+        $sql = 'SELECT count(*) AS total FROM '.self::DEFAULT_PARTITION;
+        $bindings = [];
+
+        if ($from instanceof CarbonInterface && $to instanceof CarbonInterface) {
+            $sql .= ' WHERE created_at >= ? AND created_at < ?';
+            $bindings = [Timestamp::sql($from), Timestamp::sql($to)];
+        }
+
+        $total = data_get(DB::selectOne($sql, $bindings), 'total');
+
+        return is_numeric($total) ? (int) $total : 0;
     }
 
     /**
@@ -96,7 +170,7 @@ final class PartitionManager
      */
     public function dropPartitionsOlderThan(CarbonInterface $before): array
     {
-        $cutoff = CarbonImmutable::parse($before)->format('Y_m');
+        $cutoff = $this->monthStart($before)->format('Y_m');
         $prefixLength = strlen(self::TABLE) + 1;
         $dropped = [];
 
@@ -110,8 +184,119 @@ final class PartitionManager
         return $dropped;
     }
 
+    /**
+     * The distinct UTC months for which the default partition is currently holding
+     * rows, oldest first.
+     *
+     * @return list<CarbonImmutable>
+     */
+    private function defaultPartitionMonths(): array
+    {
+        if (! $this->tableExists(self::DEFAULT_PARTITION)) {
+            return [];
+        }
+
+        $rows = DB::select(
+            'SELECT DISTINCT date_trunc(\'month\', created_at AT TIME ZONE \'UTC\') AS month '
+            .'FROM '.self::DEFAULT_PARTITION.' ORDER BY month'
+        );
+
+        $months = [];
+
+        foreach ($rows as $row) {
+            $month = data_get($row, 'month');
+
+            if (is_string($month)) {
+                $months[] = CarbonImmutable::parse($month, 'UTC');
+            }
+        }
+
+        return $months;
+    }
+
+    /**
+     * The canonical PostgreSQL default-partition drain, in one transaction: detach the
+     * default (a partitioned table refuses to create a partition whose range the
+     * default already holds rows for), create the monthly partition, move that month's
+     * rows into it through the parent table, and re-attach the default.
+     *
+     * The generated columns are excluded from the column list — PostgreSQL refuses an
+     * explicit value for one — so the moved rows recompute theirs on insert.
+     */
+    private function drainDefaultPartitionInto(string $name, CarbonImmutable $start, CarbonImmutable $end): void
+    {
+        $columns = implode(', ', $this->insertableColumns());
+        $from = Timestamp::sql($start);
+        $to = Timestamp::sql($end);
+
+        DB::transaction(function () use ($name, $start, $end, $columns, $from, $to): void {
+            DB::statement(sprintf('ALTER TABLE %s DETACH PARTITION %s', self::TABLE, self::DEFAULT_PARTITION));
+
+            DB::statement(sprintf(
+                'CREATE TABLE IF NOT EXISTS %s PARTITION OF %s FOR VALUES FROM (%s) TO (%s)',
+                $name,
+                self::TABLE,
+                $this->quoteTimestamp($start),
+                $this->quoteTimestamp($end),
+            ));
+
+            DB::statement(
+                sprintf('INSERT INTO %s (%s) SELECT %s FROM %s WHERE created_at >= ? AND created_at < ?', self::TABLE, $columns, $columns, self::DEFAULT_PARTITION),
+                [$from, $to],
+            );
+
+            DB::statement(
+                sprintf('DELETE FROM %s WHERE created_at >= ? AND created_at < ?', self::DEFAULT_PARTITION),
+                [$from, $to],
+            );
+
+            DB::statement(sprintf('ALTER TABLE %s ATTACH PARTITION %s DEFAULT', self::TABLE, self::DEFAULT_PARTITION));
+        });
+    }
+
+    /**
+     * The table's real (non-generated) columns, in declaration order. A generated
+     * column may not be written explicitly, so it is left out of the drain's INSERT.
+     *
+     * @return list<string>
+     */
+    private function insertableColumns(): array
+    {
+        $rows = DB::select(
+            'SELECT column_name FROM information_schema.columns '
+            .'WHERE table_schema = current_schema() AND table_name = ? AND is_generated = \'NEVER\' '
+            .'ORDER BY ordinal_position',
+            [self::TABLE],
+        );
+
+        $columns = [];
+
+        foreach ($rows as $row) {
+            $column = data_get($row, 'column_name');
+
+            if (is_string($column)) {
+                $columns[] = $column;
+            }
+        }
+
+        return $columns;
+    }
+
+    private function tableExists(string $name): bool
+    {
+        return data_get(DB::selectOne('SELECT to_regclass(?) AS oid', [$name]), 'oid') !== null;
+    }
+
+    /**
+     * The UTC month a moment falls in, as an instant.
+     */
+    private function monthStart(CarbonInterface $moment): CarbonImmutable
+    {
+        return CarbonImmutable::parse($moment)->setTimezone('UTC')->startOfMonth();
+    }
+
     private function quoteTimestamp(CarbonInterface $moment): string
     {
-        return "'".CarbonImmutable::parse($moment)->format('Y-m-d H:i:s')."'";
+        return "'".Timestamp::sql($moment)."'";
     }
 }
