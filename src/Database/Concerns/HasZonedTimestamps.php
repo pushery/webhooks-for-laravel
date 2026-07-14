@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Webhooks\Database\Concerns;
 
-use Illuminate\Support\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Config;
 use Webhooks\Support\Timestamp;
 
@@ -39,8 +39,16 @@ trait HasZonedTimestamps
      * Return a stored timestamp in the application's timezone. The value read from
      * PostgreSQL carries its offset, so the instant is exact whatever the session zone
      * is; shifting it to app.timezone is a presentation step, not a correction.
+     *
+     * Typed CarbonInterface, not Illuminate\Support\Carbon: an application may pin the
+     * date class to CarbonImmutable (Date::use(CarbonImmutable::class)) — a common
+     * hardening against accidental in-place date mutation. Eloquent's asDateTime() then
+     * hands back a CarbonImmutable, and setTimezone() on it returns another one. Narrowing
+     * the return to the MUTABLE class therefore made every timestamp read on every model
+     * in this package throw a TypeError in such an app, making the package unusable there.
+     * CarbonInterface is the honest contract: this method does not care which one it is.
      */
-    protected function asDateTime(mixed $value): Carbon
+    protected function asDateTime(mixed $value): CarbonInterface
     {
         return parent::asDateTime($value)->setTimezone(Config::string('app.timezone', 'UTC'));
     }

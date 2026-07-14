@@ -4,6 +4,25 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-07-14
+
+### Fixed
+
+- **The package could not be used at all in an application that pins the date class to
+  `CarbonImmutable`.** `Date::use(CarbonImmutable::class)` is a common hardening: it makes
+  accidental in-place date mutation impossible. Under it, Eloquent hands back a
+  `CarbonImmutable`, but `HasZonedTimestamps::asDateTime()` declared the **mutable**
+  `Illuminate\Support\Carbon` as its return type — so every timestamp read on every model in
+  this package raised
+  `TypeError: ... Return value must be of type Illuminate\Support\Carbon, Carbon\CarbonImmutable returned`,
+  and `Webhooks::subscribe()` threw on the very first endpoint. The return type is now
+  `Carbon\CarbonInterface`, which is the honest contract — the method shifts a timestamp into
+  the application's timezone and does not care whether the instance is mutable. Behavior is
+  unchanged for an application that does not pin the date class.
+
+  The suite could not see this because the workbench never pinned the date class; it now
+  does, in `tests/Feature/ImmutableDatesTest.php`, which fails on the old return type.
+
 ## [1.0.0] - 2026-07-13
 
 A ground-up rewrite into an all-in-one, config-gated webhooks toolkit for Laravel —
@@ -363,7 +382,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/pushery/webhooks-for-laravel/compare/v0.1.3...v1.0.0
 [0.1.3]: https://github.com/pushery/webhooks-for-laravel/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/pushery/webhooks-for-laravel/compare/v0.1.1...v0.1.2
