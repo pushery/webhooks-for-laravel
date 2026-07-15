@@ -25,6 +25,26 @@ use Webhooks\Platform\Support\SubscriptionScope;
 trait InteractsWithEndpoints
 {
     /**
+     * Re-authorize the portal gate on EVERY request, not just the first one.
+     *
+     * Livewire runs mount() only on the initial request; every later interaction is a
+     * /livewire/update request that skips it. A gate authorized in mount() alone is therefore
+     * replayable — revoke a tenant's ability mid-session and the panel keeps serving until the
+     * reader reloads. The dashboard is spared this because its route carries the gate as
+     * middleware and Livewire re-applies `can:` on update (persistent middleware); the portal's
+     * documented middleware is only ['web', 'auth'], so its panels assert the gate themselves.
+     *
+     * boot() is the first hook on BOTH the mount and the hydrate path, so the ability is checked
+     * before mount() loads anything and before any action runs. Failing it throws the same 403 an
+     * unauthorized mount always has — the gate answers identically whichever request hits it.
+     * Row-level ownership stays a separate, second guard (a foreign id fails not-found first).
+     */
+    public function bootInteractsWithEndpoints(): void
+    {
+        $this->authorize('manage-webhook-endpoints');
+    }
+
+    /**
      * A subscription query constrained to the current tenant's own endpoints.
      *
      * @return Builder<WebhookSubscription>

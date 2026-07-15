@@ -46,11 +46,6 @@ final class EndpointHealthMatrix extends Component
      */
     public array $reports = [];
 
-    public function mount(): void
-    {
-        $this->authorize('manage-webhook-endpoints');
-    }
-
     /**
      * Toggle or switch the sort column. An unknown field is ignored, so the control
      * can never sort by a column that is not a cached, orderable one.
@@ -95,8 +90,6 @@ final class EndpointHealthMatrix extends Component
      */
     public function recomputeAll(): void
     {
-        $this->authorize('manage-webhook-endpoints');
-
         foreach ($this->scopedQuery()->get() as $subscription) {
             $this->refreshRow($subscription);
         }

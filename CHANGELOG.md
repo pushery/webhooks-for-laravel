@@ -4,6 +4,23 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-07-16
+
+### Fixed
+
+- **The self-service portal re-checks its authorization gate on every request, not only the first
+  one.** Livewire runs `mount()` once; every later interaction is an update request that skips it,
+  so a gate authorized in `mount()` alone was replayable — a tenant whose `manage-webhook-endpoints`
+  ability was withdrawn mid-session kept being served by the panels it already had open, until it
+  reloaded the page. Every mutation was already safe (each carries a row-level policy, and that
+  policy re-checks the ability), but a read path with no policy — the endpoint list's refresh
+  listener — kept re-rendering the tenant's endpoints against an ability it no longer had. The gate
+  now runs in `boot()`, the first hook on both the initial and the update path, for every portal
+  panel and the portal page; it answers the same 403 an unauthorized mount always has. No data ever
+  crossed a tenant boundary — the panels scope every query to the acting tenant regardless. The
+  dashboard was never affected: its gate travels with the route as middleware, which Livewire
+  re-applies on update requests.
+
 ## [1.4.0] - 2026-07-16
 
 ### Added
@@ -604,7 +621,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.2.0...v1.3.0
