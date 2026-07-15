@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Webhooks\Core\Payload\PayloadSanitizer;
 use Webhooks\Core\Payload\PayloadStore;
 use Webhooks\Core\Ssrf\SsrfGuard;
@@ -133,15 +134,38 @@ final readonly class WebhookManager
     private function assignOwner(WebhookSubscription $subscription, Model|TenantIdentity|null $owner): void
     {
         if ($owner instanceof Model) {
+            $this->ensureIntegerOwnerKey($owner->getKey());
             $subscription->owner()->associate($owner);
 
             return;
         }
 
         if ($owner instanceof TenantIdentity) {
+            $this->ensureIntegerOwnerKey($owner->id);
             $subscription->owner_type = $owner->type;
             $subscription->owner_id = $owner->id;
         }
+    }
+
+    /**
+     * Fail fast, with a clear message, when an owner has a non-integer primary key. The
+     * package denormalises owner_id as a bigint across the delivery log and the dashboard
+     * rollup (whose null-owner sentinel is the integer 0), so a UUID owner cannot be stored —
+     * without this it would surface as an opaque insert error on the first fan-out, not here.
+     * A numeric string is fine: a bigint key comes back from the driver as a string.
+     */
+    private function ensureIntegerOwnerKey(mixed $key): void
+    {
+        if (is_int($key) || (is_string($key) && $key !== '' && ctype_digit($key))) {
+            return;
+        }
+
+        throw new InvalidArgumentException(
+            'A webhook subscription owner must have an INTEGER primary key. This package stores '
+            .'owner_id as a bigint in the delivery log and the dashboard rollup, so a non-integer '
+            .'(e.g. UUID) owner key is not supported. Use an integer-keyed owner model, or leave the '
+            .'subscription global by passing a null owner.'
+        );
     }
 
     /**

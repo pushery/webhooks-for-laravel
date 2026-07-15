@@ -4,6 +4,104 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-07-15
+
+### Security
+
+- **⚠ Behaviour change (action required): the dashboard and self-service authorization gates are now
+  fail-closed.** `view-webhook-dashboard` and `manage-webhook-endpoints` previously returned `true`
+  for **every authenticated user** when the host had not defined a `webhooks.view` / `webhooks.manage`
+  ability — so a host that registered the provider but overlooked the ability silently exposed an
+  operator surface to all logged-in users. They now **deny** until the host defines the ability
+  (`Gate::define('webhooks.view', …)` / `Gate::define('webhooks.manage', …)`; see the README's
+  dashboard and self-service sections). A host that relied on the permissive default must add the
+  ability to restore access.
+- **The self-service health matrix and payload-transform editor now scope at the query.** They loaded
+  a subscription by id and authorized only afterwards; a foreign or tampered id is now filtered out at
+  the query and fails not-found before any action runs — defence in depth, so a single policy
+  regression can no longer be the only guard.
+
+### Added
+
+- **`InboundVerifier` — a verification seam that may do I/O, for providers a signature cannot
+  express.** `SignatureScheme::verify()` is a pure function of body, headers and secret — the right
+  contract for HMAC dialects, but some providers cannot be verified that way: one that signs nothing
+  (authenticity is an authenticated API callback) or verifies through a cert-chain API keyed on a
+  webhook ID rather than a secret. A client config may now set `verifier` to a
+  `Webhooks\Client\Verification\InboundVerifier` class: container-resolved (so it may hold an HTTP
+  client or API credentials), handed the `Request` and `WebhookConfig`, taking precedence over
+  `scheme`, and making `secret` optional. Everything after verification — rate limit, dedupe, store,
+  dispatch, the 401 path — is unchanged.
+- **`dedupe_id` — derive the inbound idempotency key from the body, not only a header.** The receiver
+  read the dedupe key exclusively from a configured header, but many providers carry no delivery-id
+  header (the id is in the body, or none is sent), so the key stayed `NULL`, a `NULL` never collides
+  with the partial-unique index, and dedupe **silently did nothing** for those producers. A client
+  config may now set `dedupe_id` to `'header:Name'`, `'body:dotted.path'` (a path into the decoded
+  JSON body), or a `Webhooks\Client\Dedupe\DedupeKeyResolver` class the container resolves — evaluated
+  after signature verification, so the body is authentic. Unset keeps the previous header behaviour.
+- **Signature header names are configurable for every scheme, not just the two first-class ones.**
+  `WebhookConfig::scheme()` injected the configured `signature_headers` only into
+  `StandardWebhooksScheme` and `Ed25519Scheme`; every other scheme — including the shipped
+  `PlainHmacScheme` — kept its hard-coded default header, so a host binding a provider with a
+  different header name silently rejected every webhook as malformed. Schemes now opt in via a
+  `Webhooks\Core\Signing\AcceptsSignatureHeaders` interface (implemented by `PlainHmacScheme`,
+  `GitHubScheme`, `StripeStyleScheme`), and the config injects **only** the header names the host
+  explicitly set — an omitted key keeps the scheme's own default, so `GitHubScheme` keeps
+  `X-Hub-Signature-256` and is never clobbered by the Standard-Webhooks fallback.
+- **`PendingWebhook::dispatch()` now returns the queued `WebhookDeliveryData`.** A Server-only host
+  had no delivery row and so nothing to correlate a send against its own log or a later status
+  callback. `dispatch()`, `dispatchSync()`, `dispatchIf()` and `dispatchUnless()` now return the
+  dispatched `WebhookDeliveryData` (the conditional ones return `null` when nothing is sent), whose
+  `messageId` — stable across retries — is the correlation key. Backward-compatible: callers that
+  ignored the `void` return are unaffected.
+- **Timestamp query scopes on the log models, so a host querying the tables cannot bind a naive,
+  silently-wrong timestamp.** Every timestamp column is `timestamptz` (PostgreSQL) or a UTC-naive
+  `DATETIME(6)` (MySQL); a plain `->where('created_at', '<', …)` binds a naive literal the database
+  resolves against its **session time zone** — unrelated to `app.timezone` and routinely not UTC — so
+  the comparison is off by that offset and quietly returns the wrong rows. `WebhookDelivery`,
+  `WebhookCall` and `WebhookServerDelivery` now carry `createdBefore()`, `createdAfter()`,
+  `createdBetween()` (half-open) and the general `whereTimestamp(column, operator, moment)` scopes,
+  plus `WebhookDelivery::pendingSince()`; each binds the instant per dialect.
+  `(new WebhookDelivery)->boundTimestamp($moment)` exposes the same offset-correct literal for a raw
+  statement. New README section "Querying the tables yourself".
+- **Operator dashboard mode — observe the global, owner-less endpoints.** The package supports global
+  (owner-less) subscriptions that receive every event, but the dashboard could not show them: every
+  read scoped hard to the owner morph pair (which SQL equality never matches against `NULL`). Setting
+  `dashboard.operator = true` (`WEBHOOKS_DASHBOARD_OPERATOR`) now scopes the whole dashboard to the
+  owner-less rows. It shows *global rows only* — never one tenant's rows to another — to whoever the
+  `view-webhook-dashboard` gate admits, so gate that ability to operators.
+- **Prefix-wildcard subscriptions (`order.*`).** With `platform.wildcards` on (off by default), a
+  subscription may list a prefix wildcard: a concrete `order.line.added` is delivered to subscribers
+  of `order.line.added`, `order.line.*` and `order.*` — one prefix per dot boundary. Each arm is still
+  an indexed `whereJsonContains`, so the GIN / multi-valued index serves the fan-out unchanged; a
+  dot-less type still matches only exactly.
+- **`webhooks.schedule.enabled` — opt out of the package's own scheduled maintenance.** A
+  DB-per-tenant host must not run partition rolling, secret revocation, the rollup refresh, health
+  sweeps and log pruning against the central database only. Setting `webhooks.schedule.enabled =
+  false` now makes the package register nothing in the scheduler; the commands are unchanged and the
+  host runs them inside its own tenant loop. Defaults to `true`, so a single-database app is
+  unaffected.
+- **The shipped UI mounts in a host app with its own asset pipeline and a strict CSP.** Two additive
+  config options fix both blockers without forking the layout: `ui.assets` names a Blade partial the
+  full-page layouts `@include` in `<head>` (your `@vite` tags), and `ui.csp_nonce` (a string or
+  per-request callable, e.g. `fn () => Vite::cspNonce()`) puts a nonce on the inline theme script.
+  Both default to null. New README section "Embedding in an app with its own asset pipeline and a
+  strict CSP".
+
+### Fixed
+
+- **The owner morph-key type is consistent, and a non-integer owner is rejected up front.** The
+  `webhook_subscriptions` table created its owner columns with `nullableMorphs()` on PostgreSQL —
+  which follows `Schema::defaultMorphKeyType()` — while the delivery-log and dashboard-rollup DDL
+  hard-coded `owner_id` as `bigint`. A host that set UUID morph keys got a subscriptions table it
+  could populate but a delivery log it could not. The owner columns are now explicitly `bigint`
+  everywhere, and `WebhookManager` rejects a non-integer owner key with a clear message at
+  `subscribe()` time. Integer-keyed owners (the default) are unaffected.
+- **`large_payload` offload no longer defaults its threshold to 0.** `Settings::largePayloadThreshold()`
+  fell back to `0` instead of the documented `262144`, so a host that enabled `large_payload` in a
+  trimmed config block without an explicit `threshold` would offload **every** delivery payload to
+  disk rather than only the large ones. The accessor now carries the documented 256 KiB default.
+
 ## [1.2.0] - 2026-07-15
 
 ### Added
@@ -448,7 +546,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.0.0...v1.0.1

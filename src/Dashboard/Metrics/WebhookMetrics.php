@@ -13,11 +13,11 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Config;
 use RuntimeException;
 use stdClass;
+use Webhooks\Dashboard\DashboardTenant;
 use Webhooks\Dashboard\Data\KpiSet;
 use Webhooks\Database\Dialect\Dialect;
 use Webhooks\Database\Dialect\Sql\PercentileSelect;
 use Webhooks\Models\WebhookDelivery;
-use Webhooks\Support\TenantIdentity;
 use Webhooks\Support\Timestamp;
 use Webhooks\Support\WebhookConnection;
 
@@ -49,7 +49,7 @@ final readonly class WebhookMetrics
     public const string HOURLY_VIEW = 'webhook_delivery_hourly';
 
     public function __construct(
-        private TenantIdentity $owner,
+        private DashboardTenant $tenant,
         private CarbonInterval $window,
     ) {}
 
@@ -86,9 +86,10 @@ final readonly class WebhookMetrics
      */
     private function buildKpiSet(array $percentiles): KpiSet
     {
+        [$ownerSql, $ownerBindings] = $this->tenant->rollupCondition(Dialect::for());
+
         $counts = (array) $this->db()->table(self::HOURLY_VIEW)
-            ->where('owner_type', $this->owner->type)
-            ->where('owner_id', $this->owner->id)
+            ->whereRaw($ownerSql, $ownerBindings)
             ->where('bucket', '>=', $this->since())
             ->selectRaw(
                 'coalesce(sum(total), 0)     as total, '
@@ -120,9 +121,10 @@ final readonly class WebhookMetrics
      */
     public function hourly(): Collection
     {
+        [$ownerSql, $ownerBindings] = $this->tenant->rollupCondition(Dialect::for());
+
         return $this->db()->table(self::HOURLY_VIEW)
-            ->where('owner_type', $this->owner->type)
-            ->where('owner_id', $this->owner->id)
+            ->whereRaw($ownerSql, $ownerBindings)
             ->where('bucket', '>=', $this->since())
             ->orderBy('bucket')
             ->get(['bucket', 'total', 'delivered', 'pending', 'failed', 'retried', 'p50', 'p95']);
@@ -135,9 +137,10 @@ final readonly class WebhookMetrics
      */
     public function topEvents(int $limit = 5): Collection
     {
+        [$ownerSql, $ownerBindings] = $this->tenant->condition();
+
         return $this->db()->table($this->sourceTable())
-            ->where('owner_type', $this->owner->type)
-            ->where('owner_id', $this->owner->id)
+            ->whereRaw($ownerSql, $ownerBindings)
             ->where('created_at', '>=', $this->since())
             ->groupBy('event_type')
             ->orderByDesc('total')
@@ -154,10 +157,11 @@ final readonly class WebhookMetrics
      */
     public function recentQueue(int $limit = 5): EloquentCollection
     {
+        [$ownerSql, $ownerBindings] = $this->tenant->condition();
+
         return $this->sourceModel()
             ->newQuery()
-            ->where('owner_type', $this->owner->type)
-            ->where('owner_id', $this->owner->id)
+            ->whereRaw($ownerSql, $ownerBindings)
             ->orderByDesc('created_at')
             ->limit($limit)
             ->get();
@@ -188,9 +192,11 @@ final readonly class WebhookMetrics
      */
     private function livePercentiles(): array
     {
+        [$ownerSql, $ownerBindings] = $this->tenant->condition();
+
         $row = (array) $this->db()->selectOne(
-            $this->livePercentileSql(),
-            [$this->owner->type, $this->owner->id, $this->since()],
+            $this->livePercentileSql($ownerSql),
+            [...$ownerBindings, $this->since()],
         );
 
         return [
@@ -204,10 +210,12 @@ final readonly class WebhookMetrics
     /**
      * The window-level percentile query for the current dialect. PostgreSQL computes all four in
      * one percentile_cont(ARRAY[...]); MySQL reconstructs them with a single window-function pass.
+     *
+     * @param  literal-string  $ownerSql
      */
-    private function livePercentileSql(): string
+    private function livePercentileSql(string $ownerSql): string
     {
-        $where = 'owner_type = ? AND owner_id = ? AND created_at >= ?';
+        $where = $ownerSql.' AND created_at >= ?';
 
         if (Dialect::for() === Dialect::MySql) {
             return PercentileSelect::mysqlWindowMulti(
@@ -236,17 +244,19 @@ final readonly class WebhookMetrics
     {
         TdigestExtension::ensureInstalled();
 
+        [$ownerSql, $ownerBindings] = $this->tenant->rollupCondition(Dialect::for());
+
         $row = (array) $this->db()->selectOne(
             'WITH merged AS ('
             .'SELECT rollup(latency_digest) AS digest FROM '.self::HOURLY_VIEW.' '
-            .'WHERE owner_type = ? AND owner_id = ? AND bucket >= ?'
+            .'WHERE '.$ownerSql.' AND bucket >= ?'
             .') SELECT '
             .'tdigest_percentile(digest, 0.5)  AS p50, '
             .'tdigest_percentile(digest, 0.9)  AS p90, '
             .'tdigest_percentile(digest, 0.95) AS p95, '
             .'tdigest_percentile(digest, 0.99) AS p99 '
             .'FROM merged',
-            [$this->owner->type, $this->owner->id, $this->since()],
+            [...$ownerBindings, $this->since()],
         );
 
         return [

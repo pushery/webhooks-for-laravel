@@ -109,6 +109,10 @@ final class ServerServiceProvider extends ServiceProvider
             }
 
             $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
+                if (! Config::boolean('webhooks.schedule.enabled', true)) {
+                    return;
+                }
+
                 $schedule->command('model:prune', ['--model' => [WebhookServerDelivery::class]])->daily();
             });
         }

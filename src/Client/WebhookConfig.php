@@ -6,12 +6,15 @@ namespace Webhooks\Client;
 
 use Illuminate\Support\Facades\Config;
 use InvalidArgumentException;
+use Webhooks\Client\Dedupe\DedupeKeyResolver;
 use Webhooks\Client\Jobs\ProcessWebhookJob;
 use Webhooks\Client\Models\WebhookCall;
 use Webhooks\Client\Profiles\ProcessEverythingWebhookProfile;
 use Webhooks\Client\Profiles\WebhookProfile;
 use Webhooks\Client\Responses\DefaultRespondsTo;
 use Webhooks\Client\Responses\RespondsToWebhook;
+use Webhooks\Client\Verification\InboundVerifier;
+use Webhooks\Core\Signing\AcceptsSignatureHeaders;
 use Webhooks\Core\Signing\Ed25519Scheme;
 use Webhooks\Core\Signing\Jwks\JwksKeySet;
 use Webhooks\Core\Signing\SecretSet;
@@ -30,6 +33,7 @@ final class WebhookConfig
 {
     /**
      * @param  class-string<SignatureScheme>  $schemeClass
+     * @param  array{id?: string, timestamp?: string, signature?: string}  $explicitHeaders
      * @param  class-string<WebhookProfile>  $profileClass
      * @param  class-string<RespondsToWebhook>  $responseClass
      * @param  class-string<WebhookCall>  $modelClass
@@ -44,9 +48,11 @@ final class WebhookConfig
         private readonly string $secret,
         private readonly ?string $previousSecret,
         private readonly string $schemeClass,
+        private readonly ?string $verifierClass,
         private readonly string $idHeader,
         private readonly string $timestampHeader,
         private readonly string $signatureHeader,
+        private readonly array $explicitHeaders,
         private readonly int $tolerance,
         private readonly int $invalidStatus,
         private readonly string $profileClass,
@@ -56,6 +62,7 @@ final class WebhookConfig
         private readonly array $redact,
         private readonly string|array $storeHeaders,
         private readonly string $dedupe,
+        private readonly ?string $dedupeId,
         private readonly ?string $jwksUrl,
         private readonly int $jwksCacheTtl,
         private readonly ?string $jwksKid,
@@ -106,9 +113,41 @@ final class WebhookConfig
 
         $scheme = app()->make($this->schemeClass);
 
-        return $scheme instanceof SignatureScheme
-            ? $scheme
-            : throw new InvalidArgumentException("The scheme for webhook client config [{$this->name}] did not resolve to a SignatureScheme.");
+        if (! $scheme instanceof SignatureScheme) {
+            throw new InvalidArgumentException("The scheme for webhook client config [{$this->name}] did not resolve to a SignatureScheme.");
+        }
+
+        // Any other scheme is resolved from the container with no arguments, so it carries
+        // its own default header names. Hand it the ones the host EXPLICITLY configured (a
+        // null keeps the scheme's own default), so a provider that uses a different header —
+        // PlainHmacScheme for SendCloud's 'Sendcloud-Signature', say — works from config
+        // alone instead of forcing the host to write a scheme class just to bind the header.
+        return $scheme instanceof AcceptsSignatureHeaders
+            ? $scheme->withSignatureHeaders(
+                $this->explicitHeaders['id'] ?? null,
+                $this->explicitHeaders['timestamp'] ?? null,
+                $this->explicitHeaders['signature'] ?? null,
+            )
+            : $scheme;
+    }
+
+    /**
+     * The custom inbound verifier for this source, or null to fall back to the signature
+     * scheme. When set it takes precedence over {@see self::scheme()} and authenticates
+     * the request itself (an API callback, a cert chain) — so 'secret' is optional. The
+     * pipeline calls this first; only its absence reaches the scheme.
+     */
+    public function verifier(): ?InboundVerifier
+    {
+        if ($this->verifierClass === null) {
+            return null;
+        }
+
+        $verifier = app()->make($this->verifierClass);
+
+        return $verifier instanceof InboundVerifier
+            ? $verifier
+            : throw new InvalidArgumentException("The verifier for webhook client config [{$this->name}] did not resolve to an InboundVerifier.");
     }
 
     public function tolerance(): int
@@ -148,14 +187,46 @@ final class WebhookConfig
     }
 
     /**
-     * The producer's id (the dedupe key) from the configured id header, or null when
-     * the producer sends none — in which case the call is always stored.
+     * The delivery's idempotency key — what the partial-unique store and the fast-path
+     * cache dedupe on — or null when this producer offers none (the call is then always
+     * stored). The 'dedupe_id' config selects where it comes from:
+     *
+     *   - unset          the configured id header (the Standard-Webhooks default)
+     *   - 'header:Name'  an arbitrary header
+     *   - 'body:path'    a dotted path into the JSON body (Stripe's evt_… lives there)
+     *   - a class-string a {@see DedupeKeyResolver} the container resolves
+     *
+     * The body forms exist because real providers (Stripe, Mollie, SendCloud) carry no
+     * delivery-id header, so a header-only key stays null — and a null never collides with
+     * the partial-unique index, so dedupe silently does nothing for exactly those producers.
      */
-    public function webhookId(SignatureHeaders $headers): ?string
+    public function webhookId(SignatureHeaders $headers, string $rawBody = ''): ?string
     {
-        $id = $headers->get($this->idHeader);
+        $spec = $this->dedupeId;
 
-        return ($id === null || $id === '') ? null : $id;
+        if ($spec === null) {
+            return $this->nonEmpty($headers->get($this->idHeader));
+        }
+
+        if (str_starts_with($spec, 'header:')) {
+            return $this->nonEmpty($headers->get(substr($spec, 7)));
+        }
+
+        if (str_starts_with($spec, 'body:')) {
+            $value = data_get($this->decodeBody($rawBody), substr($spec, 5));
+
+            return match (true) {
+                is_string($value) => $this->nonEmpty($value),
+                is_int($value) => (string) $value,
+                default => null,
+            };
+        }
+
+        $resolver = app()->make($spec);
+
+        return $resolver instanceof DedupeKeyResolver
+            ? $this->nonEmpty($resolver->resolve($this->decodeBody($rawBody), $rawBody, $headers))
+            : throw new InvalidArgumentException("The 'dedupe_id' resolver for webhook client config [{$this->name}] did not resolve to a DedupeKeyResolver.");
     }
 
     /**
@@ -248,12 +319,15 @@ final class WebhookConfig
     private static function fromEntry(string $name, array $entry): self
     {
         $jwks = self::resolveJwks($name, $entry['jwks'] ?? null);
+        $verifier = self::resolveVerifier($name, $entry['verifier'] ?? null);
 
         $secret = $entry['secret'] ?? null;
 
-        // A static secret is required unless a JWKS url supplies the public keys.
-        if ($jwks === null && (! is_string($secret) || $secret === '')) {
-            throw new InvalidArgumentException("The webhook client config [{$name}] requires a non-empty 'secret' or a 'jwks' url.");
+        // A static secret is required unless a JWKS url supplies the public keys, or a
+        // custom verifier authenticates by other means (an API callback, a cert chain)
+        // and needs no shared secret at all.
+        if ($jwks === null && $verifier === null && (! is_string($secret) || $secret === '')) {
+            throw new InvalidArgumentException("The webhook client config [{$name}] requires a non-empty 'secret', a 'jwks' url, or a 'verifier'.");
         }
 
         $previous = $entry['previous_secret'] ?? null;
@@ -265,9 +339,11 @@ final class WebhookConfig
             secret: is_string($secret) ? $secret : '',
             previousSecret: is_string($previous) && $previous !== '' ? $previous : null,
             schemeClass: self::resolveScheme($name, $entry['scheme'] ?? StandardWebhooksScheme::class),
+            verifierClass: $verifier,
             idHeader: self::headerName($headers, 'id', StandardWebhooksScheme::HEADER_ID),
             timestampHeader: self::headerName($headers, 'timestamp', StandardWebhooksScheme::HEADER_TIMESTAMP),
             signatureHeader: self::headerName($headers, 'signature', StandardWebhooksScheme::HEADER_SIGNATURE),
+            explicitHeaders: self::explicitHeaders($headers),
             tolerance: self::intOr($entry['tolerance_seconds'] ?? null, 300),
             invalidStatus: self::intOr($entry['invalid_status'] ?? null, 401),
             profileClass: self::classOr($name, 'profile', $entry['profile'] ?? null, WebhookProfile::class, ProcessEverythingWebhookProfile::class),
@@ -277,6 +353,7 @@ final class WebhookConfig
             redact: self::stringList($entry['redact'] ?? null, ['Authorization', 'Cookie']),
             storeHeaders: self::resolveStoreHeaders($entry['store_headers'] ?? null),
             dedupe: self::stringOr($entry['dedupe'] ?? null, 'redis+db'),
+            dedupeId: self::resolveDedupeId($name, $entry['dedupe_id'] ?? null),
             jwksUrl: $jwks['url'] ?? null,
             jwksCacheTtl: $jwks['cacheTtl'] ?? 3600,
             jwksKid: $jwks['kid'] ?? null,
@@ -368,6 +445,66 @@ final class WebhookConfig
     }
 
     /**
+     * @return class-string<InboundVerifier>|null
+     */
+    private static function resolveVerifier(string $name, mixed $verifier): ?string
+    {
+        if ($verifier === null) {
+            return null;
+        }
+
+        if (is_string($verifier) && is_a($verifier, InboundVerifier::class, true)) {
+            return $verifier;
+        }
+
+        throw new InvalidArgumentException("The webhook client config [{$name}] has an invalid 'verifier'; expected an InboundVerifier class-string.");
+    }
+
+    /**
+     * Validate the optional 'dedupe_id' strategy up front, so a typo fails at config load
+     * rather than by silently keying dedupe on nothing. Returns the spec verbatim, or null
+     * for the default (the id header).
+     */
+    private static function resolveDedupeId(string $name, mixed $spec): ?string
+    {
+        if ($spec === null) {
+            return null;
+        }
+
+        if (is_string($spec) && (str_starts_with($spec, 'header:') || str_starts_with($spec, 'body:'))) {
+            if ($spec === 'header:' || $spec === 'body:') {
+                throw new InvalidArgumentException("The webhook client config [{$name}] 'dedupe_id' must name a header or body path after the prefix, e.g. 'header:X-Id' or 'body:data.id'.");
+            }
+
+            return $spec;
+        }
+
+        if (is_string($spec) && is_a($spec, DedupeKeyResolver::class, true)) {
+            return $spec;
+        }
+
+        throw new InvalidArgumentException("The webhook client config [{$name}] has an invalid 'dedupe_id'; expected 'header:Name', 'body:dotted.path', or a DedupeKeyResolver class-string.");
+    }
+
+    private function nonEmpty(?string $value): ?string
+    {
+        return ($value === null || $value === '') ? null : $value;
+    }
+
+    /**
+     * The JSON body decoded to an array (empty for a non-array or invalid body), for the
+     * 'body:' and resolver dedupe strategies.
+     *
+     * @return array<array-key, mixed>
+     */
+    private function decodeBody(string $rawBody): array
+    {
+        $decoded = json_decode($rawBody, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
      * @template TObject of object
      *
      * @param  class-string<TObject>  $interface
@@ -427,6 +564,28 @@ final class WebhookConfig
     private static function headerName(array $headers, string $key, string $default): string
     {
         return self::stringOr($headers[$key] ?? null, $default);
+    }
+
+    /**
+     * The header names the host EXPLICITLY set under 'signature_headers' — only these are
+     * pushed onto a scheme with its own default, so an absent key never overwrites it.
+     *
+     * @param  array<array-key, mixed>  $headers
+     * @return array{id?: string, timestamp?: string, signature?: string}
+     */
+    private static function explicitHeaders(array $headers): array
+    {
+        $explicit = [];
+
+        foreach (['id', 'timestamp', 'signature'] as $key) {
+            $value = $headers[$key] ?? null;
+
+            if (is_string($value) && $value !== '') {
+                $explicit[$key] = $value;
+            }
+        }
+
+        return $explicit;
     }
 
     private static function stringOr(mixed $value, string $default): string

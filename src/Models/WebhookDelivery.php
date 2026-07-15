@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Webhooks\Models;
 
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,6 +14,7 @@ use Illuminate\Support\Carbon;
 use Override;
 use Webhooks\Core\Payload\PayloadStore;
 use Webhooks\Database\Concerns\HasZonedTimestamps;
+use Webhooks\Database\Concerns\ScopesByTimestamp;
 use Webhooks\Database\Concerns\UsesWebhookConnection;
 use Webhooks\Database\Factories\WebhookDeliveryFactory;
 use Webhooks\Enums\DeliveryStatus;
@@ -47,6 +49,7 @@ class WebhookDelivery extends Model
 
     use HasUuids;
     use HasZonedTimestamps;
+    use ScopesByTimestamp;
     use UsesWebhookConnection;
 
     /**
@@ -127,6 +130,22 @@ class WebhookDelivery extends Model
     protected static function newFactory(): WebhookDeliveryFactory
     {
         return WebhookDeliveryFactory::new();
+    }
+
+    /**
+     * Deliveries that have been waiting to send since at least $moment: still Pending and
+     * created at or before it. This is the health-check query — "are deliveries piling up
+     * undelivered because no worker is running?" — expressed so a host cannot bind a naive,
+     * session-zone-resolved timestamp by accident (see {@see ScopesByTimestamp}).
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopePendingSince(Builder $query, DateTimeInterface $moment): Builder
+    {
+        return $query
+            ->where('status', DeliveryStatus::Pending->value)
+            ->where('created_at', '<=', $this->boundTimestamp($moment));
     }
 
     /**

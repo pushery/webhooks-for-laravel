@@ -22,8 +22,9 @@
     @if ($theme::mirrorsSystem())
         {{-- Applied before the first paint, so a dark-mode reader never sees a white
              flash. Absent from the document when the theme is pinned, so a host under a
-             strict CSP switches the inline script off by choosing light or dark. --}}
-        <script>
+             strict CSP switches the inline script off by choosing light or dark — or keeps
+             'auto' and sets webhooks.ui.csp_nonce so the script carries an allowed nonce. --}}
+        <script{!! $theme::nonceAttribute() !!}>
             (function () {
                 var query = window.matchMedia('(prefers-color-scheme: dark)');
                 var apply = function (dark) { document.documentElement.classList.toggle('dark', dark); };
@@ -33,6 +34,11 @@
         </script>
     @endif
     @wirekitStyles
+    {{-- The host's own compiled assets (its @vite tags), so the shipped screens use the
+         host's asset pipeline. Configured via webhooks.ui.assets; nothing renders when unset. --}}
+    @if ($theme::assetsView())
+        @include($theme::assetsView())
+    @endif
 </head>
 <body class="bg-[var(--color-wk-bg)] text-[color:var(--color-wk-text)] antialiased">
     {{-- WCAG 2.4.1 (Bypass Blocks): the first tab stop skips the page chrome straight

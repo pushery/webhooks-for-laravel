@@ -8,6 +8,7 @@ use Closure;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Config;
 use RuntimeException;
 use Webhooks\Support\TenantIdentity;
 
@@ -51,6 +52,26 @@ final class DashboardScope
     public static function forget(): void
     {
         self::$resolver = null;
+    }
+
+    /**
+     * What the current dashboard request is scoped to. In OPERATOR mode
+     * (`webhooks.dashboard.operator = true`) the dashboard reads the global, owner-less rows
+     * — the endpoints an operator registers with a null owner, which a tenant scope can never
+     * see — and no tenant is resolved. Otherwise it is the acting tenant, resolved exactly as
+     * {@see self::currentOwner()}.
+     *
+     * Operator mode shows global rows to whoever the `view-webhook-dashboard` ability lets in,
+     * so gate that ability to operators — it is the same fail-closed gate the tenant dashboard
+     * relies on, not a new one.
+     */
+    public static function current(): DashboardTenant
+    {
+        if (Config::boolean('webhooks.dashboard.operator', false)) {
+            return DashboardTenant::global();
+        }
+
+        return DashboardTenant::forTenant(self::currentOwner());
     }
 
     /**

@@ -26,15 +26,13 @@ final class SetupSummary extends Component
     #[Computed]
     public function summary(): array
     {
-        $owner = DashboardScope::currentOwner();
+        [$ownerSql, $ownerBindings] = DashboardScope::current()->condition();
 
         $total = WebhookSubscription::query()
-            ->where('owner_type', $owner->type)
-            ->where('owner_id', $owner->id)
+            ->whereRaw($ownerSql, $ownerBindings)
             ->count();
         $active = WebhookSubscription::query()
-            ->where('owner_type', $owner->type)
-            ->where('owner_id', $owner->id)
+            ->whereRaw($ownerSql, $ownerBindings)
             ->where('is_active', true)
             ->whereNull('disabled_at')
             ->count();

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Webhooks\Core\Signing;
 
+use Override;
+
 /**
  * Inbound verification of real Stripe webhook deliveries. Stripe's dialect is
  * exactly {@see StripeStyleScheme}'s — signed content `{timestamp}.{rawBody}`,
@@ -22,5 +24,15 @@ final readonly class StripeScheme extends StripeStyleScheme
     public function __construct()
     {
         parent::__construct(self::STRIPE_HEADER);
+    }
+
+    /**
+     * Stripe's header is `Stripe-Signature` by protocol, so a configured header name does
+     * not apply — this pin is the whole reason to pick StripeScheme over StripeStyleScheme.
+     */
+    #[Override]
+    public function withSignatureHeaders(?string $idHeader, ?string $timestampHeader, ?string $signatureHeader): SignatureScheme
+    {
+        return $this;
     }
 }

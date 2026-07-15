@@ -26,6 +26,29 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Scheduled maintenance
+    |--------------------------------------------------------------------------
+    |
+    | The package schedules its own maintenance against the DEFAULT connection:
+    | partition rolling, rotated-secret revocation, the dashboard rollup refresh,
+    | endpoint-health sweeps, and log pruning. A single-database app wants this on
+    | (the default).
+    |
+    | A DB-PER-TENANT host must turn it OFF: set 'enabled' => false and the package
+    | registers NOTHING in the scheduler, then run the commands yourself inside your
+    | own tenant loop (loop over active tenants, run each command on that tenant's
+    | connection). Left on, the maintenance would run only on the central database and
+    | NEVER on a tenant's — the delivery log grows unbounded and the dashboard reads
+    | empty. The commands themselves are unchanged either way.
+    |
+    */
+
+    'schedule' => [
+        'enabled' => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Core — signing, SSRF and HTTP transport (always on)
     |--------------------------------------------------------------------------
     |
@@ -250,6 +273,13 @@ return [
             'threshold' => 10,
         ],
 
+        // Prefix wildcards in a subscription's event types. Off by default (exact matching).
+        // When on, a subscription may list 'order.*' and receives every event under that
+        // prefix — a concrete 'order.line.added' is delivered to subscribers of
+        // 'order.line.added', 'order.line.*' and 'order.*' (one prefix per dot). Each arm is
+        // still an indexed JSON-containment lookup, so the fan-out stays an index scan.
+        'wildcards' => false,
+
         // Shapes a single endpoint's traffic — it does not throw messages away. A
         // subscription over its per-minute allowance still gets its delivery-log row and
         // its delivery; the delivery is simply enqueued with a delay, so a burst is spread
@@ -420,6 +450,16 @@ return [
             //     // previous key (the rotation window) are tried.
             //     'scheme' => \Webhooks\Core\Signing\Ed25519Scheme::class,
             //     'jwks' => ['url' => env('STRIPE_JWKS_URL'), 'cache_ttl' => 3600, 'kid' => null],
+            //     // Authenticity that is NOT a signature over the bytes — a provider API
+            //     // callback (Mollie) or a cert chain (PayPal). A verifier is
+            //     // container-resolved, takes precedence over 'scheme', and makes
+            //     // 'secret' optional. See Webhooks\Client\Verification\InboundVerifier.
+            //     'verifier' => \App\Webhooks\MollieVerifier::class,
+            //     // Header names the producer uses. Applies to ANY header-overridable
+            //     // scheme, not just the two above — set 'signature' to bind e.g.
+            //     // PlainHmacScheme to SendCloud's 'Sendcloud-Signature' from config alone.
+            //     // A key you omit keeps the scheme's own default (GitHub's stays
+            //     // X-Hub-Signature-256); StripeScheme's header is fixed and ignores this.
             //     'signature_headers' => [
             //         'id' => 'webhook-id',
             //         'timestamp' => 'webhook-timestamp',
@@ -449,6 +489,14 @@ return [
             //     // relies on the partial-unique index alone: slower under a burst, but
             //     // it needs no cache store and cannot be defeated by a cache eviction.
             //     'dedupe' => 'redis+db',
+            //     // Where the idempotency key comes from. Unset = the id header (the
+            //     // Standard-Webhooks default). Providers with no delivery-id header
+            //     // (Stripe's evt_… is in the body; Mollie/SendCloud send none) need it
+            //     // read elsewhere, or dedupe silently does nothing:
+            //     //   'dedupe_id' => 'header:X-Delivery-Id'   // an arbitrary header
+            //     //   'dedupe_id' => 'body:data.object.id'    // a dotted path into the body
+            //     //   'dedupe_id' => \App\Webhooks\MyDedupeKey::class // a DedupeKeyResolver
+            //     'dedupe_id' => 'body:id',
             //     'rate_limit' => ['max_attempts' => 60, 'decay_seconds' => 60],
             //     'large_payload' => ['enabled' => false, 'threshold' => 262144, 'disk' => 's3'],
             // ],
@@ -512,6 +560,12 @@ return [
         'enabled' => (bool) env('WEBHOOKS_DASHBOARD_ENABLED', false),
         'prefix' => 'webhooks',
         'middleware' => ['web', 'auth', 'can:view-webhook-dashboard'],
+        // Operator mode: read the GLOBAL, owner-less endpoints (subscriptions registered with
+        // a null owner) instead of scoping to the acting tenant. Turn this on for a single
+        // operator dashboard over your own global endpoints; leave it off (the default) for a
+        // per-tenant customer dashboard. It shows global rows to everyone the
+        // view-webhook-dashboard gate admits, so gate that ability to operators.
+        'operator' => (bool) env('WEBHOOKS_DASHBOARD_OPERATOR', false),
         'source_model' => WebhookDelivery::class,
         'windows' => ['24h', '7d', '30d'],
         'poll_interval' => '30s',
@@ -624,16 +678,29 @@ return [
     |   'dark'            — always dark. The class is rendered server-side.
     |
     | Pinning the theme is also the escape hatch under a strict Content-Security-Policy:
-    | only 'auto' emits an inline script at all.
+    | only 'auto' emits an inline script at all. If you keep 'auto' under a strict CSP,
+    | set 'csp_nonce' so that script carries a nonce your policy allows — a string, or a
+    | callable resolved per request, e.g. fn () => Vite::cspNonce().
     |
     | The Tailwind utilities these screens are built from are compiled by YOUR app's
     | build — see the README's "Styling the UI" section for the two source globs it
-    | needs. The package ships no compiled stylesheet.
+    | needs. The package ships no compiled stylesheet. If your app has its own Vite
+    | pipeline, point 'assets' at a Blade partial that emits it (e.g. @vite([...])) and
+    | the package layouts @include it in <head> — so the shipped screens load YOUR
+    | compiled CSS/JS without you having to publish and fork the layout.
     |
     */
 
     'ui' => [
         'theme' => env('WEBHOOKS_UI_THEME', 'auto'),
+
+        // A Blade view rendered into the package layouts' <head> — your @vite tags (or any
+        // <link>/<script>) so the shipped screens use your asset pipeline. Null renders nothing.
+        'assets' => null,
+
+        // Nonce for the inline theme script under a strict CSP: a string or a per-request
+        // callable (fn () => Vite::cspNonce()). Null emits no nonce (fine without a CSP).
+        'csp_nonce' => null,
     ],
 
 ];

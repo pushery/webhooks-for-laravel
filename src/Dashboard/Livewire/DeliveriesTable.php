@@ -100,12 +100,11 @@ final class DeliveriesTable extends Component
         $sortField = in_array($this->sortField, self::SORTABLE, true) ? $this->sortField : 'created_at';
         $sortDirection = $this->sortDirection === 'asc' ? 'asc' : 'desc';
 
-        $owner = DashboardScope::currentOwner();
+        [$ownerSql, $ownerBindings] = DashboardScope::current()->condition();
 
         $deliveries = $this->sourceModel()
             ->newQuery()
-            ->where('owner_type', $owner->type)
-            ->where('owner_id', $owner->id)
+            ->whereRaw($ownerSql, $ownerBindings)
             ->when($this->status !== '', fn (Builder $query): Builder => $query->where('status', $this->status))
             ->when($this->eventType !== '', fn (Builder $query): Builder => $query->where('event_type', 'like', '%'.$this->eventType.'%'))
             ->orderBy($sortField, $sortDirection)

@@ -92,6 +92,10 @@ final class WebhooksDashboardServiceProvider extends ServiceProvider
         }
 
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
+            if (! Config::boolean('webhooks.schedule.enabled', true)) {
+                return;
+            }
+
             $this->scheduleRefresh($schedule);
         });
 
@@ -118,14 +122,19 @@ final class WebhooksDashboardServiceProvider extends ServiceProvider
 
     /**
      * The view gate the whole page hangs off, plus the row-level action policy. The
-     * gate is permissive by default (any authenticated tenant sees only its own
-     * data); a host that defines a 'webhooks.view' ability has it enforced instead.
+     * gate is fail-CLOSED: with no host 'webhooks.view' ability defined it DENIES, so
+     * registering the dashboard never silently exposes the operator surface to every
+     * authenticated user. A host grants access by defining 'webhooks.view'.
      */
     private function registerAuthorization(): void
     {
         Gate::define('view-webhook-dashboard', static function (Authenticatable $user): bool {
+            // Fail CLOSED: a host that registers the dashboard but never defines the 'webhooks.view'
+            // ability must NOT silently expose the operator dashboard to every authenticated user.
+            // With no ability defined, deny — the host grants access by defining 'webhooks.view'
+            // (see the README's dashboard authorization section).
             if (! Gate::has('webhooks.view')) {
-                return true;
+                return false;
             }
 
             return Gate::forUser($user)->allows('webhooks.view');

@@ -44,7 +44,14 @@ return new class extends Migration
     {
         Schema::create('webhook_subscriptions', function (Blueprint $table): void {
             $table->id();
-            $table->nullableMorphs('owner');
+
+            // owner_id is an explicit bigint, NOT nullableMorphs(): the package denormalises it
+            // as a bigint across the delivery log and the dashboard rollup, so it may not follow
+            // Schema::defaultMorphKeyType('uuid'). WebhookManager rejects a non-integer owner key
+            // up front, keeping the whole morph pair consistently integer across every table.
+            $table->string('owner_type')->nullable();
+            $table->unsignedBigInteger('owner_id')->nullable();
+            $table->index(['owner_type', 'owner_id'], 'webhook_subscriptions_owner_type_owner_id_index');
             $table->string('name')->nullable();
             $table->text('url');
             $table->text('secret');
