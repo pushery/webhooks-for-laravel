@@ -3,16 +3,47 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Webhooks\Dashboard\Metrics\TdigestExtension;
-use Webhooks\Database\PostgresRequirement;
+use Webhooks\Database\DatabaseRequirement;
+use Webhooks\Database\Dialect\Dialect;
+use Webhooks\Support\WebhookConnection;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        PostgresRequirement::ensure($this->getConnection());
+        DatabaseRequirement::ensure($this->getConnection());
 
+        if (Dialect::for($this->getConnection()) === Dialect::MySql) {
+            $this->createMySql();
+
+            return;
+        }
+
+        $this->createPostgres();
+    }
+
+    public function getConnection(): ?string
+    {
+        return WebhookConnection::name();
+    }
+
+    public function down(): void
+    {
+        if (Dialect::for($this->getConnection()) === Dialect::MySql) {
+            Schema::dropIfExists('webhook_delivery_hourly');
+
+            return;
+        }
+
+        DB::statement('DROP MATERIALIZED VIEW IF EXISTS webhook_delivery_hourly');
+    }
+
+    public function createPostgres(): void
+    {
         // The hourly rollup that powers the dashboard's stacked-activity chart and
         // its latency-trend line. Counts are additive, so any window's KPI totals
         // are a sum over the hourly buckets; the per-hour p50/p95 drive the trend
@@ -70,9 +101,31 @@ return new class extends Migration
         DB::statement('REFRESH MATERIALIZED VIEW webhook_delivery_hourly');
     }
 
-    public function down(): void
+    /**
+     * MySQL has no materialized view, so the rollup is a real InnoDB table with the same name and
+     * columns, refreshed in place by webhooks:refresh-metrics (an atomic recompute in a
+     * transaction, so readers always see a whole snapshot). The owner columns carry a NON-NULL
+     * sentinel — '' and 0 — because a unique index treats NULLs as distinct on both engines, so a
+     * nullable owner pair would never collide and the owner-less (global) rollup row would be
+     * duplicated on every refresh. There is no latency_digest column: MySQL has no tdigest, and
+     * the Tier-2 driver refuses to run there.
+     */
+    public function createMySql(): void
     {
-        DB::statement('DROP MATERIALIZED VIEW IF EXISTS webhook_delivery_hourly');
+        Schema::create('webhook_delivery_hourly', function (Blueprint $table): void {
+            $table->string('owner_type')->default('');
+            $table->unsignedBigInteger('owner_id')->default(0);
+            $table->dateTime('bucket', 6);
+            $table->unsignedBigInteger('total')->default(0);
+            $table->unsignedBigInteger('delivered')->default(0);
+            $table->unsignedBigInteger('pending')->default(0);
+            $table->unsignedBigInteger('failed')->default(0);
+            $table->unsignedBigInteger('retried')->default(0);
+            $table->double('p50')->nullable();
+            $table->double('p95')->nullable();
+
+            $table->unique(['owner_type', 'owner_id', 'bucket'], 'webhook_delivery_hourly_uidx');
+        });
     }
 
     /**

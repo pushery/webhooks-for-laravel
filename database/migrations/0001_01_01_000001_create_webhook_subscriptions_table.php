@@ -6,19 +6,42 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Webhooks\Database\PostgresRequirement;
+use Webhooks\Database\DatabaseRequirement;
+use Webhooks\Database\Dialect\Dialect;
+use Webhooks\Support\WebhookConnection;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        PostgresRequirement::ensure($this->getConnection());
+        DatabaseRequirement::ensure($this->getConnection());
 
-        // Every timestamp column on this table is timestamptz, matching both delivery
-        // logs (webhook_deliveries, webhook_server_deliveries): the columns are written
-        // in UTC via Eloquent today, but the fixed-zone type keeps any future raw-SQL
-        // comparison against now() (itself timestamptz) from silently applying the
-        // session zone, and keeps the schema internally consistent.
+        if (Dialect::for($this->getConnection()) === Dialect::MySql) {
+            $this->createMySql();
+
+            return;
+        }
+
+        $this->createPostgres();
+    }
+
+    public function getConnection(): ?string
+    {
+        return WebhookConnection::name();
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('webhook_subscriptions');
+    }
+
+    /**
+     * Every timestamp column on this table is timestamptz, matching both delivery logs: the
+     * columns are written in UTC via Eloquent today, but the fixed-zone type keeps any future
+     * raw-SQL comparison against now() from silently applying the session zone.
+     */
+    private function createPostgres(): void
+    {
         Schema::create('webhook_subscriptions', function (Blueprint $table): void {
             $table->id();
             $table->nullableMorphs('owner');
@@ -54,8 +77,41 @@ return new class extends Migration
         DB::statement('CREATE INDEX webhook_subscriptions_event_types_gin ON webhook_subscriptions USING gin (event_types jsonb_path_ops)');
     }
 
-    public function down(): void
+    /**
+     * Timestamps are DATETIME(6) holding UTC. owner_type carries a case-sensitive collation so
+     * tenant scoping never conflates two morph classes. The fan-out lookup is served by a
+     * multi-valued index over the event_types array, which stock whereJsonContains uses.
+     */
+    private function createMySql(): void
     {
-        Schema::dropIfExists('webhook_subscriptions');
+        $cs = 'utf8mb4_0900_as_cs';
+
+        Schema::create('webhook_subscriptions', function (Blueprint $table) use ($cs): void {
+            $table->id();
+            $table->string('owner_type')->collation($cs)->nullable();
+            $table->unsignedBigInteger('owner_id')->nullable();
+            $table->index(['owner_type', 'owner_id'], 'webhook_subscriptions_owner_type_owner_id_index');
+            $table->string('name')->nullable();
+            $table->string('url', 2048);
+            $table->text('secret');
+            $table->text('previous_secret')->nullable();
+            $table->dateTime('secret_rotated_at', 6)->nullable();
+            $table->json('event_types');
+            $table->boolean('is_active')->default(true);
+            $table->dateTime('disabled_at', 6)->nullable();
+            $table->integer('consecutive_failures')->default(0);
+            $table->string('payload_version', 20)->nullable();
+            $table->json('transform')->nullable();
+            $table->smallInteger('health_score')->nullable();
+            $table->string('health_status', 20)->collation($cs)->nullable();
+            $table->dateTime('health_calculated_at', 6)->nullable();
+            $table->dateTime('created_at', 6)->nullable();
+            $table->dateTime('updated_at', 6)->nullable();
+        });
+
+        // A multi-valued index over the top-level event_types array is what stock
+        // whereJsonContains('event_types', 'x') uses on MySQL — the fan-out stays an index
+        // lookup, no projection table needed. CHAR(255) holds any event type name.
+        DB::statement('ALTER TABLE webhook_subscriptions ADD INDEX webhook_subscriptions_event_types_mv ((CAST(event_types AS CHAR(255) ARRAY)))');
     }
 };

@@ -19,7 +19,8 @@ dashboard over the whole delivery log — and you switch on only the layers you 
 Signatures are [Standard Webhooks](https://www.standardwebhooks.com) by default, so
 every delivery is verifiable out of the box by any Standard Webhooks consumer in any
 language. The engine is entirely in-house — no third-party webhook-engine
-dependency — and PostgreSQL-native.
+dependency — and its storage runs on **PostgreSQL or MySQL 8.4+** (or on no database
+at all, if you only send).
 
 ## The layered architecture
 
@@ -55,21 +56,87 @@ individually opt-in and off until you enable them.
 
 - PHP 8.4+ with `ext-curl`, `ext-json`, `ext-sodium`
 - Laravel 13+
-- **PostgreSQL 13+ — for the layers that persist.** The Platform, Client, Dashboard and
-  standalone-persistence layers store their tables in PostgreSQL (`jsonb`, GIN indexes,
-  partial and partial-unique indexes, declarative range partitioning, a materialized
-  view), and their migrations refuse to run on any other driver. A **send-only** app
-  (`platform.enabled=false`, no `server.persistence`) runs **no migrations at all** and
-  works on any database — see [Send-only setup](#send-only-setup-no-database).
+- **A database — for the layers that persist.** The Platform, Client, Dashboard and
+  standalone-persistence layers store their tables in **PostgreSQL 13+ or MySQL 8.4+**. A
+  **send-only** app (`platform.enabled=false`, no `server.persistence`)
+  runs **no migrations at all** and needs no database — see
+  [Send-only setup](#send-only-setup-no-database).
 - A queue worker for outbound delivery (Redis recommended so retry backoff never blocks
   other work)
 - The UI layers (dashboard, self-service portal, operator console) additionally
   need `livewire/livewire` and `pushery/wirekit` — see [Styling the UI](#styling-the-ui)
 
-> **Deploying to [Laravel Cloud](https://cloud.laravel.com)?** Provision a **Neon
-> (PostgreSQL)** database, not the MySQL option. The persistent layers are
-> PostgreSQL-only by design; their migrations refuse to run on any other driver with a
-> clear error pointing you here.
+### Which database?
+
+Reach for a topology in this order — lead with what your app already has, **not** with an
+engine demand:
+
+| Topology              | When                                              | What you run                                                                                                  |
+| --------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **T1 — Send-only**    | You only *send* webhooks                          | **No database.** Platform off; the Server engine needs only a queue.                                          |
+| **T2 — Same database**| You persist, on the engine your app already uses  | PostgreSQL **or** MySQL 8.4+ — the package migrates its tables into your app's own connection.                |
+| **T3 — Side-car**     | You persist, but want the webhook tables elsewhere| Point [`webhooks.database.connection`](#a-dedicated-database-connection) at a dedicated connection — e.g. a MySQL app with a PostgreSQL side-car. |
+
+**The one-line recommendation: don't switch engines for this package — use the one your
+app already runs on.** PostgreSQL is the reference engine and keeps a few storage
+accelerations MySQL can't express, but **every guarantee the package makes holds
+identically on both** — exact percentile numbers, race-free dedupe, the `body_sha256`
+byte-fidelity promise, the DB-enforced GDPR-erasure cascade, DST-safe timestamps, and
+case-sensitive identity. MySQL users give up storage *optimizations*, never *correctness*.
+
+### Choosing your database
+
+Every row below is a PostgreSQL-only storage optimization. **None of them changes a
+result** — they change cost at scale. Read the recommendation as *"this is when, and only
+when, the difference is worth an engine."*
+
+| Difference (PostgreSQL only)                                                     | When it hits you                                                             | Tip                                                                                            | Recommendation                                                             |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| **O(1) retention** — PG drops an old month as a partition; MySQL runs an indexed, chunked `DELETE`. | Invisible below ~1M deliveries/month; real IO pressure at tens of millions. | Lower `platform.retention_months`, enable payload offload, run `webhooks:partition-maintenance` off-peak. | Above ~1M deliveries/month **and** long retention → PostgreSQL. Otherwise MySQL is fine. |
+| **Index bounded by the open backlog** — PG partial indexes; MySQL indexes all history. | Same volume threshold.                                                      | Nothing to configure — the composite indexes are used natively on both.                       | Not worth an engine on its own; folds into the retention call above.       |
+| **Indexed containment search *into* an inbound payload** — PG `jsonb` GIN.       | Only if you search *inside* stored payloads.                                | **No shipped query uses it** — nothing breaks. Search deliveries/calls with Scout + Meilisearch (already wired). | Not an engine-choice factor.                                               |
+| **The `tdigest` percentile tier** — an optional PG extension.                    | Only at very high dashboard volume, and only if you set `dashboard.percentiles.driver = 'tdigest'`. | The default `live` driver is the same speed **and returns identical numbers** on both engines. | Not a reason to pick PostgreSQL — and `tdigest` isn't on Neon (Laravel Cloud's Postgres) either, so this tier is unavailable there regardless. |
+| **`max_allowed_packet`** — MySQL defaults to 64 MB vs PG's ~1 GB.                | Only with multi-MB *single* events.                                        | Enable offload (`server.large_payload.enabled = true`, and the inbound offload) so a big body never reaches the column. | Enable offload on MySQL if you emit multi-MB events.                       |
+
+**One hard warning — read this if you run MySQL.** The package declares
+`utf8mb4_0900_as_cs` (case- **and** accent-sensitive) on every identity column, on
+purpose. **Do not `ALTER` it back to a `_ci` collation.** Under a case-insensitive
+collation `evt_AbC` and `evt_abc` collapse into one dedupe row, and a distinct,
+signature-verified webhook is answered `200` and **silently discarded**. `webhooks:preflight`
+and a schema check guard the shipped schema, but a manual `ALTER` can still undo it.
+
+**MariaDB is not supported, at any tier** — it is rejected loudly at migrate time and by
+`webhooks:preflight`. Its `JSON` is a `LONGTEXT` alias, and it has neither the multi-valued
+index the fan-out lookup needs nor functional indexes. Use MySQL 8.4+ or PostgreSQL.
+
+> **Deploying to [Laravel Cloud](https://cloud.laravel.com)?** Cloud offers **both** a
+> first-party **MySQL 8.4** database and **Neon-powered Serverless Postgres** — either
+> works. Two cautions: **(1)** run migrations against your database's **direct**,
+> non-pooled endpoint — `migrate` and `webhooks:partition-maintenance` issue transactional
+> DDL, which a transaction pooler (PgBouncer, Neon's pooled endpoint) breaks; **(2)** Neon
+> does not ship the `tdigest` extension, so `dashboard.percentiles.driver = 'tdigest'` is
+> unavailable there — the default `live` driver needs no extension and returns the same
+> numbers.
+
+### A dedicated database connection
+
+By default the package migrates its tables into your app's **default** connection. To keep
+them on a different one — the headline case being a MySQL app with a **PostgreSQL side-car**
+for the webhook tables (topology T3) — set `webhooks.database.connection` to a connection
+defined in `config/database.php`:
+
+```env
+WEBHOOKS_DB_CONNECTION=webhooks_pgsql
+```
+
+Every model, migration and analytics query then resolves that one connection, so the
+package never silently splits across two databases; leave it unset and everything stays on
+the app default. `php artisan webhooks:preflight` prints the connection it resolved. When
+you test a host app on this topology, transact **both** connections so each case rolls back:
+
+```php
+protected $connectionsToTransact = ['mysql', 'webhooks_pgsql'];
+```
 
 ## Installation
 
@@ -531,7 +598,10 @@ page mounts at `dashboard.prefix` behind `dashboard.middleware`; the Blade views
 publishable (`--tag=webhooks-dashboard-views`) for hosts on another UI kit — publishing
 and restyling them is the supported escape hatch from WireKit. For very high volume,
 `dashboard.percentiles.driver = 'tdigest'` reads percentiles from per-bucket digests
-(requires the PostgreSQL `tdigest` extension).
+(requires the PostgreSQL `tdigest` extension — it is not available on MySQL, nor on Neon,
+which is what Laravel Cloud's Postgres is). The default `live` driver needs no extension,
+is the same complexity class on both engines, and returns **identical** numbers — so this
+tier is an optimization for extreme volume, not a correctness or an engine-choice matter.
 
 ### JSON metrics endpoint (opt-in)
 
@@ -864,11 +934,16 @@ Report vulnerabilities per the [security policy](SECURITY.md), privately.
   outbound cap SHAPES traffic rather than dropping it: an over-limit delivery is logged,
   announced (`Webhooks\Events\WebhookDeliveryRateLimited`) and enqueued with a delay, so a
   burst is spread across the following minutes instead of being lost.
-- **Partitioning & retention** — the delivery log is monthly range-partitioned;
-  `php artisan webhooks:partition-maintenance` (scheduled daily) provisions upcoming
-  partitions, drops those past `platform.retention_months` — a metadata operation, not a
-  bulk `DELETE` — and drains any delivery that landed in the catch-all default partition
-  while the schedule was behind, so a lapse in the cron cannot permanently stop either.
+- **Retention** — `php artisan webhooks:partition-maintenance` (scheduled daily) ages the
+  delivery log out past `platform.retention_months`. **On PostgreSQL** the log is monthly
+  range-partitioned, so a whole old month is dropped as a metadata operation, not a bulk
+  `DELETE`, and the command also provisions upcoming partitions and drains any delivery that
+  landed in the catch-all default partition while the schedule was behind — so a lapse in the
+  cron cannot permanently stop either. **On MySQL** the log is a flat table (kept so the
+  `ON DELETE CASCADE` GDPR guarantee holds — MySQL cannot have both a foreign key and
+  partitioning), and retention is an **indexed, chunked `DELETE`** over the same window; the
+  same command, the same cutoff. Below ~1M deliveries/month the difference is invisible; see
+  [Choosing your database](#choosing-your-database).
 - **Lifecycle events** — every delivery announces its fate. Which family to listen to
   depends on whether you run the Platform layer; see [Events](#events).
 
@@ -902,6 +977,39 @@ Version 1.0.0 is a ground-up rewrite; treat it as a new major.
 Because this is a new major, review your integration end to end rather than expecting a
 drop-in bump.
 
+## Coming from spatie/laravel-webhook-server or -webhook-client
+
+This package is a superset of both spatie webhook packages, on one engine or the other —
+**including MySQL**, which is where most of their apps run (`webhook-server` needs no
+database at all; `webhook-client` ships a flat, engine-agnostic `webhook_calls` table). You
+do not have to switch databases to adopt it.
+
+**From `spatie/laravel-webhook-server` (sending).** Replace the `WebhookCall::create()`
+builder with `Webhooks\Server\PendingWebhook` (or the `WebhookSender` facade). Signing is
+[Standard Webhooks](#signatures--interop) by default; if your consumers verify the older
+`Signature` header spatie sent, keep sending it by setting the scheme per call. Backoff,
+`Retry-After`, per-call timeouts, SSRF pinning and mutual TLS are all built in — see
+[Sending](#sending-server-layer). No table to migrate: sending is stateless.
+
+**From `spatie/laravel-webhook-client` (receiving).** Replace their route +
+`ProcessWebhookJob` with `Route::webhooks('your/path', 'source-name')` and a config profile
+— see [Receiving](#receiving-client-layer). Ours verifies, **de-duplicates on receipt**
+(two-tier), redacts headers, offloads over-sized bodies and keeps the exact received bytes
+so `hash('sha256', $call->body()) === $call->body_sha256`. Our `webhook_calls` table is a
+strict superset of theirs, with one correctness fix worth naming: **their table prunes on an
+unindexed `created_at`; ours ships the index** (so retention stays cheap as the log grows).
+
+**Backfilling their history.** New receipts flow into this package's `webhook_calls` from
+the moment you switch the route over — nothing else is required to go live. Carrying the
+**old** spatie `webhook_calls` rows across is a one-time copy; their columns map onto ours as
+`name → source`, `payload → payload`, `headers → headers`, `exception → exception`, with the
+original timestamps preserved. One caveat sets the expectation: spatie stored only the parsed
+`payload`, never the raw received bytes, so an imported row cannot carry the original
+`body_sha256` — reconstruct it from the re-encoded payload and treat imported rows as
+historical records, not re-verifiable ones. A guided `artisan` command that does this copy
+idempotently is [tracked for a follow-up release](#versioning); until then the mapping above
+is all a short migration needs.
+
 ## Testing your integration
 
 Every delivery is a queued job, so `Bus::fake()` asserts the fan-out without a network
@@ -927,7 +1035,9 @@ a first-party round trip is testable end to end.
 Working on the package itself? Its own suite runs against a real **PostgreSQL 13+**
 database (there is no SQLite fallback): `createdb webhooks_for_laravel_test`, then point
 `DB_HOST` / `DB_PORT` / `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` at it if it is not
-`postgres@127.0.0.1:5432`.
+`postgres@127.0.0.1:5432`. The cross-engine parity suites additionally drive a real **MySQL
+8.4** and a **MariaDB** server (the MariaDB one proves the guard rejects it), so those run
+locally; see the development notes in the repository.
 
 ## Versioning
 
@@ -945,6 +1055,8 @@ tells you exactly which classes that promise covers.
   `SecretSet` / `WebhookMessage` / `SignatureHeaders` / `VerificationResult`
 - The SSRF guard contract, the models, the enums, the exceptions, and **all the
   [events](#events)**
+- The migration database guards `Database\DatabaseRequirement` and `Database\PostgresRequirement`
+  (a published migration copy calls one of them), and the `webhooks.database.connection` key
 - The service providers, the Livewire component aliases, the published views and
   migrations, the config tree, and the publish tags
 

@@ -7,6 +7,7 @@ namespace Webhooks\Core;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\ServiceProvider;
 use Override;
+use Webhooks\Console\PreflightCommand;
 use Webhooks\Core\Http\HttpTransport;
 use Webhooks\Core\Signing\Console\Ed25519KeygenCommand;
 use Webhooks\Core\Signing\Jwks\JwksKeySet;
@@ -48,7 +49,7 @@ final class CoreServiceProvider extends ServiceProvider
     public function boot(): void
     {
         if ($this->app->runningInConsole()) {
-            $this->commands([Ed25519KeygenCommand::class]);
+            $this->commands([Ed25519KeygenCommand::class, PreflightCommand::class]);
         }
     }
 

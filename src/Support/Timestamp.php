@@ -40,9 +40,25 @@ final class Timestamp
      */
     public const string ELOQUENT_FORMAT = 'Y-m-d H:i:sP';
 
+    /**
+     * The literal format for MySQL DATETIME(6), which is timezone-naive: UTC microseconds
+     * with NO offset. The value carries the instant only because it is always UTC — MySQL
+     * cannot store the offset a timestamptz literal carries, and TIMESTAMP would re-resolve
+     * it against the session zone and top out in 2038.
+     */
+    public const string MYSQL_SQL_FORMAT = 'Y-m-d H:i:s.u';
+
     public static function sql(DateTimeInterface $moment): string
     {
         return self::utc($moment)->format(self::SQL_FORMAT);
+    }
+
+    /**
+     * The instant as a MySQL DATETIME(6) literal: the same moment in UTC, naive.
+     */
+    public static function mysql(DateTimeInterface $moment): string
+    {
+        return self::utc($moment)->format(self::MYSQL_SQL_FORMAT);
     }
 
     public static function utc(DateTimeInterface $moment): DateTimeImmutable

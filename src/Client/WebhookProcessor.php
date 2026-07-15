@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Webhooks\Client;
 
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
@@ -16,6 +17,10 @@ use Webhooks\Client\Models\WebhookCall;
 use Webhooks\Core\Payload\PayloadSanitizer;
 use Webhooks\Core\Payload\PayloadStore;
 use Webhooks\Core\Signing\SignatureHeaders;
+use Webhooks\Database\Dialect\Dialect;
+use Webhooks\Database\Dialect\Sql\DedupeInsert;
+use Webhooks\Support\Timestamp;
+use Webhooks\Support\WebhookConnection;
 
 /**
  * Runs the whole receiving pipeline for one request, controller-less: capture the
@@ -41,6 +46,11 @@ final readonly class WebhookProcessor
         private Request $request,
         private WebhookConfig $config,
     ) {}
+
+    private function db(): ConnectionInterface
+    {
+        return WebhookConnection::db();
+    }
 
     public function process(): Response
     {
@@ -129,17 +139,21 @@ final readonly class WebhookProcessor
         // verbatim. That is what makes body_sha256 a promise the row can keep.
         $storedBody = $path === null ? WebhookCall::encodeRawBody($rawBody) : null;
 
-        $row = DB::selectOne(
-            <<<'SQL'
-                INSERT INTO webhook_calls (id, source, webhook_id, event_type, payload, raw_body, payload_disk, payload_path, body_sha256, headers, status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?::jsonb, 'received', now(), now())
-                ON CONFLICT (source, webhook_id) WHERE webhook_id IS NOT NULL DO NOTHING
-                RETURNING id
-                SQL,
-            [$id, $this->config->name, $webhookId, $message->type, $payloadJson, $storedBody, $disk, $path, hash('sha256', $rawBody), $headersJson],
-        );
+        $dialect = Dialect::for();
+        $sql = DedupeInsert::webhookCalls($dialect);
+        $bindings = [$id, $this->config->name, $webhookId, $message->type, $payloadJson, $storedBody, $disk, $path, hash('sha256', $rawBody), $headersJson];
 
-        if ($row === null) {
+        // PostgreSQL returns the inserted id (null on a duplicate); MySQL reports the outcome
+        // through the affected-row count (1 inserted, 0 duplicate) and binds its timestamps from
+        // PHP as UTC, since its ON DUPLICATE KEY form carries no now() and the session zone is
+        // untrustworthy. Either way a duplicate yields null, and the row is then read by id.
+        if ($dialect === Dialect::MySql) {
+            $now = Timestamp::mysql(Date::now());
+
+            if ($this->db()->affectingStatement($sql, [...$bindings, $now, $now]) === 0) {
+                return null;
+            }
+        } elseif ($this->db()->selectOne($sql, $bindings) === null) {
             return null;
         }
 

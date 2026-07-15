@@ -11,7 +11,8 @@
         "ed25519",
         "ssrf",
         "livewire",
-        "postgres"
+        "postgres",
+        "mysql"
     ],
     "license": "MIT",
     "type": "library",

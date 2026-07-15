@@ -51,11 +51,6 @@ final class WebhooksServiceProvider extends ServiceProvider
         // SSRF vetting is the shared Core\Ssrf\SsrfGuard (bound by CoreServiceProvider),
         // so the manager auto-resolves it — no local guard binding here.
         $this->app->singleton(WebhookManager::class);
-
-        // Every Platform delivery names the endpoint it was built for, so the queued job
-        // can re-read it immediately before sending and refuse a delivery whose endpoint
-        // was switched off — or deleted — while it waited in the queue.
-        $this->app->singleton(DeliveryGate::class, SubscriptionDeliveryGate::class);
     }
 
     /**
@@ -92,6 +87,16 @@ final class WebhooksServiceProvider extends ServiceProvider
         if (! $this->shouldBoot()) {
             return;
         }
+
+        // Every Platform delivery names the endpoint it was built for, so the queued job
+        // re-reads it immediately before sending and refuses a delivery whose endpoint was
+        // switched off — or deleted — while it waited in the queue. This rebinds the Server
+        // layer's OpenDeliveryGate, and ONLY while the Platform layer runs: a send-only or
+        // receive-only host keeps the open gate, so a stray subscription_id meta key never
+        // queries webhook_subscriptions, a table its config never migrated. Isolation by the
+        // config gate, not by SubscriptionDeliveryGate's short-circuit — and the gate is read
+        // only at resolve time (a queued job), well after this binding is in place.
+        $this->app->singleton(DeliveryGate::class, SubscriptionDeliveryGate::class);
 
         // Keep the delivery log and circuit breaker in step with the delivery engine
         // by translating its lifecycle events into row updates.

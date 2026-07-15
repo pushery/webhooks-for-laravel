@@ -8,6 +8,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Database — where the package stores its tables
+    |--------------------------------------------------------------------------
+    |
+    | Null uses the application's own default connection. Point this at a dedicated
+    | connection to keep the package's tables somewhere other than the app database —
+    | the common case being a MySQL application that keeps these PostgreSQL-shaped
+    | tables on a PostgreSQL side-car. The named connection must be one the package
+    | supports (PostgreSQL or MySQL 8.4+); run `php artisan webhooks:preflight
+    | --connection=<name>` to check it.
+    |
+    */
+
+    'database' => [
+        'connection' => env('WEBHOOKS_DB_CONNECTION'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Core — signing, SSRF and HTTP transport (always on)
     |--------------------------------------------------------------------------
     |

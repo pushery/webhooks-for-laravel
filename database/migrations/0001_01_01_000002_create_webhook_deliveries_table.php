@@ -5,15 +5,38 @@ declare(strict_types=1);
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Webhooks\Database\DatabaseRequirement;
+use Webhooks\Database\Dialect\Dialect;
 use Webhooks\Database\PartitionManager;
-use Webhooks\Database\PostgresRequirement;
+use Webhooks\Support\WebhookConnection;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        PostgresRequirement::ensure($this->getConnection());
+        DatabaseRequirement::ensure($this->getConnection());
 
+        if (Dialect::for($this->getConnection()) === Dialect::MySql) {
+            $this->createMySql();
+
+            return;
+        }
+
+        $this->createPostgres();
+    }
+
+    public function getConnection(): ?string
+    {
+        return WebhookConnection::name();
+    }
+
+    public function down(): void
+    {
+        DB::statement('DROP TABLE IF EXISTS webhook_deliveries CASCADE');
+    }
+
+    private function createPostgres(): void
+    {
         // Range-partitioned by month: the delivery log grows fast, so old data is
         // dropped a partition at a time (webhooks:partition-maintenance) instead of
         // with an expensive DELETE. A partitioned table's primary key must include
@@ -79,8 +102,49 @@ return new class extends Migration
         $partitions->ensureWindow(CarbonImmutable::now('UTC')->startOfMonth()->subMonth(), 4);
     }
 
-    public function down(): void
+    /**
+     * A flat InnoDB table — no partitioning, so it CAN carry the FK cascade a partitioned
+     * MySQL table cannot (ERROR 1506). Deleting a subscription therefore still removes its
+     * deliveries at the database, keeping the GDPR-erasure guarantee absolute. Retention is a
+     * chunked, indexed DELETE instead of an O(1) partition drop, so the flat table adds a plain
+     * created_at index the partitioned PostgreSQL table never needed. Timestamps are DATETIME(6)
+     * holding UTC; payload_type is uncapped MEDIUMTEXT via JSON_UNQUOTE(JSON_EXTRACT(...)).
+     */
+    private function createMySql(): void
     {
-        DB::statement('DROP TABLE IF EXISTS webhook_deliveries CASCADE');
+        DB::statement(<<<'SQL'
+            CREATE TABLE webhook_deliveries (
+                id char(36) COLLATE utf8mb4_0900_as_cs NOT NULL,
+                subscription_id bigint unsigned NOT NULL,
+                owner_type varchar(255) COLLATE utf8mb4_0900_as_cs NULL,
+                owner_id bigint NULL,
+                event_type varchar(255) COLLATE utf8mb4_0900_as_cs NOT NULL,
+                event_id char(36) COLLATE utf8mb4_0900_as_cs NOT NULL,
+                payload json NOT NULL,
+                payload_type mediumtext GENERATED ALWAYS AS (JSON_UNQUOTE(JSON_EXTRACT(payload, '$.type'))) STORED,
+                payload_disk varchar(255) NULL,
+                payload_path varchar(255) NULL,
+                body_sha256 char(64) COLLATE utf8mb4_0900_as_cs NULL,
+                status varchar(20) COLLATE utf8mb4_0900_as_cs NOT NULL DEFAULT 'pending',
+                attempt int NOT NULL DEFAULT 0,
+                response_code int NULL,
+                duration_ms int NULL,
+                error mediumtext NULL,
+                created_at datetime(6) NOT NULL,
+                delivered_at datetime(6) NULL,
+                PRIMARY KEY (id),
+                CONSTRAINT webhook_deliveries_subscription_id_foreign
+                    FOREIGN KEY (subscription_id) REFERENCES webhook_subscriptions (id) ON DELETE CASCADE
+            ) ENGINE=InnoDB
+            SQL);
+
+        // The open worklist scan filters by status, so the index leads with it (no partial
+        // index on MySQL). The remaining indexes mirror the PostgreSQL set, plus a plain
+        // created_at index the chunked-delete retention needs and the partitioned table did not.
+        DB::statement('CREATE INDEX webhook_deliveries_open_idx ON webhook_deliveries (status, subscription_id, created_at)');
+        DB::statement('CREATE INDEX webhook_deliveries_sub_created_idx ON webhook_deliveries (subscription_id, created_at)');
+        DB::statement('CREATE INDEX webhook_deliveries_sub_event_idx ON webhook_deliveries (subscription_id, event_id)');
+        DB::statement('CREATE INDEX webhook_deliveries_owner_idx ON webhook_deliveries (owner_type, owner_id, created_at)');
+        DB::statement('CREATE INDEX webhook_deliveries_created_idx ON webhook_deliveries (created_at)');
     }
 };

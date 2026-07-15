@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace Webhooks\Platform\Health;
 
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\ConnectionInterface;
+use Webhooks\Database\Dialect\Dialect;
+use Webhooks\Database\Dialect\Sql\ConditionalCount;
+use Webhooks\Database\Dialect\Sql\PercentileSelect;
 use Webhooks\Models\WebhookSubscription;
 use Webhooks\Support\Settings;
 use Webhooks\Support\Timestamp;
+use Webhooks\Support\WebhookConnection;
 
 /**
  * Scores the health of a webhook endpoint from its own recent delivery history.
@@ -28,6 +32,11 @@ final readonly class EndpointHealth
         private Settings $config,
     ) {}
 
+    private function db(): ConnectionInterface
+    {
+        return WebhookConnection::db();
+    }
+
     /**
      * Compute the current health of a single endpoint from its recent history.
      */
@@ -39,25 +48,14 @@ final readonly class EndpointHealth
         // One pass over the subscription's recent deliveries: how many resolved
         // (reached an attempted outcome, so pending in-flight rows do not count),
         // how many of those succeeded, and the p95 of their measured durations.
-        // percentile_cont ignores NULL durations, so an unmeasured row is skipped.
-        $row = (array) DB::selectOne(
-            'SELECT '
-            ."count(*) FILTER (WHERE status IN ('succeeded', 'failed', 'exhausted')) AS resolved, "
-            ."count(*) FILTER (WHERE status = 'succeeded') AS succeeded, "
-            .'percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95 '
-            .'FROM webhook_deliveries '
-            .'WHERE subscription_id = ? AND created_at >= ?',
-            [$subscription->id, $since],
-        );
-
-        $resolved = $this->toInt($row['resolved'] ?? 0);
+        [$resolved, $succeeded, $p95] = Dialect::for() === Dialect::MySql
+            ? $this->readMySql($subscription->id, $since)
+            : $this->readPostgres($subscription->id, $since);
 
         if ($resolved === 0) {
             return HealthReport::unknown();
         }
 
-        $succeeded = $this->toInt($row['succeeded'] ?? 0);
-        $p95 = $this->toFloat($row['p95'] ?? 0);
         $successRate = $succeeded / $resolved;
 
         $score = $this->composeScore($successRate, $p95, $subscription->consecutive_failures);
@@ -69,6 +67,54 @@ final readonly class EndpointHealth
             p95: $p95,
             sampleSize: $resolved,
         );
+    }
+
+    /**
+     * PostgreSQL reads the counts and the interpolated p95 in one pass: percentile_cont sits
+     * inline beside the counts and ignores NULL durations for free.
+     *
+     * @return array{0: int, 1: int, 2: float}
+     */
+    private function readPostgres(int $subscriptionId, string $since): array
+    {
+        $row = (array) $this->db()->selectOne(
+            'SELECT '
+            .ConditionalCount::of("status IN ('succeeded', 'failed', 'exhausted')").' AS resolved, '
+            .ConditionalCount::of("status = 'succeeded'").' AS succeeded, '
+            .PercentileSelect::pgsqlExpression(0.95).' AS p95 '
+            .'FROM webhook_deliveries '
+            .'WHERE subscription_id = ? AND created_at >= ?',
+            [$subscriptionId, $since],
+        );
+
+        return [$this->toInt($row['resolved'] ?? 0), $this->toInt($row['succeeded'] ?? 0), $this->toFloat($row['p95'] ?? 0)];
+    }
+
+    /**
+     * MySQL has no ordered-set aggregate, so the p95 is a separate window-function query; the
+     * counts stay portable. Both read the same window, and the interpolated p95 matches
+     * PostgreSQL's percentile_cont to the last decimal.
+     *
+     * @return array{0: int, 1: int, 2: float}
+     */
+    private function readMySql(int $subscriptionId, string $since): array
+    {
+        $where = 'subscription_id = ? AND created_at >= ?';
+
+        $counts = (array) $this->db()->selectOne(
+            'SELECT '
+            .ConditionalCount::of("status IN ('succeeded', 'failed', 'exhausted')").' AS resolved, '
+            .ConditionalCount::of("status = 'succeeded'").' AS succeeded '
+            .'FROM webhook_deliveries WHERE '.$where,
+            [$subscriptionId, $since],
+        );
+
+        $p95 = (array) $this->db()->selectOne(
+            PercentileSelect::mysqlQuery(0.95, 'webhook_deliveries', $where),
+            [$subscriptionId, $since],
+        );
+
+        return [$this->toInt($counts['resolved'] ?? 0), $this->toInt($counts['succeeded'] ?? 0), $this->toFloat($p95['p95'] ?? 0)];
     }
 
     /**

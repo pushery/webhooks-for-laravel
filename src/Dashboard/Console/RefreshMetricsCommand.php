@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace Webhooks\Dashboard\Console;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\ConnectionInterface;
 use Webhooks\Dashboard\Metrics\WebhookMetrics;
+use Webhooks\Database\Dialect\Dialect;
+use Webhooks\Database\Dialect\Sql\RollupRefresh;
+use Webhooks\Support\Timestamp;
+use Webhooks\Support\WebhookConnection;
 
 /**
  * Refreshes the hourly delivery-metrics materialized view. Runs CONCURRENTLY so the
@@ -22,15 +27,39 @@ final class RefreshMetricsCommand extends Command
 
     protected $description = 'Refresh the hourly webhook delivery-metrics materialized view.';
 
+    private function db(): ConnectionInterface
+    {
+        return WebhookConnection::db();
+    }
+
     public function handle(): int
     {
         $view = WebhookMetrics::HOURLY_VIEW;
 
-        DB::statement(self::refreshStatement($view, DB::transactionLevel()));
+        if (Dialect::for() === Dialect::MySql) {
+            $this->refreshMySql($view);
+        } else {
+            $this->db()->statement(self::refreshStatement($view, $this->db()->transactionLevel()));
+        }
 
-        $this->info("Refreshed the {$view} materialized view.");
+        $this->info("Refreshed the {$view} delivery-metrics rollup.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * MySQL has no materialized view to REFRESH, so the rollup table is rebuilt in place: clear it
+     * and re-aggregate the window in one transaction, so a reader never sees a half-built or empty
+     * rollup — the whole previous snapshot stays visible (InnoDB consistent reads) until commit.
+     */
+    private function refreshMySql(string $view): void
+    {
+        $since = Timestamp::mysql(CarbonImmutable::now('UTC')->subDays(35));
+
+        $this->db()->transaction(function () use ($view, $since): void {
+            $this->db()->table($view)->delete();
+            $this->db()->insert(RollupRefresh::mysql(), [$since, $since]);
+        });
     }
 
     /**
