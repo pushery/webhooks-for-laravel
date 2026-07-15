@@ -6,8 +6,9 @@ namespace Webhooks\Database;
 
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\ConnectionInterface;
 use Webhooks\Support\Timestamp;
+use Webhooks\Support\WebhookConnection;
 
 /**
  * Creates and drops the monthly range partitions behind the webhook_deliveries
@@ -32,6 +33,11 @@ final class PartitionManager
     private const string TABLE = 'webhook_deliveries';
 
     private const string DEFAULT_PARTITION = self::TABLE.'_default';
+
+    private function db(): ConnectionInterface
+    {
+        return WebhookConnection::db();
+    }
 
     public function partitionName(CarbonInterface $month): string
     {
@@ -58,7 +64,7 @@ final class PartitionManager
             return $name;
         }
 
-        DB::statement(sprintf(
+        $this->db()->statement(sprintf(
             'CREATE TABLE IF NOT EXISTS %s PARTITION OF %s FOR VALUES FROM (%s) TO (%s)',
             $name,
             self::TABLE,
@@ -81,7 +87,7 @@ final class PartitionManager
 
     public function ensureDefaultPartition(): void
     {
-        DB::statement(sprintf(
+        $this->db()->statement(sprintf(
             'CREATE TABLE IF NOT EXISTS %s PARTITION OF %s DEFAULT',
             self::DEFAULT_PARTITION,
             self::TABLE,
@@ -127,7 +133,7 @@ final class PartitionManager
             $bindings = [Timestamp::sql($from), Timestamp::sql($to)];
         }
 
-        $total = data_get(DB::selectOne($sql, $bindings), 'total');
+        $total = data_get($this->db()->selectOne($sql, $bindings), 'total');
 
         return is_numeric($total) ? (int) $total : 0;
     }
@@ -140,7 +146,7 @@ final class PartitionManager
      */
     public function monthlyPartitions(): array
     {
-        $rows = DB::select(<<<'SQL'
+        $rows = $this->db()->select(<<<'SQL'
             SELECT c.relname AS name
             FROM pg_inherits i
             JOIN pg_class c ON c.oid = i.inhrelid
@@ -176,7 +182,7 @@ final class PartitionManager
 
         foreach ($this->monthlyPartitions() as $name) {
             if (substr($name, $prefixLength) < $cutoff) {
-                DB::statement('DROP TABLE IF EXISTS '.$name);
+                $this->db()->statement('DROP TABLE IF EXISTS '.$name);
                 $dropped[] = $name;
             }
         }
@@ -196,7 +202,7 @@ final class PartitionManager
             return [];
         }
 
-        $rows = DB::select(
+        $rows = $this->db()->select(
             'SELECT DISTINCT date_trunc(\'month\', created_at AT TIME ZONE \'UTC\') AS month '
             .'FROM '.self::DEFAULT_PARTITION.' ORDER BY month'
         );
@@ -229,10 +235,10 @@ final class PartitionManager
         $from = Timestamp::sql($start);
         $to = Timestamp::sql($end);
 
-        DB::transaction(function () use ($name, $start, $end, $columns, $from, $to): void {
-            DB::statement(sprintf('ALTER TABLE %s DETACH PARTITION %s', self::TABLE, self::DEFAULT_PARTITION));
+        $this->db()->transaction(function () use ($name, $start, $end, $columns, $from, $to): void {
+            $this->db()->statement(sprintf('ALTER TABLE %s DETACH PARTITION %s', self::TABLE, self::DEFAULT_PARTITION));
 
-            DB::statement(sprintf(
+            $this->db()->statement(sprintf(
                 'CREATE TABLE IF NOT EXISTS %s PARTITION OF %s FOR VALUES FROM (%s) TO (%s)',
                 $name,
                 self::TABLE,
@@ -240,17 +246,17 @@ final class PartitionManager
                 $this->quoteTimestamp($end),
             ));
 
-            DB::statement(
+            $this->db()->statement(
                 sprintf('INSERT INTO %s (%s) SELECT %s FROM %s WHERE created_at >= ? AND created_at < ?', self::TABLE, $columns, $columns, self::DEFAULT_PARTITION),
                 [$from, $to],
             );
 
-            DB::statement(
+            $this->db()->statement(
                 sprintf('DELETE FROM %s WHERE created_at >= ? AND created_at < ?', self::DEFAULT_PARTITION),
                 [$from, $to],
             );
 
-            DB::statement(sprintf('ALTER TABLE %s ATTACH PARTITION %s DEFAULT', self::TABLE, self::DEFAULT_PARTITION));
+            $this->db()->statement(sprintf('ALTER TABLE %s ATTACH PARTITION %s DEFAULT', self::TABLE, self::DEFAULT_PARTITION));
         });
     }
 
@@ -262,7 +268,7 @@ final class PartitionManager
      */
     private function insertableColumns(): array
     {
-        $rows = DB::select(
+        $rows = $this->db()->select(
             'SELECT column_name FROM information_schema.columns '
             .'WHERE table_schema = current_schema() AND table_name = ? AND is_generated = \'NEVER\' '
             .'ORDER BY ordinal_position',
@@ -284,7 +290,7 @@ final class PartitionManager
 
     private function tableExists(string $name): bool
     {
-        return data_get(DB::selectOne('SELECT to_regclass(?) AS oid', [$name]), 'oid') !== null;
+        return data_get($this->db()->selectOne('SELECT to_regclass(?) AS oid', [$name]), 'oid') !== null;
     }
 
     /**

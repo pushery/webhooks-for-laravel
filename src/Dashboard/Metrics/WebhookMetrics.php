@@ -7,16 +7,19 @@ namespace Webhooks\Dashboard\Metrics;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterval;
 use Illuminate\Container\Container;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use stdClass;
 use Webhooks\Dashboard\Data\KpiSet;
+use Webhooks\Database\Dialect\Dialect;
+use Webhooks\Database\Dialect\Sql\PercentileSelect;
 use Webhooks\Models\WebhookDelivery;
 use Webhooks\Support\TenantIdentity;
 use Webhooks\Support\Timestamp;
+use Webhooks\Support\WebhookConnection;
 
 /**
  * The dashboard's reporting query object, scoped to one tenant and one time window.
@@ -50,6 +53,11 @@ final readonly class WebhookMetrics
         private CarbonInterval $window,
     ) {}
 
+    private function db(): ConnectionInterface
+    {
+        return WebhookConnection::db();
+    }
+
     /**
      * Summed counts from the rollup plus the live window-level latency percentiles.
      */
@@ -78,7 +86,7 @@ final readonly class WebhookMetrics
      */
     private function buildKpiSet(array $percentiles): KpiSet
     {
-        $counts = (array) DB::table(self::HOURLY_VIEW)
+        $counts = (array) $this->db()->table(self::HOURLY_VIEW)
             ->where('owner_type', $this->owner->type)
             ->where('owner_id', $this->owner->id)
             ->where('bucket', '>=', $this->since())
@@ -112,7 +120,7 @@ final readonly class WebhookMetrics
      */
     public function hourly(): Collection
     {
-        return DB::table(self::HOURLY_VIEW)
+        return $this->db()->table(self::HOURLY_VIEW)
             ->where('owner_type', $this->owner->type)
             ->where('owner_id', $this->owner->id)
             ->where('bucket', '>=', $this->since())
@@ -127,7 +135,7 @@ final readonly class WebhookMetrics
      */
     public function topEvents(int $limit = 5): Collection
     {
-        return DB::table($this->sourceTable())
+        return $this->db()->table($this->sourceTable())
             ->where('owner_type', $this->owner->type)
             ->where('owner_id', $this->owner->id)
             ->where('created_at', '>=', $this->since())
@@ -180,11 +188,8 @@ final readonly class WebhookMetrics
      */
     private function livePercentiles(): array
     {
-        $row = (array) DB::selectOne(
-            'SELECT pct[1] AS p50, pct[2] AS p90, pct[3] AS p95, pct[4] AS p99 FROM ('
-            .'SELECT percentile_cont(ARRAY[0.5, 0.9, 0.95, 0.99]) WITHIN GROUP (ORDER BY duration_ms) AS pct '
-            .'FROM '.$this->sourceTable().' WHERE owner_type = ? AND owner_id = ? AND created_at >= ?'
-            .') s',
+        $row = (array) $this->db()->selectOne(
+            $this->livePercentileSql(),
             [$this->owner->type, $this->owner->id, $this->since()],
         );
 
@@ -194,6 +199,28 @@ final readonly class WebhookMetrics
             'p95' => $this->toFloat($row['p95'] ?? 0),
             'p99' => $this->toFloat($row['p99'] ?? 0),
         ];
+    }
+
+    /**
+     * The window-level percentile query for the current dialect. PostgreSQL computes all four in
+     * one percentile_cont(ARRAY[...]); MySQL reconstructs them with a single window-function pass.
+     */
+    private function livePercentileSql(): string
+    {
+        $where = 'owner_type = ? AND owner_id = ? AND created_at >= ?';
+
+        if (Dialect::for() === Dialect::MySql) {
+            return PercentileSelect::mysqlWindowMulti(
+                ['p50' => 0.5, 'p90' => 0.9, 'p95' => 0.95, 'p99' => 0.99],
+                $this->sourceTable(),
+                $where,
+            );
+        }
+
+        return 'SELECT pct[1] AS p50, pct[2] AS p90, pct[3] AS p95, pct[4] AS p99 FROM ('
+            .'SELECT percentile_cont(ARRAY[0.5, 0.9, 0.95, 0.99]) WITHIN GROUP (ORDER BY duration_ms) AS pct '
+            .'FROM '.$this->sourceTable().' WHERE '.$where
+            .') s';
     }
 
     /**
@@ -209,7 +236,7 @@ final readonly class WebhookMetrics
     {
         TdigestExtension::ensureInstalled();
 
-        $row = (array) DB::selectOne(
+        $row = (array) $this->db()->selectOne(
             'WITH merged AS ('
             .'SELECT rollup(latency_digest) AS digest FROM '.self::HOURLY_VIEW.' '
             .'WHERE owner_type = ? AND owner_id = ? AND bucket >= ?'
@@ -264,7 +291,9 @@ final readonly class WebhookMetrics
      */
     private function since(): string
     {
-        return Timestamp::sql($this->from());
+        return Dialect::for() === Dialect::MySql
+            ? Timestamp::mysql($this->from())
+            : Timestamp::sql($this->from());
     }
 
     /**

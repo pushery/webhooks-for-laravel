@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Override;
 use Webhooks\Database\Concerns\HasZonedTimestamps;
+use Webhooks\Database\Concerns\UsesWebhookConnection;
 use Webhooks\Database\Factories\WebhookServerDeliveryFactory;
 use Webhooks\Enums\DeliveryStatus;
 use Webhooks\Support\Timestamp;
@@ -49,6 +50,7 @@ class WebhookServerDelivery extends Model
 
     use HasZonedTimestamps;
     use MassPrunable;
+    use UsesWebhookConnection;
 
     /**
      * The log is append-then-update-in-place, tracking created_at and delivered_at

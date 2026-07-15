@@ -7,8 +7,8 @@ namespace Webhooks\Server\Listeners;
 use DateTimeInterface;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Date;
-use Illuminate\Support\Facades\DB;
 use Throwable;
 use Webhooks\Enums\DeliveryStatus;
 use Webhooks\Server\Data\WebhookDeliveryData;
@@ -19,6 +19,7 @@ use Webhooks\Server\Events\WebhookAttemptStarting;
 use Webhooks\Server\Events\WebhookAttemptSucceeded;
 use Webhooks\Server\Events\WebhookDeliveryDispatching;
 use Webhooks\Server\Models\WebhookServerDelivery;
+use Webhooks\Support\WebhookConnection;
 
 /**
  * The standalone counterpart to the Platform delivery-log subscriber: it maps the
@@ -130,7 +131,7 @@ final class PersistServerDelivery
         }
 
         try {
-            DB::transaction(static fn () => $delivery->save());
+            WebhookConnection::db()->transaction(static fn () => $delivery->save());
         } catch (QueryException $exception) {
             if (! $retry || ! $this->isUniqueViolation($exception)) {
                 throw $exception;
@@ -141,12 +142,17 @@ final class PersistServerDelivery
     }
 
     /**
-     * Whether a query failure is a unique-constraint violation (Postgres SQLSTATE
-     * 23505) — a lost insert race on the unique message_id, not a real error.
+     * Whether a query failure is a unique-constraint violation — a lost insert race on the
+     * unique message_id, not a real error. Laravel marshals a duplicate-key error into
+     * UniqueConstraintViolationException on both PostgreSQL and MySQL, so that is the portable
+     * signal. The explicit 23505 string comparison is kept ALONGSIDE it, not replaced: a driver
+     * that reports the SQLSTATE as an integer (rather than the string Laravel's own detector
+     * requires) is still recognised and recovered rather than surfacing as a hard write error.
      */
     private function isUniqueViolation(QueryException $exception): bool
     {
-        return (string) $exception->getCode() === '23505';
+        return $exception instanceof UniqueConstraintViolationException
+            || (string) $exception->getCode() === '23505';
     }
 
     private function errorFrom(?Throwable $exception): string

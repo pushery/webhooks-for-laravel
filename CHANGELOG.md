@@ -4,6 +4,53 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-07-15
+
+### Added
+
+- **MySQL 8.4+ is now a first-class storage engine, alongside PostgreSQL.** The persistent
+  layers (Platform, Client, Dashboard and standalone persistence) run on **either**
+  PostgreSQL 13+ or MySQL 8.4+, and every guarantee holds identically on both: exact
+  percentile numbers, race-free de-duplication, the `body_sha256` byte-fidelity promise, the
+  database-enforced `ON DELETE CASCADE` erasure cascade, DST-safe timestamps, and
+  case-sensitive identity. What MySQL trades away is storage *optimizations* (O(1)
+  partition-drop retention, partial indexes, the optional `tdigest` percentile tier), never
+  correctness. Choose the engine your application already runs on — the new **Choosing your
+  database** section in the README states the differences, with a tip and a recommendation for
+  each. MariaDB is rejected with a clear error (its `JSON` is a text alias and it lacks the
+  multi-valued and functional indexes the engine relies on).
+- **A dedicated database connection for the package's tables.** Set
+  `webhooks.database.connection` (env `WEBHOOKS_DB_CONNECTION`) to keep every webhook table on
+  a connection other than the application default — the headline case being a MySQL
+  application with a PostgreSQL side-car. The models, migrations and analytics queries all
+  resolve the same configured connection, so the package never splits across two databases;
+  left unset, everything stays on the application default. `webhooks:preflight` reports the
+  resolved connection and, on MySQL, checks it against every requirement.
+- **A migration guide for `spatie/laravel-webhook-server` and `spatie/laravel-webhook-client`
+  users** — the field mapping onto this package's superset, on MySQL or PostgreSQL.
+
+### Changed
+
+- **Persistence is no longer PostgreSQL-only.** The 1.0.x line documented the storage layer as
+  PostgreSQL-only by design; that is now retracted — MySQL 8.4+ is fully supported. Two
+  changes are visible to an existing PostgreSQL application on upgrade, both safe: the delivery
+  log gains a plain `created_at` index (previously only partial and composite indexes existed;
+  the index keeps retention cheap on both engines), and the delivery-log primary key orders by
+  a time-ordered UUID, preserving insert locality. Re-publish and review the migrations before
+  upgrading a populated database.
+- The `Webhooks\Database\PostgresRequirement` guard (reached only by a migration copy published
+  from 1.0.0) now names the layer and the ways forward — re-publish for the MySQL schema, point
+  at a PostgreSQL connection, or run send-only — instead of pointing only at Neon.
+
+### Fixed
+
+- **Send-only and receive-only apps are now isolated by the configuration gate, not by a data
+  convention.** The delivery gate was rebound to the subscription-reading gate unconditionally,
+  so a send-only host that set a `subscription_id` delivery-meta key would query the
+  `webhook_subscriptions` table — one its configuration never migrated. The rebind now happens
+  only while the Platform layer is enabled, so a send-only or receive-only app keeps the open
+  gate.
+
 ## [1.0.1] - 2026-07-14
 
 ### Fixed
@@ -382,7 +429,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/pushery/webhooks-for-laravel/compare/v0.1.3...v1.0.0
 [0.1.3]: https://github.com/pushery/webhooks-for-laravel/compare/v0.1.2...v0.1.3

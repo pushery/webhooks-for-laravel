@@ -9,6 +9,8 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Webhooks\Database\Dialect\Dialect;
+use Webhooks\Database\Dialect\Sql\NullsLastOrder;
 use Webhooks\Models\WebhookSubscription;
 use Webhooks\Platform\Health\EndpointHealth;
 use Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
@@ -135,14 +137,9 @@ final class EndpointHealthMatrix extends Component
      */
     private function orderClause(): string
     {
-        $ascending = $this->sortDirection === 'asc';
+        $column = $this->sortField === 'status' ? 'health_status' : 'health_score';
 
-        return match (true) {
-            $this->sortField === 'status' && $ascending => 'health_status asc nulls last',
-            $this->sortField === 'status' => 'health_status desc nulls last',
-            $ascending => 'health_score asc nulls last',
-            default => 'health_score desc nulls last',
-        };
+        return NullsLastOrder::by(Dialect::for(), $column, $this->sortDirection === 'asc');
     }
 
     public function render(): View

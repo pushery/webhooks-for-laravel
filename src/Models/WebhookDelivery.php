@@ -13,6 +13,7 @@ use Illuminate\Support\Carbon;
 use Override;
 use Webhooks\Core\Payload\PayloadStore;
 use Webhooks\Database\Concerns\HasZonedTimestamps;
+use Webhooks\Database\Concerns\UsesWebhookConnection;
 use Webhooks\Database\Factories\WebhookDeliveryFactory;
 use Webhooks\Enums\DeliveryStatus;
 
@@ -46,6 +47,7 @@ class WebhookDelivery extends Model
 
     use HasUuids;
     use HasZonedTimestamps;
+    use UsesWebhookConnection;
 
     /**
      * The log is append-then-update-in-place; it tracks created_at and
@@ -141,7 +143,7 @@ class WebhookDelivery extends Model
      * @return Builder<static>
      */
     #[Override]
-    protected function setKeysForSaveQuery($query)
+    protected function setKeysForSaveQuery($query): Builder
     {
         $query->where($this->getKeyName(), '=', $this->getKeyForSaveQuery());
 

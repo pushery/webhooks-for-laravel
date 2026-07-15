@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Carbon;
 use Override;
 use Webhooks\Database\Concerns\HasZonedTimestamps;
+use Webhooks\Database\Concerns\UsesWebhookConnection;
 use Webhooks\Database\Factories\WebhookSubscriptionFactory;
 
 /**
@@ -46,6 +47,7 @@ final class WebhookSubscription extends Model
     use HasFactory;
 
     use HasZonedTimestamps;
+    use UsesWebhookConnection;
 
     protected $table = 'webhook_subscriptions';
 
