@@ -110,7 +110,7 @@ final class WebhookMetricsController
     private function metricsFor(string $window): WebhookMetrics
     {
         return Container::getInstance()->make(WebhookMetrics::class, [
-            'owner' => DashboardScope::currentOwner(),
+            'tenant' => DashboardScope::current(),
             'window' => WindowResolver::interval($window),
         ]);
     }

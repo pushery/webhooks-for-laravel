@@ -138,6 +138,28 @@ you test a host app on this topology, transact **both** connections so each case
 protected $connectionsToTransact = ['mysql', 'webhooks_pgsql'];
 ```
 
+### Scheduled maintenance, and turning it off per tenant
+
+The package schedules its own maintenance against the default connection — partition rolling,
+rotated-secret revocation, the dashboard rollup refresh, endpoint-health sweeps and log
+pruning. A single-database app wants this on (the default), and it just works.
+
+A **DB-per-tenant** host must turn it off, or the maintenance runs only on the central
+database and never on a tenant's — the delivery log grows unbounded and the dashboard reads
+empty. Set `webhooks.schedule.enabled` to `false` and the package registers **nothing** in the
+scheduler; the commands are unchanged, so run them yourself inside your tenant loop:
+
+```php
+// config/webhooks.php
+'schedule' => ['enabled' => false],
+
+// then, in your own scheduler, per tenant:
+foreach (Tenant::active() as $tenant) {
+    $tenant->run(fn () => Artisan::call('webhooks:partition-maintenance'));
+    // …and webhooks:revoke-rotated-secrets, webhooks:refresh-metrics, model:prune, and so on.
+}
+```
+
 ## Installation
 
 ```bash
@@ -189,6 +211,10 @@ PendingWebhook::create()
 
 The delivery is queued, signed with a Standard Webhooks signature, and retried with
 backoff. Run a queue worker (or use `->dispatchSync()` to send inline).
+
+`dispatch()` returns the `WebhookDeliveryData` it queued, whose `messageId` (stable across
+retries) is your correlation key — a **Server-only** app, with no Platform delivery row, records
+it against its own log and any later status callback: `$id = PendingWebhook::create()…->dispatch()->messageId;`.
 
 ### Receive and verify one
 
@@ -367,9 +393,15 @@ the source → de-duplicate → filter → store → dispatch the handler job.
   `Webhooks\Client\Events\InvalidWebhookSignature`.
 - **Replay protection.** The signed timestamp is checked against `tolerance_seconds`
   (default `300`).
-- **Idempotency.** Two-tier dedupe on the producer's `webhook-id`: a cache fast path in
+- **Idempotency.** Two-tier dedupe on the producer's delivery id: a cache fast path in
   front of a partial-unique insert, so an at-least-once sender (including this package's
-  own Server on retry) is never processed twice. A call with no id is always stored.
+  own Server on retry) is never processed twice. A call with no id is always stored. By
+  default the id is read from the `webhook-id` header; providers that carry no delivery-id
+  header (Stripe's `evt_…` is in the body, Mollie and SendCloud send none) set `dedupe_id`
+  to read it from elsewhere — `'header:X-Delivery-Id'`, `'body:data.object.id'` (a dotted
+  path into the JSON body), or a `Webhooks\Client\Dedupe\DedupeKeyResolver` class. Without
+  it the key stays null, a null collides with nothing, and dedupe silently does nothing for
+  exactly those providers.
 - **Raw-body capture.** A prepended middleware preserves the exact bytes the signature
   was computed over, before any body parsing.
 - **Event routing.** `process` is either a single `ProcessWebhookJob` subclass or an
@@ -418,10 +450,26 @@ Other schemes ship for interop: `StripeScheme`, `GitHubScheme` and
 `PlainHmacScheme` (receive adapters for those producers), and the asymmetric
 **`Ed25519Scheme`** — the Standard Webhooks `v1a` variant, which carries a
 `webhook-signature: v1a,<base64>` entry so a receiver only ever holds the public key.
+
+A producer that uses a different header name needs no scheme class of its own: set
+`signature_headers.signature` and it is injected into any header-overridable scheme (e.g.
+`PlainHmacScheme` for SendCloud's `Sendcloud-Signature`). A key you omit keeps the scheme's
+own default, so `GitHubScheme` keeps `X-Hub-Signature-256`; `StripeScheme`'s header is fixed.
 Generate a keypair with `php artisan webhooks:ed25519-keygen` or
 `Webhooks\Core\Signing\Ed25519Keys::generate()`. A receiver may pin a static public key
 or point `jwks.url` at the producer's JSON Web Key Set of Ed25519 keys — fetched through
 the SSRF guard and cached — for rotating provider keys.
+
+**Verification that isn't a signature.** Some providers can't be verified by a pure
+function of the bytes: Mollie signs nothing (authenticity is an authenticated API call
+back to it), PayPal verifies through a cert-chain API keyed on a webhook ID, not a secret.
+Point a config's `verifier` at a `Webhooks\Client\Verification\InboundVerifier` — a
+container-resolved class that receives the `Request` and `WebhookConfig` and returns a
+`VerificationResult`. It takes precedence over `scheme`, makes `secret` optional, and
+leaves the entire rest of the pipeline (rate limit, dedupe, store, dispatch, the
+401-and-store-nothing path) untouched — so a non-HMAC provider gets everything the package
+does without you rebuilding a controller. Treat a failed provider callback as *not* valid,
+so an unreachable provider never turns the endpoint into an open write surface.
 
 **Secret rotation** is first-class: `Webhooks\Core\Signing\SecretSet::rotating($current,
 $previous)` (or `->useSecrets()` on a call) signs with both, so verification never breaks
@@ -465,6 +513,19 @@ $subscription->secret;                       // reveal once — it signs their d
 
 WebhookEvent::dispatch('invoice.paid', ['invoice_id' => 'in_123'], tenant: $team);
 ```
+
+> **Owners must have an integer primary key.** `owner_id` is denormalized as a bigint across
+> the delivery log and the dashboard rollup, so a UUID-keyed owner cannot be stored —
+> `subscribe()` rejects one up front with a clear error rather than failing on the first
+> fan-out. Use an integer-keyed owner model, or a global (`null`) endpoint. This is
+> independent of `Schema::defaultMorphKeyType()`: the package's owner columns are always
+> bigint.
+
+Event types match exactly by default. Turn on `platform.wildcards` to let a subscription
+list a **prefix wildcard** — `order.*` receives every event under that prefix, so a concrete
+`order.line.added` reaches subscribers of `order.line.added`, `order.line.*` and `order.*`
+(one prefix per dot). Each arm stays an indexed JSON-containment lookup, so the fan-out is
+still an index scan.
 
 Each subscriber receives a signed POST whose JSON body is an envelope:
 
@@ -517,6 +578,14 @@ Every query is scoped so a tenant only ever sees the endpoints it owns, guarded 
 `route_prefix` behind `middleware`, `max_endpoints_per_tenant` caps registrations, and the
 views are publishable (`--tag=webhooks-self-service-views`) if you are on another UI kit
 and want to restyle them.
+
+> **Authorization is fail-closed — you must grant access.** The `manage-webhook-endpoints`
+> gate **denies** until your app defines a `webhooks.manage` ability, so registering the layer
+> never silently opens endpoint management to every authenticated user. Opt a tenant in:
+>
+> ```php
+> Gate::define('webhooks.manage', fn ($user) => $user->isAdmin());
+> ```
 
 **Endpoint health scoring (opt-in).** Each active endpoint earns a 0–100 score blended
 from its recent success rate, a p95-latency penalty and a consecutive-failure penalty,
@@ -592,6 +661,14 @@ one-click redelivery — on a tabbed full-page component. Access is guarded by a
 `view-webhook-dashboard` gate and a `WebhookDeliveryPolicy`, and every query is
 tenant-scoped.
 
+> **Authorization is fail-closed — you must grant access.** The `view-webhook-dashboard`
+> gate **denies** until your app defines a `webhooks.view` ability, so registering the
+> dashboard never silently exposes the operator surface to every authenticated user. Grant it:
+>
+> ```php
+> Gate::define('webhooks.view', fn ($user) => $user->isAdmin());
+> ```
+
 The read model is an hourly materialized view refreshed by
 `php artisan webhooks:refresh-metrics` (scheduled at `dashboard.metrics.refresh`). The
 page mounts at `dashboard.prefix` behind `dashboard.middleware`; the Blade views are
@@ -602,6 +679,16 @@ and restyling them is the supported escape hatch from WireKit. For very high vol
 which is what Laravel Cloud's Postgres is). The default `live` driver needs no extension,
 is the same complexity class on both engines, and returns **identical** numbers — so this
 tier is an optimization for extreme volume, not a correctness or an engine-choice matter.
+
+#### Operator mode — observing your global endpoints
+
+The dashboard is tenant-scoped by default: it reads the endpoints and deliveries owned by the
+acting tenant. If instead you run a handful of **global** endpoints (subscriptions registered with
+a `null` owner, which receive every event), set `dashboard.operator = true`
+(`WEBHOOKS_DASHBOARD_OPERATOR=true`). The dashboard then reads exactly those owner-less rows — no
+tenant is resolved, so the resolver is not needed. It never shows one tenant's private rows to
+another: operator mode is *global rows only*, not *all rows*. Because it shows those rows to
+everyone the `view-webhook-dashboard` gate admits, gate that ability to your operators.
 
 ### JSON metrics endpoint (opt-in)
 
@@ -660,6 +747,37 @@ material are exposed. Latencies are milliseconds; `retry_rate` is a percentage.
 A separate, single-view **Laravel Pulse** card for your own engineers is available under
 `pulse.enabled` (its provider is not auto-registered and `laravel/pulse` stays a
 suggestion) — throughput, failure rate and latency of outbound deliveries by event type.
+
+### Querying the tables yourself
+
+If you write your own health check or report against the package's tables — `WebhookDelivery`,
+`WebhookCall`, `WebhookServerDelivery` — **bind timestamps through the shipped scopes**, never a
+plain `->where('created_at', …)`. Every timestamp column is `timestamptz` (PostgreSQL) or a
+UTC-naive `DATETIME(6)` (MySQL); a naive literal is resolved against the **database session time
+zone**, which is unrelated to `app.timezone` and routinely not UTC — so a hand-bound comparison is
+off by that offset and quietly returns the wrong rows, with no error to notice. A health check
+written that way can never fire.
+
+The scopes bind the instant, per dialect, so you can't get it wrong:
+
+```php
+use Webhooks\Models\WebhookDelivery;
+
+// "Are deliveries piling up undelivered because no worker is running?"
+$stuck = WebhookDelivery::query()
+    ->pendingSince(now()->subMinutes(15))
+    ->count();
+
+WebhookDelivery::query()->createdBefore(now()->subDay());        // strictly before
+WebhookDelivery::query()->createdAfter($since);                  // at or after
+WebhookDelivery::query()->createdBetween($from, $to);            // half-open [from, to)
+WebhookDelivery::query()->whereTimestamp('delivered_at', '>=', $since);  // any column
+```
+
+For a raw statement the scopes don't cover, `(new WebhookDelivery)->boundTimestamp($moment)` returns
+the same offset-correct literal to bind by hand. A raw format constant is deliberately **not**
+exposed: the correct literal differs by engine, so a copied constant would be right on one and wrong
+on the other — only a dialect-aware binding is safe.
 
 ## Events
 
@@ -826,6 +944,31 @@ the dashboard without forking a view: `--wh-chart-height` and `--wh-sparkline-he
 If you are on another UI kit entirely, publish the views (`--tag=webhooks-views`,
 `--tag=webhooks-dashboard-views`, `--tag=webhooks-self-service-views`) and restyle them;
 the pagination control (`webhooks::pagination`) publishes with them.
+
+### Embedding in an app with its own asset pipeline and a strict CSP
+
+The shipped layouts emit only WireKit's tokens (`@wirekitStyles`), so an app with its own
+Vite build has nowhere to load **its** compiled CSS — and its `@source` glob (above) has to
+reach `vendor/` for the utilities to build at all. Rather than publishing and forking the
+layout, point `ui.assets` at a Blade partial and the layouts `@include` it in `<head>`:
+
+```php
+// config/webhooks.php
+'ui' => [
+    'assets' => 'webhooks-assets',   // resources/views/webhooks-assets.blade.php: @vite(['resources/css/app.css'])
+],
+```
+
+Under a **strict Content-Security-Policy**, the one inline script the layouts emit — the
+`theme = 'auto'` dark-mode mirror — is blocked unless it carries a nonce. Either pin the
+theme (`WEBHOOKS_UI_THEME=light`/`dark`) to drop the script entirely, or keep `auto` and give
+it a nonce your policy allows:
+
+```php
+'ui' => [
+    'csp_nonce' => fn () => \Illuminate\Support\Facades\Vite::cspNonce(),  // string or per-request callable
+],
+```
 
 ## Configuration
 

@@ -14,6 +14,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Webhooks\Client\Events\InvalidWebhookSignature;
 use Webhooks\Client\Http\CaptureRawBody;
 use Webhooks\Client\Models\WebhookCall;
+use Webhooks\Client\Verification\InboundVerifier;
 use Webhooks\Core\Payload\PayloadSanitizer;
 use Webhooks\Core\Payload\PayloadStore;
 use Webhooks\Core\Signing\SignatureHeaders;
@@ -57,12 +58,19 @@ final readonly class WebhookProcessor
         $rawBody = $this->rawBody();
         $headers = SignatureHeaders::from($this->flattenHeaders());
 
-        $result = $this->config->scheme()->verify(
-            $rawBody,
-            $headers,
-            $this->config->secrets(),
-            $this->config->tolerance(),
-        );
+        // A configured verifier authenticates the request itself (an API callback, a cert
+        // chain) and takes precedence over the signature scheme; only its absence falls
+        // through to the pure-function scheme + shared secret.
+        $verifier = $this->config->verifier();
+
+        $result = $verifier instanceof InboundVerifier
+            ? $verifier->verify($this->request, $this->config)
+            : $this->config->scheme()->verify(
+                $rawBody,
+                $headers,
+                $this->config->secrets(),
+                $this->config->tolerance(),
+            );
 
         if (! $result->isValid()) {
             InvalidWebhookSignature::dispatch($this->request, $this->config, $result->reason());
@@ -75,7 +83,7 @@ final readonly class WebhookProcessor
         // store so a limited request is neither persisted nor dispatched.
         $this->enforceRateLimit();
 
-        $webhookId = $this->config->webhookId($headers);
+        $webhookId = $this->config->webhookId($headers, $rawBody);
         $fastPathDedupe = $webhookId !== null && $this->config->usesFastPathDedupe();
 
         // Fast-path dedupe: a repeated delivery whose id was already durably stored

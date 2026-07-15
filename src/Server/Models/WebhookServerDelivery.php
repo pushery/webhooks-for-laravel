@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Override;
 use Webhooks\Database\Concerns\HasZonedTimestamps;
+use Webhooks\Database\Concerns\ScopesByTimestamp;
 use Webhooks\Database\Concerns\UsesWebhookConnection;
 use Webhooks\Database\Factories\WebhookServerDeliveryFactory;
 use Webhooks\Enums\DeliveryStatus;
@@ -50,6 +51,7 @@ class WebhookServerDelivery extends Model
 
     use HasZonedTimestamps;
     use MassPrunable;
+    use ScopesByTimestamp;
     use UsesWebhookConnection;
 
     /**

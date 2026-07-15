@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Webhooks\Models\WebhookSubscription;
+use Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
 use Webhooks\Platform\Transform\DeclarativePayloadTransformer;
 
 /**
@@ -30,6 +31,8 @@ use Webhooks\Platform\Transform\DeclarativePayloadTransformer;
 #[Layout('webhooks::self-service.layout')]
 final class PayloadTransformEditor extends Component
 {
+    use InteractsWithEndpoints;
+
     public ?int $endpointId = null;
 
     public ?string $endpointUrl = null;
@@ -102,7 +105,9 @@ final class PayloadTransformEditor extends Component
      */
     public function save(): void
     {
-        $subscription = WebhookSubscription::query()->findOrFail((int) $this->endpointId);
+        // Scope at the query, not only at the policy: a tampered endpointId resolves to nothing and
+        // fails not-found before the save runs — the row-level policy below is the second guard.
+        $subscription = $this->findOwnedEndpoint((int) $this->endpointId);
         $this->authorize('update', $subscription);
 
         $rules = $this->buildRules();

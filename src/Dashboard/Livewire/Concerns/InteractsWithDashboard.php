@@ -31,7 +31,7 @@ trait InteractsWithDashboard
     protected function metricsFor(string $window): WebhookMetrics
     {
         return Container::getInstance()->make(WebhookMetrics::class, [
-            'owner' => DashboardScope::currentOwner(),
+            'tenant' => DashboardScope::current(),
             'window' => WindowResolver::interval($window),
         ]);
     }
@@ -68,12 +68,11 @@ trait InteractsWithDashboard
      */
     protected function scopedDelivery(string $deliveryId): WebhookDelivery
     {
-        $owner = DashboardScope::currentOwner();
+        [$ownerSql, $ownerBindings] = DashboardScope::current()->condition();
 
         return $this->sourceModel()
             ->newQuery()
-            ->where('owner_type', $owner->type)
-            ->where('owner_id', $owner->id)
+            ->whereRaw($ownerSql, $ownerBindings)
             ->findOrFail($deliveryId);
     }
 

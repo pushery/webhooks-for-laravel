@@ -245,7 +245,11 @@ final class Settings
      */
     public function largePayloadThreshold(): int
     {
-        return Config::integer('webhooks.server.large_payload.threshold', 0);
+        // 262144, matching config/webhooks.php — not 0. mergeConfigFrom only shallow-merges the
+        // top-level keys, so a host that publishes a trimmed `server` block with
+        // large_payload.enabled = true but no threshold would otherwise fall to 0 here and offload
+        // EVERY payload to disk, not just the large ones.
+        return Config::integer('webhooks.server.large_payload.threshold', 262144);
     }
 
     /**

@@ -108,6 +108,12 @@ final class WebhooksServiceProvider extends ServiceProvider
         Event::subscribe(RefreshEndpointHealthOnDelivery::class);
 
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
+            // A DB-per-tenant host turns the package schedule off and drives these commands from
+            // its own tenant loop; registering nothing here is what lets it (webhooks.schedule.enabled).
+            if (! Config::boolean('webhooks.schedule.enabled', true)) {
+                return;
+            }
+
             $schedule->command('webhooks:partition-maintenance')->daily();
 
             // A delivery revokes its own endpoint's expired secret, so this only has to
@@ -154,9 +160,10 @@ final class WebhooksServiceProvider extends ServiceProvider
     /**
      * Wire the self-service authorization surface — the manage-webhook-endpoints
      * ability plus the row-level subscription policy — but only when a host has
-     * opted a tenant in to managing its own endpoints. The gate is permissive by
-     * default (any authenticated tenant), deferring to a host 'webhooks.manage'
-     * ability when one is defined, so the layer is turnkey yet tightenable.
+     * opted a tenant in to managing its own endpoints. The gate is fail-CLOSED: with
+     * no host 'webhooks.manage' ability defined it DENIES, so registering the layer
+     * never silently exposes endpoint management to every authenticated user. A host
+     * opts a tenant in by defining 'webhooks.manage'.
      */
     private function registerSelfServiceAuthorization(): void
     {
@@ -165,8 +172,12 @@ final class WebhooksServiceProvider extends ServiceProvider
         }
 
         Gate::define('manage-webhook-endpoints', static function (Authenticatable $user): bool {
+            // Fail CLOSED: a host that registers the self-service layer but never defines the
+            // 'webhooks.manage' ability must NOT silently expose endpoint management to every
+            // authenticated user. With no ability defined, deny — the host opts a tenant in by
+            // defining 'webhooks.manage' (see the README's self-service authorization section).
             if (! Gate::has('webhooks.manage')) {
-                return true;
+                return false;
             }
 
             return Gate::forUser($user)->allows('webhooks.manage');

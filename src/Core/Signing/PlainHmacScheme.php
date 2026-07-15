@@ -17,13 +17,18 @@ namespace Webhooks\Core\Signing;
  * This is a RECEIVE adapter only, selected per source via a Client config
  * `scheme`. It is never a sending default; {@see StandardWebhooksScheme} is.
  */
-final readonly class PlainHmacScheme implements SignatureScheme
+final readonly class PlainHmacScheme implements AcceptsSignatureHeaders, SignatureScheme
 {
     public const string HEADER = 'Signature';
 
     public function __construct(
         private string $signatureHeader = self::HEADER,
     ) {}
+
+    public function withSignatureHeaders(?string $idHeader, ?string $timestampHeader, ?string $signatureHeader): SignatureScheme
+    {
+        return new self($signatureHeader ?? $this->signatureHeader);
+    }
 
     public function sign(WebhookMessage $message, SecretSet $secrets): SignatureHeaders
     {

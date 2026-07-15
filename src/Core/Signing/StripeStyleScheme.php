@@ -17,13 +17,18 @@ use Illuminate\Support\Facades\Date;
  * ({@see StandardWebhooksScheme} is). It is also the generic base for
  * {@see StripeScheme}, which pins the real `Stripe-Signature` header.
  */
-readonly class StripeStyleScheme implements SignatureScheme
+readonly class StripeStyleScheme implements AcceptsSignatureHeaders, SignatureScheme
 {
     public const string HEADER = 'Webhook-Signature';
 
     public function __construct(
         private string $signatureHeader = self::HEADER,
     ) {}
+
+    public function withSignatureHeaders(?string $idHeader, ?string $timestampHeader, ?string $signatureHeader): SignatureScheme
+    {
+        return new self($signatureHeader ?? $this->signatureHeader);
+    }
 
     public function sign(WebhookMessage $message, SecretSet $secrets): SignatureHeaders
     {

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Config;
 use Override;
 use Webhooks\Database\Concerns\HasZonedTimestamps;
 use Webhooks\Database\Concerns\UsesWebhookConnection;
@@ -111,12 +112,48 @@ final class WebhookSubscription extends Model
     }
 
     /**
+     * Subscriptions that listen for an event type. Exact matching by default; with
+     * `webhooks.platform.wildcards` on, a subscription may also list a PREFIX WILDCARD
+     * (`order.*`) and receives every event under that prefix. A concrete `order.line.added`
+     * is then delivered to subscribers of `order.line.added`, `order.line.*` and `order.*` —
+     * one prefix per dot boundary. Each arm is still a `whereJsonContains`, so the GIN /
+     * multi-valued index serves the lookup as before.
+     *
      * @param  Builder<WebhookSubscription>  $query
      * @return Builder<WebhookSubscription>
      */
     public function scopeListeningFor(Builder $query, string $eventType): Builder
     {
-        return $query->whereJsonContains('event_types', $eventType);
+        if (! Config::boolean('webhooks.platform.wildcards', false)) {
+            return $query->whereJsonContains('event_types', $eventType);
+        }
+
+        return $query->where(function (Builder $inner) use ($eventType): void {
+            $inner->whereJsonContains('event_types', $eventType);
+
+            foreach ($this->wildcardsFor($eventType) as $wildcard) {
+                $inner->orWhereJsonContains('event_types', $wildcard);
+            }
+        });
+    }
+
+    /**
+     * The prefix wildcards that cover an event type, one per dot boundary: `a.b.c` yields
+     * `a.*` and `a.b.*`. A dot-less type has none, so it only ever matches exactly.
+     *
+     * @return list<string>
+     */
+    private function wildcardsFor(string $eventType): array
+    {
+        $segments = explode('.', $eventType);
+        $wildcards = [];
+        $counter = count($segments);
+
+        for ($i = 1; $i < $counter; $i++) {
+            $wildcards[] = implode('.', array_slice($segments, 0, $i)).'.*';
+        }
+
+        return $wildcards;
     }
 
     /**

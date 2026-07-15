@@ -78,7 +78,10 @@ final class EndpointHealthMatrix extends Component
      */
     public function recompute(int $id): void
     {
-        $subscription = WebhookSubscription::query()->findOrFail($id);
+        // Scope at the query, not only at the policy: a foreign (or tampered) id resolves to
+        // nothing and fails not-found before any action runs — the row-level policy below is the
+        // second, defence-in-depth guard, not the only one.
+        $subscription = $this->findOwnedEndpoint($id);
         $this->authorize('update', $subscription);
 
         $this->refreshRow($subscription);

@@ -68,4 +68,43 @@ final class UiTheme
     {
         return self::mode() === 'auto';
     }
+
+    /**
+     * The Blade view a host points `webhooks.ui.assets` at to inject its own compiled
+     * assets (its `@vite` tags) into the package layouts' <head>, or null to inject none —
+     * so the shipped screens load the host's asset pipeline without forking the layout.
+     */
+    public static function assetsView(): ?string
+    {
+        $view = Config::get('webhooks.ui.assets');
+
+        return is_string($view) && $view !== '' ? $view : null;
+    }
+
+    /**
+     * The CSP nonce for the inline theme script, from `webhooks.ui.csp_nonce` — a string or
+     * a per-request callable (e.g. fn () => Vite::cspNonce()) — or null when none is set, in
+     * which case no nonce attribute is emitted. Only the 'auto' theme emits the script at all.
+     */
+    public static function nonce(): ?string
+    {
+        $nonce = Config::get('webhooks.ui.csp_nonce');
+
+        if (is_callable($nonce)) {
+            $nonce = $nonce();
+        }
+
+        return is_string($nonce) && $nonce !== '' ? $nonce : null;
+    }
+
+    /**
+     * The ` nonce="…"` attribute for the inline theme script, HTML-escaped, or an empty
+     * string when no nonce is configured. Rendered raw into the <script> tag.
+     */
+    public static function nonceAttribute(): string
+    {
+        $nonce = self::nonce();
+
+        return $nonce === null ? '' : ' nonce="'.htmlspecialchars($nonce, ENT_QUOTES).'"';
+    }
 }

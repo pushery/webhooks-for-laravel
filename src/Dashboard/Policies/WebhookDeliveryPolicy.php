@@ -23,7 +23,7 @@ final class WebhookDeliveryPolicy
 {
     public function redeliver(Authenticatable $user, WebhookDelivery $delivery): bool
     {
-        return DashboardScope::currentOwner()->owns($delivery->owner_type, $delivery->owner_id)
+        return DashboardScope::current()->includes($delivery->owner_type, $delivery->owner_id)
             && $this->hasManageAbility($user);
     }
 

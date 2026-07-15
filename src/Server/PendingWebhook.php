@@ -336,39 +336,47 @@ final class PendingWebhook
     }
 
     /**
+     * Queue the delivery and return the dispatched {@see WebhookDeliveryData} — its messageId
+     * (stable across attempts) lets a Server-only caller, which has no Platform delivery row,
+     * correlate the send with its own log and any later status callback.
+     *
      * @throws JsonException
      */
-    public function dispatch(): void
+    public function dispatch(): WebhookDeliveryData
     {
-        $this->dispatchUsing(dispatch(...));
+        return $this->dispatchUsing(dispatch(...));
     }
 
     /**
+     * Send the delivery on the current process and return the dispatched delivery data.
+     *
      * @throws JsonException
      */
-    public function dispatchSync(): void
+    public function dispatchSync(): WebhookDeliveryData
     {
-        $this->dispatchUsing(dispatch_sync(...));
+        return $this->dispatchUsing(dispatch_sync(...));
     }
 
     /**
+     * Dispatch only when the condition holds; returns the dispatched delivery data, or null when
+     * the condition is false and nothing was sent.
+     *
      * @throws JsonException
      */
-    public function dispatchIf(bool $condition): void
+    public function dispatchIf(bool $condition): ?WebhookDeliveryData
     {
-        if ($condition) {
-            $this->dispatch();
-        }
+        return $condition ? $this->dispatch() : null;
     }
 
     /**
+     * Dispatch unless the condition holds; returns the dispatched delivery data, or null when the
+     * condition is true and nothing was sent.
+     *
      * @throws JsonException
      */
-    public function dispatchUnless(bool $condition): void
+    public function dispatchUnless(bool $condition): ?WebhookDeliveryData
     {
-        if (! $condition) {
-            $this->dispatch();
-        }
+        return $condition ? null : $this->dispatch();
     }
 
     /**
@@ -415,7 +423,7 @@ final class PendingWebhook
      *
      * @throws JsonException
      */
-    private function dispatchUsing(Closure $dispatcher): void
+    private function dispatchUsing(Closure $dispatcher): WebhookDeliveryData
     {
         $data = $this->toDeliveryData();
 
@@ -430,6 +438,10 @@ final class PendingWebhook
         }
 
         $dispatcher($job);
+
+        // Return the exact data that was dispatched — its messageId (stable across attempts) is
+        // what a Server-only caller correlates against its own log and any later status callback.
+        return $data;
     }
 
     /**

@@ -17,6 +17,7 @@ use Webhooks\Client\Exceptions\CorruptRawBody;
 use Webhooks\Client\WebhookCallStatus;
 use Webhooks\Core\Payload\PayloadStore;
 use Webhooks\Database\Concerns\HasZonedTimestamps;
+use Webhooks\Database\Concerns\ScopesByTimestamp;
 use Webhooks\Database\Concerns\UsesWebhookConnection;
 use Webhooks\Database\Factories\WebhookCallFactory;
 use Webhooks\Support\Timestamp;
@@ -50,6 +51,7 @@ class WebhookCall extends Model
     use HasUuids;
     use HasZonedTimestamps;
     use MassPrunable;
+    use ScopesByTimestamp;
     use UsesWebhookConnection;
 
     protected $table = 'webhook_calls';

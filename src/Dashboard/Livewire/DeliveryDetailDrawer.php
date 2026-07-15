@@ -48,12 +48,11 @@ final class DeliveryDetailDrawer extends Component
             return null;
         }
 
-        $owner = DashboardScope::currentOwner();
+        [$ownerSql, $ownerBindings] = DashboardScope::current()->condition();
 
         return $this->sourceModel()
             ->newQuery()
-            ->where('owner_type', $owner->type)
-            ->where('owner_id', $owner->id)
+            ->whereRaw($ownerSql, $ownerBindings)
             ->find($this->deliveryId);
     }
 
