@@ -4,6 +4,25 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-07-15
+
+### Added
+
+- **`webhooks:import-spatie-calls` — a one-command backfill from `spatie/laravel-webhook-client`.**
+  Adopting the inbound Client layer no longer means starting with an empty log: this artisan
+  command copies an existing spatie `webhook_calls` backlog into this package's own table, on
+  **PostgreSQL or MySQL**. It maps their columns onto the superset (`name → source`,
+  `payload`, `headers`, `exception`), preserves the original timestamps, and is **idempotent** —
+  each imported row's key is derived deterministically from its source, so it is safe to re-run and
+  a second pass imports nothing new. `--dry-run` reports the counts before writing;
+  `--from-table`, `--from-connection`, `--chunk` and `--source` cover a differently-named source
+  table, a source database other than the app default, memory-bounded batches over a large
+  backlog, and a forced `source` value. Because spatie stored only the parsed payload and never the
+  raw received bytes, an imported row carries a **reconstructed, self-consistent** `body_sha256`
+  (not the producer's original) and is written in a terminal state — `processed`, or `failed` when
+  spatie recorded an exception — so importing months-old history never re-fires a handler's side
+  effects. The README's *Coming from spatie* section documents the full flow.
+
 ## [1.1.0] - 2026-07-15
 
 ### Added
@@ -429,7 +448,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/pushery/webhooks-for-laravel/compare/v0.1.3...v1.0.0

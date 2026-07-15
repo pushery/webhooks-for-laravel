@@ -1001,14 +1001,19 @@ unindexed `created_at`; ours ships the index** (so retention stays cheap as the 
 
 **Backfilling their history.** New receipts flow into this package's `webhook_calls` from
 the moment you switch the route over — nothing else is required to go live. Carrying the
-**old** spatie `webhook_calls` rows across is a one-time copy; their columns map onto ours as
+**old** spatie `webhook_calls` rows across is a one-time copy, and `php artisan
+webhooks:import-spatie-calls` does it for you. Their columns map onto ours as
 `name → source`, `payload → payload`, `headers → headers`, `exception → exception`, with the
-original timestamps preserved. One caveat sets the expectation: spatie stored only the parsed
-`payload`, never the raw received bytes, so an imported row cannot carry the original
-`body_sha256` — reconstruct it from the re-encoded payload and treat imported rows as
-historical records, not re-verifiable ones. A guided `artisan` command that does this copy
-idempotently is [tracked for a follow-up release](#versioning); until then the mapping above
-is all a short migration needs.
+original timestamps preserved. Point it at the source with `--from-table` and
+`--from-connection` — both spatie tables are also named `webhook_calls`, so a same-database
+import needs one of these to name the source distinctly — preview the counts with `--dry-run`,
+and re-run it as often as you like: each imported row's primary key is derived deterministically
+from its source, so a second run imports nothing new. One caveat sets the expectation: spatie
+stored only the parsed `payload`, never the raw received bytes, so an imported row cannot carry
+the producer's original `body_sha256` — the command reconstructs a self-consistent one from the
+re-encoded payload and writes each row in a terminal state (`processed`, or `failed` when spatie
+recorded an exception), never re-dispatching a handler over months-old history. Treat imported
+rows as historical records, not re-verifiable ones.
 
 ## Testing your integration
 

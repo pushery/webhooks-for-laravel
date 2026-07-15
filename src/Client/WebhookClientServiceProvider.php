@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Route as RouteFacade;
 use Illuminate\Support\ServiceProvider;
 use Override;
+use Webhooks\Client\Console\ImportSpatieCallsCommand;
 use Webhooks\Client\Http\CaptureRawBody;
 use Webhooks\Client\Http\WebhookController;
 use Webhooks\Client\Models\WebhookCall;
@@ -65,6 +66,10 @@ final class WebhookClientServiceProvider extends ServiceProvider
 
         if (self::$runsMigrations) {
             $this->loadMigrationsFrom(__DIR__.'/../../database/migrations/client');
+        }
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([ImportSpatieCallsCommand::class]);
         }
 
         $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
