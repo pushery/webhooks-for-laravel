@@ -33,11 +33,6 @@ final class EndpointList extends Component
 
     public int $perPage = 10;
 
-    public function mount(): void
-    {
-        $this->authorize('manage-webhook-endpoints');
-    }
-
     /**
      * Re-render when another panel changes the underlying endpoints, so the list stays
      * in step after a create, edit, delete or secret rotation.

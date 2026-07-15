@@ -15,15 +15,17 @@ use Livewire\Component;
  * save refreshes the list and a row can open the form or reveal its secret without a
  * full navigation.
  *
- * The whole page hangs off the manage-webhook-endpoints gate, authorized in mount so
- * an unauthorized tenant is refused before any panel renders. Each panel additionally
- * scopes every query to the acting tenant, so a customer only ever manages the
- * endpoints it owns.
+ * The whole page hangs off the manage-webhook-endpoints gate, authorized in boot — the
+ * first hook on both the mount and the update path — so an unauthorized tenant is refused
+ * before any panel renders AND a tenant whose ability is revoked mid-session is refused on
+ * its very next interaction, rather than being served from mounted state until it reloads.
+ * Each panel additionally asserts the same gate and scopes every query to the acting tenant,
+ * so a customer only ever manages the endpoints it owns.
  */
 #[Layout('webhooks::self-service.layout')]
 final class SelfServicePortalPage extends Component
 {
-    public function mount(): void
+    public function boot(): void
     {
         $this->authorize('manage-webhook-endpoints');
     }
