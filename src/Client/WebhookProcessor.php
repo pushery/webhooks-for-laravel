@@ -147,7 +147,7 @@ final readonly class WebhookProcessor
         // verbatim. That is what makes body_sha256 a promise the row can keep.
         $storedBody = $path === null ? WebhookCall::encodeRawBody($rawBody) : null;
 
-        $dialect = Dialect::for();
+        $dialect = WebhookConnection::dialect();
         $sql = DedupeInsert::webhookCalls($dialect);
         $bindings = [$id, $this->config->name, $webhookId, $message->type, $payloadJson, $storedBody, $disk, $path, hash('sha256', $rawBody), $headersJson];
 

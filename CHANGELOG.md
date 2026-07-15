@@ -4,6 +4,49 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-07-15
+
+### Fixed
+
+- **On MySQL, Platform delivery-log lifecycle updates silently failed — every delivery stayed
+  `pending`, the circuit breaker never tripped, endpoint health never updated.** The lifecycle
+  listener locates the delivery row by `(id, created_at)`, and the manager rendered that `created_at`
+  key as a PostgreSQL offset literal (`…+00:00`) regardless of engine — which matches zero rows
+  against MySQL's UTC-naive `DATETIME(6)` column under strict mode. So on any MySQL deployment of the
+  Platform layer the row was never found: outcome columns stayed null, `consecutive_failures` never
+  advanced (a dead endpoint was never auto-disabled), and the succeeded/failed events never fired.
+  The key is now rendered for the webhook connection's dialect.
+- **The SQL dialect now follows the webhook connection, not the application default — the dedicated
+  side-car topology worked in name only.** Every runtime query already ran against the connection
+  `webhooks.database.connection` points at, but the SQL *dialect* for those queries was chosen from
+  the application's default connection. When both are the same engine they agree, so this was
+  invisible; but in the documented side-car deployment — an app on one engine keeping the webhook
+  tables on a dedicated connection of the other — the dialect was wrong for every runtime path:
+  inbound webhooks were never persisted (a MySQL-shaped insert issued against a PostgreSQL side-car),
+  the metrics rollup never refreshed, and health/partition maintenance errored. The dialect is now
+  resolved from the webhook connection everywhere, and a guard keeps it that way.
+- **The optional tdigest percentile extension is now probed on the webhook connection, not the app
+  default.** The presence check ran on the application-default connection while the tdigest SQL ran on
+  the webhook (side-car) connection — so under a side-car it could either wrongly report the extension
+  missing (disabling a supported feature) or pass the check and then fail the query with the exact
+  cryptic error the check exists to prevent.
+- **`ui.csp_nonce` no longer has to be a config closure that breaks `php artisan config:cache`.** A
+  per-request nonce is a closure, and a closure placed in `config/webhooks.php` makes
+  `config:cache` (part of a normal production deploy) fail — the exact deploy the CSP audience runs.
+  Register the nonce source at runtime instead, `UiTheme::resolveNonceUsing(fn () => Vite::cspNonce())`
+  from a service provider; the config value is now a static string only, and a closure left in config
+  raises a clear error naming the migration path rather than silently dropping the nonce.
+- **The PostgreSQL hourly-rollup buckets stay on whole UTC hours under any database session time
+  zone.** The bucket origin was resolved against the session zone, so a sub-hour-offset zone shifted
+  every bucket boundary to `:30`, diverging from the MySQL rollup and from the package's own
+  epoch-floor fallback. The origin is now pinned to UTC. Affects fresh installs; an existing install
+  recreates the materialized view to pick it up.
+- **A typo in the `dedupe` driver key is caught at config load instead of silently disabling the
+  cache fast path.** `dedupe` was read without validation, so an unrecognised value quietly fell
+  through to the database-only path (a performance regression under a retry storm, with no error).
+  It is now validated against `redis+db` / `db` and throws on anything else, like every sibling
+  config key.
+
 ## [1.3.0] - 2026-07-15
 
 ### Security
@@ -546,7 +589,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.0.1...v1.1.0

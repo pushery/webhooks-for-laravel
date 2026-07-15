@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Webhooks\Support;
 
+use Closure;
 use Illuminate\Support\Facades\Config;
+use InvalidArgumentException;
 
 /**
  * Resolves the color scheme the package's own full-page layouts (the dashboard and the
@@ -32,6 +34,14 @@ final class UiTheme
      * throwing: a mistyped presentation setting must never take a dashboard down.
      */
     public const array MODES = ['auto', 'light', 'dark'];
+
+    /**
+     * A registered per-request CSP-nonce source. Held here rather than in config because a
+     * Closure in config/webhooks.php breaks `php artisan config:cache`.
+     *
+     * @var (Closure(): ?string)|null
+     */
+    private static ?Closure $nonceResolver = null;
 
     public static function mode(): string
     {
@@ -82,19 +92,58 @@ final class UiTheme
     }
 
     /**
-     * The CSP nonce for the inline theme script, from `webhooks.ui.csp_nonce` — a string or
-     * a per-request callable (e.g. fn () => Vite::cspNonce()) — or null when none is set, in
-     * which case no nonce attribute is emitted. Only the 'auto' theme emits the script at all.
+     * Register a per-request source for the theme script's CSP nonce — call it from a service
+     * provider's boot(): `UiTheme::resolveNonceUsing(fn () => Vite::cspNonce())`. This is the
+     * per-request path; the config value is a STATIC string only, because a Closure placed in
+     * config/webhooks.php makes `php artisan config:cache` throw (the config is not serializable)
+     * — the exact deploy step a strict-CSP host runs.
+     *
+     * @param  Closure(): ?string  $resolver
+     */
+    public static function resolveNonceUsing(Closure $resolver): void
+    {
+        self::$nonceResolver = $resolver;
+    }
+
+    /**
+     * Drop a registered nonce resolver, falling back to the config value (mainly for tests).
+     */
+    public static function forgetNonceResolver(): void
+    {
+        self::$nonceResolver = null;
+    }
+
+    /**
+     * The CSP nonce for the inline theme script: the registered per-request resolver if one is
+     * set, else the static `webhooks.ui.csp_nonce` string, else null (no nonce attribute is then
+     * emitted). Only the 'auto' theme emits the script at all.
      */
     public static function nonce(): ?string
     {
-        $nonce = Config::get('webhooks.ui.csp_nonce');
+        if (self::$nonceResolver instanceof Closure) {
+            $resolved = (self::$nonceResolver)();
 
-        if (is_callable($nonce)) {
-            $nonce = $nonce();
+            return is_string($resolved) && $resolved !== '' ? $resolved : null;
         }
 
-        return is_string($nonce) && $nonce !== '' ? $nonce : null;
+        $configured = Config::get('webhooks.ui.csp_nonce');
+
+        if ($configured === null) {
+            return null;
+        }
+
+        // A closure (or any non-string) in config can't be `config:cache`d — earlier releases
+        // documented one here, so fail LOUD with the migration path rather than silently drop the
+        // nonce (which would strip CSP protection from the theme script without a word).
+        if (! is_string($configured)) {
+            throw new InvalidArgumentException(
+                'webhooks.ui.csp_nonce must be a static string (or null). A closure there breaks '
+                .'`php artisan config:cache`; register a per-request nonce with '
+                .'UiTheme::resolveNonceUsing(fn () => Vite::cspNonce()) from a service provider instead.'
+            );
+        }
+
+        return $configured !== '' ? $configured : null;
     }
 
     /**

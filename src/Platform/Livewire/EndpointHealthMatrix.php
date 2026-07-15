@@ -9,11 +9,11 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
-use Webhooks\Database\Dialect\Dialect;
 use Webhooks\Database\Dialect\Sql\NullsLastOrder;
 use Webhooks\Models\WebhookSubscription;
 use Webhooks\Platform\Health\EndpointHealth;
 use Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
+use Webhooks\Support\WebhookConnection;
 
 /**
  * A status board of the tenant's own endpoints and their health at a glance: one row
@@ -142,7 +142,7 @@ final class EndpointHealthMatrix extends Component
     {
         $column = $this->sortField === 'status' ? 'health_status' : 'health_score';
 
-        return NullsLastOrder::by(Dialect::for(), $column, $this->sortDirection === 'asc');
+        return NullsLastOrder::by(WebhookConnection::dialect(), $column, $this->sortDirection === 'asc');
     }
 
     public function render(): View

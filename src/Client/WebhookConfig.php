@@ -352,7 +352,7 @@ final class WebhookConfig
             process: self::resolveProcess($name, $entry['process'] ?? null),
             redact: self::stringList($entry['redact'] ?? null, ['Authorization', 'Cookie']),
             storeHeaders: self::resolveStoreHeaders($entry['store_headers'] ?? null),
-            dedupe: self::stringOr($entry['dedupe'] ?? null, 'redis+db'),
+            dedupe: self::resolveDedupe($name, $entry['dedupe'] ?? null),
             dedupeId: self::resolveDedupeId($name, $entry['dedupe_id'] ?? null),
             jwksUrl: $jwks['url'] ?? null,
             jwksCacheTtl: $jwks['cacheTtl'] ?? 3600,
@@ -458,6 +458,25 @@ final class WebhookConfig
         }
 
         throw new InvalidArgumentException("The webhook client config [{$name}] has an invalid 'verifier'; expected an InboundVerifier class-string.");
+    }
+
+    /**
+     * The idempotency DRIVER, validated at load. Only 'redis+db' (default) and 'db' are known;
+     * a typo would otherwise pass silently, and because usesFastPathDedupe() keys on a 'redis'
+     * substring it would quietly disable the cache fast path — a silent performance regression
+     * under a retry storm, with no error. Fails loudly here like the other config keys do.
+     */
+    private static function resolveDedupe(string $name, mixed $dedupe): string
+    {
+        if ($dedupe === null) {
+            return 'redis+db';
+        }
+
+        if (is_string($dedupe) && in_array($dedupe, ['redis+db', 'db'], true)) {
+            return $dedupe;
+        }
+
+        throw new InvalidArgumentException("The webhook client config [{$name}] has an invalid 'dedupe'; expected 'redis+db' or 'db'.");
     }
 
     /**

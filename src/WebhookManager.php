@@ -13,6 +13,7 @@ use InvalidArgumentException;
 use Webhooks\Core\Payload\PayloadSanitizer;
 use Webhooks\Core\Payload\PayloadStore;
 use Webhooks\Core\Ssrf\SsrfGuard;
+use Webhooks\Database\Dialect\Dialect;
 use Webhooks\Enums\DeliveryStatus;
 use Webhooks\Events\WebhookDeliveryRateLimited;
 use Webhooks\Exceptions\InvalidPayloadException;
@@ -26,6 +27,7 @@ use Webhooks\Support\PayloadValidator;
 use Webhooks\Support\Settings;
 use Webhooks\Support\TenantIdentity;
 use Webhooks\Support\Timestamp;
+use Webhooks\Support\WebhookConnection;
 
 /**
  * The package's public entry point: register endpoints, fan an event out to every
@@ -433,7 +435,13 @@ final readonly class WebhookManager
                 // (id, created_at), so carrying the partition key with the id lets every
                 // lifecycle listener prune straight to the one partition that holds the
                 // row instead of probing the index of every partition that ever existed.
-                'delivery_created_at' => Timestamp::sql($delivery->created_at),
+                // Rendered for the webhook connection's dialect: the lifecycle lookup compares
+                // it against the created_at column, which is an offset-bearing timestamptz on
+                // PostgreSQL but a UTC-naive DATETIME(6) on MySQL — a PG offset literal matches
+                // ZERO naive rows under MySQL's strict mode, stranding every delivery at pending.
+                'delivery_created_at' => WebhookConnection::dialect() === Dialect::MySql
+                    ? Timestamp::mysql($delivery->created_at)
+                    : Timestamp::sql($delivery->created_at),
                 'subscription_id' => $subscription->id,
                 'event_id' => $eventId,
             ])

@@ -86,7 +86,7 @@ final readonly class WebhookMetrics
      */
     private function buildKpiSet(array $percentiles): KpiSet
     {
-        [$ownerSql, $ownerBindings] = $this->tenant->rollupCondition(Dialect::for());
+        [$ownerSql, $ownerBindings] = $this->tenant->rollupCondition(WebhookConnection::dialect());
 
         $counts = (array) $this->db()->table(self::HOURLY_VIEW)
             ->whereRaw($ownerSql, $ownerBindings)
@@ -121,7 +121,7 @@ final readonly class WebhookMetrics
      */
     public function hourly(): Collection
     {
-        [$ownerSql, $ownerBindings] = $this->tenant->rollupCondition(Dialect::for());
+        [$ownerSql, $ownerBindings] = $this->tenant->rollupCondition(WebhookConnection::dialect());
 
         return $this->db()->table(self::HOURLY_VIEW)
             ->whereRaw($ownerSql, $ownerBindings)
@@ -217,7 +217,7 @@ final readonly class WebhookMetrics
     {
         $where = $ownerSql.' AND created_at >= ?';
 
-        if (Dialect::for() === Dialect::MySql) {
+        if (WebhookConnection::dialect() === Dialect::MySql) {
             return PercentileSelect::mysqlWindowMulti(
                 ['p50' => 0.5, 'p90' => 0.9, 'p95' => 0.95, 'p99' => 0.99],
                 $this->sourceTable(),
@@ -242,9 +242,13 @@ final readonly class WebhookMetrics
      */
     private function tdigestPercentiles(): array
     {
-        TdigestExtension::ensureInstalled();
+        // Probe the extension on the WEBHOOK connection (where the tdigest SQL below runs),
+        // not the app default: under a side-car topology the two differ, and checking the
+        // wrong one either disables a supported feature or lets the SQL fail with the exact
+        // missing-function error this guard exists to prevent.
+        TdigestExtension::ensureInstalled(WebhookConnection::name());
 
-        [$ownerSql, $ownerBindings] = $this->tenant->rollupCondition(Dialect::for());
+        [$ownerSql, $ownerBindings] = $this->tenant->rollupCondition(WebhookConnection::dialect());
 
         $row = (array) $this->db()->selectOne(
             'WITH merged AS ('
@@ -301,7 +305,7 @@ final readonly class WebhookMetrics
      */
     private function since(): string
     {
-        return Dialect::for() === Dialect::MySql
+        return WebhookConnection::dialect() === Dialect::MySql
             ? Timestamp::mysql($this->from())
             : Timestamp::sql($this->from());
     }
