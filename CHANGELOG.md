@@ -4,6 +4,21 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-07-16
+
+### Added
+
+- **UUID and ULID owner keys.** A webhook subscription's owner may now be keyed by a UUID or a
+  ULID, not only a bigint. Set `platform.owner_key_type` (`WEBHOOKS_OWNER_KEY_TYPE`) to `uuid` or
+  `ulid` before migrating and the denormalised `owner_id` column is rendered to match across all
+  three tables it spans — the subscriptions table, the delivery log and the dashboard rollup — so a
+  host whose tenants key by UUID/ULID no longer has to hand-patch the published migrations after
+  every `vendor:publish`. The default stays `bigint`, so existing installs are unaffected;
+  `subscribe()` rejects an owner whose key does not match the configured type up front, with a clear
+  error, instead of failing on the first fan-out. The global (owner-less) row's MySQL rollup
+  sentinel follows the type too (the nil UUID / all-zero ULID), keeping operator-mode reads correct
+  on every engine. Proven end to end on both PostgreSQL and MySQL.
+
 ## [1.3.1] - 2026-07-15
 
 ### Fixed
@@ -589,7 +604,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.1.0...v1.2.0

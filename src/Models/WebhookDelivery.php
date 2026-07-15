@@ -17,6 +17,7 @@ use Webhooks\Database\Concerns\HasZonedTimestamps;
 use Webhooks\Database\Concerns\ScopesByTimestamp;
 use Webhooks\Database\Concerns\UsesWebhookConnection;
 use Webhooks\Database\Factories\WebhookDeliveryFactory;
+use Webhooks\Database\OwnerKeyType;
 use Webhooks\Enums\DeliveryStatus;
 
 /**
@@ -25,7 +26,7 @@ use Webhooks\Enums\DeliveryStatus;
  * @property string $id
  * @property int $subscription_id
  * @property string|null $owner_type
- * @property int|null $owner_id
+ * @property int|string|null $owner_id
  * @property string $event_type
  * @property string $event_id
  * @property array<string, mixed> $payload
@@ -87,7 +88,9 @@ class WebhookDelivery extends Model
         return [
             'payload' => 'array',
             'status' => DeliveryStatus::class,
-            'owner_id' => 'integer',
+            // owner_id follows the configured owner_key_type: an integer cast for the bigint
+            // default, a plain string for a uuid/ulid owner (which must not be numeric-coerced).
+            'owner_id' => OwnerKeyType::fromConfig() === OwnerKeyType::Bigint ? 'integer' : 'string',
             'attempt' => 'integer',
             'response_code' => 'integer',
             'duration_ms' => 'integer',

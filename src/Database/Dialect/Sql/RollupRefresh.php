@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Webhooks\Database\Dialect\Sql;
 
+use Webhooks\Database\OwnerKeyType;
+
 /**
  * Recomputes the hourly delivery rollup on MySQL, which has no materialized view to REFRESH.
  *
@@ -11,7 +13,8 @@ namespace Webhooks\Database\Dialect\Sql;
  * GROUP BY, and the per-bucket p50/p95 from a PARTITION BY window emulation that interpolates
  * exactly as PostgreSQL's percentile_cont does (a bucket with no measured durations LEFT JOINs to
  * NULL percentiles, just like the view). The owner morph pair is coalesced to the non-null
- * sentinel ('' / 0) the unique index needs. The bucket is DATE_FORMAT truncation, which works on
+ * sentinel ('' plus the owner_key_type's zero value) the unique index needs. The bucket is
+ * DATE_FORMAT truncation, which works on
  * the stored UTC-naive DATETIME directly and so never consults the session time zone. Both
  * created_at bounds bind the same 35-day-window start.
  *
@@ -25,9 +28,15 @@ final class RollupRefresh
 {
     public static function mysql(): string
     {
+        // The null-owner sentinel matches the configured owner_key_type: a bigint 0 renders
+        // unquoted, a uuid/ulid nil renders as a quoted char literal. It is a fixed package
+        // constant, never user input, so splicing it into the SQL is safe.
+        $sentinel = OwnerKeyType::fromConfig()->sentinelId();
+        $sentinelSql = is_int($sentinel) ? (string) $sentinel : "'".$sentinel."'";
+
         $bucket = "CAST(DATE_FORMAT(created_at, '%Y-%m-%d %H:00:00') AS DATETIME)";
         $ownerType = "COALESCE(owner_type, '')";
-        $ownerId = 'COALESCE(owner_id, 0)';
+        $ownerId = 'COALESCE(owner_id, '.$sentinelSql.')';
 
         return 'INSERT INTO webhook_delivery_hourly '
             .'(owner_type, owner_id, bucket, total, delivered, pending, failed, retried, p50, p95) '

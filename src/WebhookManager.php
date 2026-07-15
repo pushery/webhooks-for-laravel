@@ -14,6 +14,7 @@ use Webhooks\Core\Payload\PayloadSanitizer;
 use Webhooks\Core\Payload\PayloadStore;
 use Webhooks\Core\Ssrf\SsrfGuard;
 use Webhooks\Database\Dialect\Dialect;
+use Webhooks\Database\OwnerKeyType;
 use Webhooks\Enums\DeliveryStatus;
 use Webhooks\Events\WebhookDeliveryRateLimited;
 use Webhooks\Exceptions\InvalidPayloadException;
@@ -136,38 +137,50 @@ final readonly class WebhookManager
     private function assignOwner(WebhookSubscription $subscription, Model|TenantIdentity|null $owner): void
     {
         if ($owner instanceof Model) {
-            $this->ensureIntegerOwnerKey($owner->getKey());
+            $this->ensureOwnerKeyStorable($owner->getKey());
             $subscription->owner()->associate($owner);
 
             return;
         }
 
         if ($owner instanceof TenantIdentity) {
-            $this->ensureIntegerOwnerKey($owner->id);
+            $this->ensureOwnerKeyStorable($owner->id);
             $subscription->owner_type = $owner->type;
             $subscription->owner_id = $owner->id;
         }
     }
 
     /**
-     * Fail fast, with a clear message, when an owner has a non-integer primary key. The
-     * package denormalises owner_id as a bigint across the delivery log and the dashboard
-     * rollup (whose null-owner sentinel is the integer 0), so a UUID owner cannot be stored —
-     * without this it would surface as an opaque insert error on the first fan-out, not here.
-     * A numeric string is fine: a bigint key comes back from the driver as a string.
+     * Fail fast, with a clear message, when an owner's primary key cannot be stored as the
+     * configured owner_key_type. The package denormalises owner_id across the subscriptions
+     * table, the delivery log and the dashboard rollup; the three must share one type, so an
+     * owner whose key does not match the configured one (a UUID owner under the bigint default,
+     * say) is rejected here rather than surfacing as an opaque insert error on the first
+     * fan-out. A bigint key may arrive as a numeric string — the driver returns bigints as
+     * strings — and matches all the same.
      */
-    private function ensureIntegerOwnerKey(mixed $key): void
+    private function ensureOwnerKeyStorable(mixed $key): void
     {
-        if (is_int($key) || (is_string($key) && $key !== '' && ctype_digit($key))) {
+        $type = OwnerKeyType::fromConfig();
+
+        if ((is_int($key) || is_string($key)) && $type->accepts($key)) {
             return;
         }
 
-        throw new InvalidArgumentException(
-            'A webhook subscription owner must have an INTEGER primary key. This package stores '
-            .'owner_id as a bigint in the delivery log and the dashboard rollup, so a non-integer '
-            .'(e.g. UUID) owner key is not supported. Use an integer-keyed owner model, or leave the '
-            .'subscription global by passing a null owner.'
-        );
+        $shown = match (true) {
+            is_string($key) => "'".$key."'",
+            is_int($key) => (string) $key,
+            default => gettype($key),
+        };
+
+        throw new InvalidArgumentException(sprintf(
+            'A webhook subscription owner key (%s) cannot be stored as the configured '
+            .'webhooks.platform.owner_key_type "%s". Set it to match the primary-key type of your '
+            .'owner models (bigint, uuid or ulid) and migrate, or leave the subscription global by '
+            .'passing a null owner.',
+            $shown,
+            $type->value,
+        ));
     }
 
     /**

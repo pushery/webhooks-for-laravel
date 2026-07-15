@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Webhooks\Database\DatabaseRequirement;
 use Webhooks\Database\Dialect\Dialect;
+use Webhooks\Database\OwnerKeyType;
 use Webhooks\Support\WebhookConnection;
 
 return new class extends Migration
@@ -42,15 +43,17 @@ return new class extends Migration
      */
     private function createPostgres(): void
     {
-        Schema::create('webhook_subscriptions', function (Blueprint $table): void {
+        $ownerKeyType = OwnerKeyType::fromConfig();
+
+        Schema::create('webhook_subscriptions', function (Blueprint $table) use ($ownerKeyType): void {
             $table->id();
 
-            // owner_id is an explicit bigint, NOT nullableMorphs(): the package denormalises it
-            // as a bigint across the delivery log and the dashboard rollup, so it may not follow
-            // Schema::defaultMorphKeyType('uuid'). WebhookManager rejects a non-integer owner key
-            // up front, keeping the whole morph pair consistently integer across every table.
+            // owner_id is denormalised across the delivery log and the dashboard rollup, so its
+            // type is not nullableMorphs() but the configured owner_key_type (bigint by default,
+            // uuid/ulid on demand), rendered identically here and on those tables. WebhookManager
+            // rejects an owner whose key does not match the configured type up front.
             $table->string('owner_type')->nullable();
-            $table->unsignedBigInteger('owner_id')->nullable();
+            $ownerKeyType->blueprintColumn($table, 'owner_id')->nullable();
             $table->index(['owner_type', 'owner_id'], 'webhook_subscriptions_owner_type_owner_id_index');
             $table->string('name')->nullable();
             $table->text('url');
@@ -92,11 +95,12 @@ return new class extends Migration
     private function createMySql(): void
     {
         $cs = 'utf8mb4_0900_as_cs';
+        $ownerKeyType = OwnerKeyType::fromConfig();
 
-        Schema::create('webhook_subscriptions', function (Blueprint $table) use ($cs): void {
+        Schema::create('webhook_subscriptions', function (Blueprint $table) use ($cs, $ownerKeyType): void {
             $table->id();
             $table->string('owner_type')->collation($cs)->nullable();
-            $table->unsignedBigInteger('owner_id')->nullable();
+            $ownerKeyType->blueprintColumn($table, 'owner_id')->nullable();
             $table->index(['owner_type', 'owner_id'], 'webhook_subscriptions_owner_type_owner_id_index');
             $table->string('name')->nullable();
             $table->string('url', 2048);
