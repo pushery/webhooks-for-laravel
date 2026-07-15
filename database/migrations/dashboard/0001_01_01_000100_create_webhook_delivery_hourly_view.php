@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Schema;
 use Webhooks\Dashboard\Metrics\TdigestExtension;
 use Webhooks\Database\DatabaseRequirement;
 use Webhooks\Database\Dialect\Dialect;
+use Webhooks\Database\OwnerKeyType;
 use Webhooks\Support\WebhookConnection;
 
 return new class extends Migration
@@ -105,16 +106,19 @@ return new class extends Migration
      * MySQL has no materialized view, so the rollup is a real InnoDB table with the same name and
      * columns, refreshed in place by webhooks:refresh-metrics (an atomic recompute in a
      * transaction, so readers always see a whole snapshot). The owner columns carry a NON-NULL
-     * sentinel — '' and 0 — because a unique index treats NULLs as distinct on both engines, so a
-     * nullable owner pair would never collide and the owner-less (global) rollup row would be
-     * duplicated on every refresh. There is no latency_digest column: MySQL has no tdigest, and
-     * the Tier-2 driver refuses to run there.
+     * sentinel — '' for owner_type and the owner_key_type's zero value for owner_id (0 for bigint,
+     * the nil UUID/ULID otherwise) — because a unique index treats NULLs as distinct on both
+     * engines, so a nullable owner pair would never collide and the owner-less (global) rollup row
+     * would be duplicated on every refresh. There is no latency_digest column: MySQL has no
+     * tdigest, and the Tier-2 driver refuses to run there.
      */
     public function createMySql(): void
     {
-        Schema::create('webhook_delivery_hourly', function (Blueprint $table): void {
+        $ownerKeyType = OwnerKeyType::fromConfig();
+
+        Schema::create('webhook_delivery_hourly', function (Blueprint $table) use ($ownerKeyType): void {
             $table->string('owner_type')->default('');
-            $table->unsignedBigInteger('owner_id')->default(0);
+            $ownerKeyType->blueprintColumn($table, 'owner_id')->default($ownerKeyType->sentinelId());
             $table->dateTime('bucket', 6);
             $table->unsignedBigInteger('total')->default(0);
             $table->unsignedBigInteger('delivered')->default(0);

@@ -514,12 +514,14 @@ $subscription->secret;                       // reveal once — it signs their d
 WebhookEvent::dispatch('invoice.paid', ['invoice_id' => 'in_123'], tenant: $team);
 ```
 
-> **Owners must have an integer primary key.** `owner_id` is denormalized as a bigint across
-> the delivery log and the dashboard rollup, so a UUID-keyed owner cannot be stored —
-> `subscribe()` rejects one up front with a clear error rather than failing on the first
-> fan-out. Use an integer-keyed owner model, or a global (`null`) endpoint. This is
-> independent of `Schema::defaultMorphKeyType()`: the package's owner columns are always
-> bigint.
+> **Owner key type — bigint (default), UUID or ULID.** `owner_id` is denormalized across the
+> subscriptions table, the delivery log and the dashboard rollup, and all three share one storage
+> type. It is `bigint` by default; if your owner models key by UUID or ULID, set
+> `platform.owner_key_type` (`WEBHOOKS_OWNER_KEY_TYPE`) to `uuid` or `ulid` **before migrating** so
+> the columns are rendered to match. `subscribe()` rejects an owner whose key does not fit the
+> configured type up front, with a clear error, rather than failing on the first fan-out. Changing
+> the setting on a populated database is a schema migration, not a runtime toggle; it is independent
+> of `Schema::defaultMorphKeyType()`. A global (`null`) owner works under every setting.
 
 Event types match exactly by default. Turn on `platform.wildcards` to let a subscription
 list a **prefix wildcard** — `order.*` receives every event under that prefix, so a concrete

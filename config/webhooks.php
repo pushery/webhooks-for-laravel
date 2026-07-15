@@ -250,6 +250,15 @@ return [
     'platform' => [
         'enabled' => (bool) env('WEBHOOKS_PLATFORM_ENABLED', true),
 
+        // The primary-key type of the models that OWN webhook subscriptions: 'bigint'
+        // (default), 'uuid' or 'ulid'. It fixes the storage type of the denormalised
+        // owner_id column across the subscriptions table, the delivery log AND the
+        // dashboard rollup — the three must match or the tenant join breaks — so set it
+        // to match your owner models and migrate; changing it on a populated database is a
+        // schema migration, not a runtime toggle. A subscription with a null (global)
+        // owner works under every setting.
+        'owner_key_type' => env('WEBHOOKS_OWNER_KEY_TYPE', 'bigint'),
+
         'catalog' => [
             // 'invoice.paid' => [
             //     'description' => 'Fired when an invoice is paid in full.',

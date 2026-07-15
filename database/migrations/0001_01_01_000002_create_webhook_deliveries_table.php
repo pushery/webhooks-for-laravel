@@ -7,6 +7,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Webhooks\Database\DatabaseRequirement;
 use Webhooks\Database\Dialect\Dialect;
+use Webhooks\Database\OwnerKeyType;
 use Webhooks\Database\PartitionManager;
 use Webhooks\Support\WebhookConnection;
 
@@ -47,13 +48,16 @@ return new class extends Migration
         // generated column mirroring the payload's own "type" field for cheap reads.
         // An over-sized payload can be offloaded to a Storage disk: the row then keeps
         // only payload_disk/payload_path plus the body's sha256, and the payload
-        // column holds a compact stub.
-        DB::statement(<<<'SQL'
+        // column holds a compact stub. owner_id's type follows the configured owner_key_type
+        // (bigint by default), the one storage decision shared across all three owner tables.
+        $ownerId = OwnerKeyType::fromConfig()->rawType(Dialect::Pgsql);
+
+        DB::statement(<<<SQL
             CREATE TABLE webhook_deliveries (
                 id uuid NOT NULL,
                 subscription_id bigint NOT NULL,
                 owner_type varchar(255) NULL,
-                owner_id bigint NULL,
+                owner_id {$ownerId} NULL,
                 event_type varchar(255) NOT NULL,
                 event_id uuid NOT NULL,
                 payload jsonb NOT NULL,
@@ -112,16 +116,18 @@ return new class extends Migration
      */
     private function createMySql(): void
     {
-        DB::statement(<<<'SQL'
+        $ownerId = OwnerKeyType::fromConfig()->rawType(Dialect::MySql);
+
+        DB::statement(<<<SQL
             CREATE TABLE webhook_deliveries (
                 id char(36) COLLATE utf8mb4_0900_as_cs NOT NULL,
                 subscription_id bigint unsigned NOT NULL,
                 owner_type varchar(255) COLLATE utf8mb4_0900_as_cs NULL,
-                owner_id bigint NULL,
+                owner_id {$ownerId} NULL,
                 event_type varchar(255) COLLATE utf8mb4_0900_as_cs NOT NULL,
                 event_id char(36) COLLATE utf8mb4_0900_as_cs NOT NULL,
                 payload json NOT NULL,
-                payload_type mediumtext GENERATED ALWAYS AS (JSON_UNQUOTE(JSON_EXTRACT(payload, '$.type'))) STORED,
+                payload_type mediumtext GENERATED ALWAYS AS (JSON_UNQUOTE(JSON_EXTRACT(payload, '\$.type'))) STORED,
                 payload_disk varchar(255) NULL,
                 payload_path varchar(255) NULL,
                 body_sha256 char(64) COLLATE utf8mb4_0900_as_cs NULL,

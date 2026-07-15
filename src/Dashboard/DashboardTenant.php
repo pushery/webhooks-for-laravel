@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Webhooks\Dashboard;
 
 use Webhooks\Database\Dialect\Dialect;
+use Webhooks\Database\OwnerKeyType;
 use Webhooks\Support\TenantIdentity;
 
 /**
@@ -61,8 +62,9 @@ final readonly class DashboardTenant
      * The owner-scoping fragment against the HOURLY ROLLUP, whose null-owner representation is
      * dialect-specific: PostgreSQL's rollup is a materialized VIEW that preserves the source's
      * NULL owner, while MySQL's is a TABLE whose unique key cannot span NULLs, so its refresh
-     * COALESCEs a null owner to the ('', 0) sentinel. Global mode therefore matches `IS NULL` on
-     * PostgreSQL and that sentinel on MySQL; tenant mode is identical to {@see self::condition()}
+     * COALESCEs a null owner to the ('' + owner_key_type zero) sentinel. Global mode therefore
+     * matches `IS NULL` on PostgreSQL and that sentinel on MySQL; tenant mode is identical to
+     * {@see self::condition()}
      * on both. Use this for every read of the rollup.
      *
      * @return array{0: literal-string, 1: list<int|string>}
@@ -74,7 +76,7 @@ final readonly class DashboardTenant
         }
 
         return $dialect === Dialect::MySql
-            ? ['owner_type = ? AND owner_id = ?', ['', 0]]
+            ? ['owner_type = ? AND owner_id = ?', ['', OwnerKeyType::fromConfig()->sentinelId()]]
             : ['owner_type IS NULL AND owner_id IS NULL', []];
     }
 
