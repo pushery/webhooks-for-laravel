@@ -132,6 +132,13 @@ return new class extends Migration
      * The hourly bucket expression over created_at. date_bin (PostgreSQL 14+) is the
      * primary path; on PostgreSQL 13 it does not exist, so an epoch-floor expression
      * yields the identical whole-hour boundary.
+     *
+     * The date_bin origin carries an explicit +00 offset, NOT a bare '2000-01-01' — a bare
+     * timestamptz literal is resolved against the database SESSION time zone, so under a
+     * sub-hour-offset session zone (Asia/Kolkata +05:30, say) the origin instant would land at
+     * :30 past the hour and every bucket boundary would shift with it, diverging from both the
+     * epoch-floor fallback below and MySQL's whole-hour DATE_FORMAT truncation. Pinning it to a
+     * UTC hour boundary keeps all three engines' buckets on :00 whatever the session zone is.
      */
     private function bucketExpression(): string
     {
@@ -143,7 +150,7 @@ return new class extends Migration
         $version = is_numeric($reported) ? (int) $reported : 0;
 
         if ($version >= 140000) {
-            return "date_bin('1 hour', created_at, TIMESTAMPTZ '2000-01-01')";
+            return "date_bin('1 hour', created_at, TIMESTAMPTZ '2000-01-01 00:00:00+00')";
         }
 
         return 'to_timestamp(floor(extract(epoch FROM created_at) / 3600) * 3600)';

@@ -42,7 +42,7 @@ final class PartitionMaintenanceCommand extends Command
 
     public function handle(PartitionManager $partitions, Settings $config): int
     {
-        if (Dialect::for() === Dialect::MySql) {
+        if (WebhookConnection::dialect() === Dialect::MySql) {
             return $this->pruneByChunkedDelete($config);
         }
 

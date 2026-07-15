@@ -48,7 +48,7 @@ final readonly class EndpointHealth
         // One pass over the subscription's recent deliveries: how many resolved
         // (reached an attempted outcome, so pending in-flight rows do not count),
         // how many of those succeeded, and the p95 of their measured durations.
-        [$resolved, $succeeded, $p95] = Dialect::for() === Dialect::MySql
+        [$resolved, $succeeded, $p95] = WebhookConnection::dialect() === Dialect::MySql
             ? $this->readMySql($subscription->id, $since)
             : $this->readPostgres($subscription->id, $since);
 

@@ -36,7 +36,7 @@ final class RefreshMetricsCommand extends Command
     {
         $view = WebhookMetrics::HOURLY_VIEW;
 
-        if (Dialect::for() === Dialect::MySql) {
+        if (WebhookConnection::dialect() === Dialect::MySql) {
             $this->refreshMySql($view);
         } else {
             $this->db()->statement(self::refreshStatement($view, $this->db()->transactionLevel()));

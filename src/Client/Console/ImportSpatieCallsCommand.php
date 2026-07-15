@@ -75,7 +75,7 @@ final class ImportSpatieCallsCommand extends Command
             return self::FAILURE;
         }
 
-        $dialect = Dialect::for(WebhookConnection::name());
+        $dialect = WebhookConnection::dialect();
         $sql = ImportInsert::spatieCalls($dialect);
 
         $imported = 0;

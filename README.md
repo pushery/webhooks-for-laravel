@@ -962,13 +962,19 @@ layout, point `ui.assets` at a Blade partial and the layouts `@include` it in `<
 Under a **strict Content-Security-Policy**, the one inline script the layouts emit — the
 `theme = 'auto'` dark-mode mirror — is blocked unless it carries a nonce. Either pin the
 theme (`WEBHOOKS_UI_THEME=light`/`dark`) to drop the script entirely, or keep `auto` and give
-it a nonce your policy allows:
+it a nonce your policy allows. Because a per-request nonce is a closure and a closure in config
+breaks `php artisan config:cache`, register it from a service provider instead of the config
+file:
 
 ```php
-'ui' => [
-    'csp_nonce' => fn () => \Illuminate\Support\Facades\Vite::cspNonce(),  // string or per-request callable
-],
+// A service provider's boot():
+use Webhooks\Support\UiTheme;
+
+UiTheme::resolveNonceUsing(fn () => \Illuminate\Support\Facades\Vite::cspNonce());
 ```
+
+(`config('webhooks.ui.csp_nonce')` still accepts a **static** string for the rare case a fixed
+nonce is enough.)
 
 ## Configuration
 

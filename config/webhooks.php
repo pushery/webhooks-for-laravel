@@ -678,9 +678,11 @@ return [
     |   'dark'            — always dark. The class is rendered server-side.
     |
     | Pinning the theme is also the escape hatch under a strict Content-Security-Policy:
-    | only 'auto' emits an inline script at all. If you keep 'auto' under a strict CSP,
-    | set 'csp_nonce' so that script carries a nonce your policy allows — a string, or a
-    | callable resolved per request, e.g. fn () => Vite::cspNonce().
+    | only 'auto' emits an inline script at all. If you keep 'auto' under a strict CSP, give
+    | that script a nonce your policy allows — a STATIC string in 'csp_nonce' below, or, for a
+    | per-request nonce, register one from a service provider with
+    | UiTheme::resolveNonceUsing(fn () => Vite::cspNonce()). Do NOT put a closure in 'csp_nonce':
+    | a closure in config makes `php artisan config:cache` throw.
     |
     | The Tailwind utilities these screens are built from are compiled by YOUR app's
     | build — see the README's "Styling the UI" section for the two source globs it
@@ -698,8 +700,10 @@ return [
         // <link>/<script>) so the shipped screens use your asset pipeline. Null renders nothing.
         'assets' => null,
 
-        // Nonce for the inline theme script under a strict CSP: a string or a per-request
-        // callable (fn () => Vite::cspNonce()). Null emits no nonce (fine without a CSP).
+        // Nonce for the inline theme script under a strict CSP: a STATIC string, or null (no
+        // nonce — fine without a CSP). For a per-request nonce, register a resolver from a
+        // service provider instead — UiTheme::resolveNonceUsing(fn () => Vite::cspNonce()) —
+        // NOT a closure here: a closure in config makes `php artisan config:cache` throw.
         'csp_nonce' => null,
     ],
 
