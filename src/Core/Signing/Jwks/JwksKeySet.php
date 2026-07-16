@@ -46,12 +46,27 @@ final readonly class JwksKeySet
      */
     public function keys(string $url, int $ttlSeconds): array
     {
-        /** @var array<int|string, string> */
-        return $this->cache->remember(
-            'webhooks:jwks:'.hash('sha256', $url),
-            $ttlSeconds,
-            fn (): array => $this->fetch($url),
-        );
+        $cacheKey = 'webhooks:jwks:'.hash('sha256', $url);
+
+        /** @var array<int|string, string> $cached */
+        $cached = $this->cache->get($cacheKey, []);
+
+        if ($cached !== []) {
+            return $cached;
+        }
+
+        $keys = $this->fetch($url);
+
+        // Cache ONLY a non-empty key set. fetch() returns an empty array for any response that is
+        // not a well-formed JWKS document — a provider's maintenance page, a 5xx with a body, a
+        // transient parse failure — and Cache::remember would pin that empty result for the full
+        // TTL, rejecting every JWKS-verified webhook for up to an hour. Not caching an empty fetch
+        // lets the very next inbound request retry, so a momentary upstream blip is not an outage.
+        if ($keys !== []) {
+            $this->cache->put($cacheKey, $keys, $ttlSeconds);
+        }
+
+        return $keys;
     }
 
     /**
