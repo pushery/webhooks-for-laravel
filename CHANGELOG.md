@@ -4,6 +4,18 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-07-16
+
+### Added
+
+- **`webhooks:prune-orphaned-payloads`** reclaims offloaded payload objects on a Storage disk that
+  no delivery-log or call-log row still references — the app-side alternative to a bucket lifecycle
+  policy when `large_payload` offload is enabled. It is content-addressing-safe (an object shared by
+  several rows is kept until the last one is gone), sweeps the Server offload disk by default (or
+  `--disk=<disk>`), supports `--dry-run`, and is not scheduled by default. Prefer a disk lifecycle
+  policy for object storage; reach for this on a local disk or when compliance requires
+  app-controlled deletion, and run it off-peak (it assumes offload writes are quiesced for the sweep).
+
 ## [1.4.12] - 2026-07-16
 
 ### Documentation
@@ -793,7 +805,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.12...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.12...v1.5.0
 [1.4.12]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.11...v1.4.12
 [1.4.11]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.10...v1.4.11
 [1.4.10]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.9...v1.4.10

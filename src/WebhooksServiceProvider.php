@@ -14,6 +14,7 @@ use Override;
 use Webhooks\Console\AsyncApiCommand;
 use Webhooks\Console\EgressIpsCommand;
 use Webhooks\Console\PartitionMaintenanceCommand;
+use Webhooks\Console\PruneOrphanedPayloadsCommand;
 use Webhooks\Console\RefreshEndpointHealthCommand;
 use Webhooks\Console\RevokeRotatedSecretsCommand;
 use Webhooks\Listeners\WebhookServerEventSubscriber;
@@ -149,6 +150,7 @@ final class WebhooksServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 PartitionMaintenanceCommand::class,
+                PruneOrphanedPayloadsCommand::class,
                 AsyncApiCommand::class,
                 EgressIpsCommand::class,
                 RefreshEndpointHealthCommand::class,
