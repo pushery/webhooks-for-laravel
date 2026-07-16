@@ -4,6 +4,29 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2026-07-16
+
+### Fixed
+
+- **On MySQL, the endpoint health window no longer slides with the database session time zone.**
+  MySQL converts an offset-bearing timestamp literal into the database's session time zone, so the
+  health scorer's window bound — rendered in the PostgreSQL offset form — shifted the 24-hour window
+  by that offset against the UTC-naive column. East of UTC the window silently narrowed and dropped
+  its oldest hours, so an endpoint that had recently been failing could score a perfect, unearned
+  health and never be auto-disabled. The bound is now rendered for the connection's own dialect, and
+  the whole window is scored whatever the session zone is.
+- **On MySQL, retention pruning no longer deletes rows before their window has closed.** The inbound
+  call log and the standalone server delivery log bound their retention cutoff in the same
+  session-zone-sensitive way, so a scheduled prune east of UTC removed rows up to the session offset
+  early. The cutoff is now bound for the connection's dialect.
+- **The self-service payload-transform editor fails not-found for an endpoint the tenant does not
+  own, before the authorization check** — so a foreign-but-existing id can no longer be told apart
+  from a non-existent one, closing an id-enumeration seam. This matches how every other portal panel
+  already scopes a lookup; no legitimate access changes.
+- **The spatie backfill import now masks credential-bearing request headers (Authorization, Cookie)
+  before writing them to the call log,** exactly as the live receive path does — both now redact
+  through one shared component, so they can never disagree on which headers are secret.
+
 ## [1.4.1] - 2026-07-16
 
 ### Fixed
@@ -621,7 +644,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.2...HEAD
+[1.4.2]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.3.0...v1.3.1

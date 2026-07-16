@@ -14,6 +14,7 @@ use stdClass;
 use Webhooks\Client\InboundMessage;
 use Webhooks\Client\Models\WebhookCall;
 use Webhooks\Client\WebhookCallStatus;
+use Webhooks\Core\Http\HeaderRedactor;
 use Webhooks\Core\Payload\PayloadSanitizer;
 use Webhooks\Database\Dialect\Dialect;
 use Webhooks\Database\Dialect\Sql\ImportInsert;
@@ -186,7 +187,9 @@ final class ImportSpatieCallsCommand extends Command
     }
 
     /**
-     * The redacted-and-scrubbed headers JSON, or null when the spatie row stored none.
+     * The redacted-and-scrubbed headers JSON, or null when the spatie row stored none. The
+     * credential-bearing headers (Authorization, Cookie) are masked exactly as the live receive
+     * path masks them, so a backfilled row never carries a token the real path would have hidden.
      *
      * @throws JsonException when the stored headers are not valid JSON
      */
@@ -200,7 +203,11 @@ final class ImportSpatieCallsCommand extends Command
 
         $decoded = json_decode($headers, true, 512, JSON_THROW_ON_ERROR);
 
-        return is_array($decoded) ? json_encode(PayloadSanitizer::scrub($decoded), JSON_THROW_ON_ERROR) : null;
+        if (! is_array($decoded)) {
+            return null;
+        }
+
+        return json_encode(PayloadSanitizer::scrub(HeaderRedactor::mask($decoded)), JSON_THROW_ON_ERROR);
     }
 
     /**

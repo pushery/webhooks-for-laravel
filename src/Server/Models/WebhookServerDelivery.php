@@ -18,7 +18,6 @@ use Webhooks\Database\Concerns\ScopesByTimestamp;
 use Webhooks\Database\Concerns\UsesWebhookConnection;
 use Webhooks\Database\Factories\WebhookServerDeliveryFactory;
 use Webhooks\Enums\DeliveryStatus;
-use Webhooks\Support\Timestamp;
 
 /**
  * A single row in the standalone Server delivery log — one delivered message,
@@ -71,10 +70,13 @@ class WebhookServerDelivery extends Model
      */
     public function prunable(): Builder
     {
+        // The cutoff is bound for THIS connection's dialect: MySQL converts an offset-bearing
+        // literal into the database session time zone (8.0.19+), which would slide the retention
+        // boundary by that offset and prune rows whose window has not closed yet.
         return static::query()->where(
             'created_at',
             '<=',
-            Timestamp::sql(Date::now()->subDays(Config::integer('webhooks.server.persistence.prune_after_days', 30))),
+            $this->boundTimestamp(Date::now()->subDays(Config::integer('webhooks.server.persistence.prune_after_days', 30))),
         );
     }
 

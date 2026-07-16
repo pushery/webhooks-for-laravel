@@ -20,7 +20,6 @@ use Webhooks\Database\Concerns\HasZonedTimestamps;
 use Webhooks\Database\Concerns\ScopesByTimestamp;
 use Webhooks\Database\Concerns\UsesWebhookConnection;
 use Webhooks\Database\Factories\WebhookCallFactory;
-use Webhooks\Support\Timestamp;
 
 /**
  * A stored incoming webhook: the exact body hash, the (redacted) headers, the
@@ -65,10 +64,13 @@ class WebhookCall extends Model
      */
     public function prunable(): Builder
     {
+        // The cutoff is bound for THIS connection's dialect: MySQL converts an offset-bearing
+        // literal into the database session time zone (8.0.19+), which would slide the retention
+        // boundary by that offset and prune rows whose window has not closed yet.
         return static::query()->where(
             'created_at',
             '<=',
-            Timestamp::sql(Date::now()->subDays(Config::integer('webhooks.client.delete_after_days', 30))),
+            $this->boundTimestamp(Date::now()->subDays(Config::integer('webhooks.client.delete_after_days', 30))),
         );
     }
 
