@@ -97,7 +97,12 @@ final class EndpointForm extends Component
         $this->validate(
             [
                 'name' => ['nullable', 'string', 'max:255'],
-                'url' => ['required', 'url'],
+                // Bound the URL length so it stores identically on every supported
+                // engine: the column is varchar(2048) on MySQL (a hard 1406 error past
+                // it) but unbounded text on Postgres, so without this cap the same long
+                // URL would 500 on one engine and store on the other. Surfaced as a
+                // field error the tenant can act on instead.
+                'url' => ['required', 'url', 'max:2048'],
                 'eventTypes' => ['required', 'array', 'min:1'],
                 'eventTypes.*' => ['string'],
             ],
@@ -105,6 +110,7 @@ final class EndpointForm extends Component
                 'name.max' => __('webhooks::self-service.validation.name.max'),
                 'url.required' => __('webhooks::self-service.validation.url.required'),
                 'url.url' => __('webhooks::self-service.validation.url.url'),
+                'url.max' => __('webhooks::self-service.validation.url.max'),
                 'eventTypes.required' => __('webhooks::self-service.validation.event_types.required'),
                 'eventTypes.min' => __('webhooks::self-service.validation.event_types.min'),
             ],

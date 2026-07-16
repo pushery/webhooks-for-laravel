@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 use Webhooks\Client\Events\InvalidWebhookSignature;
 use Webhooks\Client\Http\CaptureRawBody;
 use Webhooks\Client\Models\WebhookCall;
@@ -88,12 +89,12 @@ final readonly class WebhookProcessor
         $webhookId = $this->config->webhookId($headers, $rawBody);
         $fastPathDedupe = $webhookId !== null && $this->config->usesFastPathDedupe();
 
-        // Fast-path dedupe: a repeated delivery whose id was already durably stored
+        // Fast-path dedupe: a repeated delivery whose id was already stored AND queued
         // short-circuits to the success response before touching the database. The
-        // "seen" marker is written only AFTER a successful store (below), never here,
-        // so a store failure can never leave a marker that would swallow the
-        // producer's retry with a bare success. The authoritative partial-unique
-        // insert still guards a concurrent race.
+        // "seen" marker is armed only after both the store and the dispatch succeed
+        // (below), never here, so neither a store nor a dispatch failure can leave a
+        // marker that would swallow the producer's retry with a bare success. The
+        // authoritative partial-unique insert still guards a concurrent race.
         if ($fastPathDedupe && Cache::has($this->cacheKey($webhookId))) {
             return $this->respond();
         }
@@ -106,23 +107,48 @@ final readonly class WebhookProcessor
 
         $call = $this->store($rawBody, $webhookId, $message);
 
-        // The id is now durably stored — either this request inserted it, or a
-        // concurrent request already did (the insert returned null) — so it is safe
-        // to arm the fast path. Arming it here rather than before store() means a
-        // failed store never marks the id seen, so a retry re-processes it.
-        if ($fastPathDedupe) {
-            Cache::put($this->cacheKey($webhookId), true, $this->config->tolerance() + self::SEEN_TTL_BUFFER);
-        }
-
         // Authoritative dedupe: the partial-unique insert returned nothing, so a
-        // concurrent request already stored this id. Do not dispatch a second time.
+        // concurrent request already stored this id. Arm the fast path for the next
+        // retry and do not dispatch a second time.
         if (! $call instanceof WebhookCall) {
+            $this->markSeen($fastPathDedupe, $webhookId);
+
             return $this->respond();
         }
 
-        $this->dispatchProcessing($call, $message);
+        // Dispatch the processing job. This is the one step left that can still fail
+        // after the durable insert (a queue-backend blip, a serialization error), and
+        // until it succeeds the call has no worker. If it throws, delete the row this
+        // request just inserted and leave the id UNSEEN, so the producer's retry
+        // re-stores and re-dispatches instead of being swallowed as a duplicate and
+        // acknowledged with a bare success — the delivery is never silently lost.
+        try {
+            $this->dispatchProcessing($call, $message);
+        } catch (Throwable $e) {
+            $call->delete();
+
+            throw $e;
+        }
+
+        // Stored AND queued: only now arm the fast path, so a store that succeeded but
+        // whose dispatch failed never marks the id seen. A producer retry within the
+        // window then short-circuits to the success response without another database
+        // round-trip.
+        $this->markSeen($fastPathDedupe, $webhookId);
 
         return $this->respond();
+    }
+
+    /**
+     * Arm the fast-path "seen" marker for a durably-stored id, held until the replay
+     * tolerance elapses (plus a buffer). A no-op when the source has no fast-path
+     * dedupe or the delivery carried no id.
+     */
+    private function markSeen(bool $fastPathDedupe, ?string $webhookId): void
+    {
+        if ($fastPathDedupe && $webhookId !== null) {
+            Cache::put($this->cacheKey($webhookId), true, $this->config->tolerance() + self::SEEN_TTL_BUFFER);
+        }
     }
 
     /**

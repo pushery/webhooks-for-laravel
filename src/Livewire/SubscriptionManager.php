@@ -43,7 +43,9 @@ final class SubscriptionManager extends Component
     {
         $this->validate([
             'name' => ['nullable', 'string', 'max:255'],
-            'url' => ['required', 'url'],
+            // Cap the URL at the MySQL column width so it stores the same on every
+            // supported engine (varchar(2048) there, unbounded text on Postgres).
+            'url' => ['required', 'url', 'max:2048'],
             'eventTypes' => ['required', 'array', 'min:1'],
             'eventTypes.*' => ['string'],
         ]);

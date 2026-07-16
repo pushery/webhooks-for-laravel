@@ -163,6 +163,7 @@ return [
         'url' => [
             'required' => 'Une URL d\'endpoint est requise.',
             'url' => 'Saisis une URL d\'endpoint valide.',
+            'max' => 'L\'URL d\'endpoint ne peut pas dépasser :max caractères.',
             // The SSRF guard's own message names the resolved host and address, which is
             // a probe oracle in a tenant-facing form. The reason the URL was refused is
             // always the same one a tenant can act on: it must be public and https.
