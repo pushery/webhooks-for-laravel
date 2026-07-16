@@ -4,6 +4,26 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.12] - 2026-07-16
+
+### Documentation
+
+- Documented the endpoint lifecycle API — `Webhooks::enable()`, `disable()` and `unsubscribe()` —
+  and corrected the circuit-breaker section: once an endpoint auto-disables it receives no traffic
+  and does **not** self-recover, so `Webhooks::enable()` (which also clears the failure streak) is
+  the recovery path, typically wired to the `WebhookEndpointAutoDisabled` event.
+- Documented how the self-service portal and the dashboard resolve the acting tenant and how to
+  override it (`SubscriptionScope::resolveUsing()` / `DashboardScope::resolveUsing()`) for a custom
+  tenant model — without which a team-owned installation scopes to the wrong owner and shows an
+  empty endpoint list.
+- Documented the `webhooks:asyncapi` options (an optional output path, `--format=yaml`, and
+  `--title` / `--doc-version`) and clarified that YAML is opt-in via the flag, not selected
+  automatically once `symfony/yaml` is installed.
+- Documented `client.raw_body_capture` (previously an uncommented toggle) and noted at first
+  contact that a receiving `process` job must extend `ProcessWebhookJob`.
+- Corrected a config comment that named the outbound builder `WebhookCall`; the send-side builder
+  is `PendingWebhook` (via the `WebhookSender` facade).
+
 ## [1.4.11] - 2026-07-16
 
 ### Fixed
@@ -773,7 +793,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.11...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.12...HEAD
+[1.4.12]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.11...v1.4.12
 [1.4.11]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.10...v1.4.11
 [1.4.10]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.9...v1.4.10
 [1.4.9]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.8...v1.4.9
