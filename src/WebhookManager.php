@@ -22,6 +22,7 @@ use Webhooks\Models\WebhookDelivery;
 use Webhooks\Models\WebhookSubscription;
 use Webhooks\Platform\Transform\PayloadTransformer;
 use Webhooks\Platform\Transform\PayloadVersionRegistry;
+use Webhooks\Search\SearchIndexer;
 use Webhooks\Server\Exceptions\DeliveryRefused;
 use Webhooks\Server\PendingWebhook;
 use Webhooks\Support\PayloadValidator;
@@ -345,6 +346,12 @@ final readonly class WebhookManager
             'status' => DeliveryStatus::Pending,
             'attempt' => 0,
         ])->save();
+
+        // Index the new row for Scout. The log is written through the base model, which never
+        // fires Scout's per-subclass observer, so without this an external engine (Meilisearch,
+        // …) would never see the delivery. A no-op unless search is on and the host pointed its
+        // search source at a Searchable model.
+        SearchIndexer::indexDelivery($delivery->id);
 
         // Reshape the event data for THIS endpoint before the body is built and signed,
         // so the transformed bytes are the signed-and-sent bytes. The outbound envelope

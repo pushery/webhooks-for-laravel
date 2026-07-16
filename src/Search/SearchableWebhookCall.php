@@ -13,7 +13,7 @@ use Webhooks\Client\Models\WebhookCall;
  * a searchable inbound call log without writing any code. It shares the
  * webhook_calls table, so it indexes exactly the calls the receiver stores.
  */
-final class SearchableWebhookCall extends WebhookCall
+final class SearchableWebhookCall extends WebhookCall implements Indexed
 {
     use SearchableCall;
 }

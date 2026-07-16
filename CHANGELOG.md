@@ -4,6 +4,18 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.7] - 2026-07-16
+
+### Fixed
+
+- **Scout search now actually populates an external engine (Meilisearch, Algolia, …).** The
+  delivery log is written through the base model and the inbound call log through a raw SQL upsert,
+  neither of which fires Scout's per-model observer — so with an external engine the index was never
+  written and search silently returned nothing (the shipped `collection`/`database` engines read
+  the table directly and hid the gap). Each row is now indexed explicitly after it is written, when
+  search is enabled and the configured model is a searchable one; a host that has not opted into
+  search, or is on a database-backed engine, is unaffected.
+
 ## [1.4.6] - 2026-07-16
 
 ### Fixed
@@ -694,7 +706,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.6...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.7...HEAD
+[1.4.7]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.6...v1.4.7
 [1.4.6]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.5...v1.4.6
 [1.4.5]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.4...v1.4.5
 [1.4.4]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.3...v1.4.4

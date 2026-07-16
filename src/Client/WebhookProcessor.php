@@ -21,6 +21,7 @@ use Webhooks\Core\Payload\PayloadStore;
 use Webhooks\Core\Signing\SignatureHeaders;
 use Webhooks\Database\Dialect\Dialect;
 use Webhooks\Database\Dialect\Sql\DedupeInsert;
+use Webhooks\Search\SearchIndexer;
 use Webhooks\Support\Timestamp;
 use Webhooks\Support\WebhookConnection;
 
@@ -168,7 +169,14 @@ final readonly class WebhookProcessor
 
         $model = $this->config->model();
 
-        return new $model()->newQuery()->find($id);
+        $call = new $model()->newQuery()->find($id);
+
+        // The row was written by a raw SQL upsert, which fires no Eloquent event, so Scout's
+        // observer never sees it. Index it explicitly — a no-op unless search is on and the
+        // configured model is a searchable one — so an external engine actually gets the call.
+        SearchIndexer::indexModel($call);
+
+        return $call;
     }
 
     /**

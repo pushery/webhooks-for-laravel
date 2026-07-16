@@ -12,6 +12,7 @@ use Webhooks\Events\WebhookDeliverySucceeded;
 use Webhooks\Events\WebhookEndpointAutoDisabled;
 use Webhooks\Models\WebhookDelivery;
 use Webhooks\Models\WebhookSubscription;
+use Webhooks\Search\SearchIndexer;
 use Webhooks\Server\Data\WebhookDeliveryData;
 use Webhooks\Server\Events\WebhookAttemptFailed;
 use Webhooks\Server\Events\WebhookAttemptsExhausted;
@@ -52,14 +53,14 @@ final readonly class WebhookServerEventSubscriber
         }
 
         // Outcome columns are guarded (engine-owned), so write them via forceFill.
-        $delivery->forceFill([
+        $this->persist($delivery, [
             'status' => DeliveryStatus::Succeeded,
             'attempt' => $event->attempt,
             'response_code' => $event->response->status,
             'duration_ms' => $event->response->durationMs,
             'delivered_at' => now(),
             'error' => null,
-        ])->save();
+        ]);
 
         $subscription = $delivery->subscription;
 
@@ -82,13 +83,13 @@ final readonly class WebhookServerEventSubscriber
             return;
         }
 
-        $delivery->forceFill([
+        $this->persist($delivery, [
             'status' => DeliveryStatus::Failed,
             'attempt' => $event->attempt,
             'response_code' => $event->response?->status,
             'duration_ms' => $event->response?->durationMs,
             'error' => $event->exception?->getMessage() ?? self::DEFAULT_ERROR,
-        ])->save();
+        ]);
     }
 
     public function onFinalFailed(WebhookAttemptsExhausted $event): void
@@ -101,13 +102,13 @@ final readonly class WebhookServerEventSubscriber
 
         $reason = $event->exception?->getMessage() ?? self::DEFAULT_ERROR;
 
-        $delivery->forceFill([
+        $this->persist($delivery, [
             'status' => DeliveryStatus::Exhausted,
             'attempt' => $event->attempt,
             'response_code' => $event->response?->status,
             'duration_ms' => $event->response?->durationMs,
             'error' => $reason,
-        ])->save();
+        ]);
 
         $subscription = $delivery->subscription;
 
@@ -124,6 +125,21 @@ final readonly class WebhookServerEventSubscriber
         }
 
         Event::dispatch(new WebhookDeliveryFailed($delivery, $reason));
+    }
+
+    /**
+     * Write the outcome columns and re-index the row for Scout. The log is updated through the
+     * base model, which never fires Scout's per-subclass observer, so an external engine would
+     * otherwise keep the stale (or missing) status; a no-op unless search is on and a searchable
+     * source model is configured.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function persist(WebhookDelivery $delivery, array $attributes): void
+    {
+        $delivery->forceFill($attributes)->save();
+
+        SearchIndexer::indexDelivery($delivery->id);
     }
 
     private function maybeAutoDisable(WebhookSubscription $subscription): void
