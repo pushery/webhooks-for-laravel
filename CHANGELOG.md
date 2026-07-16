@@ -4,6 +4,15 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-07-16
+
+### Documentation
+
+- The Localization surface table in the README now lists the `pagination` file alongside the
+  other four, matching the five translation files every locale ships — so a host localizing the
+  shipped UI knows the pagination control's page links and screen-reader labels are overridable
+  under the `webhooks` namespace too.
+
 ## [1.5.0] - 2026-07-16
 
 ### Added
@@ -805,7 +814,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.5.1...HEAD
+[1.5.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.12...v1.5.0
 [1.4.12]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.11...v1.4.12
 [1.4.11]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.10...v1.4.11
