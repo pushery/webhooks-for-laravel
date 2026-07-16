@@ -4,6 +4,23 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.6] - 2026-07-16
+
+### Fixed
+
+- **The self-service payload-transform preview now matches what the endpoint actually receives.**
+  When an endpoint names a payload version but stores no per-endpoint transform, delivery inherits
+  that version's default rules — but the editor's live preview only reflected its own typed
+  controls, so it showed a body (fields kept, envelope shape) different from the one delivered. The
+  preview now resolves rules exactly as delivery does.
+- **The dashboard defaults to the first configured time window rather than a hardcoded 24h.** A
+  host that narrows `dashboard.windows` to a set without `24h` no longer lands on an un-offered
+  window that no control selects (and that disagreed with the JSON metrics API).
+- **A momentary JWKS provider blip is no longer cached as an hour-long outage.** The Ed25519/JWKS
+  key set is cached only when it is non-empty; an empty result from a maintenance page or a 5xx
+  body is retried on the next request instead of being pinned for the full TTL, during which every
+  JWKS-verified webhook would have been rejected.
+
 ## [1.4.5] - 2026-07-16
 
 ### Fixed
@@ -677,7 +694,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.5...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.6...HEAD
+[1.4.6]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.5...v1.4.6
 [1.4.5]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.4...v1.4.5
 [1.4.4]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.3...v1.4.4
 [1.4.3]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.2...v1.4.3

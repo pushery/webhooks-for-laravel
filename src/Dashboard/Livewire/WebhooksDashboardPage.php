@@ -36,7 +36,10 @@ final class WebhooksDashboardPage extends Component
         }
 
         if (! in_array($this->window, $this->windows(), true)) {
-            $this->window = '24h';
+            // Fall back to the FIRST configured window, not a hardcoded '24h': a host may narrow
+            // dashboard.windows to a set that omits 24h, and defaulting to an un-offered window
+            // renders a range no button selects and disagrees with what the JSON API serves.
+            $this->window = $this->windows()[0];
         }
     }
 

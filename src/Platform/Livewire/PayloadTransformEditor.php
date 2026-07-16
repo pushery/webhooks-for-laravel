@@ -13,6 +13,7 @@ use Livewire\Component;
 use Webhooks\Models\WebhookSubscription;
 use Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
 use Webhooks\Platform\Transform\DeclarativePayloadTransformer;
+use Webhooks\Platform\Transform\PayloadVersionRegistry;
 
 /**
  * A structured editor for one endpoint's payload version and declarative transform.
@@ -150,8 +151,20 @@ final class PayloadTransformEditor extends Component
      */
     public function preview(): array
     {
+        $rules = $this->buildRules();
+
+        // Resolve rules EXACTLY as the delivery path does (WebhookManager::transformFor):
+        // an endpoint with no explicit per-endpoint transform inherits the selected version's
+        // default rule set from the registry. save() stores an empty rule set as a null
+        // transform, so empty controls always mean "inherit the version" — the preview must
+        // resolve the same way, or it shows a body the endpoint would never actually receive.
+        if ($rules === []) {
+            $rules = Container::getInstance()->make(PayloadVersionRegistry::class)
+                ->rulesFor($this->selectedVersion());
+        }
+
         return Container::getInstance()->make(DeclarativePayloadTransformer::class)
-            ->transform($this->sampleArray(), $this->buildRules(), $this->selectedVersion());
+            ->transform($this->sampleArray(), $rules, $this->selectedVersion());
     }
 
     /**
