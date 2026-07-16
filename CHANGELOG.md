@@ -4,6 +4,17 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.5] - 2026-07-16
+
+### Fixed
+
+- **⚠ The MySQL minimum (8.4, the LTS) is now enforced.** The README, config and error message have
+  always stated MySQL 8.4+, but the runtime guard's floor was 8.0.17 — so it silently accepted
+  MySQL 8.0.17 through 8.3, versions the package neither supports nor tests against. The guard now
+  refuses anything below 8.4, matching the documented requirement. A host running on an unsupported
+  8.0.17–8.3 server (against the docs) will now get a clear message to upgrade; PostgreSQL and MySQL
+  8.4+ are unaffected.
+
 ## [1.4.4] - 2026-07-16
 
 ### Fixed
@@ -666,7 +677,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.4...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.5...HEAD
+[1.4.5]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.4...v1.4.5
 [1.4.4]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.3...v1.4.4
 [1.4.3]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.1...v1.4.2

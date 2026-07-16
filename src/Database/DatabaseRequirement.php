@@ -24,8 +24,9 @@ use RuntimeException;
  *  - MariaDB is rejected. It reports itself as the `mysql` driver, but its JSON type is a
  *    text alias with no binary storage and it has neither multi-valued nor functional
  *    indexes, so the fan-out lookup and the dedupe index this package relies on do not hold.
- *  - The server must be MySQL 8.0.17+ (multi-valued JSON indexes landed there); in practice
- *    MySQL 8.4, the LTS.
+ *  - The server must be MySQL 8.4+, the LTS the package is built and tested against. (The
+ *    multi-valued JSON index the fan-out relies on landed back in 8.0.17, but 8.4 is the
+ *    supported floor.)
  *  - Strict SQL mode must be on, or an over-long webhook body is silently truncated and its
  *    stored SHA-256 no longer matches the bytes.
  *  - PDO::MYSQL_ATTR_FOUND_ROWS must be off, or an upsert reports a matched row as affected
@@ -37,9 +38,9 @@ use RuntimeException;
 final class DatabaseRequirement
 {
     /**
-     * The oldest MySQL that carries the multi-valued JSON index the fan-out lookup needs.
+     * The minimum supported MySQL: the 8.4 LTS the package is built and tested against.
      */
-    public const string MIN_MYSQL_VERSION = '8.0.17';
+    public const string MIN_MYSQL_VERSION = '8.4';
 
     /**
      * @throws RuntimeException when the resolved connection cannot serve the storage layer
@@ -83,8 +84,8 @@ final class DatabaseRequirement
     {
         if (version_compare($version, self::MIN_MYSQL_VERSION, '<')) {
             return sprintf(
-                'it reports version %s, but MySQL %s+ is required for the multi-valued JSON index the '
-                .'fan-out lookup uses. Upgrade to MySQL 8.4 (the LTS), or use PostgreSQL.',
+                'it reports version %s, but this package requires MySQL %s+ — the LTS it is built and '
+                .'tested against. Upgrade the server, or use PostgreSQL.',
                 $version,
                 self::MIN_MYSQL_VERSION,
             );
