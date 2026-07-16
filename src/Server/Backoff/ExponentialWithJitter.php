@@ -27,16 +27,20 @@ final readonly class ExponentialWithJitter implements BackoffStrategy
 
     private int $baseSeconds;
 
+    private int $capSeconds;
+
     private int $retryAfterCapSeconds;
 
     public function __construct(
         int $baseSeconds = 10,
-        private int $capSeconds = 900,
+        int $capSeconds = 900,
         ?int $retryAfterCapSeconds = null,
     ) {
-        // Floor the base at one second so a misconfigured base of 0 (or negative)
-        // can never collapse the schedule to a zero-delay retry storm.
+        // Floor the base AND the cap at one second so a misconfigured 0 (or negative) can never
+        // collapse the schedule to a zero-delay retry storm: the delay is random_int(0, ceiling)
+        // and ceiling is min(cap, base << shift), so a zero cap would floor every draw to 0.
         $this->baseSeconds = max(1, $baseSeconds);
+        $this->capSeconds = max(1, $capSeconds);
         $this->retryAfterCapSeconds = max(0, $retryAfterCapSeconds ?? $capSeconds);
     }
 

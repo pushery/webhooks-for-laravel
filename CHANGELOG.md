@@ -4,6 +4,15 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.3] - 2026-07-16
+
+### Fixed
+
+- **The exponential backoff cap is floored at one second, like the base.** The base delay was
+  already floored so a misconfigured `0` could not collapse retries into a zero-delay storm; the
+  cap was not, so a `backoff.cap` of `0` would have floored every retry delay to zero regardless of
+  the base. Both bounds are now floored.
+
 ## [1.4.2] - 2026-07-16
 
 ### Fixed
@@ -644,7 +653,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.2...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.3...HEAD
+[1.4.3]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.3.1...v1.4.0

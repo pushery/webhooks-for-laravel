@@ -73,7 +73,7 @@ but the environment it needs is worth knowing before you write a patch — it is
 change will be measured in, and it is what a fork has to stand up:
 
 - **PHP 8.4+** with `ext-curl`, `ext-json` and `ext-sodium`.
-- **A real PostgreSQL 16+ server.** There is no SQLite fallback: the delivery log uses
+- **A real PostgreSQL 13+ server.** There is no SQLite fallback: the delivery log uses
   `jsonb`, GIN and partial indexes, declarative range partitioning and a materialized
   view, and every migration refuses outright to run on another driver. The suite connects
   to `127.0.0.1:5432`, database `webhooks_for_laravel_test`, user `postgres`, no password —
