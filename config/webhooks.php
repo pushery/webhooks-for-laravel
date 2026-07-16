@@ -116,7 +116,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | Every setting here is the DEFAULT for each outbound call; the fluent builder
-    | (WebhookCall) overrides any of them per delivery.
+    | (PendingWebhook, via the WebhookSender facade) overrides any of them per delivery.
     |
     | Where delivery jobs run, and how they retry. no_retry_on_4xx keeps a 400/410
     | from being retried for hours (408/425/429 are still retried). large_payload
@@ -207,7 +207,7 @@ return [
         // Opt-in standalone delivery log for the Server layer used WITHOUT the
         // Platform layer. When the Platform layer runs it owns the webhook_deliveries
         // table and its full delivery lifecycle, so this stays off — enabling both
-        // would double-log. Turn it on only when a consumer drives WebhookCall /
+        // would double-log. Turn it on only when a consumer drives PendingWebhook /
         // WebhookSender directly and still wants a persisted, prunable record of every
         // delivery: a listener then upserts each attempt into webhook_server_deliveries
         // keyed by the message id, and rows older than 'prune_after_days' are removed by
@@ -453,6 +453,12 @@ return [
     'client' => [
         'enabled' => (bool) env('WEBHOOKS_CLIENT_ENABLED', false),
 
+        // Keep true. A middleware is prepended to the GLOBAL stack so the EXACT received
+        // bytes are captured before any other middleware can parse or re-encode the body;
+        // signature verification then runs over those bytes. Set to false only if you supply
+        // your own raw-body capture, or to avoid globally buffering every request body — with
+        // it off the receiver verifies over the request content read at processing time, which
+        // can be a re-serialized body and then silently fails to verify on some producers.
         'raw_body_capture' => true,
 
         'configs' => [

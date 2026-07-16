@@ -228,10 +228,27 @@ Enable the Client layer and describe the producer in `config/webhooks.php`:
             'name' => 'partner',
             'secret' => env('PARTNER_WEBHOOK_SECRET'),
             // 'scheme' defaults to Standard Webhooks; set it per source for others.
+            // 'process' MUST be a Webhooks\Client\Jobs\ProcessWebhookJob subclass — any
+            // other class throws when the config resolves. Implement handle() on it.
             'process' => \App\Jobs\HandlePartnerWebhook::class,
         ],
     ],
 ],
+```
+
+Your handler extends the package's base job, which hands it the stored call and the parsed
+envelope:
+
+```php
+use Webhooks\Client\Jobs\ProcessWebhookJob;
+
+class HandlePartnerWebhook extends ProcessWebhookJob
+{
+    public function handle(): void
+    {
+        // $this->webhookCall (the stored row) and $this->message (the parsed envelope)
+    }
+}
 ```
 
 Point a route at it with the macro (registered only while the Client layer is on):
@@ -545,6 +562,14 @@ consumers can deduplicate on it. Supporting operations: `Webhooks::ping($subscri
 (a one-off test event), `Webhooks::rotateSecret($subscription)`, and
 `Webhooks::redeliver($delivery)` (a replay that keeps the original event id).
 
+**Endpoint lifecycle.** `Webhooks::disable($subscription)` stops delivering while keeping
+the secret and the history — it takes effect immediately, at the delivery gate.
+`Webhooks::enable($subscription)` brings it back **and clears the consecutive-failure
+streak**: this is the recovery path for an endpoint the circuit breaker auto-disabled (see
+[Reliability](#reliability)), and flipping `is_active` by hand is *not* enough — the streak
+still stands, so the next final failure re-trips the breaker. `Webhooks::unsubscribe($subscription)`
+removes an endpoint permanently, cascading its delivery-log rows.
+
 An optional **event catalog** (`platform.catalog`) documents each type and can carry a
 JSON Schema; enable `platform.validate_payloads` and a non-conforming payload is rejected
 with `Webhooks\Exceptions\InvalidPayloadException` before any delivery is created.
@@ -589,6 +614,25 @@ and want to restyle them.
 > Gate::define('webhooks.manage', fn ($user) => $user->isAdmin());
 > ```
 
+> **Tenant resolution — override it for a non-Jetstream tenant model.** The portal scopes to
+> the owner returned by `Webhooks\Platform\Support\SubscriptionScope`, which by default reads
+> the authenticated user, preferring a Jetstream-style `currentTeam` when the user model
+> exposes one. If your endpoints are owned by a Workspace/Account/Organization model (you
+> called `Webhooks::subscribe($workspace, …)`) but your auth model is a plain `User`, the
+> default resolver scopes to the *user* and the customer sees an empty list — register a
+> resolver from a service provider so the two match:
+>
+> ```php
+> use Webhooks\Platform\Support\SubscriptionScope;
+>
+> SubscriptionScope::resolveUsing(fn () => auth()->user()?->currentWorkspace);
+> ```
+>
+> The closure may return an Eloquent model (its morph type + key are derived), an explicit
+> `Webhooks\Support\TenantIdentity`, a `[type, id]` pair, or `null` when no tenant is in scope
+> (every query then resolves to nothing — fail-closed, so a null tenant can neither see nor
+> create endpoints). The [dashboard](#observability-dashboard) uses the same resolver.
+
 **Endpoint health scoring (opt-in).** Each active endpoint earns a 0–100 score blended
 from its recent success rate, a p95-latency penalty and a consecutive-failure penalty,
 mapped onto a `healthy` / `degraded` / `failing` band (`unknown` with no history). The
@@ -630,8 +674,10 @@ an optional `core.egress.proxy` routes every outbound delivery through a forward
 
 **AsyncAPI export.** `php artisan webhooks:asyncapi` builds an AsyncAPI 3.0 document from
 the event catalog — one channel, operation and message per event type, each carrying the
-type's schema, example and description (JSON by default, YAML when `symfony/yaml` is
-installed).
+type's schema, example and description. It prints JSON to stdout by default; pass an
+optional path to write a file (`php artisan webhooks:asyncapi asyncapi.json`), add
+`--format=yaml` for YAML (which requires `symfony/yaml` — it is not selected automatically),
+and `--title` / `--doc-version` to override the document metadata.
 
 ## Observability (Dashboard)
 
@@ -669,6 +715,18 @@ tenant-scoped.
 >
 > ```php
 > Gate::define('webhooks.view', fn ($user) => $user->isAdmin());
+> ```
+
+> **Tenant resolution.** The per-tenant dashboard scopes to the owner returned by
+> `Webhooks\Dashboard\DashboardScope`, which resolves the acting tenant exactly as the
+> [self-service portal](#self-service-portal-opt-in) does — the authenticated user, preferring a
+> Jetstream `currentTeam`. For a custom Workspace/Account tenant model, override it so the
+> dashboard scopes to the same owner your subscriptions carry:
+>
+> ```php
+> use Webhooks\Dashboard\DashboardScope;
+>
+> DashboardScope::resolveUsing(fn () => auth()->user()?->currentWorkspace);
 > ```
 
 The read model is an hourly materialized view refreshed by
@@ -1079,7 +1137,10 @@ Report vulnerabilities per the [security policy](SECURITY.md), privately.
   across redelivery, and two-tier inbound dedupe on receipt.
 - **Circuit breaker** — after `platform.circuit_breaker.threshold` consecutive final
   failures an endpoint auto-disables and a `Webhooks\Events\WebhookEndpointAutoDisabled`
-  event fires; a single success resets it.
+  event fires. While an endpoint is still active a single successful delivery resets the
+  streak, but once it is disabled it receives no further traffic and so does **not**
+  self-recover — bring it back with `Webhooks::enable($subscription)` (which also clears the
+  streak), typically wired to the `WebhookEndpointAutoDisabled` event or an operator action.
 - **Rate limiting** — a per-subscription outbound cap (`platform.rate_limit`) and an
   optional per-source inbound cap keep one slow endpoint from starving the queue. The
   outbound cap SHAPES traffic rather than dropping it: an over-limit delivery is logged,
