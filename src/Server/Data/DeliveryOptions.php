@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Webhooks\Server\Data;
 
+use Illuminate\Support\Facades\Crypt;
 use Webhooks\Core\Http\TransportOptions;
 
 /**
@@ -16,6 +17,12 @@ use Webhooks\Core\Http\TransportOptions;
  * (retryAfterCap), and how many times a delivery may wait that cap out without
  * charging its retry budget (retryAfterMaxDeferrals). None of them is a transport
  * concern, so {@see self::toTransportOptions()} drops them all.
+ *
+ * The $clientCertPassphrase carried here is SEALED with the app encrypter (like the signing
+ * secret), so a mutual-TLS credential is never at rest in cleartext in the queue store or in
+ * an attempt-event payload; {@see self::toTransportOptions()} unseals it at send time. Build
+ * this through `PendingWebhook::useMutualTls()`, which seals it — never with a plaintext
+ * passphrase, which toTransportOptions() would then fail to decrypt.
  */
 final readonly class DeliveryOptions
 {
@@ -36,6 +43,13 @@ final readonly class DeliveryOptions
         public int $retryAfterMaxDeferrals = 6,
     ) {}
 
+    /**
+     * Adapt to the Core transport options at send time. The client-cert passphrase is
+     * carried SEALED through the queue (see the class docblock) and is unsealed HERE, at
+     * the Server→Core handoff on the worker — the same place and moment the signing secret
+     * is unsealed — so the plaintext exists only in the transient options handed to the
+     * transport, never at rest in the queue store or in an attempt-event payload.
+     */
     public function toTransportOptions(): TransportOptions
     {
         return new TransportOptions(
@@ -46,7 +60,9 @@ final readonly class DeliveryOptions
             proxy: $this->proxy,
             clientCert: $this->clientCert,
             clientKey: $this->clientKey,
-            clientCertPassphrase: $this->clientCertPassphrase,
+            clientCertPassphrase: $this->clientCertPassphrase === null
+                ? null
+                : Crypt::decryptString($this->clientCertPassphrase),
             contentType: $this->contentType,
             responseCaptureBytes: $this->responseCaptureBytes,
         );

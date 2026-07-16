@@ -4,6 +4,26 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.10] - 2026-07-16
+
+### Fixed
+
+- **The mutual-TLS client-certificate passphrase is now sealed at rest, like the signing
+  secret.** A passphrase set via `useMutualTls()` was serialized in cleartext into the queue
+  store and into every delivery-attempt event payload, while the signing secret in the same
+  object was encrypted. It is now sealed with the app encrypter and unsealed only at send time,
+  so it never sits in cleartext in the queue or reaches an event listener.
+- **The tdigest percentile guard now also verifies the digest column, not just the extension.**
+  The `latency_digest` column is added to the hourly rollup only when the extension is present as
+  the migrations run, so installing the extension afterwards left the column missing — and the
+  guard, which checked only the extension, passed and let the percentile query fail with a cryptic
+  `column "latency_digest" does not exist`. It now names the rebuild, the actionable error the
+  guard was always meant to give.
+- **An empty payload is no longer wrongly rejected against an object schema.** With payload
+  validation on, dispatching an event with an empty payload (`[]`) against a `{"type":"object"}`
+  schema failed, because an empty PHP array is ambiguous and was validated as a JSON array rather
+  than the empty object it represents. An empty payload now validates as `{}`.
+
 ## [1.4.9] - 2026-07-16
 
 ### Fixed
@@ -742,7 +762,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.9...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.10...HEAD
+[1.4.10]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.9...v1.4.10
 [1.4.9]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.8...v1.4.9
 [1.4.8]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.7...v1.4.8
 [1.4.7]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.6...v1.4.7

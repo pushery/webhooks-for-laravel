@@ -8,6 +8,7 @@ use Opis\JsonSchema\Errors\ErrorFormatter;
 use Opis\JsonSchema\Errors\ValidationError;
 use Opis\JsonSchema\Helper;
 use Opis\JsonSchema\Validator;
+use stdClass;
 use Webhooks\Exceptions\InvalidPayloadException;
 
 /**
@@ -42,8 +43,14 @@ final readonly class PayloadValidator
             return;
         }
 
+        // A webhook payload is a JSON object, but PHP cannot tell an empty list from an
+        // empty map, so opis's Helper::toJSON renders [] as a JSON ARRAY — which then fails
+        // an object schema even though {} would satisfy it. Validate an empty payload as the
+        // empty object it represents; a non-empty payload keeps opis's list/map detection.
+        $instance = $payload === [] ? new stdClass : Helper::toJSON($payload);
+
         $error = (new Validator)
-            ->validate(Helper::toJSON($payload), $document)
+            ->validate($instance, $document)
             ->error();
 
         if ($error instanceof ValidationError) {

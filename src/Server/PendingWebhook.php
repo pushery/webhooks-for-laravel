@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Webhooks\Server;
 
 use Closure;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
 use JsonException;
 use Webhooks\Core\Signing\JsonCanonicalizer;
@@ -409,7 +410,12 @@ final class PendingWebhook
                 proxy: $this->proxy,
                 clientCert: $this->clientCert,
                 clientKey: $this->clientKey,
-                clientCertPassphrase: $this->clientCertPassphrase,
+                // Seal the mutual-TLS passphrase like the signing secret: it must not sit in
+                // cleartext in the queue store or in an attempt-event payload. It is unsealed
+                // at send time in DeliveryOptions::toTransportOptions().
+                clientCertPassphrase: $this->clientCertPassphrase === null
+                    ? null
+                    : Crypt::encryptString($this->clientCertPassphrase),
                 contentType: $this->contentType,
                 responseCaptureBytes: $this->responseCaptureBytes,
                 largePayloadThreshold: $this->largePayloadThreshold,
