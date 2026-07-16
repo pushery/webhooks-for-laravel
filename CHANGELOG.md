@@ -4,6 +4,18 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.9] - 2026-07-16
+
+### Fixed
+
+- **Documented that offloaded payload objects are not reclaimed by retention.** With `large_payload`
+  offload enabled, over-threshold bodies are written to a Storage disk and the row keeps only a
+  content-addressed pointer — but row pruning and partition drops remove rows only, never the disk
+  objects, so the disk grew without bound and the retention docs were misleading. The offload config
+  blocks and the README now state that offloaded objects must be reclaimed by a lifecycle policy on
+  the disk (expire by last-modified age of at least the retention window); this is safe because every
+  offload re-writes the object, so an object past that age has no live row referencing it.
+
 ## [1.4.8] - 2026-07-16
 
 ### Fixed
@@ -730,7 +742,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.8...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.9...HEAD
+[1.4.9]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.8...v1.4.9
 [1.4.8]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.7...v1.4.8
 [1.4.7]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.6...v1.4.7
 [1.4.6]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.5...v1.4.6
