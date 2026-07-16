@@ -127,7 +127,9 @@ return [
     | partition is dropped — retention removes rows only. Reclaim them with a lifecycle
     | policy on the 'disk' that expires objects by last-modified age of at least your
     | retention window; every offload re-writes the object, so an object past that age
-    | has no live row and is safe to expire. http_verb, connect_timeout and timeout shape the
+    | has no live row and is safe to expire. Or run `php artisan webhooks:prune-orphaned-payloads`
+    | (a full-disk scan that deletes only objects no row still points at) — the app-side option
+    | for a local disk or app-controlled deletion. http_verb, connect_timeout and timeout shape the
     | request itself; verify_ssl toggles TLS certificate verification on it; and
     | horizon_tags tags each delivery job with its subscription and event type for
     | per-endpoint observability in Laravel Horizon.
@@ -446,7 +448,8 @@ return [
     | Offloaded objects are content-addressed and are NOT deleted by 'delete_after_days'
     | pruning (which removes rows only) — reclaim them with a lifecycle policy on the
     | 'disk' that expires objects by last-modified age of at least 'delete_after_days';
-    | every offload re-writes the object, so an object past that age is unreferenced.
+    | every offload re-writes the object, so an object past that age is unreferenced. Or run
+    | `php artisan webhooks:prune-orphaned-payloads --disk=<disk>` to reclaim from the app side.
     |
     */
 
