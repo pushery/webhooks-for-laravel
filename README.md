@@ -1077,6 +1077,7 @@ translations resolve under the `webhooks` namespace, one file per surface:
 | `self-service` | the endpoint portal |
 | `management` | the [operator console](#operator-console-opt-in) (both stub variants) |
 | `pulse` | the Laravel Pulse card |
+| `pagination` | the shared pagination control (page links + screen-reader labels) |
 
 ```php
 __('webhooks::dashboard.table.replay');
