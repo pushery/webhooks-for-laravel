@@ -67,7 +67,7 @@
                             <x-pulse::td numeric class="text-gray-700 dark:text-gray-300">
                                 @if ($event->failed > 0)
                                     <span class="text-red-500 dark:text-red-400">{{ number_format($event->failed) }}</span>
-                                    <span class="text-xs text-gray-400">({{ number_format($event->failureRate, 1) }}%)</span>
+                                    <span class="text-xs text-gray-500">({{ number_format($event->failureRate, 1) }}%)</span>
                                 @else
                                     0
                                 @endif

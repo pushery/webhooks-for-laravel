@@ -53,6 +53,12 @@ final class PayloadTransformEditor extends Component
     /** The editable sample payload, as JSON, the preview is computed from. */
     public string $sampleJson = '';
 
+    /**
+     * Bumped on every live edit so the preview's aria-live status region re-renders and a screen
+     * reader is told the output recomputed — a region whose text never changes is never announced.
+     */
+    public int $previewRevision = 0;
+
     public function mount(WebhookSubscription $subscription): void
     {
         // Route-model binding resolves the {subscription} segment UNSCOPED, so re-resolve it
@@ -70,6 +76,15 @@ final class PayloadTransformEditor extends Component
         $this->hydrateRules($subscription->transform ?? []);
 
         $this->sampleJson = $this->defaultSampleJson();
+    }
+
+    /**
+     * Any live edit (a rule field, the sample) recomputes the preview; bump the revision so the
+     * status region's key changes and the "preview updated" announcement actually fires.
+     */
+    public function updated(): void
+    {
+        $this->previewRevision++;
     }
 
     public function addIncludeField(): void

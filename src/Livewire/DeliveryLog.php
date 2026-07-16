@@ -81,7 +81,10 @@ final class DeliveryLog extends Component
             ->when($this->status !== '', fn (Builder $query): Builder => $query->where('status', $this->status))
             ->when($this->eventType !== '', fn (Builder $query): Builder => $query->where('event_type', $this->eventType))
             ->latest('created_at')
-            ->paginate(25);
+            // simplePaginate, not paginate: this operator stub is unscoped over the whole
+            // delivery log, and a full count(*) on every render does not scale on a partitioned
+            // table with millions of rows. Prev/next navigation needs no total.
+            ->simplePaginate(25);
 
         return ViewFactory::make('webhooks::livewire.delivery-log', [
             'deliveries' => $deliveries,

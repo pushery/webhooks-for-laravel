@@ -4,6 +4,19 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.4] - 2026-07-16
+
+### Fixed
+
+- **The optional operator delivery-log screen no longer runs a full row count on every render.**
+  It reads the whole delivery log unscoped, and a `count(*)` over a partitioned table with millions
+  of rows does not scale; it now uses simple (previous/next) pagination, which needs no total. The
+  tenant-facing dashboard tables are owner-scoped and were never affected.
+- **Accessibility: the payload-transform editor now announces to screen readers when the live
+  preview recomputes.** Its `aria-live` status region carried a constant string, so it never
+  actually fired; it now re-renders on each edit. The Pulse card's failure-rate text was also
+  darkened to meet the AA contrast minimum.
+
 ## [1.4.3] - 2026-07-16
 
 ### Fixed
@@ -653,7 +666,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.3...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.4...HEAD
+[1.4.4]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.3...v1.4.4
 [1.4.3]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.0...v1.4.1

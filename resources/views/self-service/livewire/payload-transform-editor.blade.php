@@ -176,7 +176,7 @@
                         <div role="region" aria-label="{{ __('webhooks::self-service.a11y.output_preview') }}">
                             <x-wirekit::stack gap="xs">
                                 <x-wirekit::text size="sm" weight="medium">{{ __('webhooks::self-service.transform.output') }}</x-wirekit::text>
-                                <x-wirekit::visually-hidden role="status" aria-live="polite">{{ __('webhooks::self-service.a11y.output_updated') }}</x-wirekit::visually-hidden>
+                                <x-wirekit::visually-hidden role="status" aria-live="polite" wire:key="wh-transform-preview-{{ $previewRevision }}">{{ __('webhooks::self-service.a11y.output_updated') }}</x-wirekit::visually-hidden>
                                 <x-wirekit::code-block language="json" :copy="true" class="wh-transform-output">{{ $outputJson }}</x-wirekit::code-block>
                             </x-wirekit::stack>
                         </div>
