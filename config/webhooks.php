@@ -122,7 +122,12 @@ return [
     | from being retried for hours (408/425/429 are still retried). large_payload
     | offloads a delivery-log payload larger than 'threshold' bytes to the 'disk'
     | Storage disk, leaving the row a pointer plus the body sha256 (off by default,
-    | so every payload stays inline). http_verb, connect_timeout and timeout shape the
+    | so every payload stays inline). Offloaded objects are content-addressed (identical
+    | bodies share one object) and are NOT deleted when the row is pruned or its
+    | partition is dropped — retention removes rows only. Reclaim them with a lifecycle
+    | policy on the 'disk' that expires objects by last-modified age of at least your
+    | retention window; every offload re-writes the object, so an object past that age
+    | has no live row and is safe to expire. http_verb, connect_timeout and timeout shape the
     | request itself; verify_ssl toggles TLS certificate verification on it; and
     | horizon_tags tags each delivery job with its subscription and event type for
     | per-endpoint observability in Laravel Horizon.
@@ -438,6 +443,10 @@ return [
     | key (or leave it null) to receive without limit. 'large_payload' offloads a body
     | larger than 'threshold' bytes to the 'disk' Storage disk, keeping only a pointer
     | plus the body sha256 in the row; rehydrate the full bytes with $call->body().
+    | Offloaded objects are content-addressed and are NOT deleted by 'delete_after_days'
+    | pruning (which removes rows only) — reclaim them with a lifecycle policy on the
+    | 'disk' that expires objects by last-modified age of at least 'delete_after_days';
+    | every offload re-writes the object, so an object past that age is unreferenced.
     |
     */
 
