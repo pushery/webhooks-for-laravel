@@ -31,7 +31,15 @@ final class WebhookSubscriptionPolicy
 
     public function create(Authenticatable $user): bool
     {
-        return $this->hasManageAbility($user);
+        // Creation must fail closed on a null tenant like every sibling ability. There
+        // is no row to own yet, so this checks the scope directly: without a tenant, a
+        // self-service create would pass a null owner to the manager and mint a GLOBAL,
+        // owner-less endpoint that then receives EVERY tenant's payloads — the exact
+        // cross-tenant leak the owner-scoping exists to prevent. (The operator console
+        // is the sanctioned place to register a global endpoint; it is unauthorized by
+        // design and never reaches this policy.)
+        return SubscriptionScope::currentOwner() instanceof TenantIdentity
+            && $this->hasManageAbility($user);
     }
 
     public function update(Authenticatable $user, WebhookSubscription $subscription): bool

@@ -275,8 +275,19 @@ final class PendingWebhook
     public function retryAfterCapInSeconds(int $seconds, ?int $maxDeferrals = null): self
     {
         return tap(clone $this, function (self $call) use ($seconds, $maxDeferrals): void {
-            $call->retryAfterCap = max(0, $seconds);
+            $cap = max(0, $seconds);
+            $call->retryAfterCap = $cap;
             $call->retryAfterMaxDeferrals = max(0, $maxDeferrals ?? $call->retryAfterMaxDeferrals);
+
+            // Keep the schedule's Retry-After clamp in lockstep with the cap. The defer
+            // threshold (above) and the delay clamp are the SAME wait; the builder must
+            // move both, or a hint under the new cap would still be shortened to the old
+            // one — released early, budget charged, back while the endpoint is still
+            // rate-limiting. Config seeds both equal; only this builder can split them. A
+            // custom strategy owns its own clamp, so it is left untouched.
+            if ($call->backoff instanceof ExponentialWithJitter) {
+                $call->backoff = $call->backoff->withRetryAfterCap($cap);
+            }
         });
     }
 

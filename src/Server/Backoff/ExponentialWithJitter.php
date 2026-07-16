@@ -44,6 +44,19 @@ final readonly class ExponentialWithJitter implements BackoffStrategy
         $this->retryAfterCapSeconds = max(0, $retryAfterCapSeconds ?? $capSeconds);
     }
 
+    /**
+     * A copy whose Retry-After clamp is the given seconds, leaving the jitter cap (the
+     * queue-visibility ceiling) untouched. The delivery builder uses this so raising the
+     * Retry-After cap on a single call also raises the clamp its released delay is bound
+     * by — otherwise the defer threshold and the delay clamp, which are the SAME wait,
+     * would silently disagree and the call would come back at the old cap while the
+     * endpoint is still rate-limiting it.
+     */
+    public function withRetryAfterCap(int $retryAfterCapSeconds): self
+    {
+        return new self($this->baseSeconds, $this->capSeconds, max(0, $retryAfterCapSeconds));
+    }
+
     public function delayAfterAttempt(int $attempt, ?int $retryAfterSeconds = null): int
     {
         if ($retryAfterSeconds !== null) {

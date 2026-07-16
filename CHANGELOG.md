@@ -4,6 +4,30 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.8] - 2026-07-16
+
+### Fixed
+
+- **Self-service endpoint creation now fails closed when no tenant is in scope.** With a resolver
+  that yields no current tenant, every read and manage action already refused; creation did not, and
+  passed a null owner through to the manager — registering a global, owner-less endpoint that would
+  then receive every tenant's payloads while staying invisible in the creator's own list. Creation
+  now requires a tenant, like every other self-service action. The unscoped operator console is
+  unchanged: registering a global endpoint there is intentional.
+- **Raising a delivery's Retry-After cap on a single call now also raises the delay it is clamped
+  to.** `retryAfterCapInSeconds()` moved only the defer threshold, not the schedule's clamp, so a
+  hint under the new cap was still shortened to the configured default — the delivery came back
+  while the endpoint was still rate-limiting it, and the attempt was charged. Both move together
+  now.
+- **A processing-dispatch failure after an inbound call is stored no longer swallows the producer's
+  retry.** If the queue push failed once the row was committed, the call was marked seen yet never
+  handled, and every retry short-circuited to a bare success — stored, acknowledged, silently never
+  processed. The row is now rolled back and left unseen on a dispatch failure, so the retry stores
+  and dispatches it.
+- **The endpoint URL is capped at 2048 characters on the self-service and operator forms.** The
+  column is `varchar(2048)` on MySQL but unbounded `text` on PostgreSQL, so an over-long URL stored
+  on one engine and errored on the other; it is now refused as a field error identically on both.
+
 ## [1.4.7] - 2026-07-16
 
 ### Fixed
@@ -706,7 +730,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.7...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.8...HEAD
+[1.4.8]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.7...v1.4.8
 [1.4.7]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.6...v1.4.7
 [1.4.6]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.5...v1.4.6
 [1.4.5]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.4...v1.4.5
