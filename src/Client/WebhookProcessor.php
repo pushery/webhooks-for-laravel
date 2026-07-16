@@ -301,7 +301,12 @@ final readonly class WebhookProcessor
         // through the shared redactor so the live path and the backfill import can never disagree.
         $stored = HeaderRedactor::mask($kept, $this->config->redact());
 
-        return json_encode(PayloadSanitizer::scrub($stored), JSON_THROW_ON_ERROR);
+        // Substitute invalid UTF-8, the same lossy-but-valid guarantee scrub() gives NUL bytes.
+        // Header VALUES are read verbatim off the wire (never through json_decode like the
+        // payload), so a stray non-UTF-8 byte — a Latin-1 accent, an intermediary's injected
+        // byte — would otherwise make this throw AFTER the signature already verified, 500 every
+        // retry and silently lose the webhook. The exact bytes survive in raw_body + body_sha256.
+        return json_encode(PayloadSanitizer::scrub($stored), JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
     /**

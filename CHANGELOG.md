@@ -4,6 +4,17 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.11] - 2026-07-16
+
+### Fixed
+
+- **A stored header carrying an invalid UTF-8 byte no longer loses a verified inbound webhook.**
+  With `store_headers` enabled, a header value containing a stray non-UTF-8 byte (a Latin-1
+  accent, an intermediary's injected byte) made the header-JSON encode throw after the signature
+  had already verified — a 500 on every retry, silently losing an authenticated webhook. The
+  header JSON now substitutes invalid UTF-8, the same lossy-but-valid guarantee already applied to
+  NUL bytes in the payload; the exact received bytes remain in the stored raw body and its SHA-256.
+
 ## [1.4.10] - 2026-07-16
 
 ### Fixed
@@ -762,7 +773,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.10...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.11...HEAD
+[1.4.11]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.10...v1.4.11
 [1.4.10]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.9...v1.4.10
 [1.4.9]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.8...v1.4.9
 [1.4.8]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.7...v1.4.8
