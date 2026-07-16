@@ -15,6 +15,7 @@ use Webhooks\Client\Events\InvalidWebhookSignature;
 use Webhooks\Client\Http\CaptureRawBody;
 use Webhooks\Client\Models\WebhookCall;
 use Webhooks\Client\Verification\InboundVerifier;
+use Webhooks\Core\Http\HeaderRedactor;
 use Webhooks\Core\Payload\PayloadSanitizer;
 use Webhooks\Core\Payload\PayloadStore;
 use Webhooks\Core\Signing\SignatureHeaders;
@@ -250,20 +251,21 @@ final readonly class WebhookProcessor
             return null;
         }
 
-        $redact = array_map(strtolower(...), ['authorization', 'cookie', ...$this->config->redact()]);
         $only = is_array($store) ? array_map(strtolower(...), $store) : null;
 
-        $stored = [];
+        $kept = [];
 
         foreach ($this->flattenHeaders() as $name => $value) {
-            $lower = strtolower($name);
-
-            if ($only !== null && ! in_array($lower, $only, true)) {
+            if ($only !== null && ! in_array(strtolower($name), $only, true)) {
                 continue;
             }
 
-            $stored[$name] = in_array($lower, $redact, true) ? '[redacted]' : $value;
+            $kept[$name] = $value;
         }
+
+        // The always-masked set (Authorization, Cookie) plus the host's redact list, applied
+        // through the shared redactor so the live path and the backfill import can never disagree.
+        $stored = HeaderRedactor::mask($kept, $this->config->redact());
 
         return json_encode(PayloadSanitizer::scrub($stored), JSON_THROW_ON_ERROR);
     }

@@ -43,12 +43,21 @@ final readonly class EndpointHealth
     public function scoreFor(WebhookSubscription $subscription): HealthReport
     {
         $window = $this->config->healthWindowHours();
-        $since = Timestamp::sql(now()->subHours($window));
+        $dialect = WebhookConnection::dialect();
+
+        // The window bound is bound for the ENGINE, not just the query shape. MySQL converts an
+        // offset-bearing literal into the database SESSION time zone (8.0.19+), which silently
+        // slides the whole window by that offset against the UTC-naive DATETIME(6) column — an
+        // endpoint's oldest hours drop out and a failing endpoint can score healthy. The naive
+        // form is the instant the column actually holds.
+        $since = $dialect === Dialect::MySql
+            ? Timestamp::mysql(now()->subHours($window))
+            : Timestamp::sql(now()->subHours($window));
 
         // One pass over the subscription's recent deliveries: how many resolved
         // (reached an attempted outcome, so pending in-flight rows do not count),
         // how many of those succeeded, and the p95 of their measured durations.
-        [$resolved, $succeeded, $p95] = WebhookConnection::dialect() === Dialect::MySql
+        [$resolved, $succeeded, $p95] = $dialect === Dialect::MySql
             ? $this->readMySql($subscription->id, $since)
             : $this->readPostgres($subscription->id, $since);
 
