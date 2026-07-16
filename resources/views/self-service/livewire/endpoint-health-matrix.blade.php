@@ -2,7 +2,6 @@
      health band + score and — once recomputed — its live success rate, p95 latency and
      sample size. The Status and Score headers sort the board; per-row and all-at-once
      Recompute drive the shared health engine. Owner-scoped, WireKit-tokenized throughout. --}}
-@php($headerButton = '-mx-[var(--padding-wk-x-md)] -my-[var(--padding-wk-y-md)] w-[calc(100%+2*var(--padding-wk-x-md))] cursor-pointer px-[var(--padding-wk-x-md)] py-[var(--padding-wk-y-md)] text-left')
 <div class="wh-portal wh-portal-health mx-auto flex max-w-5xl flex-col gap-[var(--padding-wk-y-lg)] p-[var(--padding-wk-x-lg)]" wire:key="health-matrix">
     <header class="flex flex-wrap items-start justify-between gap-[var(--padding-wk-x-md)]">
         <x-wirekit::stack gap="sm">
@@ -33,21 +32,19 @@
             <x-wirekit::table.head>
                 <x-wirekit::table.row>
                     <x-wirekit::table.th>{{ __('webhooks::self-service.table.endpoint') }}</x-wirekit::table.th>
-                    {{-- Sortable in Livewire-sort mode: the th carries aria-sort, and a real
-                         nested button carries the wire:click so the sort is keyboard-operable
-                         (a bare sortable th renders a non-focusable header). --}}
+                    {{-- Sortable in Livewire-sort mode via WireKit's native `sort-action`: the th
+                         announces aria-sort, and the header label sits in a keyboard-operable
+                         <button wire:click> with a focus ring (WCAG 2.1.1). --}}
                     <x-wirekit::table.th
                         sortable
                         :sort-direction="$sortField === 'status' ? $sortDirection : null"
-                    >
-                        <button type="button" wire:click="sortBy('status')" class="{{ $headerButton }}">{{ __('webhooks::self-service.table.status') }}</button>
-                    </x-wirekit::table.th>
+                        sort-action="sortBy('status')"
+                    >{{ __('webhooks::self-service.table.status') }}</x-wirekit::table.th>
                     <x-wirekit::table.th
                         sortable
                         :sort-direction="$sortField === 'score' ? $sortDirection : null"
-                    >
-                        <button type="button" wire:click="sortBy('score')" class="{{ $headerButton }}">{{ __('webhooks::self-service.table.score') }}</button>
-                    </x-wirekit::table.th>
+                        sort-action="sortBy('score')"
+                    >{{ __('webhooks::self-service.table.score') }}</x-wirekit::table.th>
                     <x-wirekit::table.th align="right">{{ __('webhooks::self-service.table.success_rate') }}</x-wirekit::table.th>
                     <x-wirekit::table.th align="right">{{ __('webhooks::self-service.table.p95') }}</x-wirekit::table.th>
                     <x-wirekit::table.th align="right">{{ __('webhooks::self-service.table.sample') }}</x-wirekit::table.th>

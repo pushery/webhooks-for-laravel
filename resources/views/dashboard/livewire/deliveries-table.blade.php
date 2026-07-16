@@ -1,10 +1,9 @@
 {{-- The full delivery table: tenant-scoped, filterable, sortable and paginated.
-     Each sortable header is a real button (keyboard reachable) that fills its header
-     cell, so the whole th is the click target its pointer cursor already advertises,
+     Each sortable header uses WireKit's native `sort-action`: a keyboard-operable button
+     (focus ring, WCAG 2.1.1) carries the wire:click and the sort-direction indicator,
      while the th itself announces aria-sort. Each row opens the detail drawer, and an
      inline replay re-queues the delivery. Empty results render the WireKit empty state;
      the control below the table is the package's own pagination view. --}}
-@php($headerButton = '-mx-[var(--padding-wk-x-md)] -my-[var(--padding-wk-y-md)] w-[calc(100%+2*var(--padding-wk-x-md))] cursor-pointer px-[var(--padding-wk-x-md)] py-[var(--padding-wk-y-md)] text-left')
 <div class="wh-dash-deliveries" wire:key="deliveries-table">
     <div class="mb-[var(--padding-wk-y-md)] flex flex-wrap items-end gap-[var(--padding-wk-x-md)]">
         <x-wirekit::select wire:model.live="status" :label="__('webhooks::dashboard.filters.status')" hideLabel>
@@ -36,24 +35,12 @@
         <x-wirekit::table hoverable :aria-label="__('webhooks::dashboard.a11y.deliveries_table')">
             <x-wirekit::table.head>
                 <x-wirekit::table.row>
-                    <x-wirekit::table.th sortable :sort-direction="$sortField === 'event_type' ? $sortDirection : null">
-                        <button type="button" wire:click="sortBy('event_type')" class="{{ $headerButton }}">{{ __('webhooks::dashboard.table.event') }}</button>
-                    </x-wirekit::table.th>
-                    <x-wirekit::table.th sortable :sort-direction="$sortField === 'status' ? $sortDirection : null">
-                        <button type="button" wire:click="sortBy('status')" class="{{ $headerButton }}">{{ __('webhooks::dashboard.table.status') }}</button>
-                    </x-wirekit::table.th>
-                    <x-wirekit::table.th sortable :sort-direction="$sortField === 'attempt' ? $sortDirection : null">
-                        <button type="button" wire:click="sortBy('attempt')" class="{{ $headerButton }}">{{ __('webhooks::dashboard.table.attempt') }}</button>
-                    </x-wirekit::table.th>
-                    <x-wirekit::table.th sortable :sort-direction="$sortField === 'response_code' ? $sortDirection : null">
-                        <button type="button" wire:click="sortBy('response_code')" class="{{ $headerButton }}">{{ __('webhooks::dashboard.table.code') }}</button>
-                    </x-wirekit::table.th>
-                    <x-wirekit::table.th sortable :sort-direction="$sortField === 'duration_ms' ? $sortDirection : null">
-                        <button type="button" wire:click="sortBy('duration_ms')" class="{{ $headerButton }}">{{ __('webhooks::dashboard.table.duration') }}</button>
-                    </x-wirekit::table.th>
-                    <x-wirekit::table.th sortable :sort-direction="$sortField === 'created_at' ? $sortDirection : null">
-                        <button type="button" wire:click="sortBy('created_at')" class="{{ $headerButton }}">{{ __('webhooks::dashboard.table.when') }}</button>
-                    </x-wirekit::table.th>
+                    <x-wirekit::table.th sortable :sort-direction="$sortField === 'event_type' ? $sortDirection : null" sort-action="sortBy('event_type')">{{ __('webhooks::dashboard.table.event') }}</x-wirekit::table.th>
+                    <x-wirekit::table.th sortable :sort-direction="$sortField === 'status' ? $sortDirection : null" sort-action="sortBy('status')">{{ __('webhooks::dashboard.table.status') }}</x-wirekit::table.th>
+                    <x-wirekit::table.th sortable :sort-direction="$sortField === 'attempt' ? $sortDirection : null" sort-action="sortBy('attempt')">{{ __('webhooks::dashboard.table.attempt') }}</x-wirekit::table.th>
+                    <x-wirekit::table.th sortable :sort-direction="$sortField === 'response_code' ? $sortDirection : null" sort-action="sortBy('response_code')">{{ __('webhooks::dashboard.table.code') }}</x-wirekit::table.th>
+                    <x-wirekit::table.th sortable :sort-direction="$sortField === 'duration_ms' ? $sortDirection : null" sort-action="sortBy('duration_ms')">{{ __('webhooks::dashboard.table.duration') }}</x-wirekit::table.th>
+                    <x-wirekit::table.th sortable :sort-direction="$sortField === 'created_at' ? $sortDirection : null" sort-action="sortBy('created_at')">{{ __('webhooks::dashboard.table.when') }}</x-wirekit::table.th>
                     <x-wirekit::table.th align="right">{{ __('webhooks::dashboard.table.actions') }}</x-wirekit::table.th>
                 </x-wirekit::table.row>
             </x-wirekit::table.head>

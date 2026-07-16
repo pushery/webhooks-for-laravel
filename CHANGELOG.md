@@ -4,6 +4,16 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2026-07-16
+
+### Changed
+
+- The dashboard delivery table and the self-service health board now sort their columns
+  through WireKit's native keyboard-operable `sort-action`, replacing the package's own
+  header-button markup. The headers keep their focus ring and `aria-sort` and gain a
+  sort-direction indicator. **This raises the WireKit floor for the shipped tables to 2.12**
+  — on an older WireKit the sort headers still render but become mouse-only.
+
 ## [1.5.1] - 2026-07-16
 
 ### Documentation
@@ -814,7 +824,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.5.1...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.5.2...HEAD
+[1.5.2]: https://github.com/pushery/webhooks-for-laravel/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.12...v1.5.0
 [1.4.12]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.11...v1.4.12

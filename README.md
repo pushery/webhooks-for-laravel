@@ -968,6 +968,11 @@ for layers you never enabled.
 **Required for every screen this package renders** — the dashboard, the self-service
 portal and both publishable stubs.
 
+> **WireKit ≥ 2.12.** The shipped dashboard and self-service tables sort their columns
+> through WireKit's native keyboard-operable `sort-action` (WCAG 2.1.1). On an older
+> WireKit the sort headers still render, but only as mouse targets — install WireKit 2.12
+> or newer to keep them reachable by keyboard.
+
 The package ships **no compiled stylesheet**. Its views are Tailwind utilities over
 WireKit's design tokens: `@wirekitStyles` brings the tokens, and **your** Tailwind build
 compiles the utilities that consume them. That build has to be told where to look — for
