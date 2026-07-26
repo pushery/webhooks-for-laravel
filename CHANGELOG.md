@@ -4,6 +4,46 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-07-26
+
+### Added
+
+- **A cross-tenant dashboard scope for support consoles.** `dashboard.all_tenants`
+  (`WEBHOOKS_DASHBOARD_ALL_TENANTS`) reads every delivery, owner-less and tenant-owned alike —
+  the "what did we send to this customer's endpoint?" view. It is deliberately separate from
+  `dashboard.operator`, which stays *global rows only*: those are different permission levels,
+  and merging them would silently widen every existing operator dashboard on upgrade. It wins
+  when both flags are on, and carries its own ability
+  (`dashboard.all_tenants_ability`, default `view-all-tenant-webhooks`) on top of the route
+  gate. If that ability is defined and the user fails it the request is **denied**, never
+  narrowed to a smaller scope.
+- `WebhookSubscription` now carries the timestamp query scopes the three log models already
+  had, so `->whereTimestamp('disabled_at', '>=', $moment)` binds correctly per dialect.
+  Filtering that column by hand — or borrowing the binding from another model — was the only
+  previous option, and the plain `->where()` it invites is silently wrong: PostgreSQL resolves
+  a naive literal against the database session zone, shifting the window by that offset.
+
+### Security
+
+- The cross-tenant dashboard scope **requires** its ability rather than defaulting open. An
+  undefined ability now denies instead of reading every tenant's deliveries. This matters
+  because the scope sits behind `view-webhook-dashboard`, which a per-tenant dashboard grants
+  broadly — every customer needs it for their own data — so an install that enabled the flag
+  without defining a second ability would have exposed every customer's history to every
+  customer. To run with no second gate, define the ability as always-true explicitly.
+
+### Fixed
+
+- **The PostgreSQL delivery log now has a `created_at` index.** Every existing index led with
+  another column, so a global newest-first read — the operator delivery log, which is not
+  owner-scoped — could not be served by any of them: PostgreSQL sequentially scanned every
+  live partition and sorted the union before it could take the first page. The index is
+  declared on the partitioned parent, so new partitions inherit it. MySQL already had one.
+  **Existing installations get it through a new additive migration** — run `php artisan
+  migrate` (re-publish the migration tag first if you publish them). On a large log the index
+  build locks each partition while it runs; the migration's docblock describes the manual
+  online path if that window matters.
+
 ## [1.6.0] - 2026-07-26
 
 ### Security
@@ -854,7 +894,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.5.2...v1.6.0
 [1.5.2]: https://github.com/pushery/webhooks-for-laravel/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.5.0...v1.5.1

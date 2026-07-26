@@ -593,6 +593,26 @@ return [
         // per-tenant customer dashboard. It shows global rows to everyone the
         // view-webhook-dashboard gate admits, so gate that ability to operators.
         'operator' => (bool) env('WEBHOOKS_DASHBOARD_OPERATOR', false),
+        // Cross-tenant operator mode: read EVERY delivery, owner-less and tenant-owned alike.
+        // This is the support/console view — "what did we send to THIS customer's endpoint?" —
+        // and it is deliberately NOT part of 'operator' above: seeing the global endpoints and
+        // seeing every tenant's private history are different permission levels, and rolling
+        // them together would silently widen every existing operator dashboard on upgrade.
+        //
+        // It takes precedence over 'operator' when both are on, and it is gated by its OWN
+        // ability (below) on top of the route's view-webhook-dashboard middleware. If that
+        // ability is defined and the acting user fails it, the dashboard denies the request
+        // rather than quietly falling back to a narrower scope — a support screen that
+        // silently shrinks to the handful of owner-less rows is the failure this exists to
+        // prevent, and it shows no error while doing it.
+        'all_tenants' => (bool) env('WEBHOOKS_DASHBOARD_ALL_TENANTS', false),
+        // The ability guarding cross-tenant reads. REQUIRED while 'all_tenants' is on: leave it
+        // undefined and the dashboard refuses to load rather than reading every tenant's data.
+        // Operator mode can default open because it shows only your own owner-less rows; this
+        // shows every customer's, behind an ability a per-tenant dashboard grants broadly. To
+        // deliberately run with no second gate, define it as always-true — explicit and
+        // greppable, unlike an absence.
+        'all_tenants_ability' => env('WEBHOOKS_DASHBOARD_ALL_TENANTS_ABILITY', 'view-all-tenant-webhooks'),
         'source_model' => WebhookDelivery::class,
         'windows' => ['24h', '7d', '30d'],
         'poll_interval' => '30s',

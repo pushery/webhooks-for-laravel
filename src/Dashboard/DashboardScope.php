@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Webhooks\Dashboard;
 
 use Closure;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Gate;
 use RuntimeException;
 use Webhooks\Support\TenantIdentity;
 
@@ -55,23 +57,81 @@ final class DashboardScope
     }
 
     /**
-     * What the current dashboard request is scoped to. In OPERATOR mode
-     * (`webhooks.dashboard.operator = true`) the dashboard reads the global, owner-less rows
-     * — the endpoints an operator registers with a null owner, which a tenant scope can never
-     * see — and no tenant is resolved. Otherwise it is the acting tenant, resolved exactly as
-     * {@see self::currentOwner()}.
+     * What the current dashboard request is scoped to, in precedence order:
      *
-     * Operator mode shows global rows to whoever the `view-webhook-dashboard` ability lets in,
-     * so gate that ability to operators — it is the same fail-closed gate the tenant dashboard
-     * relies on, not a new one.
+     * 1. **ALL-TENANTS** (`webhooks.dashboard.all_tenants = true`) — every delivery, whoever
+     *    owns it: the support/operator console. Checked first because it is the strictly wider
+     *    scope, so a host that switches it on does not have to also remember to switch
+     *    `operator` off. Additionally gated by its own ability, fail-closed (see below).
+     * 2. **OPERATOR** (`webhooks.dashboard.operator = true`) — the global, owner-less rows
+     *    only: the endpoints an operator registers with a null owner, which a tenant scope can
+     *    never see. Not "everything"; a tenant's private rows stay invisible.
+     * 3. Otherwise the acting tenant, resolved exactly as {@see self::currentOwner()}.
+     *
+     * Both operator modes show their rows to whoever the `view-webhook-dashboard` ability lets
+     * in, so gate that ability to operators. All-tenants carries a SECOND gate on top, because
+     * reading another tenant's delivery history is a higher permission level than reading your
+     * own global endpoints.
      */
     public static function current(): DashboardTenant
     {
+        if (Config::boolean('webhooks.dashboard.all_tenants', false)) {
+            self::authorizeAllTenants();
+
+            return DashboardTenant::allTenants();
+        }
+
         if (Config::boolean('webhooks.dashboard.operator', false)) {
             return DashboardTenant::global();
         }
 
         return DashboardTenant::forTenant(self::currentOwner());
+    }
+
+    /**
+     * Fail closed on the cross-tenant scope: the configured ability must EXIST and the acting
+     * user must pass it. An undefined ability, a blank ability name and an unauthenticated
+     * request all deny.
+     *
+     * The undefined case is the one worth spelling out, because the obvious default is the
+     * dangerous one. Operator mode leaves an undefined ability open and that is fine there — it
+     * exposes only the owner-less rows the operator itself registered. This scope exposes every
+     * TENANT's delivery history, and it sits behind `view-webhook-dashboard`, an ability a
+     * per-tenant dashboard necessarily grants BROADLY: every customer needs it to see their own
+     * deliveries. So a host that flips this flag without defining a second ability would hand
+     * every customer every other customer's history — silently, with nothing failing. Copying
+     * operator mode's default here copies its shape without its safety.
+     *
+     * A host that genuinely wants no second gate says so explicitly —
+     * `Gate::define('view-all-tenant-webhooks', fn () => true)` — which is greppable and
+     * reviewable, unlike an absence.
+     *
+     * It DENIES rather than narrowing. Falling back to the tenant or global scope would leave a
+     * support screen rendering successfully while showing a fraction of the rows it is supposed
+     * to — no error, no empty state, nothing failing a test. That silent narrowing is the exact
+     * failure this whole scope was added to prevent, so it must not be its own failure mode.
+     */
+    private static function authorizeAllTenants(): void
+    {
+        $ability = Config::string('webhooks.dashboard.all_tenants_ability', 'view-all-tenant-webhooks');
+
+        if ($ability === '' || ! Gate::has($ability)) {
+            throw new AuthorizationException(
+                'The webhook dashboard is in cross-tenant mode, which reads EVERY tenant\'s '
+                .'deliveries, so it requires its own ability. Define '
+                ."'".($ability === '' ? 'view-all-tenant-webhooks' : $ability)."' and grant it "
+                .'to your operators — or set webhooks.dashboard.all_tenants to false.'
+            );
+        }
+
+        $user = Auth::user();
+
+        if ($user === null || Gate::forUser($user)->denies($ability)) {
+            throw new AuthorizationException(
+                'The webhook dashboard is in cross-tenant mode, which requires the '
+                ."'{$ability}' ability."
+            );
+        }
     }
 
     /**

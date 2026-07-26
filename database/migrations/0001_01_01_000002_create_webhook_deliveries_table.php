@@ -94,6 +94,20 @@ return new class extends Migration
         // with both owner columns before created_at — leaving owner_type as a heap
         // filter would interleave a second owner type that shares an owner_id.
         DB::statement('CREATE INDEX webhook_deliveries_owner_idx ON webhook_deliveries (owner_type, owner_id, created_at)');
+        // A GLOBAL newest-first read — the operator delivery log, which is deliberately not
+        // owner-scoped — is served by none of the indexes above: every one of them LEADS with
+        // another column, so none can produce created_at order on its own. Without this the
+        // planner sequentially scans EVERY live partition and sorts the union before it can
+        // take the first page, and the sort is blocking: the LIMIT saves nothing.
+        //
+        // Declared on the partitioned PARENT, so PostgreSQL propagates it to every partition
+        // the rolling PartitionManager window creates later — an index added per partition
+        // would silently stop covering new months.
+        //
+        // No DESC: a btree scans either direction, so one index serves newest-first and
+        // oldest-first alike. This mirrors the plain created_at index the MySQL lane below
+        // already carries, which is why the operator log is fast there and was not here.
+        DB::statement('CREATE INDEX webhook_deliveries_created_idx ON webhook_deliveries (created_at)');
 
         $partitions = new PartitionManager;
         $partitions->ensureDefaultPartition();
@@ -110,8 +124,9 @@ return new class extends Migration
      * A flat InnoDB table — no partitioning, so it CAN carry the FK cascade a partitioned
      * MySQL table cannot (ERROR 1506). Deleting a subscription therefore still removes its
      * deliveries at the database, keeping the GDPR-erasure guarantee absolute. Retention is a
-     * chunked, indexed DELETE instead of an O(1) partition drop, so the flat table adds a plain
-     * created_at index the partitioned PostgreSQL table never needed. Timestamps are DATETIME(6)
+     * chunked, indexed DELETE instead of an O(1) partition drop, which is a SECOND reason this
+     * lane needs a plain created_at index — the first, a global newest-first operator read, applies
+     * to both engines, so PostgreSQL carries one too. Timestamps are DATETIME(6)
      * holding UTC; payload_type is uncapped MEDIUMTEXT via JSON_UNQUOTE(JSON_EXTRACT(...)).
      */
     private function createMySql(): void
