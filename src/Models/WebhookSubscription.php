@@ -14,6 +14,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Override;
 use Webhooks\Database\Concerns\HasZonedTimestamps;
+use Webhooks\Database\Concerns\ScopesByTimestamp;
 use Webhooks\Database\Concerns\UsesWebhookConnection;
 use Webhooks\Database\Factories\WebhookSubscriptionFactory;
 
@@ -48,6 +49,21 @@ final class WebhookSubscription extends Model
     use HasFactory;
 
     use HasZonedTimestamps;
+
+    /**
+     * Timestamp scopes, exactly as on the three log models. This table carries columns a
+     * host legitimately filters by moment — `disabled_at` (which endpoints were auto-disabled
+     * in the last 24h?), `secret_rotated_at`, `health_calculated_at` — and a plain
+     * `->where('disabled_at', '>=', $moment)` binds a NAIVE literal that PostgreSQL resolves
+     * against the database session zone. The window then shifts by that offset and the query
+     * quietly returns the wrong rows.
+     *
+     * Without this the correct call was `->where('disabled_at', '>=', (new WebhookDelivery)->boundTimestamp($m))`
+     * — borrowing the binding from an unrelated model, which reads like a mistake and invites
+     * exactly the "cleanup" back to the silently-wrong form.
+     */
+    use ScopesByTimestamp;
+
     use UsesWebhookConnection;
 
     protected $table = 'webhook_subscriptions';
