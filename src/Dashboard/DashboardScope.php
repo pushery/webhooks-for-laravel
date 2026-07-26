@@ -162,7 +162,7 @@ final class DashboardScope
 
         $identifier = $user->getAuthIdentifier();
 
-        if (! is_int($identifier) && ! (is_string($identifier) && is_numeric($identifier))) {
+        if (! is_int($identifier) && (! is_string($identifier) || ! is_numeric($identifier))) {
             throw new RuntimeException(
                 'The authenticated identifier is not a numeric owner id. Register a tenant-aware '
                 .'resolver with DashboardScope::resolveUsing().'

@@ -1,4 +1,5 @@
 {
+    "$schema": "https://getcomposer.org/schema.json",
     "name": "pushery/webhooks-for-laravel",
     "description": "An all-in-one, config-gated webhooks toolkit for Laravel: send signed outbound webhooks (Standard Webhooks signatures by default, Ed25519 optional), receive and verify inbound ones, let customers self-serve their endpoints, and observe every delivery on a dashboard — switch on only the layers you need.",
     "keywords": [
@@ -26,7 +27,7 @@
         "ext-curl": "*",
         "ext-json": "*",
         "ext-sodium": "*",
-        "guzzlehttp/guzzle": "^7.8",
+        "guzzlehttp/guzzle": "^7.15.1",
         "guzzlehttp/psr7": "^2.7",
         "illuminate/console": "^13.0",
         "illuminate/contracts": "^13.0",

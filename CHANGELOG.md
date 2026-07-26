@@ -4,6 +4,36 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-07-26
+
+### Security
+
+- The `guzzlehttp/guzzle` floor is raised to **^7.15.1**. The previous `^7.8` let an install
+  resolve to a version carrying four advisories — a `Proxy-Authorization` header forwarded to
+  origin servers on redirect, URI fragments disclosed in `Referer`, host-only cookie scope not
+  preserved, and unbounded response cookies. This package drives outbound HTTP to
+  customer-controlled URLs, so those are squarely in its path.
+
+### Added
+
+- The package now ships a **Laravel Boost skill** at
+  `resources/boost/skills/webhooks-for-laravel/SKILL.md`. Boost surfaces it inside consuming
+  applications, so an agent integrating the package gets the layer gates, the per-layer
+  publish tags and the smallest correct send/receive setup without reading the whole
+  documentation. It is required at release.
+
+### Changed
+
+- The documentation moved to <https://docs.pushery.com/webhooks-for-laravel/>. Everything the
+  README used to carry — installation, the layer guides, signatures and interop, events,
+  security, reliability, the configuration and command reference, the upgrade and migration
+  guides — is published there, restructured into pages instead of one long file. Nothing was
+  dropped.
+- The README is now a showcase: what the package does, how to install it, what you get, and
+  links into the documentation. It no longer duplicates the pages it points at.
+- The five shipped files that referred a reader to the README's "Styling the UI" section now
+  link the guide directly, so the pointer resolves for anyone reading the installed package.
+
 ## [1.5.2] - 2026-07-16
 
 ### Changed
@@ -824,7 +854,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.5.2...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.5.2...v1.6.0
 [1.5.2]: https://github.com/pushery/webhooks-for-laravel/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.4.12...v1.5.0
