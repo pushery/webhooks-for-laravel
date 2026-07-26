@@ -3,8 +3,9 @@
      WireKit's stylesheet (@wirekitStyles) carries the DESIGN TOKENS; the Tailwind
      utilities that consume them — in WireKit's components and in these views — are
      compiled by the host application. A host therefore points its Tailwind build at both
-     packages' views (see the README's "Styling the UI" section: import this package's
-     resources/css/webhooks.css and add WireKit's own source glob), or publishes and
+     packages' views (see the "Styling the UI" guide at
+     https://docs.pushery.com/webhooks-for-laravel/guides/styling-the-ui: import this
+     package's resources/css/webhooks.css and add WireKit's own source glob), or publishes and
      overrides this layout with the webhooks-self-service-views tag.
 
      Dark mode: WireKit's dark tokens live behind a `.dark` class on the root element, so

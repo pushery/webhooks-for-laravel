@@ -218,7 +218,7 @@ final class PendingWebhook
 
     public function useHttpVerb(string $verb): self
     {
-        return tap(clone $this, fn (self $call) => $call->verb = strtolower($verb));
+        return tap(clone $this, fn (self $call): string => $call->verb = strtolower($verb));
     }
 
     /**

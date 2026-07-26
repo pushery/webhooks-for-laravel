@@ -1,6 +1,7 @@
 {{-- WireKit-styled stub (publish tag: webhooks-ui-wirekit). Requires pushery/wirekit
-     and a Tailwind build that scans both packages' views (see the README's "Styling the
-     UI" section); place behind your own authorization. Publish the neutral variant
+     and a Tailwind build that scans both packages' views (see the "Styling the UI" guide
+     at https://docs.pushery.com/webhooks-for-laravel/guides/styling-the-ui); place behind
+     your own authorization. Publish the neutral variant
      instead with the webhooks-ui tag. --}}
 <x-wirekit::stack gap="md" class="wh-deliveries">
     <x-wirekit::row gap="md" class="flex-wrap items-end">
