@@ -4,6 +4,40 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-07-26
+
+### Fixed
+
+- **The static-analysis gate no longer dies on a fresh dependency resolution.** `phpstan/phpstan`
+  2.2.6 removed a private property that `rector/rector` 2.5.7 reaches into, so every
+  `rector process` aborted outright — the gate did not report a finding, it crashed. A library
+  does not commit its lockfile, so CI resolves fresh on every run and hit this before any
+  developer machine did. PHPStan is pinned below 2.2.6 until Rector supports it, and every
+  upper-bound pin in `require-dev` now has to be registered with its reason and its retirement
+  condition or the build fails. **Dev-only — `require-dev` never reaches the published package,
+  so no consumer inherits the pin.**
+
+### Added
+
+- **A reference page for the stored status values and the exceptions.** The versioning page
+  promised Semantic Versioning on "the enums, the exceptions" as categories — which tells you
+  the promise exists but not what it covers, so writing a `catch` block or comparing
+  `$delivery->status` meant reading the source. Every backed enum is now named with its exact
+  stored string, and every exception with what throws it and whether catching it is the right
+  layer. Derived from the code by a guard, so a new case or exception cannot ship unnamed.
+
+### Changed
+
+- The mutation release gate now **adopts a green isolated CI run** for the tree being tagged,
+  and only falls back to the local ~2-hour serial run when no such proof exists. The receipt
+  could previously be produced only locally, which forced that run onto the developer machine
+  at every release — the contention the fleet rule moves to CI in the first place. Adoption is
+  verified, not assumed: the pipeline's commit must resolve to the same tree, and the mutation
+  step itself must be green, and that step must have **produced a score** — the nightly lane is
+  state-deduped and exits 0 when nothing changed, so a green step alone can mean no mutation
+  ran at all. `just mutate-local` forces the local run. Internal tooling only — nothing shipped
+  changes.
+
 ## [1.7.0] - 2026-07-26
 
 ### Added
@@ -894,7 +928,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.7.1...HEAD
+[1.7.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.5.2...v1.6.0
 [1.5.2]: https://github.com/pushery/webhooks-for-laravel/compare/v1.5.1...v1.5.2
