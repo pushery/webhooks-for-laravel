@@ -43,7 +43,7 @@ trait HasZonedTimestamps
      * Format a value for storage. On MySQL the instant is converted to UTC first, so a
      * naive DATETIME(6) column always holds UTC whatever timezone the value arrived in;
      * on PostgreSQL the offset-bearing format already carries the instant, so the parent
-     * behaviour is exact.
+     * behavior is exact.
      */
     public function fromDateTime($value): ?string
     {

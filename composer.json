@@ -43,12 +43,6 @@
             "Webhooks\\Database\\Factories\\": "database/factories/"
         }
     },
-    "config": {
-        "sort-packages": true,
-        "allow-plugins": {
-            "pestphp/pest-plugin": true
-        }
-    },
     "extra": {
         "laravel": {
             "providers": [
@@ -65,7 +59,8 @@
         "livewire/livewire": "Required to render any UI this package ships: the observability dashboard, the self-service endpoint portal, and the optional management components (Webhooks\\WebhooksUiServiceProvider).",
         "pushery/wirekit": "Required to render the dashboard and the self-service portal AS SHIPPED — their views are built from WireKit components. A host on another UI kit must publish the views (--tag=webhooks-dashboard-views / --tag=webhooks-self-service-views) and restyle them instead.",
         "blade-ui-kit/blade-icons": "Renders the icons the shipped screens ask WireKit for (empty states, primary actions). Without it WireKit draws an inert placeholder in their place.",
-        "blade-ui-kit/blade-heroicons": "The icon set the shipped screens are drawn against (WireKit's default preset)."
+        "blade-ui-kit/blade-heroicons": "The icon set the shipped screens are drawn against (WireKit's default preset).",
+        "symfony/yaml": "Enables `--format=yaml` on `webhooks:asyncapi`. The command defaults to JSON and reports a clear error when this package is absent, so it stays entirely optional."
     },
     "minimum-stability": "stable",
     "prefer-stable": true

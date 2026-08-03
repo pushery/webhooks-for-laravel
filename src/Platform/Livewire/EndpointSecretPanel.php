@@ -95,7 +95,7 @@ final class EndpointSecretPanel extends Component
      * Once the reveal window has elapsed, drop the plaintext secrets from the
      * component state on the very next request. The render guard alone only stops the
      * value being shown — the raw props would otherwise linger on the server instance
-     * and keep being serialised into the client snapshot; nulling them here retracts
+     * and keep being serialized into the client snapshot; nulling them here retracts
      * the plaintext entirely rather than merely hiding it.
      */
     public function hydrate(): void

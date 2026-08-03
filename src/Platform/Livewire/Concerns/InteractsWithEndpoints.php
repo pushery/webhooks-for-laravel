@@ -57,7 +57,7 @@ trait InteractsWithEndpoints
     /**
      * Load one endpoint the acting tenant owns. The owner filter comes first, so a
      * cross-tenant id simply resolves to nothing and fails with a not-found before
-     * any action runs — the row-level policy is the second, defence-in-depth guard.
+     * any action runs — the row-level policy is the second, defense-in-depth guard.
      */
     protected function findOwnedEndpoint(int $id): WebhookSubscription
     {

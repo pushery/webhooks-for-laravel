@@ -66,7 +66,7 @@ final class PayloadTransformEditor extends Component
         // through the owner-scoped query: a foreign id then fails not-found (404) BEFORE the
         // policy, exactly as every other panel does — otherwise a foreign-but-existing id 403s
         // while a non-existent one 404s, letting a tenant enumerate which ids exist. The policy
-        // stays the second, defence-in-depth guard.
+        // stays the second, defense-in-depth guard.
         $subscription = $this->findOwnedEndpoint((int) $subscription->id);
         $this->authorize('update', $subscription);
 

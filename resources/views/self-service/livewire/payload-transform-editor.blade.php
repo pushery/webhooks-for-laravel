@@ -169,7 +169,7 @@
                             <x-wirekit::text size="sm" weight="medium">{{ __('webhooks::self-service.transform.input') }}</x-wirekit::text>
                             <x-wirekit::code-block language="json" :copy="true" class="wh-transform-input">{{ $inputJson }}</x-wirekit::code-block>
                         </x-wirekit::stack>
-                        {{-- A labelled region, NOT a live region around the code block: the output
+                        {{-- A labeled region, NOT a live region around the code block: the output
                              body recomputes on every debounced keystroke, and a live region there
                              would read the whole JSON document out again every 400 ms. The short
                              status sentence beside it carries the announcement instead. --}}

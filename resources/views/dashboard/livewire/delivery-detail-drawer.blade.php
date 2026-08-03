@@ -99,6 +99,16 @@
                      $this->payloadJson is a COMPUTED property, so a body this user may not see is
                      never serialized into the Livewire snapshot; the check below is a boundary,
                      not a curtain. Never bind the delivery or its payload as a public property. --}}
+                @if ($this->payloadOffloadNotice !== null)
+                    {{-- FIRST, because it changes how everything below reads. Past the offload
+                         threshold the row holds only a stub, so the largest deliveries render as
+                         the smallest ones — and under a redacted body the stub is
+                         indistinguishable from "there was barely anything here". --}}
+                    <x-wirekit::text size="sm" variant="muted" class="mt-[var(--padding-wk-y-sm)] wh-dash-drawer-payload-offloaded">
+                        {{ $this->payloadOffloadNotice }}
+                    </x-wirekit::text>
+                @endif
+
                 @if ($this->payloadNotice !== null)
                     {{-- Say WHY, always. A panel that just stops after its heading reads as a
                          defect, and the next person "fixes" it by deleting the guard. --}}

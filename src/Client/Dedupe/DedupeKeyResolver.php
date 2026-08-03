@@ -15,7 +15,7 @@ use Webhooks\Core\Signing\SignatureHeaders;
  *
  * The key is what the partial-unique store and the fast-path cache key on: return a
  * value that is STABLE across a producer's retries of the same event (so the second
- * delivery is recognised as a duplicate) and DISTINCT between different events. Return
+ * delivery is recognized as a duplicate) and DISTINCT between different events. Return
  * null when this delivery carries no usable key — the call is then always stored, never
  * silently swallowed. Called only after the signature is verified, so the body is
  * authentic.

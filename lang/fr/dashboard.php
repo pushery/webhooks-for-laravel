@@ -113,6 +113,7 @@ return [
         // Shown INSTEAD of the values when the payload ability denies the read. It has
         // to say why: a panel that just stops after its heading reads as a defect.
         'payload_redacted' => 'Les valeurs sont masquées. La structure reste visible pour que tu puisses vérifier la forme du corps sans lire les données qu\'il contient.',
+        'payload_offloaded' => 'Ce corps était trop volumineux pour le journal et a été déplacé vers le disque :disk. Ce qui s\'affiche ici est le fragment conservé par le journal, pas le corps livré.',
         'payload_hidden' => 'Le corps est masqué. Tu n\'as pas l\'autorisation de consulter les payloads des livraisons.',
     ],
 

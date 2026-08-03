@@ -113,6 +113,7 @@ return [
         // Shown INSTEAD of the values when the payload ability denies the read. It has
         // to say why: a panel that just stops after its heading reads as a defect.
         'payload_redacted' => 'Values are hidden. The structure is shown so you can check the shape of the body without reading the data it carries.',
+        'payload_offloaded' => 'This body was too large to keep in the log and was moved to the :disk disk. What is shown here is the stub the log kept, not the delivered body.',
         'payload_hidden' => 'The body is hidden. You do not have permission to view delivery payloads.',
     ],
 

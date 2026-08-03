@@ -14,7 +14,7 @@ use Webhooks\Support\TenantIdentity;
 /**
  * Row-level authorization for self-service endpoint management. A self-service query
  * already constrains to the resolved owner, so a foreign row never loads; this policy
- * is the second, defence-in-depth check on the action itself.
+ * is the second, defense-in-depth check on the action itself.
  *
  * Every ability is granted only when the subscription belongs to the acting tenant
  * AND — when a host has wired the manage-webhook-endpoints ability — that ability

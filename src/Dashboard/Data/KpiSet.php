@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Webhooks\Dashboard\Data;
 
 /**
- * The summarised delivery KPIs for one owner over one window: additive counts
+ * The summarized delivery KPIs for one owner over one window: additive counts
  * summed from the hourly rollup, plus the window-level latency percentiles
  * computed live over the raw rows (never averaged from the rollup's per-hour
  * buckets). The retry rate is derived from the counts so the math lives in one

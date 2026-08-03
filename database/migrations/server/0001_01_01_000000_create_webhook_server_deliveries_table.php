@@ -19,7 +19,7 @@ return new class extends Migration
      * webhooks.server.persistence.enabled, so an app that never opts in gains no table.
      *
      * The flat shape is portable, so this is the first table to run on either engine.
-     * PostgreSQL keeps its exact original schema; MySQL gets a shape that is behaviourally
+     * PostgreSQL keeps its exact original schema; MySQL gets a shape that is behaviorally
      * identical — UTC-naive DATETIME(6) instead of timestamptz, MEDIUMTEXT for the error,
      * and a case-sensitive collation on the identity columns.
      */

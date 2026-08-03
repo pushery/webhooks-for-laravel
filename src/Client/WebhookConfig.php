@@ -363,7 +363,7 @@ final class WebhookConfig
     }
 
     /**
-     * Normalise the optional 'large_payload' block into enabled + threshold + disk,
+     * Normalize the optional 'large_payload' block into enabled + threshold + disk,
      * falling back to the documented defaults (off, 256 KiB, the 's3' disk).
      *
      * @return array{enabled: bool, threshold: int, disk: string}
@@ -380,7 +380,7 @@ final class WebhookConfig
     }
 
     /**
-     * Normalise the optional 'rate_limit' block into a token-bucket size + decay, or
+     * Normalize the optional 'rate_limit' block into a token-bucket size + decay, or
      * null when the source declares none (unthrottled).
      *
      * @return array{max_attempts: int, decay_seconds: int}|null
@@ -398,7 +398,7 @@ final class WebhookConfig
     }
 
     /**
-     * Normalise the optional 'jwks' block into a url + cache TTL + optional kid, or
+     * Normalize the optional 'jwks' block into a url + cache TTL + optional kid, or
      * null when no JWKS is configured (the static-secret path).
      *
      * @return array{url: string, cacheTtl: int, kid: ?string}|null
