@@ -50,7 +50,7 @@ return [
         'new_heading' => 'New endpoint',
         'edit_heading' => 'Edit endpoint',
         'name_label' => 'Name',
-        'name_hint' => 'An optional label to recognise this endpoint.',
+        'name_hint' => 'An optional label to recognize this endpoint.',
         'url_label' => 'Endpoint URL',
         'url_placeholder' => 'https://example.com/webhooks',
         'event_types_label' => 'Event types',

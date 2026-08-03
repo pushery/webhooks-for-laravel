@@ -99,6 +99,36 @@ final class DeliveryDetailDrawer extends Component
     }
 
     /**
+     * The line saying the body was OFFLOADED, or null when it is stored inline.
+     *
+     * Without it the drawer misleads in the most expensive direction. Past
+     * `server.large_payload.threshold` the manager writes only a stub into the row — the event
+     * type, or nothing — and moves the body to a disk. The drawer renders that stub, so a
+     * delivery large enough to be offloaded appears as the SMALLEST one in the log, and an
+     * operator reads it as "this payload was tiny" when the opposite is true.
+     *
+     * The payload gate makes it worse rather than better: under `redacted` the stub renders as
+     * `{"type":"[string]"}`, and now two different explanations — "redacted" and "there was
+     * barely anything here" — produce the same picture, both wrong.
+     *
+     * Deliberately a NOTICE and not a rehydrate. Fetching the body from the disk on every open
+     * would undo the reason the operator turned offloading on, and it would be a second read
+     * path over the same data that the payload ability would have to cover as well. Saying what
+     * happened costs nothing and removes the false reading.
+     */
+    #[Computed]
+    public function payloadOffloadNotice(): ?string
+    {
+        $delivery = $this->delivery;
+
+        if ($delivery === null || $delivery->payload_disk === null) {
+            return null;
+        }
+
+        return $this->line('webhooks::dashboard.drawer.payload_offloaded', ['disk' => $delivery->payload_disk]);
+    }
+
+    /**
      * One translated line, narrowed to a string.
      *
      * A translation lookup is typed as string|array|null because a key can resolve to a
@@ -106,10 +136,12 @@ final class DeliveryDetailDrawer extends Component
      * accident, and Blade would then render nothing — costing the drawer exactly the
      * explanation this guard depends on for not looking like a defect. Falling back to the
      * key keeps something visible and points at the cause.
+     *
+     * @param  array<string, string>  $replace
      */
-    private function line(string $key): string
+    private function line(string $key, array $replace = []): string
     {
-        $line = __($key);
+        $line = __($key, $replace);
 
         return is_string($line) ? $line : $key;
     }

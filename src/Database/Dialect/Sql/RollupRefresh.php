@@ -19,7 +19,7 @@ use Webhooks\Database\OwnerKeyType;
  * created_at bounds bind the same 35-day-window start.
  *
  * The caller runs this inside a transaction after clearing the table, so readers keep seeing the
- * previous whole snapshot until it commits — the non-blocking behaviour REFRESH ... CONCURRENTLY
+ * previous whole snapshot until it commits — the non-blocking behavior REFRESH ... CONCURRENTLY
  * gives on PostgreSQL.
  *
  * @internal

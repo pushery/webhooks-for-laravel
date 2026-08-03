@@ -152,7 +152,7 @@ final readonly class EndpointHealth
 
     /**
      * Blend the three health signals into a 0-100 score using the configured weights.
-     * Each signal is normalised to 0..1 (1 = perfectly healthy) and the weighted mean
+     * Each signal is normalized to 0..1 (1 = perfectly healthy) and the weighted mean
      * is scaled to 0-100, so the score never leaves the range regardless of weights.
      */
     private function composeScore(float $successRate, float $p95, int $consecutiveFailures): int

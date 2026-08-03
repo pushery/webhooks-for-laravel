@@ -113,6 +113,7 @@ return [
         // Shown INSTEAD of the values when the payload ability denies the read. It has
         // to say why: a panel that just stops after its heading reads as a defect.
         'payload_redacted' => 'Los valores están ocultos. Se muestra la estructura para que puedas comprobar la forma del cuerpo sin leer los datos que contiene.',
+        'payload_offloaded' => 'Este cuerpo era demasiado grande para el registro y se movió al disco :disk. Lo que se muestra aquí es el fragmento que guardó el registro, no el cuerpo entregado.',
         'payload_hidden' => 'El cuerpo está oculto. No tienes permiso para ver los payloads de las entregas.',
     ],
 

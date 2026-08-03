@@ -147,7 +147,7 @@ final class PersistServerDelivery
      * UniqueConstraintViolationException on both PostgreSQL and MySQL, so that is the portable
      * signal. The explicit 23505 string comparison is kept ALONGSIDE it, not replaced: a driver
      * that reports the SQLSTATE as an integer (rather than the string Laravel's own detector
-     * requires) is still recognised and recovered rather than surfacing as a hard write error.
+     * requires) is still recognized and recovered rather than surfacing as a hard write error.
      */
     private function isUniqueViolation(QueryException $exception): bool
     {

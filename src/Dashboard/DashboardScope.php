@@ -158,7 +158,7 @@ final class DashboardScope
     }
 
     /**
-     * Normalise a resolved value into a tenant identity, or null when it carries no
+     * Normalize a resolved value into a tenant identity, or null when it carries no
      * owner type (a bare id cannot identify a morph pair on its own).
      */
     private static function normalize(mixed $resolved): ?TenantIdentity

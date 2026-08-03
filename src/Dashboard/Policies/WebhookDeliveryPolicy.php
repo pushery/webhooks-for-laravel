@@ -12,7 +12,7 @@ use Webhooks\Models\WebhookDelivery;
 /**
  * Row-level authorization for dashboard actions. The panels already scope every
  * query by the resolved owner, so a cross-tenant row never loads; this policy is
- * the second, defence-in-depth check on the action itself.
+ * the second, defense-in-depth check on the action itself.
  *
  * Redelivery is allowed when the delivery belongs to the acting tenant AND — when a
  * host has defined a finer-grained 'webhooks.manage' ability — that ability passes.

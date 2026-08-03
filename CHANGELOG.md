@@ -4,6 +4,41 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-08-03
+
+### Added
+
+- **The delivery drawer now says when a body was offloaded, instead of showing its stub without
+  comment.** Past `server.large_payload.threshold` the log keeps only a stub — the event type, or
+  nothing — and the body moves to a disk. The drawer rendered that stub silently, so the
+  *largest* deliveries appeared as the smallest ones in the log, and an operator reasonably read
+  "this payload was tiny" when the opposite was true.
+
+  The payload gate sharpened the confusion rather than easing it: with the body redacted, a stub
+  renders as `{"type":"[string]"}`, which is indistinguishable from a delivery that really did
+  carry almost nothing. The drawer now names the disk the body went to, above the body, in all
+  seven locales.
+
+  Deliberately a notice and not a fetch. Rehydrating from the disk on every open would undo the
+  reason offloading was switched on, and it would add a second read path over the same data that
+  the payload ability would then have to cover as well. The pointer stays out of the Livewire
+  snapshot, exactly like the body itself.
+
+### Changed
+
+- **`symfony/yaml` is now listed under `suggest`.** `webhooks:asyncapi --format=yaml` has always
+  needed it — the command defaults to JSON and reports a clear error when the package is absent —
+  but it was the only optional dependency with no entry, so the requirement was discoverable
+  only by hitting it. Nothing about the behaviour changes.
+
+- **The published `composer.json` no longer carries a `config` block.** It held `sort-packages`
+  and an `allow-plugins` entry for a `require-dev` package: composer reads `config` only from the
+  root package, so both were inert text in an installed dependency. No consumer behaviour
+  changes; the manifest simply stops describing this repository's own tooling.
+
+- One piece of English UI copy in the self-service portal was corrected to US spelling
+  (`recognise` → `recognize`), matching the rest of the shipped surface.
+
 ## [1.8.0] - 2026-08-03
 
 ### Security
@@ -1012,7 +1047,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.9.0...HEAD
+[1.9.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.7.1...v1.8.0
 [1.7.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.6.0...v1.7.0

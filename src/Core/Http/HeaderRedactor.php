@@ -26,7 +26,7 @@ final class HeaderRedactor
      * Replace the value of every credential-bearing header with a fixed marker, comparing
      * names case-insensitively. Non-secret headers pass through untouched. Accepts any array
      * key so it can defend an untrusted map (a header blob decoded from a backfill source),
-     * normalising each name to a string before matching.
+     * normalizing each name to a string before matching.
      *
      * @param  array<array-key, mixed>  $headers
      * @param  list<string>  $extra  additional header names to mask (a host's redact list)

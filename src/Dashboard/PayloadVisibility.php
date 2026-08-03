@@ -90,7 +90,7 @@ final class PayloadVisibility
      * Replace every scalar leaf with its type while keeping the structure intact.
      *
      * Keys are kept — they are the shape, and the shape is the point. Null is kept as null
-     * rather than labelled: a null carries no value to leak, and collapsing it into a marker
+     * rather than labeled: a null carries no value to leak, and collapsing it into a marker
      * would hide the one distinction an operator most often needs, "the field was there but
      * empty" versus "the field was never sent".
      */
