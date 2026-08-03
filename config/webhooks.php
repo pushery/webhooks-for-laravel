@@ -613,6 +613,30 @@ return [
         // deliberately run with no second gate, define it as always-true — explicit and
         // greppable, unlike an absence.
         'all_tenants_ability' => env('WEBHOOKS_DASHBOARD_ALL_TENANTS_ABILITY', 'view-all-tenant-webhooks'),
+        // The delivery BODY, which is a different permission level from the delivery log.
+        // The drawer renders the stored request body, and in a real integration that body is
+        // the business record itself — the order, the customer, the shipping address — next
+        // to a copy button. Gating it with the same ability as the log would mean "may see
+        // that a delivery failed" implies "may see whose order it was".
+        //
+        // So the body has its own ability, and it FAILS CLOSED: full values only when
+        // 'ability' is defined AND the acting user passes it. That direction matters because
+        // view-webhook-dashboard is an ability a per-tenant dashboard necessarily grants
+        // broadly — every customer needs it for their own deliveries — so defaulting the body
+        // open would hand it to everyone that admits. To deliberately show every body to every
+        // dashboard user, define the ability as always-true: explicit and greppable, unlike
+        // an absence.
+        //
+        // 'denied' is what a denied read shows: 'redacted' (default) keeps the structure and
+        // replaces every value with its type, which is what debugging actually needs; 'hidden'
+        // shows nothing but the notice. Either way the drawer says WHY, because a panel that
+        // simply stops after its heading reads as a bug and invites the guard's removal.
+        // Anything other than those two tokens is read as 'hidden' — a typo in a security
+        // setting must not be the permissive reading.
+        'payload' => [
+            'ability' => env('WEBHOOKS_DASHBOARD_PAYLOAD_ABILITY', 'view-webhook-payload'),
+            'denied' => env('WEBHOOKS_DASHBOARD_PAYLOAD_DENIED', 'redacted'),
+        ],
         'source_model' => WebhookDelivery::class,
         'windows' => ['24h', '7d', '30d'],
         'poll_interval' => '30s',

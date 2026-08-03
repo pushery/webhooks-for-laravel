@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 use Webhooks\Client\Events\InvalidWebhookSignature;
-use Webhooks\Client\Http\CaptureRawBody;
+use Webhooks\Client\Http\RawBody;
 use Webhooks\Client\Models\WebhookCall;
 use Webhooks\Client\Verification\InboundVerifier;
 use Webhooks\Core\Http\HeaderRedactor;
@@ -325,9 +325,11 @@ final readonly class WebhookProcessor
 
     private function rawBody(): string
     {
-        $captured = $this->request->attributes->get(CaptureRawBody::ATTRIBUTE);
-
-        return is_string($captured) ? $captured : $this->request->getContent();
+        // Delegated rather than duplicated: RawBody is the supported way for a verifier to
+        // reach these bytes, and two implementations of "the body" would eventually disagree
+        // about one delivery — which is the whole class of bug this resolution exists to
+        // prevent.
+        return RawBody::of($this->request);
     }
 
     private function cacheKey(string $webhookId): string

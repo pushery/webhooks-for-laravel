@@ -94,13 +94,28 @@
                 </x-wirekit::timeline>
 
                 <x-wirekit::text size="sm" weight="medium">{{ __('webhooks::dashboard.drawer.payload') }}</x-wirekit::text>
-                {{-- The WireKit code block, not a raw pre: it brings the copy button an operator
-                     reaches for when pasting a body into a bug report. --}}
-                <x-wirekit::code-block
-                    language="json"
-                    :copy="true"
-                    class="wh-dash-drawer-payload mt-[var(--padding-wk-y-sm)]"
-                >{{ json_encode($delivery->payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</x-wirekit::code-block>
+                {{-- The body is gated separately from the rest of the drawer, and the component
+                     decides how much of it exists at all — see Webhooks\Dashboard\PayloadVisibility.
+                     $this->payloadJson is a COMPUTED property, so a body this user may not see is
+                     never serialized into the Livewire snapshot; the check below is a boundary,
+                     not a curtain. Never bind the delivery or its payload as a public property. --}}
+                @if ($this->payloadNotice !== null)
+                    {{-- Say WHY, always. A panel that just stops after its heading reads as a
+                         defect, and the next person "fixes" it by deleting the guard. --}}
+                    <x-wirekit::text size="sm" variant="muted" class="mt-[var(--padding-wk-y-sm)] wh-dash-drawer-payload-notice">
+                        {{ $this->payloadNotice }}
+                    </x-wirekit::text>
+                @endif
+
+                @if ($this->payloadJson !== null)
+                    {{-- The WireKit code block, not a raw pre: it brings the copy button an operator
+                         reaches for when pasting a body into a bug report. --}}
+                    <x-wirekit::code-block
+                        language="json"
+                        :copy="true"
+                        class="wh-dash-drawer-payload mt-[var(--padding-wk-y-sm)]"
+                    >{{ $this->payloadJson }}</x-wirekit::code-block>
+                @endif
 
                 <div class="mt-[var(--padding-wk-y-md)]">
                     {{-- Disabled while the replay is in flight, so a double-click cannot enqueue

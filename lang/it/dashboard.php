@@ -110,6 +110,10 @@ return [
         'delivered' => 'Consegnata',
         'payload' => 'Payload',
         'replay' => 'Reinvia consegna',
+        // Shown INSTEAD of the values when the payload ability denies the read. It has
+        // to say why: a panel that just stops after its heading reads as a defect.
+        'payload_redacted' => 'I valori sono nascosti. Viene mostrata la struttura, così puoi verificare la forma del corpo senza leggere i dati che contiene.',
+        'payload_hidden' => 'Il corpo è nascosto. Non hai il permesso di visualizzare i payload delle consegne.',
     ],
 
     'empty' => [

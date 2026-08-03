@@ -4,6 +4,90 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-08-03
+
+### Security
+
+- **The delivery body in the dashboard drawer is now gated separately from the dashboard
+  itself, and it fails closed.** Until now any user who could open the dashboard could read
+  every delivery payload in full, next to a copy button — and in a real integration that
+  payload is the business record: the order, the customer, the shipping address. It hung on a
+  single ability, `view-webhook-dashboard`, which a per-tenant dashboard necessarily grants
+  broadly, because every customer needs it to see their own deliveries. "May see that a
+  delivery failed" therefore implied "may see whose order it was", which is not a coarse
+  permission level but the absence of one.
+
+  The body now has its own ability, `dashboard.payload.ability` (default
+  `view-webhook-payload`). Values are shown only when that ability is defined **and** the
+  acting user passes it.
+
+  **This changes behaviour on upgrade.** A host that defines nothing gets the safe default
+  rather than the previous one. To keep the old behaviour, say so explicitly — one line,
+  greppable, unlike an absence:
+
+  ```php
+  Gate::define('view-webhook-payload', fn (): bool => true);
+  ```
+
+  A denied read is not a blank space. By default the drawer shows the body's structure with
+  every value replaced by its type, which is the half debugging actually needs, and it always
+  explains why the values are missing — a panel that stops after its heading reads as a defect
+  and invites the guard's removal. Set `dashboard.payload.denied` to `hidden` for the notice
+  alone; any other value is read as `hidden`, because a typo in a security setting must not be
+  the permissive reading.
+
+  The drawer holds the delivery and the rendered body as computed properties rather than public
+  ones, so a body the user may not see is never serialized into the Livewire snapshot. The gate
+  is a boundary, not a template that declines to print.
+
+### Added
+
+- **`Webhooks\Client\Http\RawBody::of($request)` — a supported way for an `InboundVerifier` to
+  read a delivery's exact bytes.** A signature scheme is handed the body already; a verifier is
+  not, it receives the `Request`. And at least one of the two cases the verifier seam exists for
+  *needs* the bytes: a provider that verifies through a callback API checks the document it
+  sent. The package already captured those bytes before anything downstream could re-encode
+  them, but the reader was `private` and the attribute constant sat on an `@internal` class — so
+  a verifier reaching for it got a static-analysis error for doing the right thing.
+
+  The trap this closes is worth naming, because it is invisible. `$request->json()->all()`
+  re-encoded is **not** the delivery: `/` comes back as `\/`, non-ASCII as `\uXXXX`, and key
+  order need not survive. The provider then answers about a different document — with HTTP 200
+  and a negative verdict. Nothing throws, nothing logs, and no test goes red while the provider
+  is faked; in production it simply reads as "the provider rejects our webhooks", with no cause
+  anywhere. The verifier contract and the receiving guide now both say so.
+
+  The package's own inbound pipeline resolves the body through this same helper rather than a
+  second copy, so a verifier and the pipeline can never disagree about what the body was for a
+  given delivery.
+
+- **An umbrella publish tag, `webhooks`.** `php artisan vendor:publish --tag=webhooks` now
+  publishes the config, the views and the language files in one command, instead of three.
+
+  It covers exactly those three, and the two omissions are deliberate rather than partial work.
+  **Migrations stay out**: a published migration *runs*, and the per-layer migration tags exist
+  so a send-only host never receives the client, server and dashboard tables it never switched
+  on — an "everything" tag would undo that in one command. **The two operator-console variants
+  stay out** as well: `webhooks-ui` and `webhooks-ui-wirekit` write to the same destination by
+  design, so publishing both would resolve to whichever ran last, and an order-dependent publish
+  is worse than none. Both exclusions are held by tests, so neither can be "completed" by
+  accident later.
+
+### Changed
+
+- **Laravel Scout 11 is now covered for the searchable delivery and inbound-call logs.** The
+  `suggest` block points a host at Scout for `Webhooks\Search\SearchableWebhookDelivery` and
+  friends, while the development requirement was pinned to Scout 10 — so a host on 11 had the
+  suggestion with nothing behind it. The requirement is `^10.0 || ^11.0` now, and the suite
+  exercises that surface against the highest version the constraint resolves to, which today
+  is 11.
+
+  Worth stating precisely, because the difference matters to anyone still on 10: Scout 10
+  remains supported and installable, but the gate proves **one** resolution per run, not both
+  majors side by side. Nothing changed in the shipped code, and nothing about the requirement
+  itself: Scout stays optional and the search layer stays off until `webhooks.search.enabled`
+  is set.
+
 ## [1.7.1] - 2026-07-26
 
 ### Fixed
@@ -928,7 +1012,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.7.1...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.7.1...v1.8.0
 [1.7.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.5.2...v1.6.0

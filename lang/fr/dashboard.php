@@ -110,6 +110,10 @@ return [
         'delivered' => 'Livrée',
         'payload' => 'Payload',
         'replay' => 'Renvoyer la livraison',
+        // Shown INSTEAD of the values when the payload ability denies the read. It has
+        // to say why: a panel that just stops after its heading reads as a defect.
+        'payload_redacted' => 'Les valeurs sont masquées. La structure reste visible pour que tu puisses vérifier la forme du corps sans lire les données qu\'il contient.',
+        'payload_hidden' => 'Le corps est masqué. Tu n\'as pas l\'autorisation de consulter les payloads des livraisons.',
     ],
 
     'empty' => [
