@@ -107,6 +107,10 @@ return [
         'delivered' => 'Zugestellt',
         'payload' => 'Payload',
         'replay' => 'Zustellung erneut senden',
+        // Shown INSTEAD of the values when the payload ability denies the read. It has
+        // to say why: a panel that just stops after its heading reads as a defect.
+        'payload_redacted' => 'Die Werte sind ausgeblendet. Du siehst die Struktur, damit du die Form des Rumpfs prüfen kannst, ohne die enthaltenen Daten zu lesen.',
+        'payload_hidden' => 'Der Rumpf ist ausgeblendet. Du hast keine Berechtigung, Zustell-Payloads anzusehen.',
     ],
 
     'empty' => [

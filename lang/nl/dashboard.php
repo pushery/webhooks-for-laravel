@@ -110,6 +110,10 @@ return [
         'delivered' => 'Afgeleverd',
         'payload' => 'Payload',
         'replay' => 'Levering opnieuw versturen',
+        // Shown INSTEAD of the values when the payload ability denies the read. It has
+        // to say why: a panel that just stops after its heading reads as a defect.
+        'payload_redacted' => 'De waarden zijn verborgen. De structuur blijft zichtbaar, zodat je de vorm van de body kunt controleren zonder de gegevens erin te lezen.',
+        'payload_hidden' => 'De body is verborgen. Je hebt geen rechten om bezorgpayloads te bekijken.',
     ],
 
     'empty' => [

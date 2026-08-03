@@ -190,9 +190,27 @@ final class WebhooksServiceProvider extends ServiceProvider
 
     private function registerPublishing(): void
     {
+        // Every customization group also answers to the umbrella tag `webhooks`, so
+        // `vendor:publish --tag=webhooks` hands a host everything it may edit in one command.
+        //
+        // The umbrella covers config, views and lang and DELIBERATELY STOPS THERE. Two groups
+        // are held out, and neither is an oversight:
+        //
+        //  - The migration tags. A published migration RUNS (see registerPublishing's note
+        //    below), so sweeping them into an "everything" tag would create the client,
+        //    server and dashboard tables in a send-only host that never switched those layers
+        //    on. Splitting them by layer exists precisely to prevent that; an umbrella over
+        //    them would undo it in one command.
+        //  - The two UI variants. `webhooks-ui` and `webhooks-ui-wirekit` write to the SAME
+        //    destination on purpose — a host picks exactly one — so publishing both would
+        //    resolve to whichever ran last. An umbrella that produces an order-dependent
+        //    result is worse than no umbrella.
+        //
+        // `webhooks-views` already carries the whole resources/views tree, so the narrower
+        // dashboard and self-service view tags need no umbrella entry to be reachable.
         $this->publishes([
             __DIR__.'/../config/webhooks.php' => config_path('webhooks.php'),
-        ], 'webhooks-config');
+        ], ['webhooks', 'webhooks-config']);
 
         // One migration tag per LAYER, each landing its files FLAT in database/migrations.
         //
@@ -214,11 +232,11 @@ final class WebhooksServiceProvider extends ServiceProvider
 
         $this->publishes([
             __DIR__.'/../resources/views' => resource_path('views/vendor/webhooks'),
-        ], 'webhooks-views');
+        ], ['webhooks', 'webhooks-views']);
 
         $this->publishes([
             __DIR__.'/../lang' => lang_path('vendor/webhooks'),
-        ], 'webhooks-lang');
+        ], ['webhooks', 'webhooks-lang']);
     }
 
     /**

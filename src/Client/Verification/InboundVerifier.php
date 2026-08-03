@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Webhooks\Client\Verification;
 
 use Illuminate\Http\Request;
+use Webhooks\Client\Http\RawBody;
 use Webhooks\Client\WebhookConfig;
 use Webhooks\Core\Signing\VerificationResult;
 
@@ -28,6 +29,13 @@ use Webhooks\Core\Signing\VerificationResult;
  * any other result rejects it with the config's invalid_status and stores nothing. Treat
  * a failed provider callback (a timeout, a 5xx) as NOT valid — never let an unreachable
  * provider turn the endpoint into an open write surface.
+ *
+ * If your verifier authenticates over the BYTES — PayPal's verify call does, since it checks
+ * the document it sent — read them with {@see RawBody::of()} and never
+ * with `$request->json()`. A parsed-and-re-encoded body is a different document: `/` becomes
+ * `\/`, non-ASCII becomes `\uXXXX`, and key order need not survive. The provider then answers
+ * about that other document, with HTTP 200 and a negative verdict — nothing throws, nothing
+ * logs, and no test goes red while the provider is faked.
  */
 interface InboundVerifier
 {
