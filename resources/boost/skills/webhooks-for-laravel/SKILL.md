@@ -52,6 +52,19 @@ Two dependencies between the gates bite silently:
   outbound delivery entirely, set **both** to `false`.
 - **Dashboard requires Platform.** The dashboard reads Platform's
   `webhook_deliveries` log, whose migration only runs while `platform.enabled=true`.
+- **Anything with a screen requires two more packages.** The dashboard and the
+  self-service portal are Livewire components whose views are built from WireKit
+  components, and neither is a hard dependency of this package — turning the layer on
+  without them fails at render with `Unable to locate a class or view for component
+  [wirekit::card]`, not at boot:
+
+  ```bash
+  composer require livewire/livewire pushery/wirekit
+  ```
+
+  A host on a different UI kit publishes the views instead
+  (`--tag=webhooks-dashboard-views` / `--tag=webhooks-self-service-views`) and restyles
+  them. Either way the host's own Tailwind build has to scan both packages' views.
 
 ### 3. Configure
 

@@ -4,6 +4,40 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1] - 2026-08-04
+
+### Fixed
+
+- **The payload-version select now shows the stored version on the first paint, not the first
+  option.** The control was bound with `wire:model` alone, which sets the choice once Alpine has
+  run — so the server render carried no `selected`, and an endpoint pinned to `v2` rendered as
+  though it inherited. That is the state a reader acts on before hydration, and the only state a
+  reader without JavaScript ever sees.
+
+- **The six shipped tables now name their own scroll region.** Each table sits inside a focusable,
+  horizontally scrolling container, and the container took its accessible name from WireKit's
+  generic fallback — so a screen-reader user tabbing through the dashboard met several identically
+  named regions. They now carry a translated, table-specific name in all seven locales, which also
+  makes the name independent of which locales WireKit itself happens to ship. Two of the six had no
+  table name at all and gained one.
+
+### Changed
+
+- **The bundled Boost skill now states the UI prerequisites.** Switching on the dashboard or the
+  self-service portal needs `livewire/livewire` and `pushery/wirekit`, neither of which is a hard
+  dependency — so an agent following the skill turned a layer on and met `Unable to locate a class
+  or view for component [wirekit::card]` at render rather than a clear message at boot. The layer
+  table's dependency notes now name both packages, the install line, and the publish-and-restyle
+  route for a host on another UI kit.
+
+- **The two publishable delete dialogs now say why they set their own cancel label, and when it
+  would be safe to stop.** WireKit ships translations of its own from 2.26 on, which reads like an
+  invitation to drop the override — but it ships `en` and `de`, and these screens ship seven
+  locales. Taking the invitation would return `es`, `fr`, `it`, `nl` and `pt` to English with
+  nothing turning red: the button still renders, in the wrong language. The comment now names the
+  condition to check (`vendor/pushery/wirekit/lang/` carrying all seven) rather than the release
+  note that prompted the question.
+
 ## [1.9.0] - 2026-08-03
 
 ### Added
@@ -1047,7 +1081,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.9.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.9.1...HEAD
+[1.9.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.9.0...v1.9.1
 [1.9.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.7.1...v1.8.0
 [1.7.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.7.0...v1.7.1

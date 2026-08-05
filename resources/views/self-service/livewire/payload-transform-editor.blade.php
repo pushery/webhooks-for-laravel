@@ -29,10 +29,18 @@
                 <x-wirekit::stack gap="lg">
                     <x-wirekit::heading :level="2" size="sm">{{ __('webhooks::self-service.transform.rules') }}</x-wirekit::heading>
 
+                    {{-- :value as well as wire:model. Livewire's binding sets the choice once
+                         Alpine runs; the SERVER render decides what a reader sees before that
+                         — and without it the markup carries no `selected`, so the first paint
+                         and a scripting-off render both show the first option regardless of
+                         the stored version. WireKit only began honoring `value` on select in
+                         2.25; below that the prop is inert, which is the behavior we have
+                         today, so this is safe against the declared floor. --}}
                     <x-wirekit::select
                         :label="__('webhooks::self-service.transform.version_label')"
                         :hint="__('webhooks::self-service.transform.version_hint')"
                         wire:model.live="payloadVersion"
+                        :value="$payloadVersion"
                         :options="$versionOptions"
                     />
 

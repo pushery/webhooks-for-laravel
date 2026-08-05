@@ -121,6 +121,8 @@ return [
     // Beschriftungen, die nur eine Vorlesesoftware ankündigt. Ein nicht übersetzter
     // barrierefreier Name ist eine nicht übersetzte Oberfläche.
     'a11y' => [
+        'subscriptions_table' => 'Deine Webhook-Endpunkte',
+        'delivery_log_table' => 'Zustellprotokoll',
         'delete_subscription' => 'Endpunkt :url löschen',
     ],
 ];

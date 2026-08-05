@@ -121,6 +121,8 @@ return [
     // Strings a reader never sees but a screen reader always announces. An untranslated
     // accessible name is an untranslated interface.
     'a11y' => [
+        'subscriptions_table' => 'Tes endpoints de webhook',
+        'delivery_log_table' => 'Journal des livraisons',
         'delete_subscription' => 'Supprimer l\'endpoint :url',
     ],
 ];

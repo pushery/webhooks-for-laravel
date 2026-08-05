@@ -14,7 +14,11 @@
                     :description="__('webhooks::dashboard.empty.no_deliveries.description')"
                 />
             @else
-                <x-wirekit::table hoverable :aria-label="__('webhooks::dashboard.a11y.recent_deliveries_table')">
+                <x-wirekit::table
+                    hoverable
+                    :aria-label="__('webhooks::dashboard.a11y.recent_deliveries_table')"
+                    :table-label="__('webhooks::dashboard.a11y.recent_deliveries_table')"
+                >
                     <x-wirekit::table.head>
                         <x-wirekit::table.row>
                             <x-wirekit::table.th>{{ __('webhooks::dashboard.table.status') }}</x-wirekit::table.th>

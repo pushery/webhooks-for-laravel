@@ -32,7 +32,11 @@
             :description="__('webhooks::dashboard.empty.no_deliveries_found.description')"
         />
     @else
-        <x-wirekit::table hoverable :aria-label="__('webhooks::dashboard.a11y.deliveries_table')">
+        <x-wirekit::table
+            hoverable
+            :aria-label="__('webhooks::dashboard.a11y.deliveries_table')"
+            :table-label="__('webhooks::dashboard.a11y.deliveries_table')"
+        >
             <x-wirekit::table.head>
                 <x-wirekit::table.row>
                     <x-wirekit::table.th sortable :sort-direction="$sortField === 'event_type' ? $sortDirection : null" sort-action="sortBy('event_type')">{{ __('webhooks::dashboard.table.event') }}</x-wirekit::table.th>
