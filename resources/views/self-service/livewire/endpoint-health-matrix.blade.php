@@ -28,7 +28,11 @@
             :description="__('webhooks::self-service.empty.no_endpoints_health.description')"
         />
     @else
-        <x-wirekit::table hoverable :aria-label="__('webhooks::self-service.a11y.health_table')">
+        <x-wirekit::table
+            hoverable
+            :aria-label="__('webhooks::self-service.a11y.health_table')"
+            :table-label="__('webhooks::self-service.a11y.health_table')"
+        >
             <x-wirekit::table.head>
                 <x-wirekit::table.row>
                     <x-wirekit::table.th>{{ __('webhooks::self-service.table.endpoint') }}</x-wirekit::table.th>

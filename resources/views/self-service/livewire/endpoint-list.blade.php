@@ -26,7 +26,11 @@
             :description="__('webhooks::self-service.empty.no_endpoints.description')"
         />
     @else
-        <x-wirekit::table hoverable :aria-label="__('webhooks::self-service.a11y.endpoints_table')">
+        <x-wirekit::table
+            hoverable
+            :aria-label="__('webhooks::self-service.a11y.endpoints_table')"
+            :table-label="__('webhooks::self-service.a11y.endpoints_table')"
+        >
             <x-wirekit::table.head>
                 <x-wirekit::table.row>
                     <x-wirekit::table.th>{{ __('webhooks::self-service.table.endpoint') }}</x-wirekit::table.th>
@@ -112,8 +116,14 @@
                                             {{ __('webhooks::self-service.delete_dialog.description') }}
                                         </x-wirekit::alert-dialog.description>
                                         <x-wirekit::alert-dialog.actions>
-                                            {{-- The default cancel label is WireKit's own English; pass the
-                                                 translated one so the dialog is not half-localized. --}}
+                                            {{-- Pass the translated cancel label rather than taking WireKit's
+                                                 default, or the dialog is half-localized. WireKit does ship
+                                                 translations of its own since 2.26 — but only en and de, and
+                                                 these screens ship seven locales. Dropping this override
+                                                 would silently return es, fr, it, nl and pt to English, with
+                                                 nothing turning red: the button still renders, in the wrong
+                                                 language. Remove it when vendor/pushery/wirekit/lang/ carries
+                                                 all seven, not when the release notes mention translations. --}}
                                             <x-wirekit::alert-dialog.cancel>{{ __('webhooks::self-service.actions.cancel') }}</x-wirekit::alert-dialog.cancel>
                                             <x-wirekit::button
                                                 intent="danger"

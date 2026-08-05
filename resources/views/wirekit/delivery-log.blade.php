@@ -33,7 +33,11 @@
             :description="__('webhooks::management.empty.no_deliveries.description')"
         />
     @else
-        <x-wirekit::table hoverable>
+        <x-wirekit::table
+            hoverable
+            :aria-label="__('webhooks::management.a11y.delivery_log_table')"
+            :table-label="__('webhooks::management.a11y.delivery_log_table')"
+        >
             <x-wirekit::table.head>
                 <x-wirekit::table.row>
                     <x-wirekit::table.th>{{ __('webhooks::management.table.event') }}</x-wirekit::table.th>
