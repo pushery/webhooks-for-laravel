@@ -92,13 +92,20 @@
                                     wire:click="edit({{ $endpoint->id }})"
                                     :aria-label="__('webhooks::self-service.a11y.edit_endpoint', ['url' => $endpoint->url])"
                                 >{{ __('webhooks::self-service.list.edit') }}</x-wirekit::button>
-                                <x-wirekit::button
-                                    size="sm"
-                                    surface="ghost"
-                                    :href="route('webhooks.self-service.transform', $endpoint->id)"
-                                    wire:navigate
-                                    :aria-label="__('webhooks::self-service.a11y.edit_transform', ['url' => $endpoint->url])"
-                                >{{ __('webhooks::self-service.list.transform') }}</x-wirekit::button>
+                                {{-- Only when the editor is actually mounted. This panel is
+                                     embeddable in a host's own screen, where the portal's
+                                     routes need not exist — and this link is drawn per ROW,
+                                     so an unconditional one renders fine against an empty
+                                     account and throws on the first real endpoint. --}}
+                                @if ($showTransformLink)
+                                    <x-wirekit::button
+                                        size="sm"
+                                        surface="ghost"
+                                        :href="route('webhooks.self-service.transform', $endpoint->id)"
+                                        wire:navigate
+                                        :aria-label="__('webhooks::self-service.a11y.edit_transform', ['url' => $endpoint->url])"
+                                    >{{ __('webhooks::self-service.list.transform') }}</x-wirekit::button>
+                                @endif
 
                                 @if ($allowDelete)
                                     <x-wirekit::alert-dialog :name="'delete-endpoint-' . $endpoint->id">

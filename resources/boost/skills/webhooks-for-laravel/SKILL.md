@@ -156,6 +156,36 @@ An authentic request is verified, de-duplicated, stored and dispatched to the
 job. An invalid, expired or malformed signature is answered `401` and never
 reaches it.
 
+**Embed a self-service panel in a screen the application already has.** Each panel
+has a stable alias, and a host that mounts its own page usually does not want the
+portal's URLs beside it:
+
+```php
+// config/webhooks.php
+'platform' => ['self_service' => ['enabled' => true, 'register_routes' => false]],
+```
+
+```blade
+<livewire:webhooks.self-service.endpoint-list />
+```
+
+With `register_routes` false the provider registers the components and mounts
+nothing, and the panels drop the links they cannot resolve rather than failing to
+render. The `manage-webhook-endpoints` gate still applies on every request.
+
+**Check the operator console per action.** `Webhooks\Livewire\SubscriptionManager`
+and `DeliveryLog` are unscoped across every tenant and must sit behind an
+operator-only gate of the host's. That page gate does not re-run on each Livewire
+interaction, so set `admin.ability` when a revoked capability has to bite
+immediately:
+
+```php
+'admin' => ['ability' => 'webhooks.operate'],
+```
+
+The action name (`create`, `toggle`, `delete`, `redeliver`, `ping`) is passed to the
+gate. Default `null` means no per-action check. It is not tenant scoping.
+
 **Send-only, with no database.** When the application wants nothing but the
 signed, SSRF-guarded, retrying sender:
 
@@ -213,6 +243,12 @@ the tables and keep the sender.
 - Do not verify inbound signatures by hand. The Client layer's pipeline handles
   verification, replay windows and de-duplication; a hand-rolled comparison is
   where timing leaks and replay holes come from.
+- Do not bulk-register endpoints through the self-service portal. Two brakes ship
+  **on**: `platform.self_service.registrations_per_minute` (10) and
+  `platform.test_ping.max_per_minute` (5, refused with
+  `Webhooks\Exceptions\TestPingThrottled`). They bound what a *person* repeats.
+  An import belongs on `Webhooks::subscribe()`, which is not braked; `null` removes
+  either brake if the application genuinely needs it gone.
 - Do not document package internals here; keep this skill focused on adoption in
   Laravel applications, and link the deeper reference material instead.
 

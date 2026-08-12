@@ -143,6 +143,12 @@ return [
     // the tenant reads the same sentence wherever it is refused.
     'limit_reached' => 'Tu as atteint ta limite d\'endpoints.',
 
+    // Contention, pas la limite : un enregistrement simultané du même tenant a gardé le verrou.
+    'limit_busy' => 'Un autre de tes enregistrements est encore en cours. Réessaie.',
+
+    // La cadence, pas le quota : ici c'est la VITESSE qui compte, et elle se libère seule.
+    'registration_throttled' => 'Tu enregistres des endpoints trop vite. Attends un instant et réessaie.',
+
     'toast' => [
         'endpoint_registered' => 'Endpoint enregistré.',
         'endpoint_updated' => 'Endpoint mis à jour.',

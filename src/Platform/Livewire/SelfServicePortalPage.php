@@ -8,6 +8,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Webhooks\Platform\Support\PortalRoutes;
 
 /**
  * The full-page self-service portal shell. It hosts the tenant's own endpoint list,
@@ -32,6 +33,10 @@ final class SelfServicePortalPage extends Component
 
     public function render(): View
     {
-        return ViewFactory::make('webhooks::self-service.page');
+        return ViewFactory::make('webhooks::self-service.page', [
+            // Null when the health board is not mounted — a host that embeds this shell
+            // without the portal's own routes still gets the panels, minus the links.
+            'healthBoardUrl' => PortalRoutes::url('webhooks.self-service.health'),
+        ]);
     }
 }

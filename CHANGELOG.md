@@ -4,6 +4,106 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-08-12
+
+### Added
+
+- **The self-service panels can be embedded without the portal's own pages.**
+  `platform.self_service.register_routes` (default `true`) splits two decisions that used to be
+  one: registering the provider registered the Livewire components *and* mounted routes with
+  their own prefix and middleware. A host that wanted `<livewire:webhooks.self-service.endpoint-list />`
+  inside a screen it already guards had to accept a second URL onto the same surface, carrying
+  the portal's middleware instead of its own — or decline the provider and get no components at
+  all. Set it to `false` and the provider registers the panels and mounts nothing.
+
+- **The operator console can check each action, not only the page.**
+  `admin.ability` (default `null`) makes `create`, `toggle`, `delete`, `redeliver` and `ping`
+  authorize on every request; the action name is passed to the gate, so one ability can answer
+  differently per action. For a rule no ability expresses, subclass either component and
+  override `authorizeAction(string $action): void`.
+
+  This is not a duplicate of the operator-only gate you put in front of the page, and it does
+  not replace it. A page gate decides who receives a Livewire snapshot; every interaction after
+  that is a separate request to Livewire's own endpoint. So a capability revoked *during* a
+  session keeps working until the reader navigates, and a component embedded in a second place
+  inherits that page's gate rather than the one you reasoned about. The default is `null`,
+  which is exactly the previous behavior — and none of this is tenant scoping: the console
+  still reads every tenant's rows.
+
+- **Two events that name a person rather than a delivery.** `WebhookEndpointRegistered` and
+  `WebhookSecretRotated` carry the subscription and the acting user, and fire from
+  `WebhookManager`, so an endpoint registered through your own screen is recorded like one
+  registered through the portal. The actor is `null` when nobody is authenticated — a console
+  command, a seeder, a queued job — which is information rather than a gap. Neither secret
+  travels on the rotation event: events reach every listener, are serialized into queue
+  payloads and are frequently logged wholesale. The package still writes no audit trail of its
+  own; hang a listener on these and write wherever yours lives.
+
+### Changed
+
+- **Two brakes now ship switched on, and one of them can be met by an existing integration.**
+  `platform.self_service.registrations_per_minute` (`10`) bounds how fast a single tenant may
+  register endpoints through the portal; `platform.test_ping.max_per_minute` (`5`) bounds how
+  often one endpoint may be manually test-pinged. Set either to `null` to remove it.
+
+  `max_endpoints_per_tenant` bounds how *many* endpoints a tenant ends up with and says nothing
+  about how fast — nothing at all when it is unset. The test ping had no bound of any kind: it
+  bypasses the delivery rate limit on purpose, so that an operator can prove an endpoint answers
+  while it is over its allowance, and that exemption left the one send a person repeats at will
+  unlimited, aimed at a destination the requester chose.
+
+  **What to check before upgrading:** a bulk import driven through the self-service portal will
+  meet the registration brake. Bulk registration belongs on `Webhooks::subscribe()`, which is
+  deliberately not braked. An over-allowance ping is refused with the new
+  `Webhooks\Exceptions\TestPingThrottled`, which carries `secondsUntilAvailable` so a screen can
+  say when to try again; the shipped operator stub does exactly that.
+
+- **The WireKit floor is now 2.25, up from 2.12.** 1.9.1 fixed the self-service payload-version
+  select by passing `:value` alongside `wire:model`, so the server render carries `selected` for
+  the stored version. WireKit's select only honors `value` from **2.25.0** on — before that it
+  declares no such prop at all — so on 2.12 through 2.24 that fix does nothing and the control
+  goes on showing the first option, the empty "inherit" entry, for an endpoint that is pinned.
+  The constraint said the fix was supported three minors before the behavior existed.
+
+  This narrows the supported range: a host pinned below WireKit 2.25 has to move up to install
+  this version. The alternative was to keep the wider range and weaken the test that proves the
+  first paint, which would have gone green while every host on 2.12–2.24 kept a control that
+  misreports its own stored state — visibly, and for a reader without JavaScript exclusively.
+  Both floors are now named in [Styling the UI](https://docs.pushery.com/webhooks-for-laravel/guides/styling-the-ui),
+  with what each one buys.
+
+### Fixed
+
+- **A self-service panel embedded outside the portal no longer throws on its first real row.**
+  The endpoint list linked each row to the payload-transform editor unconditionally, and that
+  route exists only while the portal mounts its own pages. Rendered anywhere else the link threw
+  from inside the view, so the whole screen failed — but only once there was an endpoint to draw
+  a row for. An empty account rendered perfectly, which is how an adoption could be verified as
+  complete and still be one customer away from a 500. Three further links had the same shape: the
+  health-board link on the portal shell, and the back links on the health board and the transform
+  editor. All four now render only when their route is registered.
+
+### Security
+
+- **The endpoint cap now holds when two registrations arrive at once.** It was read-then-act —
+  count the tenant's endpoints, then insert one — with no lock, transaction or constraint between
+  the two steps, so two concurrent requests both read one below the limit, both passed, and both
+  inserted. The check and the insert now share a per-tenant lock. A double-submit is the ordinary
+  way one customer produces two simultaneous registrations, so this was reachable without trying.
+
+  A registration that finds another in flight waits briefly and then re-reads the cap, which
+  gives a true verdict either way. Only a wait past a few seconds is reported, and it is
+  reported as contention rather than as the cap — a tenant with slots left is not told it is
+  full. With no cap configured no lock is taken at all.
+
+- **The SSRF guard now refuses the IPv6 transition prefixes.** 6to4 (`2002::/16`), its
+  deprecated relay anycast (`192.88.99.0/24`), Teredo (`2001::/32`) and both ORCHID blocks were
+  not on the blocklist, and their absence was not a completeness gap. 6to4 and Teredo *embed* an
+  IPv4 address, and not in the low bits where the guard unwraps one: it knew the mapped,
+  translated and compatible forms, all of which carry the address behind a fixed 12-byte prefix,
+  while 6to4 carries it in bits 16–47. `2002:7f00:1::` is `127.0.0.1` written in an encoding the
+  unwrapper could not see, and a registered endpoint at that address passed validation.
+
 ## [1.9.1] - 2026-08-04
 
 ### Fixed
@@ -1081,7 +1181,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.9.1...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.10.0...HEAD
+[1.10.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.9.1...v1.10.0
 [1.9.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.9.0...v1.9.1
 [1.9.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.7.1...v1.8.0

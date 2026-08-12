@@ -107,6 +107,9 @@ return [
         // Shown when a replay is asked for an endpoint that is switched off — by its
         // tenant, or by the circuit breaker after too many failures.
         'endpoint_disabled' => 'Este endpoint está desativado. Reativa-o antes de lhe reenviar uma entrega.',
+
+        // Mostrado quando um ping de teste é recusado por ter esgotado a quota do minuto.
+        'ping_throttled' => 'Este endpoint esgotou os seus pings de teste por agora. Tenta novamente dentro de :seconds segundo(s).',
     ],
 
     'validation' => [

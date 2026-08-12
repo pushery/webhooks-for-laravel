@@ -26,8 +26,13 @@ use Webhooks\Support\PlatformRequirement;
  * The manage-webhook-endpoints gate and the row-level WebhookSubscriptionPolicy that
  * the portal authorizes against are registered by the main WebhooksServiceProvider
  * (also gated on the same switch); this provider adds only the presentation layer —
- * the Livewire components, the mount route, and the publishable views — so the two
+ * the Livewire components, the mount routes, and the publishable views — so the two
  * halves stay independently testable.
+ *
+ * The panels and the pages are separately switchable: with
+ * webhooks.platform.self_service.register_routes false this provider registers the
+ * components and mounts nothing, which is what a host embedding a panel in its own
+ * guarded screen wants.
  */
 final class SelfServicePortalServiceProvider extends ServiceProvider
 {
@@ -63,11 +68,31 @@ final class SelfServicePortalServiceProvider extends ServiceProvider
         );
 
         $this->registerPanels();
-        $this->loadRoutesFrom(__DIR__.'/../../routes/self-service.php');
+
+        if ($this->shouldRegisterRoutes()) {
+            $this->loadRoutesFrom(__DIR__.'/../../routes/self-service.php');
+        }
 
         if ($this->app->runningInConsole()) {
             $this->registerPublishing();
         }
+    }
+
+    /**
+     * Whether the portal also mounts its OWN pages, or only registers the panels.
+     *
+     * These were one decision until a host tried to embed a panel in a screen it already
+     * guards: registering the provider was all-or-nothing, and the all included a second
+     * URL onto the same surface, carrying the portal's own middleware rather than the
+     * host's. Declining the provider left the panels unregistered, which is why they were
+     * not embeddable at all. Splitting the two makes "give me the components" expressible
+     * without also saying "and publish them at a URL of your own".
+     *
+     * Defaults to true, so a host that never sets it keeps the whole portal.
+     */
+    public function shouldRegisterRoutes(): bool
+    {
+        return Config::boolean('webhooks.platform.self_service.register_routes', true);
     }
 
     /**

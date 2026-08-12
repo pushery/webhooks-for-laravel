@@ -107,6 +107,9 @@ return [
         // Shown when a replay is asked for an endpoint that is switched off — by its
         // tenant, or by the circuit breaker after too many failures.
         'endpoint_disabled' => 'Dit endpoint is uitgeschakeld. Schakel het weer in voordat je een levering opnieuw verstuurt.',
+
+        // Getoond als een testping wordt geweigerd omdat het minuutquotum op is.
+        'ping_throttled' => 'Dit endpoint heeft zijn testpings er voorlopig op zitten. Probeer het over :seconds seconde(n) opnieuw.',
     ],
 
     'validation' => [

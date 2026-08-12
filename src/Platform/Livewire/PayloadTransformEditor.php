@@ -12,6 +12,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Webhooks\Models\WebhookSubscription;
 use Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
+use Webhooks\Platform\Support\PortalRoutes;
 use Webhooks\Platform\Transform\DeclarativePayloadTransformer;
 use Webhooks\Platform\Transform\PayloadVersionRegistry;
 
@@ -352,6 +353,8 @@ final class PayloadTransformEditor extends Component
         return ViewFactory::make('webhooks::self-service.livewire.payload-transform-editor', [
             'versionOptions' => $versionOptions,
             'versioningEnabled' => Config::boolean('webhooks.platform.payload_versioning.enabled', false),
+            // Null when the portal's own pages are not mounted: there is nowhere to go back to.
+            'portalUrl' => PortalRoutes::url('webhooks.self-service'),
             'inputJson' => $this->toJson($this->sampleArray()),
             'outputJson' => $this->toJson($this->preview()),
         ]);

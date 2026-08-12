@@ -19,9 +19,12 @@ use Webhooks\Livewire\SubscriptionManager;
  *     <livewire:webhooks.admin.subscriptions />
  *     <livewire:webhooks.admin.deliveries />
  *
- * Both components are deliberately unscoped and carry no authorization of their own:
- * they show and mutate EVERY tenant's endpoints and deliveries, which is what an
- * operator screen is for and exactly what a tenant may never see. The customer-facing
+ * Both components are deliberately unscoped and, by default, carry no authorization of
+ * their own: they show and mutate EVERY tenant's endpoints and deliveries, which is what an
+ * operator screen is for and exactly what a tenant may never see. Their mutating actions
+ * DO honor `webhooks.admin.ability` once you set one — a check per action, which the page
+ * gate above cannot give — but the page gate is what keeps the screen off a customer's
+ * browser, and no config setting replaces it. The customer-facing
  * equivalents are the self-service portal
  * (`Webhooks\Platform\SelfServicePortalServiceProvider`) and the observability
  * dashboard (`Webhooks\Dashboard\WebhooksDashboardServiceProvider`), both of which

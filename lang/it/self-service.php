@@ -143,6 +143,12 @@ return [
     // the tenant reads the same sentence wherever it is refused.
     'limit_reached' => 'Hai raggiunto il limite di endpoint.',
 
+    // Contesa, non il limite: una registrazione simultanea dello stesso tenant ha tenuto il lock.
+    'limit_busy' => 'Un\'altra tua registrazione è ancora in corso. Riprova.',
+
+    // La cadenza, non il tetto: qui conta la VELOCITÀ, e si sblocca da sola.
+    'registration_throttled' => 'Stai registrando endpoint troppo in fretta. Aspetta un momento e riprova.',
+
     'toast' => [
         'endpoint_registered' => 'Endpoint registrato.',
         'endpoint_updated' => 'Endpoint aggiornato.',

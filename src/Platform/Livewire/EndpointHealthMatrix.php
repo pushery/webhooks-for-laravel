@@ -13,6 +13,7 @@ use Webhooks\Database\Dialect\Sql\NullsLastOrder;
 use Webhooks\Models\WebhookSubscription;
 use Webhooks\Platform\Health\EndpointHealth;
 use Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
+use Webhooks\Platform\Support\PortalRoutes;
 use Webhooks\Support\WebhookConnection;
 
 /**
@@ -150,6 +151,8 @@ final class EndpointHealthMatrix extends Component
             'reports' => $this->reports,
             'sortField' => $this->sortField,
             'sortDirection' => $this->sortDirection,
+            // Null when the portal's own pages are not mounted: there is nowhere to go back to.
+            'portalUrl' => PortalRoutes::url('webhooks.self-service'),
         ]);
     }
 }

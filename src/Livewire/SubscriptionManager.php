@@ -10,18 +10,25 @@ use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Component;
 use Webhooks\Core\Http\Exceptions\BlockedDestination;
 use Webhooks\Facades\Webhooks;
+use Webhooks\Livewire\Concerns\AuthorizesOperatorActions;
 use Webhooks\Models\WebhookSubscription;
 
 /**
  * The OPERATOR console for webhook endpoints: register one, switch it on or off, delete
  * it. A published stub — restyle it and make it yours.
  *
- * It is deliberately UNSCOPED and UNAUTHORIZED: it lists and mutates EVERY endpoint in
- * the installation regardless of owner, and the endpoints it registers are global
- * (owner-less), so every tenant's events reach them. That is what an operator screen is
- * for — and it means the component MUST be embedded behind an operator-only gate of your
+ * It is deliberately UNSCOPED, and unauthorized by default: it lists and mutates EVERY
+ * endpoint in the installation regardless of owner, and the endpoints it registers are
+ * global (owner-less), so every tenant's events reach them. That is what an operator screen
+ * is for — and it means the component MUST be embedded behind an operator-only gate of your
  * own. It is not a tenant-facing surface, and putting it on one leaks endpoints across
  * tenants.
+ *
+ * That gate stays yours and stays required. What create(), toggle() and delete() add is a
+ * check at the moment the action runs, which your page gate cannot give: set
+ * webhooks.admin.ability, or override authorizeAction() in a subclass. Left unset it does
+ * nothing, so this component behaves exactly as it always has. See
+ * {@see AuthorizesOperatorActions} for why the two differ.
  *
  * The tenant-facing surface is the self-service portal
  * (`Webhooks\Platform\Livewire\EndpointList`), which is owner-scoped and
@@ -29,6 +36,8 @@ use Webhooks\Models\WebhookSubscription;
  */
 final class SubscriptionManager extends Component
 {
+    use AuthorizesOperatorActions;
+
     public string $name = '';
 
     public string $url = '';
@@ -41,6 +50,8 @@ final class SubscriptionManager extends Component
 
     public function create(): void
     {
+        $this->authorizeAction('create');
+
         $this->validate([
             'name' => ['nullable', 'string', 'max:255'],
             // Cap the URL at the MySQL column width so it stores the same on every
@@ -73,6 +84,8 @@ final class SubscriptionManager extends Component
      */
     public function toggle(int $id): void
     {
+        $this->authorizeAction('toggle');
+
         $subscription = WebhookSubscription::query()->findOrFail($id);
 
         $subscription->is_active
@@ -86,6 +99,8 @@ final class SubscriptionManager extends Component
      */
     public function delete(int $id): void
     {
+        $this->authorizeAction('delete');
+
         Webhooks::unsubscribe(WebhookSubscription::query()->findOrFail($id));
     }
 
