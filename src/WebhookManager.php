@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Webhooks;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -17,7 +19,10 @@ use Webhooks\Database\Dialect\Dialect;
 use Webhooks\Database\OwnerKeyType;
 use Webhooks\Enums\DeliveryStatus;
 use Webhooks\Events\WebhookDeliveryRateLimited;
+use Webhooks\Events\WebhookEndpointRegistered;
+use Webhooks\Events\WebhookSecretRotated;
 use Webhooks\Exceptions\InvalidPayloadException;
+use Webhooks\Exceptions\TestPingThrottled;
 use Webhooks\Models\WebhookDelivery;
 use Webhooks\Models\WebhookSubscription;
 use Webhooks\Platform\Transform\PayloadTransformer;
@@ -76,6 +81,10 @@ final readonly class WebhookManager
         $this->assignOwner($subscription, $owner);
 
         $subscription->save();
+
+        // Fired here rather than in the portal's form, so a host that registers endpoints
+        // through its own screen or its own service layer gets the same record.
+        Event::dispatch(new WebhookEndpointRegistered($subscription, $this->actor()));
 
         return $subscription;
     }
@@ -238,16 +247,54 @@ final readonly class WebhookManager
     }
 
     /**
-     * Send a one-off test event to a single subscription (rate limit bypassed).
+     * Send a one-off test event to a single subscription.
+     *
+     * The delivery rate limit is bypassed on purpose — an operator has to be able to prove
+     * an endpoint answers while it is over its allowance. What that exemption cost was a
+     * bound of any kind on the one send a human repeats at will, aimed at a destination the
+     * requester chose: the SSRF guard decides where a ping may land, never how often. So
+     * this has a brake of its own, per endpoint.
+     *
+     * @throws TestPingThrottled when the endpoint is over its test-ping allowance
      */
     public function ping(WebhookSubscription $subscription): WebhookDelivery
     {
+        $this->guardTestPingAllowance($subscription);
+
         return $this->deliver(
             $subscription,
             'webhooks.ping',
             (string) Str::uuid7(),
             ['message' => 'This is a test event from Webhooks for Laravel.'],
         );
+    }
+
+    /**
+     * Refuse a test ping once the endpoint has had its allowance for the current minute.
+     *
+     * Refused, not deferred: a real event that arrives two minutes late still means what
+     * it meant, while a test ping that does has already failed at the only thing it was
+     * for. The bucket is only hit once the ping is allowed through, so a refusal does not
+     * push the next opening further out — an over-eager caller stops making it worse for
+     * itself the moment it stops.
+     *
+     * @throws TestPingThrottled
+     */
+    private function guardTestPingAllowance(WebhookSubscription $subscription): void
+    {
+        $max = $this->config->testPingPerMinute();
+
+        if ($max === null) {
+            return;
+        }
+
+        $key = "webhooks:test-ping:{$subscription->id}";
+
+        if (RateLimiter::tooManyAttempts($key, $max)) {
+            throw new TestPingThrottled($subscription, RateLimiter::availableIn($key));
+        }
+
+        RateLimiter::hit($key, self::RATE_LIMIT_WINDOW);
     }
 
     /**
@@ -268,7 +315,27 @@ final readonly class WebhookManager
         $subscription->secret_rotated_at = now();
         $subscription->save();
 
+        Event::dispatch(new WebhookSecretRotated($subscription, $this->actor()));
+
         return $subscription->secret;
+    }
+
+    /**
+     * Who is acting, for the events that record a person rather than a delivery.
+     *
+     * Null outside a session — a console command, a seeder, a queued job — which is the
+     * whole reason the events carry a nullable actor.
+     *
+     * This used to check that the container had `auth` bound first, on the theory that a
+     * send-only or console-driven host might register no guard. Coverage said otherwise by
+     * refusing to reach the branch, and it was right: this package requires
+     * laravel/framework, so the auth manager is bound in every host that can install it.
+     * The check could not fire, and a guard that cannot fire only makes the next reader
+     * believe in a case that does not exist.
+     */
+    private function actor(): ?Authenticatable
+    {
+        return Auth::user();
     }
 
     /**

@@ -143,6 +143,14 @@ return [
     // the tenant reads the same sentence wherever it is refused.
     'limit_reached' => 'Du hast dein Endpunkt-Limit erreicht.',
 
+    // Nebenläufigkeit, nicht das Limit: eine gleichzeitige Registrierung desselben Tenants
+    // hielt die Sperre zu lange. Das Limit zu nennen wäre eine Aussage, mit der der Leser
+    // nichts anfangen kann.
+    'limit_busy' => 'Eine andere Registrierung von dir läuft noch. Bitte versuche es erneut.',
+
+    // Die Frequenz-Bremse, nicht das Limit: hier geht es ums TEMPO, und sie löst sich von selbst.
+    'registration_throttled' => 'Du registrierst zu schnell hintereinander Endpunkte. Warte einen Moment und versuche es erneut.',
+
     'toast' => [
         'endpoint_registered' => 'Endpunkt registriert.',
         'endpoint_updated' => 'Endpunkt aktualisiert.',

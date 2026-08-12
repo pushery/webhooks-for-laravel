@@ -176,6 +176,21 @@ final class Settings
     }
 
     /**
+     * How many manual test pings one endpoint may receive per minute, or null for no
+     * brake at all.
+     *
+     * Null and a non-positive value mean the same thing on purpose: a "limit" of zero
+     * would refuse every ping, which is a way to break the feature by typo rather than a
+     * setting anyone wants. Switching the brake off is spelled null.
+     */
+    public function testPingPerMinute(): ?int
+    {
+        $max = Config::get('webhooks.platform.test_ping.max_per_minute');
+
+        return is_int($max) && $max > 0 ? $max : null;
+    }
+
+    /**
      * How long an endpoint's rotated-away secret keeps signing and verifying. Zero
      * revokes it the instant it is rotated away.
      */

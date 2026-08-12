@@ -307,6 +307,24 @@ return [
             'max_per_minute' => 60,
         ],
 
+        // A brake on the MANUAL test ping (Webhooks::ping), which the shaping above
+        // deliberately does not touch — a ping bypasses the allowance on purpose, so an
+        // operator can prove an endpoint works while it is over its budget. That exemption
+        // leaves the one send a human can repeat at will completely unbounded, and it goes
+        // to a destination the requester chose: the SSRF guard decides WHERE a ping may
+        // land, never HOW OFTEN, which is the half that makes an amplifier.
+        //
+        // Counted per ENDPOINT rather than per account, because that is the bound the
+        // destination cares about — how often IT is hit, not how many pings one account
+        // made across all of its endpoints. Over the allowance the ping is REFUSED
+        // (Webhooks\Exceptions\TestPingThrottled), not deferred: a test send that arrives
+        // two minutes later has already failed at the only thing it was for.
+        //
+        // Set to null to remove the brake. On by default — a deliberate behavior change.
+        'test_ping' => [
+            'max_per_minute' => 5,
+        ],
+
         // How long an endpoint's PREVIOUS signing secret keeps verifying after a
         // rotation. Both secrets sign each delivery during the window, so a consumer can
         // migrate without dropping a webhook; once it closes, the old secret is cleared
@@ -337,10 +355,31 @@ return [
         // or rotated secret stays revealable; 'allow_delete' toggles endpoint deletion;
         // 'max_endpoints_per_tenant' caps how many a single tenant may register
         // (null = unlimited).
+        //
+        // 'registrations_per_minute' brakes how often ONE tenant may register an endpoint.
+        // The cap bounds how many it ends up with; this bounds how fast it gets there, which
+        // is a different question and the one an automated client asks. Counted per tenant,
+        // over attempts that reach the write path — validation and authorization run first,
+        // so a rejected form costs nothing against it. Set to null to remove the brake.
+        //
+        // It is ON by default, and that is a deliberate behavior change: a host doing a bulk
+        // import THROUGH THE PORTAL will meet it. Bulk registration belongs on the manager
+        // (Webhooks::subscribe), which is not braked at all — this is the human surface.
+        //
+        // 'register_routes' is for a host that wants the PANELS but not the portal's own
+        // pages. Set it to false and the provider registers the Livewire components and
+        // nothing else — no route, no prefix, no middleware stack of its own — so you can
+        // embed <livewire:webhooks.self-service.endpoint-list /> in a screen you already
+        // guard, instead of the same surface gaining a second URL beside it. The panels
+        // drop the links they can no longer resolve (the transform editor, the health
+        // board, the back link) rather than failing to render, so what you get is the
+        // list, the form and the secret panel, working.
         'self_service' => [
             'enabled' => (bool) env('WEBHOOKS_SELF_SERVICE_ENABLED', false),
             'middleware' => ['web', 'auth'],
             'route_prefix' => 'webhooks/endpoints',
+            'register_routes' => true,
+            'registrations_per_minute' => 10,
             'secret_reveal_ttl' => 60,
             'allow_delete' => true,
             'max_endpoints_per_tenant' => null,
@@ -776,6 +815,43 @@ return [
         // service provider instead — UiTheme::resolveNonceUsing(fn () => Vite::cspNonce()) —
         // NOT a closure here: a closure in config makes `php artisan config:cache` throw.
         'csp_nonce' => null,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Operator console
+    |--------------------------------------------------------------------------
+    |
+    | The two publishable OPERATOR components (Webhooks\Livewire\SubscriptionManager
+    | and Webhooks\Livewire\DeliveryLog, registered by WebhooksUiServiceProvider).
+    | They are unscoped by design: they read and mutate EVERY tenant's endpoints and
+    | deliveries, which is what an operator screen is for and exactly what a customer
+    | may never see. They must be embedded behind an operator-only gate of your own.
+    |
+    | 'ability' adds a check on each ACTION, which is a different assurance from the
+    | page gate you already put in front of them, not a duplicate of it. A page gate
+    | decides who receives a Livewire snapshot; every interaction after that is a
+    | separate request to Livewire's own endpoint. So a capability revoked mid-session
+    | keeps working until the reader reloads — and if you ever embed a component in a
+    | second place, it inherits THAT page's gate rather than the original one.
+    |
+    | Null is the default and means today's behavior exactly: no per-action check, the
+    | page gate is the only guard. Set it to an ability name and create(), toggle(),
+    | delete(), redeliver() and ping() authorize against it. The action name is passed
+    | to the gate as its argument, so one ability can answer differently per action:
+    |
+    |     Gate::define('webhooks.operate', fn ($user, string $action) => match ($action) {
+    |         'delete' => $user->isAdmin(),
+    |         default  => $user->isOperator(),
+    |     });
+    |
+    | For a rule no ability can express, override authorizeAction() in a subclass of
+    | either component instead — the same seam, one level lower.
+    |
+    */
+
+    'admin' => [
+        'ability' => null,
     ],
 
 ];

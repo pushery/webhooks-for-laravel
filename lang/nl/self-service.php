@@ -143,6 +143,12 @@ return [
     // the tenant reads the same sentence wherever it is refused.
     'limit_reached' => 'Je hebt je endpoint-limiet bereikt.',
 
+    // Contentie, niet de limiet: een gelijktijdige registratie van dezelfde tenant hield de lock.
+    'limit_busy' => 'Een andere registratie van jou loopt nog. Probeer het opnieuw.',
+
+    // De frequentierem, niet het maximum: hier gaat het om SNELHEID, en hij loopt vanzelf af.
+    'registration_throttled' => 'Je registreert te snel achter elkaar endpoints. Wacht even en probeer het opnieuw.',
+
     'toast' => [
         'endpoint_registered' => 'Endpoint geregistreerd.',
         'endpoint_updated' => 'Endpoint bijgewerkt.',

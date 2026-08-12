@@ -11,9 +11,13 @@
                 <x-wirekit::text variant="muted" class="break-all">{{ $this->endpointUrl }}</x-wirekit::text>
             @endif
         </x-wirekit::stack>
-        <x-wirekit::button :href="route('webhooks.self-service')" wire:navigate size="sm" surface="ghost" intent="neutral">
-            {{ __('webhooks::self-service.actions.back_to_endpoints') }}
-        </x-wirekit::button>
+        {{-- Absent when this editor is embedded without the portal's own routes: there is
+             no endpoint page of ours to go back to. --}}
+        @if ($portalUrl !== null)
+            <x-wirekit::button :href="$portalUrl" wire:navigate size="sm" surface="ghost" intent="neutral">
+                {{ __('webhooks::self-service.actions.back_to_endpoints') }}
+            </x-wirekit::button>
+        @endif
     </header>
 
     @unless ($versioningEnabled)
@@ -33,9 +37,15 @@
                          Alpine runs; the SERVER render decides what a reader sees before that
                          — and without it the markup carries no `selected`, so the first paint
                          and a scripting-off render both show the first option regardless of
-                         the stored version. WireKit only began honoring `value` on select in
-                         2.25; below that the prop is inert, which is the behavior we have
-                         today, so this is safe against the declared floor. --}}
+                         the stored version.
+
+                         WireKit only began honoring `value` on select in 2.25, and THAT is why
+                         2.25 is the declared floor rather than a nicety. Below it the prop is
+                         not merely inert: this control then misreports the stored version on
+                         every first paint and on every scripting-off render — it shows the
+                         empty "inherit" entry for an endpoint that is pinned. The floor is the
+                         fix; softening the assertion that proves it would only hide the defect
+                         from us while shipping it to the host. --}}
                     <x-wirekit::select
                         :label="__('webhooks::self-service.transform.version_label')"
                         :hint="__('webhooks::self-service.transform.version_hint')"

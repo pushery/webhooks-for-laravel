@@ -107,6 +107,10 @@ return [
         // Wird gezeigt, wenn eine Zustellung an einen deaktivierten Endpunkt erneut
         // gesendet werden soll — deaktiviert von seinem Tenant oder vom Circuit Breaker.
         'endpoint_disabled' => 'Dieser Endpunkt ist deaktiviert. Aktiviere ihn wieder, bevor du eine Zustellung erneut sendest.',
+
+        // Erscheint, wenn ein Test-Ping abgelehnt wird, weil der Endpunkt sein Kontingent
+        // für die Minute aufgebraucht hat. Die Wartezeit reist als Platzhalter.
+        'ping_throttled' => 'Dieser Endpunkt hat seine Test-Pings vorerst aufgebraucht. Versuche es in :seconds Sekunde(n) erneut.',
     ],
 
     'validation' => [

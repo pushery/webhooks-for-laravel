@@ -7,7 +7,8 @@ namespace Webhooks\Core\Ssrf;
 /**
  * Classifies a resolved IP address as safe (public) or blocked. Blocked covers
  * every private, loopback, link-local, ULA, carrier-grade-NAT, multicast,
- * documentation, benchmarking and cloud-metadata range for BOTH IPv4 and IPv6.
+ * documentation, benchmarking, transition and cloud-metadata range for BOTH IPv4
+ * and IPv6.
  *
  * The classification is done with an explicit CIDR list rather than PHP's
  * `FILTER_FLAG_NO_RES_RANGE`, whose IPv6 coverage is incomplete — the cloud
@@ -35,6 +36,7 @@ final class AddressClassifier
         '172.16.0.0/12',      // private
         '192.0.0.0/24',       // IETF protocol assignments
         '192.0.2.0/24',       // TEST-NET-1 (documentation)
+        '192.88.99.0/24',     // 6to4 relay anycast, deprecated (RFC 7526)
         '192.168.0.0/16',     // private
         '198.18.0.0/15',      // benchmarking
         '198.51.100.0/24',    // TEST-NET-2
@@ -46,7 +48,17 @@ final class AddressClassifier
         '::1/128',            // loopback
         '64:ff9b::/96',       // NAT64
         '100::/64',           // discard-only
+        // The IPv6 transition prefixes, and the reason they are here is not tidiness.
+        // 6to4 and Teredo EMBED an IPv4 address, and neither puts it in the low 32 bits —
+        // 6to4 carries it in bits 16-47, so `2002:7f00:0001::` addresses 127.0.0.1 and
+        // walks straight past the unwrapping below, which only knows the three forms with a
+        // 12-byte prefix. Blocking the whole prefix is the answer that does not depend on
+        // enumerating every encoding.
+        '2001::/32',          // Teredo (RFC 4380) — embeds the server's IPv4
+        '2001:10::/28',       // ORCHID, expired (RFC 4843)
+        '2001:20::/28',       // ORCHIDv2 (RFC 7343)
         '2001:db8::/32',      // documentation
+        '2002::/16',          // 6to4 (RFC 3056) — embeds an IPv4 in bits 16-47
         'fc00::/7',           // ULA (incl. fd00:ec2::254 cloud metadata)
         'fe80::/10',          // link-local
         // Site-local. Deprecated in favour of ULA (RFC 3879), but private BY INTENT and

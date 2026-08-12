@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Webhooks\Platform\Livewire;
 
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\View as ViewFactory;
@@ -134,26 +135,57 @@ final class EndpointForm extends Component
     {
         $this->authorize('create', WebhookSubscription::class);
 
-        if ($this->endpointCapReached()) {
-            $this->addError('url', __('webhooks::self-service.limit_reached'));
+        // Before the lock, not inside it: a tenant that is already over its allowance has
+        // no business making everyone behind it wait for a lock it will be refused under.
+        if ($this->registrationRateExceeded()) {
+            $this->addError('url', __('webhooks::self-service.registration_throttled'));
 
             return;
         }
 
         try {
-            // Register through the manager so the URL is SSRF-vetted and the signing
-            // secret is generated and encrypted-at-rest by the existing scheme. The new
-            // endpoint is owned by the SAME tenant identity the read scope resolves, so
-            // create and filter can never diverge onto different owner columns.
-            $subscription = Webhooks::subscribe(
-                SubscriptionScope::currentOwner(),
-                $this->url,
-                array_values($this->eventTypes),
-                $this->name !== '' ? $this->name : null,
-            );
-        } catch (BlockedDestination) {
-            $this->addError('url', $this->blockedUrlMessage());
+            // The cap check moved INSIDE the lock, and that is the whole point: read
+            // outside it, the count is a fact about a moment that has already passed by
+            // the time the insert runs, and two concurrent registrations both pass it.
+            //
+            // Each refusal names itself on the field where it happens and returns null, so
+            // the caller only has to distinguish "registered" from "did not" — and the two
+            // reasons cannot be confused for one another on the way out.
+            $subscription = $this->withRegistrationLock(function (): ?WebhookSubscription {
+                if ($this->endpointCapReached()) {
+                    $this->addError('url', __('webhooks::self-service.limit_reached'));
 
+                    return null;
+                }
+
+                try {
+                    // Register through the manager so the URL is SSRF-vetted and the signing
+                    // secret is generated and encrypted-at-rest by the existing scheme. The
+                    // new endpoint is owned by the SAME tenant identity the read scope
+                    // resolves, so create and filter can never diverge onto different owner
+                    // columns.
+                    return Webhooks::subscribe(
+                        SubscriptionScope::currentOwner(),
+                        $this->url,
+                        array_values($this->eventTypes),
+                        $this->name !== '' ? $this->name : null,
+                    );
+                } catch (BlockedDestination) {
+                    $this->addError('url', $this->blockedUrlMessage());
+
+                    return null;
+                }
+            });
+        } catch (LockTimeoutException) {
+            // Another registration of this tenant's held the lock past the wait. Not the
+            // cap — saying "you are at your limit" here would be a lie the tenant cannot
+            // act on, and the honest instruction is simply to try again.
+            $this->addError('url', __('webhooks::self-service.limit_busy'));
+
+            return;
+        }
+
+        if (! $subscription instanceof WebhookSubscription) {
             return;
         }
 

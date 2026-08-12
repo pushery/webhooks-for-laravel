@@ -107,6 +107,10 @@ return [
         // Shown when a replay is asked for an endpoint that is switched off — by its
         // tenant, or by the circuit breaker after too many failures.
         'endpoint_disabled' => 'This endpoint is disabled. Re-enable it before replaying a delivery to it.',
+
+        // Shown when a test ping is refused because the endpoint has had its allowance
+        // for the minute. The wait travels as a placeholder so a locale can place it.
+        'ping_throttled' => 'This endpoint has had its test pings for now. Try again in :seconds second(s).',
     ],
 
     'validation' => [

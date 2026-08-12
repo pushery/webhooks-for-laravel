@@ -143,6 +143,13 @@ return [
     // the tenant reads the same sentence wherever it is refused.
     'limit_reached' => 'You have reached your endpoint limit.',
 
+    // Contention, not the cap: a concurrent registration of the same tenant's held the
+    // lock past the wait. Naming the cap here would be a lie the reader cannot act on.
+    'limit_busy' => 'Another registration of yours is still in progress. Please try again.',
+
+    // The allowance, which is not the cap: this one is about SPEED, and it clears on its own.
+    'registration_throttled' => 'You are registering endpoints too quickly. Please wait a moment and try again.',
+
     'toast' => [
         'endpoint_registered' => 'Endpoint registered.',
         'endpoint_updated' => 'Endpoint updated.',

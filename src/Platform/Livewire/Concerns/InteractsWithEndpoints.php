@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace Webhooks\Platform\Livewire\Concerns;
 
+use Closure;
 use Illuminate\Container\Container;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\RateLimiter;
 use Webhooks\Core\Ssrf\SsrfGuard;
 use Webhooks\Models\WebhookSubscription;
 use Webhooks\Platform\Support\SubscriptionScope;
+use Webhooks\Support\TenantIdentity;
 
 /**
  * Shared plumbing for the self-service portal panels: build the owner-scoped
@@ -77,12 +82,138 @@ trait InteractsWithEndpoints
     /**
      * Whether the tenant has reached its endpoint cap, so registering another is
      * refused. An unset cap is always false.
+     *
+     * Read on its own this is only ever advisory — it is what decides whether a button is
+     * drawn. The decision that MUST hold is the one inside {@see withRegistrationLock()},
+     * which asks the same question with the answer pinned.
      */
     protected function endpointCapReached(): bool
     {
         $max = $this->maxEndpointsPerTenant();
 
         return $max !== null && $this->scopedQuery()->count() >= $max;
+    }
+
+    /**
+     * How long the registration lock is held before it expires on its own, in seconds.
+     *
+     * A backstop, not a budget: the section it guards is one count and one insert. It
+     * exists so a request killed mid-registration cannot wedge a tenant out of registering
+     * until the cache is flushed.
+     */
+    private const int REGISTRATION_LOCK_TTL = 10;
+
+    /**
+     * How long a registration waits for a concurrent one to finish, in seconds.
+     *
+     * Waiting is the right answer rather than refusing outright: the other request
+     * finishes in milliseconds, and the waiter then re-reads the cap and gets a correct
+     * verdict — created, or honestly at the limit. Only a wait past this is reported as
+     * contention.
+     */
+    private const int REGISTRATION_LOCK_WAIT = 3;
+
+    /**
+     * Run a registration inside the acting tenant's registration lock, so the cap check
+     * and the insert cannot interleave with a concurrent registration.
+     *
+     * Without it the cap is read-then-act: two requests both read count = max - 1, both
+     * pass, both insert, and the cap is over with nothing to notice. That is not a
+     * contrived race — the cap bounds a SELF-SERVICE resource, and a double-submit is the
+     * ordinary way one customer produces two simultaneous registrations.
+     *
+     * Keyed by the WHOLE morph pair, matching the query scope exactly, so two tenants
+     * never wait on each other and two tenants sharing an owner_id under different owner
+     * types are still separate. With no cap configured there is nothing to race for and no
+     * lock is taken, so an unlimited installation pays nothing for this.
+     *
+     * @template TValue
+     *
+     * @param  Closure(): TValue  $register
+     * @return TValue
+     *
+     * @throws LockTimeoutException when a concurrent registration held the lock too long
+     */
+    protected function withRegistrationLock(Closure $register): mixed
+    {
+        $owner = SubscriptionScope::currentOwner();
+
+        if ($this->maxEndpointsPerTenant() === null || ! $owner instanceof TenantIdentity) {
+            return $register();
+        }
+
+        return Cache::lock($this->registrationLockKey($owner), self::REGISTRATION_LOCK_TTL)
+            ->block(self::REGISTRATION_LOCK_WAIT, $register);
+    }
+
+    /**
+     * How many endpoints one tenant may register per minute, or null for no brake.
+     *
+     * A non-positive value reads as no brake rather than as "none allowed": a limit of
+     * zero would refuse every registration, which is a way to disable the portal by typo
+     * rather than a setting anyone wants.
+     */
+    protected function maxRegistrationsPerMinute(): ?int
+    {
+        $max = Config::get('webhooks.platform.self_service.registrations_per_minute');
+
+        return is_int($max) && $max > 0 ? $max : null;
+    }
+
+    /**
+     * Whether this tenant has spent its registration allowance for the current minute.
+     *
+     * The cap and this answer different questions: the cap bounds how MANY endpoints a
+     * tenant ends up with, this bounds how FAST it gets there. An installation with no cap
+     * has no answer to a client that registers in a loop, and one with a cap still has
+     * none to a client that empties and refills it.
+     *
+     * The bucket is spent by attempts that reach the write path — validation and
+     * authorization have already run, so a rejected form costs nothing against it.
+     */
+    protected function registrationRateExceeded(): bool
+    {
+        $max = $this->maxRegistrationsPerMinute();
+        $owner = SubscriptionScope::currentOwner();
+
+        if ($max === null || ! $owner instanceof TenantIdentity) {
+            return false;
+        }
+
+        $key = $this->registrationRateKey($owner);
+
+        if (RateLimiter::tooManyAttempts($key, $max)) {
+            return true;
+        }
+
+        RateLimiter::hit($key, self::REGISTRATION_RATE_WINDOW);
+
+        return false;
+    }
+
+    /**
+     * The window the registration allowance is measured over, in seconds.
+     */
+    private const int REGISTRATION_RATE_WINDOW = 60;
+
+    /**
+     * The registration allowance's cache key for one tenant. Distinct from the
+     * registration LOCK's key: one bounds how fast a tenant may register, the other keeps
+     * a single registration atomic, and sharing a key would make each break the other.
+     */
+    protected function registrationRateKey(TenantIdentity $owner): string
+    {
+        return 'webhooks:endpoint-registration-rate:'.str_replace('\\', '.', $owner->type).':'.$owner->id;
+    }
+
+    /**
+     * The registration lock's cache key for one tenant. The morph class is dotted rather
+     * than hashed so the key stays legible in a cache browser; both halves are present, so
+     * it identifies exactly the tenant the scoped query does.
+     */
+    protected function registrationLockKey(TenantIdentity $owner): string
+    {
+        return 'webhooks:endpoint-registration:'.str_replace('\\', '.', $owner->type).':'.$owner->id;
     }
 
     /**

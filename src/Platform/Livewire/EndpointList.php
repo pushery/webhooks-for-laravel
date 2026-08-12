@@ -14,6 +14,7 @@ use Livewire\WithPagination;
 use Webhooks\Facades\Webhooks;
 use Webhooks\Models\WebhookSubscription;
 use Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
+use Webhooks\Platform\Support\PortalRoutes;
 
 /**
  * The tenant's own endpoint list: each row shows the URL, an active toggle, a cached
@@ -147,6 +148,9 @@ final class EndpointList extends Component
         return ViewFactory::make('webhooks::self-service.livewire.endpoint-list', [
             'endpoints' => $endpoints,
             'allowDelete' => $this->deletionAllowed(),
+            // Resolved once for the page, not once per row: the answer is a property of the
+            // route table, and asking it per row would only make a long list slower.
+            'showTransformLink' => PortalRoutes::has('webhooks.self-service.transform'),
         ]);
     }
 }

@@ -9,9 +9,12 @@
             <x-wirekit::heading :level="1" size="lg">{{ __('webhooks::self-service.page.heading') }}</x-wirekit::heading>
             <x-wirekit::text variant="muted">{{ __('webhooks::self-service.page.intro') }}</x-wirekit::text>
         </div>
-        <x-wirekit::button :href="route('webhooks.self-service.health')" wire:navigate size="sm" surface="ghost" intent="neutral">
-            {{ __('webhooks::self-service.page.health_link') }}
-        </x-wirekit::button>
+        {{-- Absent when this shell is embedded without the portal's own routes. --}}
+        @if ($healthBoardUrl !== null)
+            <x-wirekit::button :href="$healthBoardUrl" wire:navigate size="sm" surface="ghost" intent="neutral">
+                {{ __('webhooks::self-service.page.health_link') }}
+            </x-wirekit::button>
+        @endif
     </header>
 
     <livewire:webhooks.self-service.endpoint-form wire:key="portal-form" />

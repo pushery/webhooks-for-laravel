@@ -9,7 +9,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Webhooks\Exceptions\TestPingThrottled;
 use Webhooks\Facades\Webhooks;
+use Webhooks\Livewire\Concerns\AuthorizesOperatorActions;
 use Webhooks\Models\WebhookDelivery;
 use Webhooks\Models\WebhookSubscription;
 
@@ -17,9 +19,13 @@ use Webhooks\Models\WebhookSubscription;
  * The OPERATOR view of the delivery log: browse every delivery, filter it, and replay or
  * test-ping one. A published stub — restyle it and make it yours.
  *
- * It is deliberately UNSCOPED and UNAUTHORIZED: it reads EVERY tenant's deliveries, so
- * it MUST be embedded behind an operator-only gate of your own. It is not a
+ * It is deliberately UNSCOPED, and unauthorized by default: it reads EVERY tenant's
+ * deliveries, so it MUST be embedded behind an operator-only gate of your own. It is not a
  * tenant-facing surface.
+ *
+ * Its two mutating actions — redeliver() and ping() — additionally honor
+ * webhooks.admin.ability (or an overridden authorizeAction()) when a host sets one, so the
+ * whole console gates the same way rather than only half of it. Left unset, nothing changes.
  *
  * The tenant-facing surface is the observability dashboard
  * (`Webhooks\Dashboard\Livewire\DeliveriesTable`), which is owner-scoped and
@@ -27,6 +33,7 @@ use Webhooks\Models\WebhookSubscription;
  */
 final class DeliveryLog extends Component
 {
+    use AuthorizesOperatorActions;
     use WithPagination;
 
     public string $status = '';
@@ -43,6 +50,8 @@ final class DeliveryLog extends Component
      */
     public function redeliver(string $id): void
     {
+        $this->authorizeAction('redeliver');
+
         $this->message = '';
 
         $delivery = WebhookDelivery::query()->findOrFail($id);
@@ -56,11 +65,27 @@ final class DeliveryLog extends Component
         Webhooks::redeliver($delivery);
     }
 
+    /**
+     * Test-ping one endpoint. Over its allowance the reader is told when to try again
+     * rather than met with an exception — the same courtesy the disabled-endpoint case
+     * above gets, and for the same reason: this is a screen, and both refusals are
+     * ordinary outcomes of pressing the button rather than faults.
+     */
     public function ping(int $subscriptionId): void
     {
+        $this->authorizeAction('ping');
+
+        $this->message = '';
+
         $subscription = WebhookSubscription::query()->findOrFail($subscriptionId);
 
-        Webhooks::ping($subscription);
+        try {
+            Webhooks::ping($subscription);
+        } catch (TestPingThrottled $throttled) {
+            $this->message = __('webhooks::management.messages.ping_throttled', [
+                'seconds' => $throttled->secondsUntilAvailable,
+            ]);
+        }
     }
 
     /**
