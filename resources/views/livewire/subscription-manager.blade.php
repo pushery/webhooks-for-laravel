@@ -50,10 +50,10 @@
         <tbody>
             @foreach ($subscriptions as $subscription)
                 <tr wire:key="sub-{{ $subscription->id }}" class="border-t">
-                    <td class="py-2">
+                    <th scope="row" class="py-2">
                         <span class="font-medium">{{ $subscription->name ?? '—' }}</span>
                         <span class="block text-gray-500">{{ $subscription->url }}</span>
-                    </td>
+                    </th>
                     <td class="py-2">{{ implode(', ', $subscription->event_types) }}</td>
                     <td class="py-2">
                         @if ($subscription->is_active)

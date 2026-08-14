@@ -38,7 +38,10 @@
                                 <x-wirekit::table.td>
                                     <x-wirekit::badge :intent="$intent">{{ __('webhooks::dashboard.status.'.$delivery->status->value) }}</x-wirekit::badge>
                                 </x-wirekit::table.td>
-                                <x-wirekit::table.td>{{ $delivery->event_type }}</x-wirekit::table.td>
+                                {{-- The row header is the EVENT, not the first cell: this table leads with a
+                                     status badge, and "Failed" does not tell a screen-reader user WHICH delivery
+                                     failed. A th[scope=row] need not be the first column (WCAG 1.3.1). --}}
+                                <x-wirekit::table.th headerScope="row">{{ $delivery->event_type }}</x-wirekit::table.th>
                                 <x-wirekit::table.td>{{ $delivery->response_code ?? '—' }}</x-wirekit::table.td>
                                 <x-wirekit::table.td align="right">
                                     {{-- Disabled while a replay is in flight, so a double-click cannot

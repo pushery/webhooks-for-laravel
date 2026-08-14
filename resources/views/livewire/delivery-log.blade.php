@@ -31,7 +31,7 @@
             @foreach ($deliveries as $delivery)
                 @php($when = $delivery->created_at->settings(['locale' => app()->getLocale()]))
                 <tr wire:key="del-{{ $delivery->id }}" class="border-t">
-                    <td class="py-2">{{ $delivery->event_type }}</td>
+                    <th scope="row" class="py-2">{{ $delivery->event_type }}</th>
                     {{-- The stored status value keys the label; only the label is translated. --}}
                     <td class="py-2">{{ __('webhooks::management.status.'.$delivery->status->value) }}</td>
                     <td class="py-2">{{ $delivery->attempt }}</td>

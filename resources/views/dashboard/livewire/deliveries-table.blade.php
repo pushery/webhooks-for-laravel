@@ -57,11 +57,11 @@
                     })
                     @php($when = $delivery->created_at->settings(['locale' => app()->getLocale()]))
                     <x-wirekit::table.row wire:key="dt-{{ $delivery->id }}">
-                        <x-wirekit::table.td>
+                        <x-wirekit::table.th headerScope="row">
                             <button type="button" wire:click="viewDelivery('{{ $delivery->id }}')" class="cursor-pointer text-[color:var(--color-wk-accent)]" aria-label="{{ __('webhooks::dashboard.a11y.view_delivery', ['event' => $delivery->event_type]) }}">
                                 {{ $delivery->event_type }}
                             </button>
-                        </x-wirekit::table.td>
+                        </x-wirekit::table.th>
                         <x-wirekit::table.td>
                             <x-wirekit::badge :intent="$intent">{{ __('webhooks::dashboard.status.'.$delivery->status->value) }}</x-wirekit::badge>
                         </x-wirekit::table.td>

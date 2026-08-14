@@ -80,12 +80,12 @@
             <x-wirekit::table.body>
                 @foreach ($subscriptions as $subscription)
                     <x-wirekit::table.row wire:key="sub-{{ $subscription->id }}">
-                        <x-wirekit::table.td>
+                        <x-wirekit::table.th headerScope="row">
                             <x-wirekit::stack gap="none">
                                 <x-wirekit::text weight="medium">{{ $subscription->name ?? '—' }}</x-wirekit::text>
                                 <x-wirekit::text size="sm" variant="muted">{{ $subscription->url }}</x-wirekit::text>
                             </x-wirekit::stack>
-                        </x-wirekit::table.td>
+                        </x-wirekit::table.th>
                         <x-wirekit::table.td>{{ implode(', ', $subscription->event_types) }}</x-wirekit::table.td>
                         <x-wirekit::table.td>
                             <x-wirekit::badge :intent="$subscription->is_active ? 'success' : 'neutral'">

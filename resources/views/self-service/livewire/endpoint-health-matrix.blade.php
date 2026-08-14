@@ -73,14 +73,14 @@
                     @php($healthLabel = __('webhooks::self-service.health.'.($endpoint->health_status ?? 'unknown')))
                     @php($report = $reports[$endpoint->id] ?? null)
                     <x-wirekit::table.row wire:key="health-{{ $endpoint->id }}">
-                        <x-wirekit::table.td>
+                        <x-wirekit::table.th headerScope="row">
                             <x-wirekit::stack gap="none">
                                 @if ($endpoint->name !== null)
                                     <x-wirekit::text weight="medium">{{ $endpoint->name }}</x-wirekit::text>
                                 @endif
                                 <x-wirekit::text size="sm" variant="muted" class="break-all">{{ $endpoint->url }}</x-wirekit::text>
                             </x-wirekit::stack>
-                        </x-wirekit::table.td>
+                        </x-wirekit::table.th>
                         <x-wirekit::table.td>
                             <x-wirekit::badge :intent="$healthIntent">{{ $healthLabel }}</x-wirekit::badge>
                         </x-wirekit::table.td>

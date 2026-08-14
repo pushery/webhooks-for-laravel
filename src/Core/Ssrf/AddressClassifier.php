@@ -137,6 +137,16 @@ final class AddressClassifier
             return false;
         }
 
+        // A whole-byte prefix is decided already, and this shortcut looks removable: for every
+        // prefix in the list above, the mask path below reaches the same answer, because a
+        // zero remainder makes the mask 0 and the masked comparison trivially equal. Mutation
+        // testing says so too — three mutants on these two lines are unkillable.
+        //
+        // It is NOT removable. The mask path indexes $ipBin[$wholeBytes], and a prefix that
+        // covers the WHOLE address (/32 on IPv4, /128 on IPv6) puts that index one past the
+        // end. The list happens to contain no such prefix that is reachable — ::/128 and
+        // ::1/128 are in it, but unwrapMappedIp() turns :: and ::1 into IPv4 before they ever
+        // get here — so today the crash cannot happen. Add one single-address CIDR and it can.
         if ($remainingBits === 0) {
             return true;
         }
