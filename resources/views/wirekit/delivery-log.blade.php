@@ -64,7 +64,7 @@
                         $when = $delivery->created_at->settings(['locale' => app()->getLocale()]);
                     @endphp
                     <x-wirekit::table.row wire:key="del-{{ $delivery->id }}">
-                        <x-wirekit::table.td>{{ $delivery->event_type }}</x-wirekit::table.td>
+                        <x-wirekit::table.th headerScope="row">{{ $delivery->event_type }}</x-wirekit::table.th>
                         <x-wirekit::table.td>
                             {{-- The stored status value keys the label; only the label is translated. --}}
                             <x-wirekit::badge :intent="$intent">{{ __('webhooks::management.status.'.$delivery->status->value) }}</x-wirekit::badge>

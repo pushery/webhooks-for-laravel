@@ -4,6 +4,26 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.1] - 2026-08-14
+
+### Fixed
+
+- **Every table row in the shipped screens now identifies itself to a screen reader.** The cell
+  that names the row was rendered as a data cell, so navigating a row's other columns announced
+  "3 events" or "Failed" with no way to tell WHICH endpoint or delivery they belonged to — on
+  surfaces where endpoints are disabled and secrets rotated, that is the row you must not
+  confuse (WCAG 2.2 1.3.1, Level A). Six tables were affected: the self-service endpoint list
+  and health matrix, the dashboard's deliveries table and recent queue, and both the plain and
+  WireKit variants of the subscription manager and delivery log.
+
+  The recent queue is the one that is not simply "the first cell": it leads with a status badge,
+  so its row header is the event column instead. A row header does not have to come first, and
+  promoting the badge would have satisfied the rule while still announcing nothing identifying.
+
+  Reported by a consuming application whose accessibility sweep noticed the screen it replaced
+  had a row header where the package's did not — the class of regression no test of ours could
+  see, because the markup stays valid and the page looks identical.
+
 ## [1.10.0] - 2026-08-12
 
 ### Added
@@ -1181,7 +1201,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.10.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.10.1...HEAD
+[1.10.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.9.1...v1.10.0
 [1.9.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.9.0...v1.9.1
 [1.9.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.8.0...v1.9.0
