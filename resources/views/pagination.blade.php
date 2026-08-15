@@ -17,7 +17,10 @@
 @if ($paginator->hasPages())
     <nav
         role="navigation"
-        aria-label="{{ __('webhooks::pagination.navigation') }}"
+        {{-- A caller may name its own landmark. A page that hosts two paginators otherwise
+             offers two navigation landmarks with the identical accessible name, and a
+             screen-reader user jumping to one of them is guessing. --}}
+        aria-label="{{ $landmarkLabel ?? __('webhooks::pagination.navigation') }}"
         class="wh-pagination flex flex-wrap items-center justify-between gap-[var(--gap-wk-sm)] font-[family-name:var(--font-wk-sans)] text-[length:var(--text-wk-sm)]"
     >
         <p class="text-[color:var(--color-wk-text-muted)]">

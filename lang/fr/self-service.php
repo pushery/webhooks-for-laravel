@@ -122,6 +122,29 @@ return [
         'output' => 'Sortie',
     ],
 
+    // The tenant's own delivery log. The status labels are keyed by the STORED
+    // DeliveryStatus value, which never changes, and read as outcomes rather than
+    // states: a customer asking "did my order go out?" is not asking for an enum.
+    'deliveries' => [
+        'heading' => 'Livraisons récentes',
+        'filter_label' => 'Filtrer par endpoint',
+        'all_endpoints' => 'Tous les endpoints',
+        'event' => 'Événement',
+        'outcome' => 'Résultat',
+        'response_code' => 'Réponse',
+        'when' => 'Quand',
+        // The paginator's own landmark. Distinct from the table's region name and from
+        // the heading above it, or a screen-reader user is offered three landmarks with
+        // one name and has to guess which is the pager.
+        'pagination_label' => 'Livraisons récentes, pages',
+        'status' => [
+            'pending' => 'En file d\'attente',
+            'succeeded' => 'Livrée',
+            'failed' => 'Échec, nouvelle tentative',
+            'exhausted' => 'Abandonnée',
+        ],
+    ],
+
     'empty' => [
         'no_endpoints' => [
             'title' => 'Aucun endpoint pour le moment',
@@ -130,6 +153,17 @@ return [
         'no_endpoints_health' => [
             'title' => 'Aucun endpoint pour le moment',
             'description' => 'Enregistre un endpoint de webhook pour commencer à suivre son état ici.',
+        ],
+        'no_deliveries' => [
+            'title' => 'Aucune livraison pour l\'instant',
+            // Names the retention window, because after it there provably are no
+            // rows by design and "nothing yet" would mislead about exactly the
+            // question this panel exists to answer.
+            'description' => 'Rien n\'a encore été envoyé à tes endpoints. Les livraisons plus anciennes que la période de rétention sont supprimées : une plus ancienne a donc pu passer ici et disparaître.',
+            // The same state with a filter on: the unfiltered sentence is a claim
+            // about every endpoint the reader owns, and it is false while one is
+            // selected — the others may be busy.
+            'filtered' => 'Rien n\'a encore été envoyé à cet endpoint. Les livraisons plus anciennes que la période de rétention sont supprimées : une plus ancienne a donc pu passer ici et disparaître.',
         ],
     ],
 
@@ -178,6 +212,9 @@ return [
         'event_types' => [
             'required' => 'Sélectionne au moins un type d\'événement.',
             'min' => 'Sélectionne au moins un type d\'événement.',
+            // A registration for a type the catalog does not declare. Only reachable
+            // while the catalog is populated: an empty one places no constraint at all.
+            'in' => 'Ce type d\'événement n\'est pas publié par cette application.',
         ],
     ],
 
@@ -207,5 +244,6 @@ return [
         // live region: it is recomputed on every debounced keystroke, and announcing the
         // whole JSON body every 400 ms would make the editor unusable with a screen reader.
         'output_updated' => 'Aperçu mis à jour.',
+        'deliveries_table' => 'Livraisons récentes',
     ],
 ];

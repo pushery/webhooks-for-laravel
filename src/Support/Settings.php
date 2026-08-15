@@ -403,6 +403,77 @@ final class Settings
     }
 
     /**
+     * The event types the catalog declares, in the order the host wrote them.
+     *
+     * The keys are cast because a catalog type that looks numeric ("1001") comes back
+     * from PHP as an int key, and every consumer here wants a string.
+     *
+     * @return list<string>
+     */
+    public function eventTypes(): array
+    {
+        return array_map(strval(...), array_keys($this->catalog()));
+    }
+
+    /**
+     * The event types a subscription may be registered for, or NULL when the catalog
+     * declares none.
+     *
+     * Null is the load-bearing value, not an empty list: the catalog ships EMPTY, and an
+     * application that keeps it that way must go on registering any type it likes rather
+     * than having every registration refused the day it upgrades. A caller turns null into
+     * "no constraint"; only a populated catalog becomes an allowlist.
+     *
+     * With prefix wildcards on, the covering wildcards join the set. A wildcard that covers
+     * a declared type is a legitimate registration — and one that covers nothing is the same
+     * typo the allowlist exists to catch, so deriving them from the catalog rather than
+     * accepting any `*`-suffixed string keeps both halves true.
+     *
+     * @return list<string>|null
+     */
+    public function acceptedEventTypes(): ?array
+    {
+        $types = $this->eventTypes();
+
+        if ($types === []) {
+            return null;
+        }
+
+        if (! Config::boolean('webhooks.platform.wildcards', false)) {
+            return $types;
+        }
+
+        $wildcards = [];
+
+        foreach ($types as $type) {
+            foreach ($this->wildcardsFor($type) as $wildcard) {
+                $wildcards[] = $wildcard;
+            }
+        }
+
+        return array_values(array_unique([...$types, ...$wildcards]));
+    }
+
+    /**
+     * The prefix wildcards that cover an event type, one per dot boundary: `a.b.c` yields
+     * `a.*` and `a.b.*`. A dot-less type has none, so it only ever matches exactly.
+     *
+     * @return list<string>
+     */
+    public function wildcardsFor(string $eventType): array
+    {
+        $segments = explode('.', $eventType);
+        $wildcards = [];
+        $counter = count($segments);
+
+        for ($i = 1; $i < $counter; $i++) {
+            $wildcards[] = implode('.', array_slice($segments, 0, $i)).'.*';
+        }
+
+        return $wildcards;
+    }
+
+    /**
      * The JSON Schema declared for an event type in the catalog, or null when the
      * type declares none. The catalog is indexed by the literal event type (which
      * contains dots, e.g. "invoice.paid"), not via dot-notation config access.

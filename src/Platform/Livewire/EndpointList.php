@@ -143,7 +143,11 @@ final class EndpointList extends Component
 
     public function render(): View
     {
-        $endpoints = $this->scopedQuery()->latest()->paginate($this->perPage);
+        // Clamped, because a public Livewire property is writable from the browser and
+        // Builder::limit() silently drops a non-positive value — a page size the reader
+        // controls is one they can set to a value that pages nothing, and the component
+        // would read every row it can see, in one request.
+        $endpoints = $this->scopedQuery()->latest()->paginate(max(1, min($this->perPage, 100)));
 
         return ViewFactory::make('webhooks::self-service.livewire.endpoint-list', [
             'endpoints' => $endpoints,

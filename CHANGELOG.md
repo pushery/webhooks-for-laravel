@@ -4,6 +4,135 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-08-15
+
+### Fixed
+
+- **A webhook that is not JSON no longer arrives as an empty payload that everyone treats as a
+  success.** The receive side had one decoder and it was `json_decode`, so a producer posting
+  `application/x-www-form-urlencoded` — Mollie sends exactly one field, `id=tr_…` — reached the
+  handler with nothing in it. The handler found no fields, had nothing to do, marked the call
+  processed and answered `200`, and the producer, told the delivery succeeded, never sent it
+  again. No exception, no log line, nothing queued: a total loss that reads as success from both
+  ends. Reported from a consuming application against a real provider account, where the whole
+  receive path was built and every delivery would have been lost silently.
+
+  The body is now read by its content type, with one rule that matters more than the change
+  itself: **the declared type is permission to try the form decoder, never evidence about the
+  body.** JSON is attempted first whatever the request declared, because a request built without
+  a content type is stamped `application/x-www-form-urlencoded` by the HTTP layer and real
+  producers send JSON under a wrong type or none — a decoder that believed the header would hand
+  a JSON document to `parse_str` and break deliveries that work today. `application/vnd.x+json`
+  needs no special handling for the same reason.
+
+- **The idempotency key had the same defect, one layer up.** `dedupe_id => 'body:…'` and every
+  `DedupeKeyResolver` are fed by a second decoder that runs before the envelope is built, and it
+  was JSON-only too. A form producer therefore got a null key — and a null collides with nothing
+  in the partial-unique index, so dedupe did nothing at all and every retry stored a fresh row.
+  Both decoders now share one implementation, so they cannot disagree about one delivery.
+
+  **This changes behavior for an unchanged config.** A source that already declares
+  `dedupe_id => 'body:…'` (or a resolver) and receives form bodies starts de-duplicating on
+  upgrade: repeat deliveries carrying the same key are answered with the configured success
+  response and are no longer dispatched to a handler. That is the documented intent of the
+  setting, and until now it was silently inert for exactly those producers — but if a handler
+  was relying on seeing every repeat, it will stop.
+
+  One limit is worth knowing: no signature scheme covers the `Content-Type` header, so a replay
+  that strips it off an authentic form delivery still verifies, arrives unread, and yields no
+  dedupe key. It is no longer silent — that is what the new event is for — and a scheme with a
+  replay window bounds it in time, but a body-only HMAC has no window to bound it with.
+
+- **A form field whose bytes are not UTF-8 no longer fails the delivery after it verified.**
+  Percent-escapes decode to arbitrary bytes, and a JSON payload could never carry any, so
+  everything downstream was built on the assumption that it could not be there: storing the
+  payload and serializing the handler job onto the queue both encode as JSON and throw on such a
+  byte, the first of them before the row is even written. Invalid UTF-8 is now substituted where
+  the bytes enter, the lossy-but-valid trade the stored payload already makes for NUL bytes — the
+  exact bytes stay on the row, and `$call->body()` returns them.
+
+### Added
+- **The self-service portal can answer "did my last delivery arrive?".** A fourth panel,
+  `webhooks.self-service.endpoint-deliveries`, lists what was sent to a customer's endpoints —
+  event, outcome, response code and when — newest first, paginated, and optionally narrowed to one
+  endpoint. None of the three existing panels ever mentioned a delivery, so a customer could see
+  THAT they had an endpoint and never whether anything had reached it; the health badge does not
+  answer it either, because a score says an endpoint is broadly fine, not whether one particular
+  event went out. Without the list, a receiver seeing nothing arrive cannot rule out "you did not
+  send", which makes the list less a feature than the alternative to a support ticket.
+
+  It is owner-scoped on the delivery row's own denormalized `(owner_type, owner_id)` pair, with no
+  join for the scope to be widened through, and it renders **no body of any kind** — not the
+  outbound payload, and not the stored `error`, which is an HTTP client's exception message and can
+  quote back whatever the receiver wrote. The empty state names the retention window, because after
+  it there provably are no rows by design.
+
+  Reported from the same consuming application as the catalog validation above, comparing what its
+  own screen did before replacing it with the shipped panels.
+
+- **A populated event catalog is now the allowlist for registrations.** The self-service form and
+  the operator console validated event types as `['string']`, so a tenant could register for a type
+  nothing publishes: the endpoint saved, looked configured, and never fired — and a typo
+  (`user.registred`) was indistinguishable from a correct registration until someone noticed weeks
+  of nothing had arrived. The package already knew its catalog; only the two forms never asked it.
+
+  The catalog **ships empty and an empty catalog constrains nothing**, so an application that keeps
+  none is unaffected. Writing one turns it into a list. With `platform.wildcards` on, the prefix
+  wildcards covering a declared type (`invoice.*` for `invoice.paid`) are accepted alongside it.
+
+  **An endpoint that already holds a type the catalog does not declare stays editable**, and the
+  form goes on offering that type so its owner can drop it deliberately. Writing a catalog after
+  endpoints exist is the ordinary way to adopt this, and every save re-validates the whole list —
+  without that, renaming such an endpoint would be refused over a type nobody touched, with no way
+  out but deleting and re-registering, which mints a new secret and a new endpoint id.
+
+  What a populated catalog constrains is REGISTRATION, not dispatch: the fan-out never consults it,
+  so an application can still emit a type it does not document. The refusal carries the package's
+  own translated sentence in all seven shipped locales rather than the framework's default line.
+
+  Reported from a consuming application that was replacing its own registration screen with the
+  shipped panels and compared what it would lose: its screen validated against its catalog, and
+  adopting the panels would have dropped that check silently.
+
+- **`Webhooks\Client\PayloadFormat`, on the `InboundMessage` your handler receives.** An empty
+  payload used to mean four things at once, and the one that mattered was invisible. `format`
+  separates them — `Json`, `Form`, `None` (nothing was sent) and `Unreadable` (something was
+  sent and nothing read it) — and `$message->format->readable()` is false for `Unreadable`
+  alone. Check it before acting on an empty payload; the bytes are still on the row.
+
+- **`Webhooks\Client\Events\UnreadableWebhookPayload`.** Fires when an authentic delivery
+  arrives in a format nothing could read, carrying the stored `call`, its source `config` and the
+  declared `contentType`, so an application can alert without changing every handler —
+  `$event->call->body()` returns the exact unread bytes. It fires only once the row and the
+  handler job are durable, and a listener that throws cannot take the delivery down with it: the
+  failure is wrapped in a `Webhooks\Client\Exceptions\UnreadablePayloadListenerFailed` and
+  reported, and the delivery still succeeds. Wrapped rather than reported as-is because Laravel's
+  handler skips a documented set of exceptions — a listener that ran `firstOrFail()`,
+  `Gate::authorize()`, `validate()` or `abort()` throws one of them, and reporting it would be a
+  silent no-op. The
+  call is still stored and still answered normally, because the delivery is authentic and asking
+  the producer to retry bytes that will fail the same way buys nothing.
+
+  A form body PHP only partly read is reported as unread rather than as a partial read, because
+  a handler acts on a half-read payload: that covers a body carrying more fields than
+  `max_input_vars` and one whose nesting leaves `parse_str` nothing at all. A body that mixes
+  ordinary fields with a single over-nested one is the case PHP reports nothing about, and it
+  arrives carrying the fields that survived.
+
+  `multipart/form-data` is answered as unread rather than parsed. PHP consumes a multipart POST
+  into `$_POST` and `$_FILES` before any middleware can capture the bytes, so the body usually
+  arrives empty — and calling that "nothing was sent" would be a confident false claim about a
+  delivery that carried fields. JSON is still attempted first, so an envelope mislabeled
+  `multipart/*` is read rather than refused.
+
+  An envelope serialized by an earlier release — a queue backlog, a delayed dispatch, a
+  `queue:retry` out of `failed_jobs` — carries no `format`, and PHP does not apply a promoted
+  parameter's default when it unserializes. Those envelopes are filled in as `Json`, the only
+  thing their payload could have come from, so the guard above is safe to write on the first line
+  of a handler during a rolling upgrade rather than after the queue has drained. The reverse
+  direction is not covered and cannot be: an envelope written by this release does not
+  unserialize under an earlier one, so a rollback strands whatever it enqueued.
+
 ## [1.10.1] - 2026-08-14
 
 ### Fixed
@@ -1201,7 +1330,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.10.1...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.11.0...HEAD
+[1.11.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.10.1...v1.11.0
 [1.10.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.9.1...v1.10.0
 [1.9.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.9.0...v1.9.1

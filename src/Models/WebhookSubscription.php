@@ -17,6 +17,7 @@ use Webhooks\Database\Concerns\HasZonedTimestamps;
 use Webhooks\Database\Concerns\ScopesByTimestamp;
 use Webhooks\Database\Concerns\UsesWebhookConnection;
 use Webhooks\Database\Factories\WebhookSubscriptionFactory;
+use Webhooks\Support\Settings;
 
 /**
  * A registered webhook endpoint and the event types it listens for.
@@ -147,29 +148,10 @@ final class WebhookSubscription extends Model
         return $query->where(function (Builder $inner) use ($eventType): void {
             $inner->whereJsonContains('event_types', $eventType);
 
-            foreach ($this->wildcardsFor($eventType) as $wildcard) {
+            foreach (new Settings()->wildcardsFor($eventType) as $wildcard) {
                 $inner->orWhereJsonContains('event_types', $wildcard);
             }
         });
-    }
-
-    /**
-     * The prefix wildcards that cover an event type, one per dot boundary: `a.b.c` yields
-     * `a.*` and `a.b.*`. A dot-less type has none, so it only ever matches exactly.
-     *
-     * @return list<string>
-     */
-    private function wildcardsFor(string $eventType): array
-    {
-        $segments = explode('.', $eventType);
-        $wildcards = [];
-        $counter = count($segments);
-
-        for ($i = 1; $i < $counter; $i++) {
-            $wildcards[] = implode('.', array_slice($segments, 0, $i)).'.*';
-        }
-
-        return $wildcards;
     }
 
     /**

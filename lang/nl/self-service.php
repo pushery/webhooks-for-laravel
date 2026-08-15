@@ -122,6 +122,29 @@ return [
         'output' => 'Uitvoer',
     ],
 
+    // The tenant's own delivery log. The status labels are keyed by the STORED
+    // DeliveryStatus value, which never changes, and read as outcomes rather than
+    // states: a customer asking "did my order go out?" is not asking for an enum.
+    'deliveries' => [
+        'heading' => 'Recente leveringen',
+        'filter_label' => 'Filter op endpoint',
+        'all_endpoints' => 'Alle endpoints',
+        'event' => 'Event',
+        'outcome' => 'Resultaat',
+        'response_code' => 'Antwoord',
+        'when' => 'Wanneer',
+        // The paginator's own landmark. Distinct from the table's region name and from
+        // the heading above it, or a screen-reader user is offered three landmarks with
+        // one name and has to guess which is the pager.
+        'pagination_label' => 'Recente leveringen, pagina\'s',
+        'status' => [
+            'pending' => 'In de wachtrij',
+            'succeeded' => 'Afgeleverd',
+            'failed' => 'Mislukt, wordt opnieuw geprobeerd',
+            'exhausted' => 'Opgegeven',
+        ],
+    ],
+
     'empty' => [
         'no_endpoints' => [
             'title' => 'Nog geen endpoints',
@@ -130,6 +153,17 @@ return [
         'no_endpoints_health' => [
             'title' => 'Nog geen endpoints',
             'description' => 'Registreer een webhook-endpoint om de gezondheid ervan hier te volgen.',
+        ],
+        'no_deliveries' => [
+            'title' => 'Nog geen leveringen',
+            // Names the retention window, because after it there provably are no
+            // rows by design and "nothing yet" would mislead about exactly the
+            // question this panel exists to answer.
+            'description' => 'Er is nog niets naar je endpoints gestuurd. Leveringen ouder dan de bewaartermijn worden verwijderd, dus een oudere kan hier geweest en alweer weg zijn.',
+            // The same state with a filter on: the unfiltered sentence is a claim
+            // about every endpoint the reader owns, and it is false while one is
+            // selected — the others may be busy.
+            'filtered' => 'Er is nog niets naar dit endpoint gestuurd. Leveringen ouder dan de bewaartermijn worden verwijderd, dus een oudere kan hier geweest en alweer weg zijn.',
         ],
     ],
 
@@ -178,6 +212,9 @@ return [
         'event_types' => [
             'required' => 'Selecteer minstens één event-type.',
             'min' => 'Selecteer minstens één event-type.',
+            // A registration for a type the catalog does not declare. Only reachable
+            // while the catalog is populated: an empty one places no constraint at all.
+            'in' => 'Dit event-type publiceert deze applicatie niet.',
         ],
     ],
 
@@ -207,5 +244,6 @@ return [
         // live region: it is recomputed on every debounced keystroke, and announcing the
         // whole JSON body every 400 ms would make the editor unusable with a screen reader.
         'output_updated' => 'Voorbeeld bijgewerkt.',
+        'deliveries_table' => 'Recente leveringen',
     ],
 ];

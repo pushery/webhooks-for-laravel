@@ -266,6 +266,13 @@ return [
         // owner works under every setting.
         'owner_key_type' => env('WEBHOOKS_OWNER_KEY_TYPE', 'bigint'),
 
+        // The catalog also decides what may be REGISTERED. While it is empty — the shipped
+        // state — it constrains nothing and a subscription may name any event type. Write
+        // one and the self-service form and the operator console refuse a type it does not
+        // declare, because an endpoint registered for a type nothing publishes looks
+        // configured and stays silent. It does NOT constrain dispatch: the fan-out never
+        // consults it, so an application may still emit an undocumented type. An endpoint
+        // registered before a type left the catalog stays editable.
         'catalog' => [
             // 'invoice.paid' => [
             //     'description' => 'Fired when an invoice is paid in full.',
@@ -501,6 +508,12 @@ return [
         // your own raw-body capture, or to avoid globally buffering every request body — with
         // it off the receiver verifies over the request content read at processing time, which
         // can be a re-serialized body and then silently fails to verify on some producers.
+        //
+        // Those captured bytes are then decoded into the envelope a handler reads: JSON, or a
+        // form body the producer declared as application/x-www-form-urlencoded (Mollie's shape).
+        // A body neither reads is reported to the handler as unread rather than as empty —
+        // $message->format->readable() — because the two are otherwise indistinguishable, and
+        // acknowledging an unread delivery is what stops the producer ever repeating it.
         'raw_body_capture' => true,
 
         'configs' => [
@@ -557,10 +570,12 @@ return [
             //     'dedupe' => 'redis+db',
             //     // Where the idempotency key comes from. Unset = the id header (the
             //     // Standard-Webhooks default). Providers with no delivery-id header
-            //     // (Stripe's evt_… is in the body; Mollie/SendCloud send none) need it
-            //     // read elsewhere, or dedupe silently does nothing:
+            //     // (Stripe's evt_… is in the JSON body; Mollie's tr_… is a form field;
+            //     // SendCloud sends none) need it read elsewhere, or dedupe silently
+            //     // does nothing:
             //     //   'dedupe_id' => 'header:X-Delivery-Id'   // an arbitrary header
-            //     //   'dedupe_id' => 'body:data.object.id'    // a dotted path into the body
+            //     //   'dedupe_id' => 'body:data.object.id'    // a dotted path into the body,
+            //     //                                           // in whichever format it arrived
             //     //   'dedupe_id' => \App\Webhooks\MyDedupeKey::class // a DedupeKeyResolver
             //     'dedupe_id' => 'body:id',
             //     'rate_limit' => ['max_attempts' => 60, 'decay_seconds' => 60],

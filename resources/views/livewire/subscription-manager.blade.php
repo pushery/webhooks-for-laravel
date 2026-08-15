@@ -25,7 +25,10 @@
                      put it wherever its grammar wants it. --}}
                 <p class="text-sm text-gray-500">{{ __('webhooks::management.form.event_types_empty', ['file' => 'config/webhooks.php']) }}</p>
             @endforelse
+            {{-- Both keys: a per-item rule reports on the INDEXED path (eventTypes.0), so
+                 a field-level lookup alone would refuse the save and show nothing. --}}
             @error('eventTypes') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
+            @error('eventTypes.*') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
         </fieldset>
 
         <button type="submit" class="rounded bg-indigo-600 px-4 py-2 text-white">{{ __('webhooks::management.form.submit') }}</button>
