@@ -108,7 +108,11 @@ final class DeliveriesTable extends Component
             ->when($this->status !== '', fn (Builder $query): Builder => $query->where('status', $this->status))
             ->when($this->eventType !== '', fn (Builder $query): Builder => $query->where('event_type', 'like', '%'.$this->eventType.'%'))
             ->orderBy($sortField, $sortDirection)
-            ->paginate($this->perPage);
+            // Clamped, because a public Livewire property is writable from the browser and
+            // Builder::limit() silently drops a non-positive value — a page size the reader
+            // controls is one they can set to a value that pages nothing, and the component
+            // would read every row it can see, in one request.
+            ->paginate(max(1, min($this->perPage, 100)));
 
         return ViewFactory::make('webhooks::dashboard.livewire.deliveries-table', [
             'deliveries' => $deliveries,

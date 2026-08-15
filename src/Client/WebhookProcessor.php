@@ -13,6 +13,8 @@ use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 use Webhooks\Client\Events\InvalidWebhookSignature;
+use Webhooks\Client\Events\UnreadableWebhookPayload;
+use Webhooks\Client\Exceptions\UnreadablePayloadListenerFailed;
 use Webhooks\Client\Http\RawBody;
 use Webhooks\Client\Models\WebhookCall;
 use Webhooks\Client\Verification\InboundVerifier;
@@ -103,7 +105,7 @@ final readonly class WebhookProcessor
             return $this->respond();
         }
 
-        $message = InboundMessage::fromRawBody($rawBody, $webhookId);
+        $message = InboundMessage::fromRawBody($rawBody, $webhookId, $headers->get('content-type'));
 
         $call = $this->store($rawBody, $webhookId, $message);
 
@@ -135,6 +137,44 @@ final readonly class WebhookProcessor
         // window then short-circuits to the success response without another database
         // round-trip.
         $this->markSeen($fastPathDedupe, $webhookId);
+
+        // A body nothing could read is the one failure this pipeline cannot answer for the
+        // host: the signature verified, so the delivery is authentic and has just been stored
+        // and queued — but its meaning is still sitting unread in the bytes. Say so once, here,
+        // so a listener can alert instead of the silence a handler that finds no fields would
+        // otherwise produce.
+        //
+        // Announced only after the row and the job are durable, deliberately. A listener is
+        // host code and may throw or be queued; announced any earlier, one that did would take
+        // the delivery down with it and leave nothing behind — turning a silent loss into a
+        // total one, which is the opposite of what this is for.
+        //
+        // For the same reason its failure is reported rather than raised. Letting it escape
+        // would answer a stored, queued delivery with a 500, and a body nothing could read
+        // often has no dedupe key to recognize the retry by — so the retry would store another
+        // row and run the handler again.
+        //
+        // Wrapped rather than reported as-is, because those are not the same thing: Laravel's
+        // handler skips a documented set of exceptions outright, and a listener that ran
+        // firstOrFail(), Gate::authorize(), validate() or abort() throws one of them. Reporting
+        // it would be a silent no-op — a failed alert that is itself unreported, which is this
+        // area's own failure one level up. A package-owned class is in no host's ignore list.
+        //
+        // And the report is guarded too. It is the last step: reporting can throw (a reportable
+        // exception whose own report() fails, a reportable() callback, a logger that cannot be
+        // built), and at this point there is nothing left to attempt that does not cost the
+        // delivery a second row.
+        if (! $message->format->readable()) {
+            try {
+                UnreadableWebhookPayload::dispatch($call, $this->config, $headers->get('content-type'));
+            } catch (Throwable $listenerFailure) {
+                try {
+                    report(UnreadablePayloadListenerFailed::for($this->config->name, $listenerFailure));
+                } catch (Throwable) {
+                    // Nothing above this can report, and the delivery is already safe.
+                }
+            }
+        }
 
         return $this->respond();
     }

@@ -23,7 +23,9 @@ use Webhooks\Core\Signing\SignatureHeaders;
 interface DedupeKeyResolver
 {
     /**
-     * @param  array<array-key, mixed>  $payload  the decoded JSON body, or an empty array for a non-JSON body
+     * @param  array<array-key, mixed>  $payload  the decoded body — JSON, or the fields of a
+     *                                            form the producer declared as such — and an
+     *                                            empty array when nothing could read it
      */
     public function resolve(array $payload, string $rawBody, SignatureHeaders $headers): ?string;
 }

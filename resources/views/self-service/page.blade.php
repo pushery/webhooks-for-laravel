@@ -20,6 +20,7 @@
     <livewire:webhooks.self-service.endpoint-form wire:key="portal-form" />
     <livewire:webhooks.self-service.secret-panel wire:key="portal-secret" />
     <livewire:webhooks.self-service.endpoint-list wire:key="portal-list" />
+    <livewire:webhooks.self-service.endpoint-deliveries wire:key="portal-deliveries" />
 
     <x-wirekit::toast-region />
 </div>

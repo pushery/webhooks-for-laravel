@@ -22,7 +22,7 @@
                         :error="$errors->first('url') ?: null"
                     />
 
-                    <x-wirekit::field :label="__('webhooks::management.form.event_types_legend')" :error="$errors->first('eventTypes') ?: null">
+                    <x-wirekit::field :label="__('webhooks::management.form.event_types_legend')" :error="$errors->first('eventTypes') ?: ($errors->first('eventTypes.*') ?: null)">
                         <x-wirekit::stack gap="xs">
                             @forelse ($availableEventTypes as $type)
                                 <x-wirekit::checkbox wire:model="eventTypes" value="{{ $type }}" label="{{ $type }}" />

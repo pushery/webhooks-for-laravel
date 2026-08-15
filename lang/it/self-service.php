@@ -122,6 +122,29 @@ return [
         'output' => 'Uscita',
     ],
 
+    // The tenant's own delivery log. The status labels are keyed by the STORED
+    // DeliveryStatus value, which never changes, and read as outcomes rather than
+    // states: a customer asking "did my order go out?" is not asking for an enum.
+    'deliveries' => [
+        'heading' => 'Consegne recenti',
+        'filter_label' => 'Filtra per endpoint',
+        'all_endpoints' => 'Tutti gli endpoint',
+        'event' => 'Evento',
+        'outcome' => 'Esito',
+        'response_code' => 'Risposta',
+        'when' => 'Quando',
+        // The paginator's own landmark. Distinct from the table's region name and from
+        // the heading above it, or a screen-reader user is offered three landmarks with
+        // one name and has to guess which is the pager.
+        'pagination_label' => 'Consegne recenti, pagine',
+        'status' => [
+            'pending' => 'In coda',
+            'succeeded' => 'Consegnata',
+            'failed' => 'Fallita, nuovo tentativo',
+            'exhausted' => 'Abbandonata',
+        ],
+    ],
+
     'empty' => [
         'no_endpoints' => [
             'title' => 'Ancora nessun endpoint',
@@ -130,6 +153,17 @@ return [
         'no_endpoints_health' => [
             'title' => 'Ancora nessun endpoint',
             'description' => 'Registra un endpoint webhook per iniziare a monitorarne qui la salute.',
+        ],
+        'no_deliveries' => [
+            'title' => 'Ancora nessuna consegna',
+            // Names the retention window, because after it there provably are no
+            // rows by design and "nothing yet" would mislead about exactly the
+            // question this panel exists to answer.
+            'description' => 'Ai tuoi endpoint non è ancora stato inviato nulla. Le consegne più vecchie del periodo di conservazione vengono rimosse, quindi una precedente può essere passata di qui ed essere già sparita.',
+            // The same state with a filter on: the unfiltered sentence is a claim
+            // about every endpoint the reader owns, and it is false while one is
+            // selected — the others may be busy.
+            'filtered' => 'A questo endpoint non è ancora stato inviato nulla. Le consegne più vecchie del periodo di conservazione vengono rimosse, quindi una precedente può essere passata di qui ed essere già sparita.',
         ],
     ],
 
@@ -178,6 +212,9 @@ return [
         'event_types' => [
             'required' => 'Seleziona almeno un tipo di evento.',
             'min' => 'Seleziona almeno un tipo di evento.',
+            // A registration for a type the catalog does not declare. Only reachable
+            // while the catalog is populated: an empty one places no constraint at all.
+            'in' => 'Questo tipo di evento non è pubblicato da questa applicazione.',
         ],
     ],
 
@@ -207,5 +244,6 @@ return [
         // live region: it is recomputed on every debounced keystroke, and announcing the
         // whole JSON body every 400 ms would make the editor unusable with a screen reader.
         'output_updated' => 'Anteprima aggiornata.',
+        'deliveries_table' => 'Consegne recenti',
     ],
 ];

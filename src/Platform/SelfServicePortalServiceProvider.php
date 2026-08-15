@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 use Override;
+use Webhooks\Platform\Livewire\EndpointDeliveries;
 use Webhooks\Platform\Livewire\EndpointForm;
 use Webhooks\Platform\Livewire\EndpointHealthMatrix;
 use Webhooks\Platform\Livewire\EndpointList;
@@ -105,6 +106,7 @@ final class SelfServicePortalServiceProvider extends ServiceProvider
         Livewire::component('webhooks.self-service.endpoint-list', EndpointList::class);
         Livewire::component('webhooks.self-service.endpoint-form', EndpointForm::class);
         Livewire::component('webhooks.self-service.secret-panel', EndpointSecretPanel::class);
+        Livewire::component('webhooks.self-service.endpoint-deliveries', EndpointDeliveries::class);
         Livewire::component('webhooks.self-service.health-matrix', EndpointHealthMatrix::class);
         Livewire::component('webhooks.self-service.transform-editor', PayloadTransformEditor::class);
     }

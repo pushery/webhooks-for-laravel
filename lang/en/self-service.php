@@ -122,6 +122,29 @@ return [
         'output' => 'Output',
     ],
 
+    // The tenant's own delivery log. The status labels are keyed by the STORED
+    // DeliveryStatus value, which never changes, and read as outcomes rather than
+    // states: a customer asking "did my order go out?" is not asking for an enum.
+    'deliveries' => [
+        'heading' => 'Recent deliveries',
+        'filter_label' => 'Filter by endpoint',
+        'all_endpoints' => 'All endpoints',
+        'event' => 'Event',
+        'outcome' => 'Outcome',
+        'response_code' => 'Response',
+        'when' => 'When',
+        // The paginator's own landmark. Distinct from the table's region name and from
+        // the heading above it, or a screen-reader user is offered three landmarks with
+        // one name and has to guess which is the pager.
+        'pagination_label' => 'Recent deliveries, pages',
+        'status' => [
+            'pending' => 'Queued',
+            'succeeded' => 'Delivered',
+            'failed' => 'Failed, retrying',
+            'exhausted' => 'Gave up',
+        ],
+    ],
+
     'empty' => [
         'no_endpoints' => [
             'title' => 'No endpoints yet',
@@ -130,6 +153,17 @@ return [
         'no_endpoints_health' => [
             'title' => 'No endpoints yet',
             'description' => 'Register a webhook endpoint to start tracking its health here.',
+        ],
+        'no_deliveries' => [
+            'title' => 'No deliveries yet',
+            // Names the retention window, because after it there provably are no
+            // rows by design and "nothing yet" would mislead about exactly the
+            // question this panel exists to answer.
+            'description' => 'Nothing has been sent to your endpoints yet. Deliveries older than the retention window are removed, so an older one may have been here and gone.',
+            // The same state with a filter on: the unfiltered sentence is a claim
+            // about every endpoint the reader owns, and it is false while one is
+            // selected — the others may be busy.
+            'filtered' => 'Nothing has been sent to this endpoint yet. Deliveries older than the retention window are removed, so an older one may have been here and gone.',
         ],
     ],
 
@@ -179,6 +213,9 @@ return [
         'event_types' => [
             'required' => 'Select at least one event type.',
             'min' => 'Select at least one event type.',
+            // A registration for a type the catalog does not declare. Only reachable
+            // while the catalog is populated: an empty one places no constraint at all.
+            'in' => 'This event type is not one this application publishes.',
         ],
     ],
 
@@ -208,5 +245,6 @@ return [
         // live region: it is recomputed on every debounced keystroke, and announcing the
         // whole JSON body every 400 ms would make the editor unusable with a screen reader.
         'output_updated' => 'Preview updated.',
+        'deliveries_table' => 'Recent deliveries',
     ],
 ];

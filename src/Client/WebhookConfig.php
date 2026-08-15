@@ -7,6 +7,7 @@ namespace Webhooks\Client;
 use Illuminate\Support\Facades\Config;
 use InvalidArgumentException;
 use Webhooks\Client\Dedupe\DedupeKeyResolver;
+use Webhooks\Client\Http\BodyDecoder;
 use Webhooks\Client\Jobs\ProcessWebhookJob;
 use Webhooks\Client\Models\WebhookCall;
 use Webhooks\Client\Profiles\ProcessEverythingWebhookProfile;
@@ -193,7 +194,8 @@ final class WebhookConfig
      *
      *   - unset          the configured id header (the Standard-Webhooks default)
      *   - 'header:Name'  an arbitrary header
-     *   - 'body:path'    a dotted path into the JSON body (Stripe's evt_… lives there)
+     *   - 'body:path'    a dotted path into the decoded body (Stripe's evt_… lives there,
+     *                    and so does Mollie's tr_… — a form field, not a JSON one)
      *   - a class-string a {@see DedupeKeyResolver} the container resolves
      *
      * The body forms exist because real providers (Stripe, Mollie, SendCloud) carry no
@@ -213,7 +215,7 @@ final class WebhookConfig
         }
 
         if (str_starts_with($spec, 'body:')) {
-            $value = data_get($this->decodeBody($rawBody), substr($spec, 5));
+            $value = data_get($this->decodeBody($rawBody, $headers), substr($spec, 5));
 
             return match (true) {
                 is_string($value) => $this->nonEmpty($value),
@@ -225,7 +227,7 @@ final class WebhookConfig
         $resolver = app()->make($spec);
 
         return $resolver instanceof DedupeKeyResolver
-            ? $this->nonEmpty($resolver->resolve($this->decodeBody($rawBody), $rawBody, $headers))
+            ? $this->nonEmpty($resolver->resolve($this->decodeBody($rawBody, $headers), $rawBody, $headers))
             : throw new InvalidArgumentException("The 'dedupe_id' resolver for webhook client config [{$this->name}] did not resolve to a DedupeKeyResolver.");
     }
 
@@ -511,16 +513,19 @@ final class WebhookConfig
     }
 
     /**
-     * The JSON body decoded to an array (empty for a non-array or invalid body), for the
-     * 'body:' and resolver dedupe strategies.
+     * The body decoded to an array (empty when nothing could read it), for the 'body:' and
+     * resolver dedupe strategies.
+     *
+     * Shared with the envelope rather than restated, and for a sharper reason than tidiness:
+     * this runs BEFORE the envelope is built, on the same bytes. Two decoders that disagree
+     * would give one delivery a payload and no idempotency key — and a null key collides with
+     * nothing in the partial-unique index, so every retry of it would store a fresh row.
      *
      * @return array<array-key, mixed>
      */
-    private function decodeBody(string $rawBody): array
+    private function decodeBody(string $rawBody, SignatureHeaders $headers): array
     {
-        $decoded = json_decode($rawBody, true);
-
-        return is_array($decoded) ? $decoded : [];
+        return BodyDecoder::decode($rawBody, $headers->get('content-type'))[1];
     }
 
     /**

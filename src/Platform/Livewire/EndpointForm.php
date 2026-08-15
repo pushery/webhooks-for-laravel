@@ -6,8 +6,9 @@ namespace Webhooks\Platform\Livewire;
 
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\View as ViewFactory;
+use Illuminate\Validation\Rule;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Webhooks\Core\Http\Exceptions\BlockedDestination;
@@ -15,6 +16,7 @@ use Webhooks\Facades\Webhooks;
 use Webhooks\Models\WebhookSubscription;
 use Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
 use Webhooks\Platform\Support\SubscriptionScope;
+use Webhooks\Support\Settings;
 
 /**
  * Create or edit a single endpoint. Opened by the list via the new-endpoint /
@@ -95,6 +97,12 @@ final class EndpointForm extends Component
      */
     public function save(): void
     {
+        $accepted = new Settings()->acceptedEventTypes();
+
+        if ($accepted !== null && $this->storedEventTypes() !== []) {
+            $accepted = array_values(array_unique([...$accepted, ...$this->storedEventTypes()]));
+        }
+
         $this->validate(
             [
                 'name' => ['nullable', 'string', 'max:255'],
@@ -104,8 +112,19 @@ final class EndpointForm extends Component
                 // URL would 500 on one engine and store on the other. Surfaced as a
                 // field error the tenant can act on instead.
                 'url' => ['required', 'url', 'max:2048'],
+                // Constrained to the catalog, and only when the host keeps one. The catalog
+                // ships EMPTY, so an `in` rule applied unconditionally would refuse every
+                // registration the day an application upgrades; null means "no catalog, no
+                // constraint".
+                //
+                // What a populated catalog constrains is REGISTRATION, not dispatch: the
+                // fan-out never consults it, so an application can still emit a type it does
+                // not document. What it buys is that this form stops accepting a type it
+                // never offered — a typo like `user.registred` produced an endpoint that
+                // looked configured, stayed silent, and was indistinguishable from a correct
+                // registration until someone noticed weeks of nothing arriving.
                 'eventTypes' => ['required', 'array', 'min:1'],
-                'eventTypes.*' => ['string'],
+                'eventTypes.*' => $accepted === null ? ['string'] : ['string', Rule::in($accepted)],
             ],
             [
                 'name.max' => __('webhooks::self-service.validation.name.max'),
@@ -114,6 +133,9 @@ final class EndpointForm extends Component
                 'url.max' => __('webhooks::self-service.validation.url.max'),
                 'eventTypes.required' => __('webhooks::self-service.validation.event_types.required'),
                 'eventTypes.min' => __('webhooks::self-service.validation.event_types.min'),
+                // Named explicitly, like every other message here, so a refused save does not
+                // fall back to the framework's untranslated ":attribute is invalid".
+                'eventTypes.*.in' => __('webhooks::self-service.validation.event_types.in'),
             ],
             [
                 'name' => __('webhooks::self-service.form.name_label'),
@@ -258,10 +280,43 @@ final class EndpointForm extends Component
         $this->resetValidation();
     }
 
+    /**
+     * What the endpoint currently being edited already holds, read from the ROW.
+     *
+     * Not a property, and that is the whole point. Every public property of a Livewire
+     * component is writable from the browser, so a remembered set kept in component state
+     * would be an allowlist the client can extend: one extra key in the update payload and
+     * the catalog rule accepts anything. Nothing about this value belongs to the request —
+     * it belongs to the row — so it is read from the row, on the request that needs it.
+     *
+     * Reading it here rather than spreading `$this->eventTypes` also keeps the offered list
+     * out of client control: that property is wire:model-bound and may hold anything at all,
+     * including a nested array, which `array_unique` answers with a warning Laravel promotes
+     * to an uncaught error.
+     *
+     * @return list<string>
+     */
+    #[Computed]
+    private function storedEventTypes(): array
+    {
+        if ($this->endpointId === null) {
+            return [];
+        }
+
+        return array_values($this->findOwnedEndpoint($this->endpointId)->event_types);
+    }
+
     public function render(): View
     {
         return ViewFactory::make('webhooks::self-service.livewire.endpoint-form', [
-            'availableEventTypes' => array_keys(Config::array('webhooks.platform.catalog', [])),
+            // The catalog, plus anything the OPENED ROW already holds that the catalog no
+            // longer declares. Without the second half the stale value has no checkbox, so a
+            // tenant can neither keep it nor drop it — the value is in the component's state
+            // and Livewire's checkbox binding only ever adds or removes its OWN value.
+            'availableEventTypes' => array_values(array_unique([
+                ...new Settings()->eventTypes(),
+                ...$this->storedEventTypes(),
+            ])),
         ]);
     }
 }

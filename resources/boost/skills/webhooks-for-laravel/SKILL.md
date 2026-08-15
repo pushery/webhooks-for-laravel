@@ -139,6 +139,15 @@ class HandlePartnerWebhook extends ProcessWebhookJob
     {
         // $this->webhookCall — the stored row
         // $this->message     — the parsed envelope
+
+        // Not every producer sends JSON. Mollie posts a form body; some send XML.
+        // `format` says how the body was read, and `readable()` is false only when
+        // nothing read it — the one case where an empty payload means data is
+        // missing rather than absent.
+        if (! $this->message->format->readable()) {
+            // $this->webhookCall->body() still returns the exact bytes.
+            throw new RuntimeException('Unread delivery');
+        }
     }
 }
 ```
@@ -243,6 +252,11 @@ the tables and keep the sender.
 - Do not verify inbound signatures by hand. The Client layer's pipeline handles
   verification, replay windows and de-duplication; a hand-rolled comparison is
   where timing leaks and replay holes come from.
+- Do not `json_decode` the raw body yourself when `$this->message->payload` looks
+  empty, and do not treat that empty payload as "the producer sent nothing". The
+  pipeline already reads JSON and declared form bodies; check
+  `$this->message->format` first. Acknowledging a delivery nobody read is what
+  stops the producer ever sending it again, and it leaves no error behind.
 - Do not bulk-register endpoints through the self-service portal. Two brakes ship
   **on**: `platform.self_service.registrations_per_minute` (10) and
   `platform.test_ping.max_per_minute` (5, refused with

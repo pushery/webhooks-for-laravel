@@ -114,6 +114,11 @@ return [
     ],
 
     'validation' => [
+        'event_types' => [
+            // An operator registers a GLOBAL endpoint here, so a type nothing publishes
+            // costs every tenant's events for it rather than one tenant's.
+            'in' => 'Diesen Event-Typ veröffentlicht diese Anwendung nicht.',
+        ],
         'url' => [
             // What the reader gets when the SSRF guard refuses the destination. The
             // guard's own message stays untranslated: it is an operator diagnostic for

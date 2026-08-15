@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace Webhooks\Livewire;
 
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\View as ViewFactory;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Webhooks\Core\Http\Exceptions\BlockedDestination;
 use Webhooks\Facades\Webhooks;
 use Webhooks\Livewire\Concerns\AuthorizesOperatorActions;
 use Webhooks\Models\WebhookSubscription;
+use Webhooks\Support\Settings;
 
 /**
  * The OPERATOR console for webhook endpoints: register one, switch it on or off, delete
@@ -52,13 +53,20 @@ final class SubscriptionManager extends Component
     {
         $this->authorizeAction('create');
 
+        $accepted = new Settings()->acceptedEventTypes();
+
         $this->validate([
             'name' => ['nullable', 'string', 'max:255'],
             // Cap the URL at the MySQL column width so it stores the same on every
             // supported engine (varchar(2048) there, unbounded text on Postgres).
             'url' => ['required', 'url', 'max:2048'],
             'eventTypes' => ['required', 'array', 'min:1'],
-            'eventTypes.*' => ['string'],
+            // Constrained to the catalog when the host keeps one, and unconstrained when it
+            // does not — the catalog ships empty. An operator registers a GLOBAL endpoint
+            // here, so a typo costs every tenant's events for that type, not one tenant's.
+            'eventTypes.*' => $accepted === null ? ['string'] : ['string', Rule::in($accepted)],
+        ], [
+            'eventTypes.*.in' => __('webhooks::management.validation.event_types.in'),
         ]);
 
         try {
@@ -108,7 +116,7 @@ final class SubscriptionManager extends Component
     {
         return ViewFactory::make('webhooks::livewire.subscription-manager', [
             'subscriptions' => WebhookSubscription::query()->latest()->get(),
-            'availableEventTypes' => array_keys(Config::array('webhooks.platform.catalog', [])),
+            'availableEventTypes' => new Settings()->eventTypes(),
         ]);
     }
 }
