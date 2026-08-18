@@ -305,9 +305,7 @@ final readonly class WebhookMetrics
      */
     private function since(): string
     {
-        return WebhookConnection::dialect() === Dialect::MySql
-            ? Timestamp::mysql($this->from())
-            : Timestamp::sql($this->from());
+        return Timestamp::forDialect(WebhookConnection::dialect(), $this->from());
     }
 
     /**

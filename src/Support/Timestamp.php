@@ -7,6 +7,7 @@ namespace Webhooks\Support;
 use DateTimeImmutable;
 use DateTimeInterface;
 use DateTimeZone;
+use Webhooks\Database\Dialect\Dialect;
 
 /**
  * Renders a moment as an UNAMBIGUOUS SQL timestamp literal: the same instant in UTC,
@@ -59,6 +60,20 @@ final class Timestamp
     public static function mysql(DateTimeInterface $moment): string
     {
         return self::utc($moment)->format(self::MYSQL_SQL_FORMAT);
+    }
+
+    /**
+     * The instant rendered for the engine it will be compared against.
+     *
+     * The two literals are not interchangeable, and picking the wrong one fails SILENTLY
+     * rather than loudly: an offset-bearing PostgreSQL literal matches ZERO naive rows under
+     * MySQL, so a query returns an empty set instead of an error. That choice was written out
+     * as the same ternary in five places; a dialect difference belongs in exactly one, which
+     * is what the Dialect enum exists for.
+     */
+    public static function forDialect(Dialect $dialect, DateTimeInterface $moment): string
+    {
+        return $dialect === Dialect::MySql ? self::mysql($moment) : self::sql($moment);
     }
 
     public static function utc(DateTimeInterface $moment): DateTimeImmutable

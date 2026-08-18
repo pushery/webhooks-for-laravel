@@ -18,10 +18,18 @@ return [
         // its grammar wants it.
         'event_types_empty' => 'Configure event types in :file.',
         'submit' => 'Register endpoint',
+        // The same form, once an endpoint is open for editing.
+        'submit_update' => 'Save changes',
+        // Only offered while editing: a registration is active by definition.
+        'active_label' => 'Active',
     ],
 
     'secret' => [
         'heading' => 'Signing secret (shown once — store it now)',
+        // A rotation says something a registration does not, and the reader has to be told
+        // it: the previous secret keeps verifying until the rotation window closes. That is
+        // what makes rotating during an incident safe to do immediately.
+        'rotated_heading' => 'New signing secret (shown once — store it now). The previous secret keeps verifying until the rotation window closes.',
     ],
 
     'table' => [
@@ -42,7 +50,19 @@ return [
         'disabled' => 'Disabled',
         'enable' => 'Enable',
         'disable' => 'Disable',
+        'edit' => 'Edit',
+        'rotate' => 'Rotate secret',
         'delete' => 'Delete',
+    ],
+
+    // Rotating starts a clock on the old secret rather than invalidating it, but it is
+    // still a change every consumer of the endpoint has to follow, so both stubs confirm
+    // it — the WireKit variant through an alert-dialog, the neutral one through the
+    // browser confirm.
+    'rotate_dialog' => [
+        'title' => 'Rotate this signing secret?',
+        'description' => 'A new secret is issued immediately and shown once. The current secret keeps verifying until the rotation window closes, so update the receiver before then.',
+        'confirm' => 'Rotate secret',
     ],
 
     // Deleting an endpoint is irreversible and stops a live integration, so both stubs
@@ -132,6 +152,8 @@ return [
     'a11y' => [
         'subscriptions_table' => 'Your webhook endpoints',
         'delivery_log_table' => 'Delivery log',
+        'edit_subscription' => 'Edit endpoint :url',
+        'rotate_subscription' => 'Rotate the signing secret of endpoint :url',
         'delete_subscription' => 'Delete endpoint :url',
     ],
 ];

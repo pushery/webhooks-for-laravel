@@ -192,8 +192,13 @@ immediately:
 'admin' => ['ability' => 'webhooks.operate'],
 ```
 
-The action name (`create`, `toggle`, `delete`, `redeliver`, `ping`) is passed to the
-gate. Default `null` means no per-action check. It is not tenant scoping.
+The action name (`create`, `edit`, `toggle`, `rotate`, `delete`, `redeliver`, `ping`)
+is passed to the gate. Default `null` means no per-action check. It is not tenant
+scoping.
+
+`rotate` is the one to reach for in an incident: it issues a new signing secret and
+shows it once, while the previous secret keeps verifying until the rotation window
+closes — so a leak is closed immediately without knocking the receiver offline.
 
 **Send-only, with no database.** When the application wants nothing but the
 signed, SSRF-guarded, retrying sender:

@@ -50,9 +50,7 @@ final readonly class EndpointHealth
         // slides the whole window by that offset against the UTC-naive DATETIME(6) column — an
         // endpoint's oldest hours drop out and a failing endpoint can score healthy. The naive
         // form is the instant the column actually holds.
-        $since = $dialect === Dialect::MySql
-            ? Timestamp::mysql(now()->subHours($window))
-            : Timestamp::sql(now()->subHours($window));
+        $since = Timestamp::forDialect($dialect, now()->subHours($window));
 
         // One pass over the subscription's recent deliveries: how many resolved
         // (reached an attempted outcome, so pending in-flight rows do not count),

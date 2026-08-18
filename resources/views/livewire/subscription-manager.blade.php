@@ -1,7 +1,10 @@
 {{-- Published stub: restyle with your design system (WireKit recommended) and
      place behind your own authorization. --}}
 <div class="wh-subscriptions space-y-8">
-    <form wire:submit="create" class="space-y-4">
+    {{-- One form for both jobs. The component decides which it is from whether an endpoint
+         is open for editing, so a save can never register a duplicate of the row it meant
+         to correct. --}}
+    <form wire:submit="save" class="space-y-4">
         <div>
             <label for="wh-name" class="block text-sm font-medium">{{ __('webhooks::management.form.name_label') }}</label>
             <input id="wh-name" type="text" wire:model="name" class="mt-1 block w-full rounded border px-3 py-2">
@@ -31,12 +34,30 @@
             @error('eventTypes.*') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
         </fieldset>
 
-        <button type="submit" class="rounded bg-indigo-600 px-4 py-2 text-white">{{ __('webhooks::management.form.submit') }}</button>
+        @if ($editingId !== null)
+            {{-- Only while editing: a registration is active by definition, and an
+                 unchecked box on the create form would offer a state nobody asked for. --}}
+            <label class="flex items-center gap-2">
+                <input type="checkbox" wire:model="isActive"> {{ __('webhooks::management.form.active_label') }}
+            </label>
+        @endif
+
+        <div class="flex items-center gap-3">
+            <button type="submit" class="rounded bg-indigo-600 px-4 py-2 text-white">
+                {{ $editingId === null ? __('webhooks::management.form.submit') : __('webhooks::management.form.submit_update') }}
+            </button>
+            @if ($editingId !== null)
+                <button type="button" wire:click="cancel" class="text-gray-600">{{ __('webhooks::management.actions.cancel') }}</button>
+            @endif
+        </div>
     </form>
 
     @if ($newSecret)
         <div class="wh-new-secret rounded border border-green-300 bg-green-50 p-4">
-            <p class="text-sm font-medium">{{ __('webhooks::management.secret.heading') }}:</p>
+            {{-- A rotation says something a registration does not: the OLD secret keeps
+                 verifying until the rotation window closes, which is what makes rotating
+                 during an incident safe to do immediately. --}}
+            <p class="text-sm font-medium">{{ $rotated ? __('webhooks::management.secret.rotated_heading') : __('webhooks::management.secret.heading') }}:</p>
             <code class="break-all">{{ $newSecret }}</code>
         </div>
     @endif
@@ -66,9 +87,25 @@
                         @endif
                     </td>
                     <td class="py-2 text-right">
-                        <button type="button" wire:click="toggle({{ $subscription->id }})" class="text-indigo-600">
+                        <button
+                            type="button"
+                            wire:click="edit({{ $subscription->id }})"
+                            aria-label="{{ __('webhooks::management.a11y.edit_subscription', ['url' => $subscription->url]) }}"
+                            class="text-indigo-600"
+                        >{{ __('webhooks::management.subscription.edit') }}</button>
+                        <button type="button" wire:click="toggle({{ $subscription->id }})" class="ml-3 text-indigo-600">
                             {{ $subscription->is_active ? __('webhooks::management.subscription.disable') : __('webhooks::management.subscription.enable') }}
                         </button>
+                        {{-- Rotating starts a clock on the old secret rather than invalidating it,
+                             but it is still a change every consumer of this endpoint has to follow,
+                             so it is confirmed like the destructive action next to it. --}}
+                        <button
+                            type="button"
+                            wire:click="rotate({{ $subscription->id }})"
+                            wire:confirm="{{ __('webhooks::management.rotate_dialog.description') }}"
+                            aria-label="{{ __('webhooks::management.a11y.rotate_subscription', ['url' => $subscription->url]) }}"
+                            class="ml-3 text-indigo-600"
+                        >{{ __('webhooks::management.subscription.rotate') }}</button>
                         {{-- Deleting an endpoint is irreversible and stops a live production
                              integration, so it is never a bare one-click destroy. This neutral stub
                              uses the browser confirm because it deliberately depends on no design

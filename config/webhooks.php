@@ -386,6 +386,27 @@ return [
             'middleware' => ['web', 'auth'],
             'route_prefix' => 'webhooks/endpoints',
             'register_routes' => true,
+
+            // What a refusal SAYS when a reader lacks manage-webhook-endpoints. The gate
+            // itself is not configurable and is not weakened by this: an unauthorized reader
+            // is refused either way, before any panel renders and on every later interaction.
+            //
+            // 403 is the honest answer and the default: the surface exists, you may not have
+            // it. Set 404 if your application's convention is to hide rather than to deny —
+            // "real, but not yours" also confirms that this installation runs an endpoint
+            // portal, which rewards guessing URLs, and a host that answers 404 everywhere
+            // else wants this surface to match rather than to stand out.
+            //
+            // Left at 403 the original authorization exception is rethrown untouched, so an
+            // installation that never sets this key behaves exactly as it always has. This is
+            // the same decision as client.*.undetermined_status, for the same reason: a
+            // distinguishable answer is information a prober can read too, so which one to
+            // give is the host's call rather than the package's.
+            //
+            // Row-level ownership is a SEPARATE and already-settled question: a foreign
+            // endpoint id fails not-found before its policy everywhere in this package,
+            // whatever this is set to.
+            'refuse_with' => 403,
             'registrations_per_minute' => 10,
             'secret_reveal_ttl' => 60,
             'allow_delete' => true,
@@ -471,10 +492,15 @@ return [
     | explicitly; it resolves to the same default scheme with no extra plumbing.
     |
     | An invalid signature responds with 'invalid_status' (401 by default), never
-    | 500: a request that can never verify must not tell the sender to retry. The
-    | signed timestamp is checked against 'tolerance_seconds' for replay
-    | protection, and a repeated 'webhook_id' is de-duplicated so an at-least-once
-    | sender (including our own Server on retry) is never processed twice.
+    | 500: a request that can never verify must not tell the sender to retry. A
+    | 'verifier' has one outcome a scheme does not — the provider callback did not
+    | answer, so authenticity was never established either way. That is still a
+    | refusal (nothing is stored), but it is the only one a retry could resolve, so
+    | 'undetermined_status' can answer it separately; unset, it stays identical to
+    | 'invalid_status'. The signed timestamp is checked against
+    | 'tolerance_seconds' for replay protection, and a repeated 'webhook_id' is
+    | de-duplicated so an at-least-once sender (including our own Server on retry)
+    | is never processed twice.
     |
     | 'process' is either a single job class (extend
     | Webhooks\Client\Jobs\ProcessWebhookJob — it receives the stored call and the
@@ -546,6 +572,12 @@ return [
             //     ],
             //     'tolerance_seconds' => 300,
             //     'invalid_status' => 401,
+            //     // Only reachable through a 'verifier': a signature scheme always
+            //     // reaches a verdict, a provider callback can time out. Unset, such a
+            //     // delivery is answered exactly like a rejected one. Set it (503 is the
+            //     // usual choice) to tell the sender to try again instead of to give up —
+            //     // the one refusal a retry can actually resolve.
+            //     'undetermined_status' => 503,
             //     // Three swappable seams, each defaulting to the class shown. 'profile'
             //     // decides which calls are processed and stored at all (filter out the
             //     // noise a producer sends); 'response' decides what the producer gets

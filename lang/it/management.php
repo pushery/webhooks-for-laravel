@@ -18,10 +18,18 @@ return [
         // its grammar wants it.
         'event_types_empty' => 'Configura i tipi di evento in :file.',
         'submit' => 'Registra endpoint',
+        // Lo stesso modulo, quando un endpoint è aperto in modifica.
+        'submit_update' => 'Salva le modifiche',
+        // Offerto solo in modifica: una registrazione è attiva per definizione.
+        'active_label' => 'Attivo',
     ],
 
     'secret' => [
         'heading' => 'Chiave di firma (mostrata una sola volta — salvala ora)',
+        // Una rotazione dice qualcosa che una registrazione non dice, e chi legge deve saperlo:
+        // la chiave precedente resta valida finché la finestra di rotazione non si chiude. È
+        // per questo che durante un incidente si può ruotare subito.
+        'rotated_heading' => 'Nuova chiave di firma (mostrata una sola volta — salvala ora). La chiave precedente resta valida finché la finestra di rotazione non si chiude.',
     ],
 
     'table' => [
@@ -42,6 +50,8 @@ return [
         'disabled' => 'Disattivato',
         'enable' => 'Attiva',
         'disable' => 'Disattiva',
+        'edit' => 'Modifica',
+        'rotate' => 'Ruota chiave',
         'delete' => 'Elimina',
     ],
 
@@ -52,6 +62,15 @@ return [
         'title' => 'Eliminare questo endpoint?',
         'description' => 'L\'endpoint smette immediatamente di ricevere webhook e la sua chiave di firma viene distrutta. Questa operazione non può essere annullata.',
         'confirm' => 'Elimina endpoint',
+    ],
+
+    // Ruotare mette la chiave precedente sotto scadenza invece di invalidarla, ma resta
+    // un cambiamento che ogni ricevente deve seguire: entrambi gli stub lo confermano
+    // come l'eliminazione accanto.
+    'rotate_dialog' => [
+        'title' => 'Ruotare questa chiave di firma?',
+        'description' => 'Viene emessa subito una nuova chiave, mostrata una sola volta. La chiave attuale resta valida finché la finestra di rotazione non si chiude: aggiorna il ricevente prima di allora.',
+        'confirm' => 'Ruota chiave',
     ],
 
     'actions' => [
@@ -131,6 +150,8 @@ return [
     'a11y' => [
         'subscriptions_table' => 'I tuoi endpoint webhook',
         'delivery_log_table' => 'Registro delle consegne',
+        'edit_subscription' => 'Modifica endpoint :url',
+        'rotate_subscription' => 'Ruota la chiave di firma dell\'endpoint :url',
         'delete_subscription' => 'Elimina endpoint :url',
     ],
 ];

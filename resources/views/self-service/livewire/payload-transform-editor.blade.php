@@ -39,13 +39,19 @@
                          and a scripting-off render both show the first option regardless of
                          the stored version.
 
-                         WireKit only began honoring `value` on select in 2.25, and THAT is why
-                         2.25 is the declared floor rather than a nicety. Below it the prop is
-                         not merely inert: this control then misreports the stored version on
-                         every first paint and on every scripting-off render — it shows the
-                         empty "inherit" entry for an endpoint that is pinned. The floor is the
-                         fix; softening the assertion that proves it would only hide the defect
-                         from us while shipping it to the host. --}}
+                         WireKit only began honoring `value` on select in 2.25, and below that
+                         the prop is not merely inert: this control then misreports the stored
+                         version on every first paint and on every scripting-off render — it
+                         shows the empty "inherit" entry for an endpoint that is pinned.
+
+                         That is the version which introduced the behavior, and nothing more.
+                         The declared floor is 2.27, enforced through composer.json's
+                         `conflict`, and it sits higher for an unrelated reason — the seven
+                         shipped locales. An earlier version of this comment conflated the two
+                         and pointed a reader at the lower number as the one to pin, which
+                         reinstates exactly the defect described above. WirekitFloorContractTest
+                         now reads the shipped views and not only the styling guide, which is
+                         why that went unnoticed. --}}
                     <x-wirekit::select
                         :label="__('webhooks::self-service.transform.version_label')"
                         :hint="__('webhooks::self-service.transform.version_hint')"

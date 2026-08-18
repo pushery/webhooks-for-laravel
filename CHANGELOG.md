@@ -4,6 +4,149 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2026-08-16
+
+### Changed
+
+- **The WireKit floor is now enforced instead of merely claimed — `conflict` on `<2.27`.** The
+  v1.10.0 entry said a host pinned below WireKit 2.25 had to move up to install the package. It
+  did not: the constraint sat in `require-dev`, which a consumer never installs, and in a
+  `suggest` line that carries no version at all. A host on 2.20 installed it without resistance
+  and got the defect the floor existed to prevent — a control that misreports its own stored
+  state, quietly, on the first paint.
+
+  `composer.json` now carries `"conflict": {"pushery/wirekit": "<2.27"}`. That **refuses** an
+  older WireKit; it never installs one, so a headless host — or one on a different UI kit that
+  publishes the views — is unaffected. **It is a real narrowing:** an installation that resolves
+  WireKit below 2.27 today will not resolve this version.
+
+  The number moved from 2.25 to 2.27 because that is where the *last* of the shipped screens'
+  requirements landed, measured tag by tag: 2.27.0 is the first release carrying all seven
+  locales this package ships **and** wrapping its own `alert-dialog` cancel label in `__()`.
+  2.25 would have left the newest of the three quiet failures unguarded and put the same question
+  back on the table in a few weeks. Every place the number appears is held to one value by
+  `WirekitFloorContractTest`, so the constraint and the prose cannot drift apart again.
+
+### Added
+
+- **A secret the operator console reveals no longer rides along in the component state.**
+  `newSecret` is a public Livewire property, so the plaintext was re-serialized into every
+  request of the session after a registration or a rotation — long after it had been copied. It
+  is dropped in `dehydrate()` now, which is the one place that gets both halves: Livewire renders
+  before it and snapshots after it, so the value still reaches the one response that reveals it
+  and reaches **no** snapshot at all, not even that response's own.
+
+  No reveal window and no new action, deliberately. The self-service panel can afford a TTL
+  because it also has `reveal()` — when the window closes the tenant asks again. This console has
+  no way back, so a timer would only decide how long an operator has before the secret is
+  unrecoverable, and the alternative (a reveal action on a screen that is unscoped across every
+  tenant) is a larger security surface than the one being closed.
+
+- **The operator console can edit an endpoint and rotate its signing secret.** It could
+  register, switch and destroy one, and nothing else — which cost something on both ends of
+  the severity scale.
+
+  `rotate` is the security action: a leaked signing secret has to be rollable from the surface
+  that manages it, and without the action an operator was left with tinker or a database write
+  at the moment speed matters most. Rotating issues a new secret immediately and reveals it
+  once, while the previous secret stays valid as the verify-only rotation secret until the
+  window closes — so the leak is closed without knocking the receiver offline while it
+  redeploys. Both shipped view variants confirm it first.
+
+  `edit` is the everyday one: without it, correcting a URL or an event selection meant
+  delete-and-recreate, which is not the same operation. The endpoint got a **new identity**,
+  and its delivery history, its health state and its active secret went with the old row.
+  Editing keeps all three, and the destination is re-vetted through the SSRF guard on the way
+  in, so an edit is not a route around the check that vets a registration.
+
+  **If you published the stub, re-publish it or the two buttons will not appear.** A
+  published view is yours and the package never overwrites it, so an installation running its
+  own copy keeps the old three-action screen — `create()` is unchanged and still works, but
+  the form now submits `save` and the row actions are new markup. Nothing breaks either way;
+  the capability simply is not on screen until the view carries it.
+
+  Both authorize through the existing `authorizeAction()` seam under the names `edit` and
+  `rotate`, so one ability keeps answering per action, and both remain no-ops while
+  `webhooks.admin.ability` is unset. Whatever an endpoint already holds stays acceptable and
+  stays offered when the event catalog no longer declares it — the usual order writes the
+  catalog after the endpoints exist, and without that a rename would be refused over a value
+  nobody touched. Reported from a consuming application whose own 235-line console existed for
+  exactly these two actions.
+
+- **A receiver can now tell "I could not check" apart from "this is not authentic".**
+  `VerificationResult` knew four outcomes and none of them meant *undetermined*. For a
+  signature scheme that is complete — a pure function of body, headers and secret always
+  reaches a verdict. An `InboundVerifier` does I/O, and I/O has a third exit, so a provider
+  answering `404` ("this payment never existed" — a forgery) and a provider not answering at
+  all (a timeout, a 5xx) both became `invalid`. A **provider outage** and someone **probing
+  the endpoint** were therefore indistinguishable to every listener, and an alert built on
+  one fires on the other.
+
+  `VerificationResult::undetermined()` and `VerificationStatus::Undetermined` separate them.
+  Nothing about the refusal softens: `isValid()` stays false, nothing is stored, nothing is
+  dispatched. What changes is that the reason reaches `InvalidWebhookSignature` as
+  `'undetermined'`.
+
+  The second half is what the **sender** is told. A new per-config `undetermined_status`
+  answers that one outcome separately — `503` asks the producer to try again, where `401`
+  asks it to give up, which is the wrong instruction for a delivery that was in all
+  likelihood genuine. It is **unset by default** and falls back to `invalid_status`, so an
+  installation that configures nothing answers every refusal exactly as before: a
+  distinguishable answer is information a prober can read too, which makes it the host's
+  decision rather than the package's. The distinction says whether the check *completed*,
+  never which part of it failed. Reported from a consuming application verifying Mollie by
+  API callback, where an hourly reconciliation run was the only thing catching the
+  deliveries refused during an outage.
+
+- **The self-service portal can hide instead of deny — `platform.self_service.refuse_with`.**
+  A reader without `manage-webhook-endpoints` is refused with 403, which is the honest answer
+  and stays the default. For a host whose convention is to hide, it is also a disclosure:
+  "real, but not yours" confirms that the installation runs an endpoint portal at all, which is
+  the question a reader guessing URLs is asking. Set the key to `404` and the portal's pages
+  and its embedded panels both answer that instead.
+
+  The gate does not change and is not weakened: the reader is refused before any panel renders
+  and on every later interaction, exactly as before. Left unset, the original authorization
+  exception is rethrown untouched — message and gate response included — so an installation
+  that never sets the key cannot tell the option exists. Same decision, and the same reasoning,
+  as `client.*.undetermined_status`: a distinguishable answer is information a prober can read
+  too, which makes it the host's call rather than the package's.
+
+  Endpoint **ownership** is a separate, already-settled question and needs no configuration: a
+  foreign endpoint id fails not-found before its policy everywhere in this package. Reported
+  from a consuming application that had written the same exception mapping into its own
+  middleware once, and would have written it again in the next one.
+
+### Fixed
+
+- **A shipped view comment named a superseded WireKit floor.** The transform-editor view told a
+  reader that 2.25 "is the declared floor". The floor is 2.27, enforced in this same release
+  through `conflict`; 2.25 is only the release that began honoring `value` on a select. Because
+  `resources/` ships — through `vendor:publish` and through the public mirror — a reader who
+  followed that comment would pin below the floor and reinstate the very defect the paragraph
+  above it warns about: a version select that misreports the stored value on first paint.
+  `WirekitFloorContractTest` held that shape for the styling guide only; it reads the shipped
+  views now as well.
+
+- **A single letter in a self-service URL answered 500 instead of 404.** The portal's transform
+  route took `{subscription}` unconstrained, so the segment reached route-model binding — and the
+  query — exactly as typed. `GET /webhooks/endpoints/abc/transform` made Postgres refuse the cast
+  and returned a server error, where `/42/transform` correctly returned 404. It needed no
+  knowledge of the installation, and the answer confirmed both that the route exists and that a
+  database sits behind it. MySQL coerces instead of refusing, so the same defect was invisible on
+  a suite running only that engine.
+
+  The segment is now bounded to `[0-9]{1,18}`, which refuses the match rather than catching
+  anything. Mapping the query exception to 404 would have swallowed genuine database errors on
+  the same route — a worse trade than the defect.
+
+  **The length bound is load-bearing, not decoration.** A digits-only constraint leaves the same
+  500 reachable from the other end: `9999999999999999999999999` is all digits, so it passes the
+  pattern and the column then rejects it for *range* rather than syntax. Eighteen digits is the
+  widest run that always fits a signed bigint, so the pattern now refuses exactly what the key
+  column cannot hold. Reported from a consuming application, and the range half was found while
+  proving the reported half.
+
 ## [1.11.0] - 2026-08-15
 
 ### Fixed
@@ -220,6 +363,15 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   misreports its own stored state — visibly, and for a reader without JavaScript exclusively.
   Both floors are now named in [Styling the UI](https://docs.pushery.com/webhooks-for-laravel/guides/styling-the-ui),
   with what each one buys.
+
+  > **Correction (2026-08-15).** The sentence above was not true when it was published. The
+  > constraint lived in `require-dev`, which a consumer never installs, and in an unversioned
+  > `suggest` — so nothing stopped a host on WireKit 2.20 from installing 1.10.0 and getting
+  > exactly the defect the floor was meant to prevent. It said what we *tested* against and
+  > claimed what we *enforced*. It is enforced from the next release on, at 2.27 rather than
+  > 2.25 — see the `[Unreleased]` entry. The sentence is left standing rather than rewritten,
+  > because the history is published and a silently corrected claim is worse than a visibly
+  > corrected one.
 
 ### Fixed
 
@@ -1330,7 +1482,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.11.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.12.0...HEAD
+[1.12.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.10.1...v1.11.0
 [1.10.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.10.0...v1.10.1
 [1.10.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.9.1...v1.10.0

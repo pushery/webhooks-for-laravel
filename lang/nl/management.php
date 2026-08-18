@@ -18,10 +18,18 @@ return [
         // its grammar wants it.
         'event_types_empty' => 'Configureer de event-types in :file.',
         'submit' => 'Endpoint registreren',
+        // Hetzelfde formulier, zodra er een endpoint openstaat om te bewerken.
+        'submit_update' => 'Wijzigingen opslaan',
+        // Alleen bij bewerken: een registratie is per definitie actief.
+        'active_label' => 'Actief',
     ],
 
     'secret' => [
         'heading' => 'Ondertekeningssleutel (wordt maar één keer getoond — sla hem nu op)',
+        // Een rotatie zegt iets wat een registratie niet zegt, en de lezer moet het weten: de
+        // vorige sleutel blijft geldig tot het rotatievenster sluit. Precies daarom kun je
+        // tijdens een incident meteen roteren.
+        'rotated_heading' => 'Nieuwe ondertekeningssleutel (wordt maar één keer getoond — sla hem nu op). De vorige sleutel blijft geldig tot het rotatievenster sluit.',
     ],
 
     'table' => [
@@ -42,6 +50,8 @@ return [
         'disabled' => 'Uitgeschakeld',
         'enable' => 'Inschakelen',
         'disable' => 'Uitschakelen',
+        'edit' => 'Bewerken',
+        'rotate' => 'Sleutel roteren',
         'delete' => 'Verwijderen',
     ],
 
@@ -52,6 +62,15 @@ return [
         'title' => 'Dit endpoint verwijderen?',
         'description' => 'Het endpoint ontvangt vanaf nu geen webhooks meer en de ondertekeningssleutel wordt vernietigd. Dit kan niet ongedaan worden gemaakt.',
         'confirm' => 'Endpoint verwijderen',
+    ],
+
+    // Roteren zet de oude sleutel onder een termijn in plaats van hem meteen ongeldig te
+    // maken, maar het blijft een wijziging die elke ontvanger moet volgen — beide stubs
+    // bevestigen hem dus, net als het verwijderen ernaast.
+    'rotate_dialog' => [
+        'title' => 'Deze ondertekeningssleutel roteren?',
+        'description' => 'Er wordt meteen een nieuwe sleutel uitgegeven, die één keer wordt getoond. De huidige sleutel blijft geldig tot het rotatievenster sluit — werk de ontvanger daarvoor bij.',
+        'confirm' => 'Sleutel roteren',
     ],
 
     'actions' => [
@@ -131,6 +150,8 @@ return [
     'a11y' => [
         'subscriptions_table' => 'Je webhook-endpoints',
         'delivery_log_table' => 'Afleverlogboek',
+        'edit_subscription' => 'Endpoint :url bewerken',
+        'rotate_subscription' => 'De ondertekeningssleutel van endpoint :url roteren',
         'delete_subscription' => 'Endpoint :url verwijderen',
     ],
 ];

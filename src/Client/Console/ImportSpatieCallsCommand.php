@@ -218,7 +218,7 @@ final class ImportSpatieCallsCommand extends Command
     {
         $moment = is_string($value) && $value !== '' ? Date::parse($value, 'UTC') : Date::now();
 
-        return $dialect === Dialect::MySql ? Timestamp::mysql($moment) : Timestamp::sql($moment);
+        return Timestamp::forDialect($dialect, $moment);
     }
 
     /**
