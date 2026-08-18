@@ -56,6 +56,7 @@ final class WebhookConfig
         private readonly array $explicitHeaders,
         private readonly int $tolerance,
         private readonly int $invalidStatus,
+        private readonly ?int $undeterminedStatus,
         private readonly string $profileClass,
         private readonly string $responseClass,
         private readonly string $modelClass,
@@ -159,6 +160,20 @@ final class WebhookConfig
     public function invalidStatus(): int
     {
         return $this->invalidStatus;
+    }
+
+    /**
+     * The status for a verification that did not complete, defaulting to invalid_status.
+     *
+     * Configured separately, and unset by default, because it is the one refusal a producer
+     * could usefully retry: a `503` tells the sender "ask again", a `401` tells it "give
+     * up". Splitting them is a decision only the host can make — it changes what the caller
+     * is told — so an installation that configures nothing keeps answering every refusal
+     * identically, exactly as before.
+     */
+    public function undeterminedStatus(): int
+    {
+        return $this->undeterminedStatus ?? $this->invalidStatus;
     }
 
     public function profile(): WebhookProfile
@@ -348,6 +363,10 @@ final class WebhookConfig
             explicitHeaders: self::explicitHeaders($headers),
             tolerance: self::intOr($entry['tolerance_seconds'] ?? null, 300),
             invalidStatus: self::intOr($entry['invalid_status'] ?? null, 401),
+            // Null, not a default status: null is what carries "the host did not ask for
+            // the distinction", which is the only value that can be told apart from a host
+            // deliberately configuring the same status invalid_status already uses.
+            undeterminedStatus: is_int($entry['undetermined_status'] ?? null) ? $entry['undetermined_status'] : null,
             profileClass: self::classOr($name, 'profile', $entry['profile'] ?? null, WebhookProfile::class, ProcessEverythingWebhookProfile::class),
             responseClass: self::classOr($name, 'response', $entry['response'] ?? null, RespondsToWebhook::class, DefaultRespondsTo::class),
             modelClass: self::classOr($name, 'model', $entry['model'] ?? null, WebhookCall::class, WebhookCall::class),

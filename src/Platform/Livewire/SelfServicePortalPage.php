@@ -8,6 +8,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Webhooks\Platform\Support\PortalRefusal;
 use Webhooks\Platform\Support\PortalRoutes;
 
 /**
@@ -28,7 +29,7 @@ final class SelfServicePortalPage extends Component
 {
     public function boot(): void
     {
-        $this->authorize('manage-webhook-endpoints');
+        PortalRefusal::shape(fn () => $this->authorize('manage-webhook-endpoints'));
     }
 
     public function render(): View

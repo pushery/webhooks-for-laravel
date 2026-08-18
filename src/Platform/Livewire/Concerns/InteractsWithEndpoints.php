@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\RateLimiter;
 use Webhooks\Core\Ssrf\SsrfGuard;
 use Webhooks\Models\WebhookSubscription;
+use Webhooks\Platform\Support\PortalRefusal;
 use Webhooks\Platform\Support\SubscriptionScope;
 use Webhooks\Support\TenantIdentity;
 
@@ -40,13 +41,14 @@ trait InteractsWithEndpoints
      * documented middleware is only ['web', 'auth'], so its panels assert the gate themselves.
      *
      * boot() is the first hook on BOTH the mount and the hydrate path, so the ability is checked
-     * before mount() loads anything and before any action runs. Failing it throws the same 403 an
-     * unauthorized mount always has — the gate answers identically whichever request hits it.
+     * before mount() loads anything and before any action runs. It refuses identically whichever
+     * request hits it — through {@see PortalRefusal}, so a host that answers 404 everywhere gets
+     * the same answer here as from its own screens, without the gate itself changing.
      * Row-level ownership stays a separate, second guard (a foreign id fails not-found first).
      */
     public function bootInteractsWithEndpoints(): void
     {
-        $this->authorize('manage-webhook-endpoints');
+        PortalRefusal::shape(fn () => $this->authorize('manage-webhook-endpoints'));
     }
 
     /**

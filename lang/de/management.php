@@ -18,10 +18,18 @@ return [
         // its grammar wants it.
         'event_types_empty' => 'Konfiguriere die Event-Typen in :file.',
         'submit' => 'Endpunkt registrieren',
+        // Dasselbe Formular, sobald ein Endpunkt zum Bearbeiten geöffnet ist.
+        'submit_update' => 'Änderungen speichern',
+        // Nur beim Bearbeiten angeboten: eine Registrierung ist per Definition aktiv.
+        'active_label' => 'Aktiv',
     ],
 
     'secret' => [
         'heading' => 'Signaturschlüssel (wird nur einmal angezeigt — speichere ihn jetzt)',
+        // Eine Rotation sagt etwas, was eine Registrierung nicht sagt, und der Leser muss
+        // es erfahren: der bisherige Schlüssel bleibt gültig, bis das Rotationsfenster
+        // schließt. Genau deshalb ist eine Rotation im Störfall sofort machbar.
+        'rotated_heading' => 'Neuer Signaturschlüssel (wird nur einmal angezeigt — speichere ihn jetzt). Der bisherige Schlüssel bleibt gültig, bis das Rotationsfenster schließt.',
     ],
 
     'table' => [
@@ -42,6 +50,8 @@ return [
         'disabled' => 'Deaktiviert',
         'enable' => 'Aktivieren',
         'disable' => 'Deaktivieren',
+        'edit' => 'Bearbeiten',
+        'rotate' => 'Schlüssel rotieren',
         'delete' => 'Löschen',
     ],
 
@@ -52,6 +62,15 @@ return [
         'title' => 'Diesen Endpunkt löschen?',
         'description' => 'Der Endpunkt empfängt ab sofort keine Webhooks mehr und sein Signaturschlüssel wird vernichtet. Das lässt sich nicht rückgängig machen.',
         'confirm' => 'Endpunkt löschen',
+    ],
+
+    // Eine Rotation setzt den bisherigen Schlüssel unter eine Frist, statt ihn sofort
+    // ungültig zu machen — sie bleibt aber eine Änderung, der jeder Empfänger folgen
+    // muss. Deshalb bestätigen beide Stubs sie, wie das Löschen daneben.
+    'rotate_dialog' => [
+        'title' => 'Diesen Signaturschlüssel rotieren?',
+        'description' => 'Ein neuer Schlüssel wird sofort erzeugt und einmal angezeigt. Der bisherige bleibt gültig, bis das Rotationsfenster schließt — aktualisiere den Empfänger bis dahin.',
+        'confirm' => 'Schlüssel rotieren',
     ],
 
     'actions' => [
@@ -132,6 +151,8 @@ return [
     'a11y' => [
         'subscriptions_table' => 'Deine Webhook-Endpunkte',
         'delivery_log_table' => 'Zustellprotokoll',
+        'edit_subscription' => 'Endpunkt :url bearbeiten',
+        'rotate_subscription' => 'Signaturschlüssel des Endpunkts :url rotieren',
         'delete_subscription' => 'Endpunkt :url löschen',
     ],
 ];

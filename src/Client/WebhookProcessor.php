@@ -22,6 +22,7 @@ use Webhooks\Core\Http\HeaderRedactor;
 use Webhooks\Core\Payload\PayloadSanitizer;
 use Webhooks\Core\Payload\PayloadStore;
 use Webhooks\Core\Signing\SignatureHeaders;
+use Webhooks\Core\Signing\VerificationStatus;
 use Webhooks\Database\Dialect\Dialect;
 use Webhooks\Database\Dialect\Sql\DedupeInsert;
 use Webhooks\Search\SearchIndexer;
@@ -37,8 +38,11 @@ use Webhooks\Support\WebhookConnection;
  *
  * A bad, expired or malformed signature aborts with the config's invalid_status
  * (401 by default) — never a 500, because such a request can never be made valid by
- * a retry. A duplicate is answered with the same success response but not re-stored
- * or re-dispatched.
+ * a retry. A verification that did not COMPLETE — an InboundVerifier whose provider
+ * callback timed out — is the exception: it is refused just as hard, but it is the one
+ * refusal a retry could resolve, so it can be answered separately through
+ * undetermined_status. A duplicate is answered with the same success response but not
+ * re-stored or re-dispatched.
  */
 final readonly class WebhookProcessor
 {
@@ -80,7 +84,16 @@ final readonly class WebhookProcessor
         if (! $result->isValid()) {
             InvalidWebhookSignature::dispatch($this->request, $this->config, $result->reason());
 
-            abort($this->config->invalidStatus());
+            // Every refusal stores nothing and dispatches nothing. What can differ is the
+            // one thing the SENDER can act on: whether to try again. A verification that did
+            // not complete — the provider callback timed out — is the only refusal a retry
+            // could resolve, and answering it 401 tells a producer to give up on a delivery
+            // that was probably genuine. It still needs the host's consent, because a
+            // distinguishable answer is information a prober can also read, so an unset
+            // undetermined_status falls back to invalid_status and nothing changes.
+            abort($result->status === VerificationStatus::Undetermined
+                ? $this->config->undeterminedStatus()
+                : $this->config->invalidStatus());
         }
 
         // Throttle authentic requests per source. This runs after verification so a

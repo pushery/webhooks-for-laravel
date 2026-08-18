@@ -123,15 +123,12 @@
                                             {{ __('webhooks::self-service.delete_dialog.description') }}
                                         </x-wirekit::alert-dialog.description>
                                         <x-wirekit::alert-dialog.actions>
-                                            {{-- Pass the translated cancel label rather than taking WireKit's
-                                                 default, or the dialog is half-localized. WireKit does ship
-                                                 translations of its own since 2.26 — but only en and de, and
-                                                 these screens ship seven locales. Dropping this override
-                                                 would silently return es, fr, it, nl and pt to English, with
-                                                 nothing turning red: the button still renders, in the wrong
-                                                 language. Remove it when vendor/pushery/wirekit/lang/ carries
-                                                 all seven, not when the release notes mention translations. --}}
-                                            <x-wirekit::alert-dialog.cancel>{{ __('webhooks::self-service.actions.cancel') }}</x-wirekit::alert-dialog.cancel>
+                                            {{-- No cancel label passed on purpose: WireKit's own default is `__('Cancel')`,
+                                                 and from 2.27 it ships all seven locales this package ships. composer.json
+                                                 refuses anything older, so that is a guarantee rather than a hope — passing
+                                                 our own label again would be a second answer to a question the library
+                                                 already answers, and the second answer is the one that drifts. --}}
+                                            <x-wirekit::alert-dialog.cancel />
                                             <x-wirekit::button
                                                 intent="danger"
                                                 wire:click="delete({{ $endpoint->id }})"

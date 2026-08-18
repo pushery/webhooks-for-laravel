@@ -26,9 +26,20 @@ use Webhooks\Core\Signing\VerificationResult;
  * which is the whole point: only the authenticity predicate differs per provider.
  *
  * Return {@see VerificationResult::valid()} only when the delivery is proven authentic;
- * any other result rejects it with the config's invalid_status and stores nothing. Treat
- * a failed provider callback (a timeout, a 5xx) as NOT valid — never let an unreachable
- * provider turn the endpoint into an open write surface.
+ * any other result rejects it and stores nothing. Never let an unreachable provider turn
+ * the endpoint into an open write surface.
+ *
+ * A failed callback still refuses the delivery — but report it as
+ * {@see VerificationResult::undetermined()} rather than invalid, because the two are
+ * opposite events wearing the same face. A provider answering 404 says the payment never
+ * existed: the delivery is a forgery, and repeated ones are someone probing the endpoint. A
+ * provider that times out says nothing at all about this delivery, which was in all
+ * likelihood genuine. Collapsed into one status, an outage and an attack are
+ * indistinguishable to every listener, and a receiver either alerts on both or on neither.
+ *
+ * The distinction also reaches the sender, if the host asks for it: `undetermined_status`
+ * answers that one case separately (503, say) so a producer is told to try again instead of
+ * to give up. Left unset it falls back to `invalid_status` and nothing changes.
  *
  * If your verifier authenticates over the BYTES — PayPal's verify call does, since it checks
  * the document it sent — read them with {@see RawBody::of()} and never

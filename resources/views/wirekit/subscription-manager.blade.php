@@ -6,7 +6,10 @@
 <x-wirekit::stack gap="lg" class="wh-subscriptions">
     <x-wirekit::card>
         <x-wirekit::card.body>
-            <form wire:submit="create">
+            {{-- One form for both jobs. The component decides which it is from whether an
+                 endpoint is open for editing, so a save can never register a duplicate of
+                 the row it meant to correct. --}}
+            <form wire:submit="save">
                 <x-wirekit::stack gap="md">
                     <x-wirekit::input
                         :label="__('webhooks::management.form.name_label')"
@@ -36,16 +39,32 @@
                         </x-wirekit::stack>
                     </x-wirekit::field>
 
-                    <div>
-                        <x-wirekit::button type="submit">{{ __('webhooks::management.form.submit') }}</x-wirekit::button>
-                    </div>
+                    @if ($editingId !== null)
+                        {{-- Only while editing: a registration is active by definition, and an
+                             unchecked box on the create form would offer a state nobody asked for. --}}
+                        <x-wirekit::checkbox wire:model="isActive" :label="__('webhooks::management.form.active_label')" />
+                    @endif
+
+                    <x-wirekit::row gap="sm">
+                        <x-wirekit::button type="submit">
+                            {{ $editingId === null ? __('webhooks::management.form.submit') : __('webhooks::management.form.submit_update') }}
+                        </x-wirekit::button>
+                        @if ($editingId !== null)
+                            <x-wirekit::button type="button" surface="ghost" wire:click="cancel">
+                                {{ __('webhooks::management.actions.cancel') }}
+                            </x-wirekit::button>
+                        @endif
+                    </x-wirekit::row>
                 </x-wirekit::stack>
             </form>
         </x-wirekit::card.body>
     </x-wirekit::card>
 
     @if ($newSecret)
-        <x-wirekit::alert variant="success" :title="__('webhooks::management.secret.heading')">
+        {{-- A rotation says something a registration does not: the OLD secret keeps verifying
+             until the rotation window closes, which is what makes rotating during an incident
+             safe to do immediately. --}}
+        <x-wirekit::alert variant="success" :title="$rotated ? __('webhooks::management.secret.rotated_heading') : __('webhooks::management.secret.heading')">
             <x-wirekit::code class="wh-new-secret break-all">{{ $newSecret }}</x-wirekit::code>
         </x-wirekit::alert>
     @endif
@@ -93,9 +112,41 @@
                             </x-wirekit::badge>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td align="right">
+                            <x-wirekit::button
+                                size="sm"
+                                surface="ghost"
+                                wire:click="edit({{ $subscription->id }})"
+                                :aria-label="__('webhooks::management.a11y.edit_subscription', ['url' => $subscription->url])"
+                            >{{ __('webhooks::management.subscription.edit') }}</x-wirekit::button>
+
                             <x-wirekit::button size="sm" surface="ghost" wire:click="toggle({{ $subscription->id }})" wire:loading.attr="disabled" wire:target="toggle">
                                 {{ $subscription->is_active ? __('webhooks::management.subscription.disable') : __('webhooks::management.subscription.enable') }}
                             </x-wirekit::button>
+
+                            {{-- Rotating starts a clock on the old secret rather than invalidating
+                                 it, but it is still a change every consumer of this endpoint has to
+                                 follow — so it is confirmed through the same alert-dialog as the
+                                 destructive action beside it, never a bare click. --}}
+                            <x-wirekit::alert-dialog :name="'rotate-subscription-' . $subscription->id">
+                                <x-slot:trigger>
+                                    <x-wirekit::button
+                                        size="sm"
+                                        surface="ghost"
+                                        :aria-label="__('webhooks::management.a11y.rotate_subscription', ['url' => $subscription->url])"
+                                    >{{ __('webhooks::management.subscription.rotate') }}</x-wirekit::button>
+                                </x-slot:trigger>
+
+                                <x-wirekit::alert-dialog.title>{{ __('webhooks::management.rotate_dialog.title') }}</x-wirekit::alert-dialog.title>
+                                <x-wirekit::alert-dialog.description>
+                                    {{ __('webhooks::management.rotate_dialog.description') }}
+                                </x-wirekit::alert-dialog.description>
+                                <x-wirekit::alert-dialog.actions>
+                                    <x-wirekit::alert-dialog.cancel />
+                                    <x-wirekit::button
+                                        wire:click="rotate({{ $subscription->id }})"
+                                    >{{ __('webhooks::management.rotate_dialog.confirm') }}</x-wirekit::button>
+                                </x-wirekit::alert-dialog.actions>
+                            </x-wirekit::alert-dialog>
 
                             {{-- Deleting an endpoint is irreversible and stops a live production
                                  integration, so it is confirmed through the WireKit alert-dialog —
@@ -116,14 +167,12 @@
                                     {{ __('webhooks::management.delete_dialog.description') }}
                                 </x-wirekit::alert-dialog.description>
                                 <x-wirekit::alert-dialog.actions>
-                                    {{-- Pass the translated cancel label rather than taking WireKit's default,
-                                         or the dialog is half-localized. WireKit does ship translations of its
-                                         own since 2.26 — but only en and de, and these screens ship seven
-                                         locales. Dropping this override would silently return es, fr, it, nl
-                                         and pt to English, with nothing turning red: the button still renders,
-                                         in the wrong language. Remove it when vendor/pushery/wirekit/lang/
-                                         carries all seven, not when the release notes mention translations. --}}
-                                    <x-wirekit::alert-dialog.cancel>{{ __('webhooks::management.actions.cancel') }}</x-wirekit::alert-dialog.cancel>
+                                    {{-- No cancel label passed on purpose: WireKit's own default is `__('Cancel')`,
+                                                 and from 2.27 it ships all seven locales this package ships. composer.json
+                                                 refuses anything older, so that is a guarantee rather than a hope — passing
+                                                 our own label again would be a second answer to a question the library
+                                                 already answers, and the second answer is the one that drifts. --}}
+                                            <x-wirekit::alert-dialog.cancel />
                                     <x-wirekit::button
                                         intent="danger"
                                         wire:click="delete({{ $subscription->id }})"

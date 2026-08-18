@@ -18,10 +18,18 @@ return [
         // its grammar wants it.
         'event_types_empty' => 'Configura os tipos de evento em :file.',
         'submit' => 'Registar endpoint',
+        // O mesmo formulário, assim que há um endpoint aberto para edição.
+        'submit_update' => 'Guardar alterações',
+        // Só é oferecido na edição: um registo está ativo por definição.
+        'active_label' => 'Ativo',
     ],
 
     'secret' => [
         'heading' => 'Chave de assinatura (mostrada uma única vez — guarda-a agora)',
+        // Uma rotação diz algo que um registo não diz, e quem lê tem de saber: a chave
+        // anterior continua a validar até a janela de rotação fechar. É por isso que rodar
+        // durante um incidente pode ser feito de imediato.
+        'rotated_heading' => 'Nova chave de assinatura (mostrada uma única vez — guarda-a agora). A chave anterior continua a validar até a janela de rotação fechar.',
     ],
 
     'table' => [
@@ -42,6 +50,8 @@ return [
         'disabled' => 'Desativado',
         'enable' => 'Ativar',
         'disable' => 'Desativar',
+        'edit' => 'Editar',
+        'rotate' => 'Rodar chave',
         'delete' => 'Eliminar',
     ],
 
@@ -52,6 +62,15 @@ return [
         'title' => 'Eliminar este endpoint?',
         'description' => 'O endpoint deixa imediatamente de receber webhooks e a sua chave de assinatura é destruída. Esta ação não pode ser anulada.',
         'confirm' => 'Eliminar endpoint',
+    ],
+
+    // Rodar coloca a chave anterior sob prazo em vez de a invalidar, mas continua a ser
+    // uma alteração que cada recetor tem de acompanhar, por isso ambos os stubs a
+    // confirmam, tal como a eliminação ao lado.
+    'rotate_dialog' => [
+        'title' => 'Rodar esta chave de assinatura?',
+        'description' => 'É emitida imediatamente uma nova chave, mostrada uma única vez. A chave atual continua a validar até a janela de rotação fechar — atualiza o recetor até lá.',
+        'confirm' => 'Rodar chave',
     ],
 
     'actions' => [
@@ -131,6 +150,8 @@ return [
     'a11y' => [
         'subscriptions_table' => 'Os teus endpoints de webhook',
         'delivery_log_table' => 'Registo de entregas',
+        'edit_subscription' => 'Editar o endpoint :url',
+        'rotate_subscription' => 'Rodar a chave de assinatura do endpoint :url',
         'delete_subscription' => 'Eliminar o endpoint :url',
     ],
 ];

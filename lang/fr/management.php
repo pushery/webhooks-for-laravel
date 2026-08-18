@@ -18,10 +18,18 @@ return [
         // its grammar wants it.
         'event_types_empty' => 'Configure les types d\'événements dans :file.',
         'submit' => 'Enregistrer l\'endpoint',
+        // Le même formulaire, une fois qu'un endpoint est ouvert en modification.
+        'submit_update' => 'Enregistrer les modifications',
+        // Proposé uniquement en modification : un enregistrement est actif par définition.
+        'active_label' => 'Actif',
     ],
 
     'secret' => [
         'heading' => 'Clé de signature (affichée une seule fois — enregistre-la maintenant)',
+        // Une rotation dit quelque chose qu'un enregistrement ne dit pas, et il faut le dire
+        // au lecteur : l'ancienne clé reste valide jusqu'à la fermeture de la fenêtre de
+        // rotation. Voilà pourquoi une rotation en pleine incident peut se faire tout de suite.
+        'rotated_heading' => 'Nouvelle clé de signature (affichée une seule fois — enregistre-la maintenant). L\'ancienne clé reste valide jusqu\'à la fermeture de la fenêtre de rotation.',
     ],
 
     'table' => [
@@ -42,6 +50,8 @@ return [
         'disabled' => 'Désactivé',
         'enable' => 'Activer',
         'disable' => 'Désactiver',
+        'edit' => 'Modifier',
+        'rotate' => 'Faire tourner la clé',
         'delete' => 'Supprimer',
     ],
 
@@ -52,6 +62,15 @@ return [
         'title' => 'Supprimer cet endpoint ?',
         'description' => 'L\'endpoint cesse immédiatement de recevoir des webhooks et sa clé de signature est détruite. Cette action est irréversible.',
         'confirm' => 'Supprimer l\'endpoint',
+    ],
+
+    // Faire tourner la clé met l'ancienne sous délai plutôt que de l'invalider, mais cela
+    // reste un changement que chaque récepteur doit suivre : les deux stubs le confirment
+    // donc comme la suppression à côté.
+    'rotate_dialog' => [
+        'title' => 'Faire tourner cette clé de signature ?',
+        'description' => 'Une nouvelle clé est émise immédiatement et affichée une seule fois. La clé actuelle reste valide jusqu\'à la fermeture de la fenêtre de rotation, mets donc le récepteur à jour avant.',
+        'confirm' => 'Faire tourner la clé',
     ],
 
     'actions' => [
@@ -131,6 +150,8 @@ return [
     'a11y' => [
         'subscriptions_table' => 'Tes endpoints de webhook',
         'delivery_log_table' => 'Journal des livraisons',
+        'edit_subscription' => 'Modifier l\'endpoint :url',
+        'rotate_subscription' => 'Faire tourner la clé de signature de l\'endpoint :url',
         'delete_subscription' => 'Supprimer l\'endpoint :url',
     ],
 ];
