@@ -934,7 +934,35 @@ return [
     |     });
     |
     | For a rule no ability can express, override authorizeAction() in a subclass of
-    | either component instead — the same seam, one level lower.
+    | either component instead — the same seam, one level lower. Both components are
+    | non-final so that override is actually reachable; until v2.0.1 they were not, which
+    | made this sentence describe something the language forbids.
+    |
+    | ⚠️ THIS MUST NAME AN ABILITY YOU DECLARED WITH Gate::define() — NOT A
+    | spatie/laravel-permission PERMISSION. That package installs a Gate::before hook
+    | which reads the FIRST positional gate argument as a GUARD name and shifts it off:
+    |
+    |     if (is_string($args[0] ?? null) && ! class_exists($args[0])) {
+    |         $guard = array_shift($args);
+    |     }
+    |
+    | The action name travels in exactly that position, so 'create' becomes the guard,
+    | the permission lookup asks for a guard nobody defined, the hook declines to decide,
+    | and the check falls through to an ability that does not exist — a deny. The console
+    | then refuses EVERY action to EVERY operator, including the one the permission was
+    | granted to, and it refuses silently: nothing throws, nothing is logged, the form
+    | just does nothing.
+    |
+    | That failure is invisible to the obvious test, and this is the part worth keeping:
+    | a surface that denies everything looks exactly like a surface that is well guarded.
+    | Only a POSITIVE arm — asserting a permitted operator really CAN act — separates the
+    | two, and that is the arm people rarely write.
+    |
+    | The way through is one line. Declare an ability that asks the permission itself and
+    | point this key at THAT; a closure declared as fn ($user) => … ignores an argument it
+    | does not accept, which makes the action name harmless:
+    |
+    |     Gate::define('webhooks.operate', fn ($user) => $user->can('manage webhooks'));
     |
     */
 

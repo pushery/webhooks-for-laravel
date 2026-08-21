@@ -188,5 +188,7 @@
                 @endforeach
             </x-wirekit::table.body>
         </x-wirekit::table>
+
+        {{ $subscriptions->links() }}
     @endif
 </x-wirekit::stack>
