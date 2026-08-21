@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Client;
+namespace Pushery\Webhooks\Client;
 
 /**
  * How the bytes of an inbound delivery were read into {@see InboundMessage::$payload} —

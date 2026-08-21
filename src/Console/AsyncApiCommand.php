@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Console;
+namespace Pushery\Webhooks\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Config;
+use Pushery\Webhooks\Platform\AsyncApi\AsyncApiGenerator;
 use Symfony\Component\Yaml\Yaml;
-use Webhooks\Platform\AsyncApi\AsyncApiGenerator;
 
 /**
  * Writes an AsyncAPI 3.0 document built from the webhook event catalog, either to a

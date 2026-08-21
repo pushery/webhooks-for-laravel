@@ -2,32 +2,34 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Client;
+namespace Pushery\Webhooks\Client;
 
+use Illuminate\Database\Connection;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use Pushery\Webhooks\Client\Events\InboundWebhookVerified;
+use Pushery\Webhooks\Client\Events\InvalidWebhookSignature;
+use Pushery\Webhooks\Client\Events\UnreadableWebhookPayload;
+use Pushery\Webhooks\Client\Exceptions\InboundListenerFailed;
+use Pushery\Webhooks\Client\Http\RawBody;
+use Pushery\Webhooks\Client\Models\WebhookCall;
+use Pushery\Webhooks\Client\Verification\InboundVerifier;
+use Pushery\Webhooks\Core\Http\HeaderRedactor;
+use Pushery\Webhooks\Core\Payload\PayloadSanitizer;
+use Pushery\Webhooks\Core\Payload\PayloadStore;
+use Pushery\Webhooks\Core\Signing\SignatureHeaders;
+use Pushery\Webhooks\Core\Signing\VerificationStatus;
+use Pushery\Webhooks\Database\Dialect\Dialect;
+use Pushery\Webhooks\Database\Dialect\Sql\DedupeInsert;
+use Pushery\Webhooks\Search\SearchIndexer;
+use Pushery\Webhooks\Support\Timestamp;
+use Pushery\Webhooks\Support\WebhookConnection;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
-use Webhooks\Client\Events\InvalidWebhookSignature;
-use Webhooks\Client\Events\UnreadableWebhookPayload;
-use Webhooks\Client\Exceptions\UnreadablePayloadListenerFailed;
-use Webhooks\Client\Http\RawBody;
-use Webhooks\Client\Models\WebhookCall;
-use Webhooks\Client\Verification\InboundVerifier;
-use Webhooks\Core\Http\HeaderRedactor;
-use Webhooks\Core\Payload\PayloadSanitizer;
-use Webhooks\Core\Payload\PayloadStore;
-use Webhooks\Core\Signing\SignatureHeaders;
-use Webhooks\Core\Signing\VerificationStatus;
-use Webhooks\Database\Dialect\Dialect;
-use Webhooks\Database\Dialect\Sql\DedupeInsert;
-use Webhooks\Search\SearchIndexer;
-use Webhooks\Support\Timestamp;
-use Webhooks\Support\WebhookConnection;
 
 /**
  * Runs the whole receiving pipeline for one request, controller-less: capture the
@@ -82,7 +84,13 @@ final readonly class WebhookProcessor
             );
 
         if (! $result->isValid()) {
-            InvalidWebhookSignature::dispatch($this->request, $this->config, $result->reason());
+            InvalidWebhookSignature::dispatch(
+                $this->config->name,
+                $result->reason(),
+                $this->request->ip(),
+                $this->request->path(),
+                $this->request->userAgent(),
+            );
 
             // Every refusal stores nothing and dispatches nothing. What can differ is the
             // one thing the SENDER can act on: whether to try again. A verification that did
@@ -94,6 +102,21 @@ final readonly class WebhookProcessor
             abort($result->status === VerificationStatus::Undetermined
                 ? $this->config->undeterminedStatus()
                 : $this->config->invalidStatus());
+        }
+
+        // The delivery is authentic from here on, and which secret proved it is the one thing
+        // about a rotation nobody could otherwise see. Guarded like the unreadable-payload
+        // announcement below and for the same reason: the delivery is genuine and already
+        // verified, so a broken ledger must not answer the producer 500 and ask it to retry
+        // something that succeeded.
+        try {
+            InboundWebhookVerified::dispatch($this->config->name, $result->matchedKeyId);
+        } catch (Throwable $listenerFailure) {
+            try {
+                report(InboundListenerFailed::for('verified', $this->config->name, $listenerFailure));
+            } catch (Throwable) {
+                // Nothing above this can report, and the delivery is untouched.
+            }
         }
 
         // Throttle authentic requests per source. This runs after verification so a
@@ -119,6 +142,25 @@ final readonly class WebhookProcessor
         }
 
         $message = InboundMessage::fromRawBody($rawBody, $webhookId, $headers->get('content-type'));
+
+        // The event type is the column a stream is split on and what picks the handler job,
+        // and not every producer puts it in the body: GitHub sends `X-GitHub-Event` and
+        // leaves the body carrying only `action`. Read from the body alone, such an
+        // installation logs every delivery with an EMPTY type -- nothing goes red, the
+        // stream simply cannot be split. So the config gets to say where it comes from,
+        // with the body's own value as the default it hands back unchanged.
+        $eventType = $this->config->eventTypeFor($headers, $rawBody, $message->type);
+
+        if ($eventType !== $message->type) {
+            $message = new InboundMessage(
+                id: $message->id,
+                type: $eventType,
+                createdAt: $message->createdAt,
+                data: $message->data,
+                payload: $message->payload,
+                format: $message->format,
+            );
+        }
 
         $call = $this->store($rawBody, $webhookId, $message);
 
@@ -179,10 +221,10 @@ final readonly class WebhookProcessor
         // delivery a second row.
         if (! $message->format->readable()) {
             try {
-                UnreadableWebhookPayload::dispatch($call, $this->config, $headers->get('content-type'));
+                UnreadableWebhookPayload::dispatch($call, $this->config->name, $headers->get('content-type'));
             } catch (Throwable $listenerFailure) {
                 try {
-                    report(UnreadablePayloadListenerFailed::for($this->config->name, $listenerFailure));
+                    report(InboundListenerFailed::for('unreadable-payload', $this->config->name, $listenerFailure));
                 } catch (Throwable) {
                     // Nothing above this can report, and the delivery is already safe.
                 }
@@ -236,14 +278,44 @@ final readonly class WebhookProcessor
         // through the affected-row count (1 inserted, 0 duplicate) and binds its timestamps from
         // PHP as UTC, since its ON DUPLICATE KEY form carries no now() and the session zone is
         // untrustworthy. Either way a duplicate yields null, and the row is then read by id.
+        $connection = $this->db();
+
         if ($dialect === Dialect::MySql) {
             $now = Timestamp::mysql(Date::now());
 
-            if ($this->db()->affectingStatement($sql, [...$bindings, $now, $now]) === 0) {
+            if ($connection->affectingStatement($sql, [...$bindings, $now, $now]) === 0) {
                 return null;
             }
-        } elseif ($this->db()->selectOne($sql, $bindings) === null) {
-            return null;
+        } else {
+            // ⚠️ THE POSTGRES ARM IS A WRITE THAT LARAVEL'S SELECT PATH CANNOT RECOGNIZE AS ONE,
+            // and it needs BOTH lines below rather than either.
+            //
+            // `INSERT … ON CONFLICT … RETURNING id` has to come back through `selectOne()` to
+            // read the returned id, and `selectOne()` defaults `$useReadPdo` to TRUE
+            // (Connection::selectOne -> select -> getPdoForSelect -> getReadPdo). On a host
+            // running this connection with Laravel's documented `read`/`write` split, the third
+            // argument is the difference between the insert reaching the primary and reaching a
+            // replica. Against a streaming replica that is SQLSTATE 25006 and a 500 on every
+            // authentic delivery; where the read node accepts writes it is worse, because the
+            // row lands off the write path, the `find()` below reads a node that does not have
+            // it, and this method reports the delivery as a DUPLICATE.
+            //
+            // `select()` also never calls `recordsHaveBeenModified()`, so `sticky` cannot
+            // protect the read that follows — the flag has to be set by hand. The MySQL arm
+            // above is immune to both by accident: `affectingStatement()` always takes
+            // `getPdo()` and records the modification itself.
+            //
+            // Invisible in a transactional test by construction: inside a transaction
+            // `getReadPdo()` returns the write PDO, so the whole suite masks it.
+            $inserted = $connection->selectOne($sql, $bindings, false);
+
+            if ($connection instanceof Connection) {
+                $connection->recordsHaveBeenModified();
+            }
+
+            if ($inserted === null) {
+                return null;
+            }
         }
 
         $model = $this->config->model();

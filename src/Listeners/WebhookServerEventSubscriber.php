@@ -2,22 +2,22 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Listeners;
+namespace Pushery\Webhooks\Listeners;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Facades\Event;
-use Webhooks\Enums\DeliveryStatus;
-use Webhooks\Events\WebhookDeliveryFailed;
-use Webhooks\Events\WebhookDeliverySucceeded;
-use Webhooks\Events\WebhookEndpointAutoDisabled;
-use Webhooks\Models\WebhookDelivery;
-use Webhooks\Models\WebhookSubscription;
-use Webhooks\Search\SearchIndexer;
-use Webhooks\Server\Data\WebhookDeliveryData;
-use Webhooks\Server\Events\WebhookAttemptFailed;
-use Webhooks\Server\Events\WebhookAttemptsExhausted;
-use Webhooks\Server\Events\WebhookAttemptSucceeded;
-use Webhooks\Support\Settings;
+use Pushery\Webhooks\Enums\DeliveryStatus;
+use Pushery\Webhooks\Events\WebhookDeliveryFailed;
+use Pushery\Webhooks\Events\WebhookDeliverySucceeded;
+use Pushery\Webhooks\Events\WebhookEndpointAutoDisabled;
+use Pushery\Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Search\SearchIndexer;
+use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
+use Pushery\Webhooks\Server\Events\WebhookAttemptFailed;
+use Pushery\Webhooks\Server\Events\WebhookAttemptsExhausted;
+use Pushery\Webhooks\Server\Events\WebhookAttemptSucceeded;
+use Pushery\Webhooks\Support\Settings;
 
 /**
  * Translates the delivery engine's lifecycle events into delivery-log updates and

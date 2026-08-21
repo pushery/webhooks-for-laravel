@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Livewire\Concerns;
+namespace Pushery\Webhooks\Livewire\Concerns;
 
 use Illuminate\Support\Facades\Config;
 

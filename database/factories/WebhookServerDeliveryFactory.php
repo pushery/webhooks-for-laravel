@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Database\Factories;
+namespace Pushery\Webhooks\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
-use Webhooks\Enums\DeliveryStatus;
-use Webhooks\Server\Models\WebhookServerDelivery;
+use Pushery\Webhooks\Enums\DeliveryStatus;
+use Pushery\Webhooks\Server\Models\WebhookServerDelivery;
 
 /**
  * @extends Factory<WebhookServerDelivery>

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Exceptions;
+namespace Pushery\Webhooks\Exceptions;
 
+use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\WebhookManager;
 use RuntimeException;
-use Webhooks\Models\WebhookSubscription;
-use Webhooks\WebhookManager;
 
 /**
  * A manual test ping was refused because the endpoint has had too many in the last

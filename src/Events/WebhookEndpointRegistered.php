@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Events;
+namespace Pushery\Webhooks\Events;
 
 use Illuminate\Contracts\Auth\Authenticatable;
-use Webhooks\Models\WebhookSubscription;
-use Webhooks\WebhookManager;
+use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\WebhookManager;
 
 /**
  * Fired when a webhook endpoint is registered, naming WHO registered it.

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Database\Dialect;
+namespace Pushery\Webhooks\Database\Dialect;
 
 use Illuminate\Support\Facades\DB;
 

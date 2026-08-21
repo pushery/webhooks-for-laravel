@@ -1,6 +1,7 @@
 {{-- The full-page dashboard shell. Tabs are wire:navigate links (SPA feel, no
-     client router); the window switch broadcasts to the panels. Each panel is a
-     lazy, independently-polling Livewire component. --}}
+     client router); the window is part of the key of every panel that takes one, so
+     changing it remounts them. Each panel is a lazy, independently-polling Livewire
+     component. --}}
 <div class="wh-dash mx-auto flex max-w-6xl flex-col gap-[var(--padding-wk-y-lg)] p-[var(--padding-wk-x-lg)]">
     <header class="flex flex-wrap items-center justify-between gap-[var(--padding-wk-x-md)]">
         <x-wirekit::heading :level="1" size="lg">{{ __('webhooks::dashboard.heading') }}</x-wirekit::heading>
@@ -38,19 +39,36 @@
         @endforeach
     </nav>
 
+    {{-- ⚠️ THE WINDOW IS PART OF THE KEY ON EVERY PANEL THAT TAKES ONE, AND IT HAS TO BE.
+         A broadcast cannot reach a panel that is still lazy: Livewire's client drops the
+         event outright for an unresolved lazy component. That panel then resolves through
+         its own `__lazyLoad`, which RESURRECTS the mount parameters encoded into the
+         placeholder when the page first rendered — so it comes up on the OLD window and
+         stays there. The header reads 7d, the panel counts 24h, and nothing reports it.
+         The re-render does not fix it either: a child whose key is unchanged is replaced
+         by an empty stub rather than mounted again, so the encoded parameters never move.
+
+         Putting the window in the key means the child is a different child on every
+         window, so it is mounted fresh — with the new window, and a placeholder that
+         encodes the new window. The panels below that take no window keep a stable key.
+
+         The cost is deliberate: switching the window remounts these four, so their
+         skeleton shows for one round trip instead of the old numbers being patched in
+         place. That is the honest picture — during that round trip the old numbers are
+         not the new window's, which is exactly the confusion this fixes. --}}
     <div class="wh-dash-body">
         @if ($tab === 'overview')
             <div class="flex flex-col gap-[var(--padding-wk-y-lg)]">
-                <livewire:webhooks.dashboard.kpi-cards :window="$window" wire:key="ov-kpis" />
+                <livewire:webhooks.dashboard.kpi-cards :window="$window" wire:key="ov-kpis-{{ $window }}" />
 
                 <div class="grid grid-cols-1 gap-[var(--padding-wk-y-lg)] lg:grid-cols-3">
                     <div class="lg:col-span-2 flex flex-col gap-[var(--padding-wk-y-lg)]">
-                        <livewire:webhooks.dashboard.hourly-activity-chart :window="$window" wire:key="ov-activity" />
-                        <livewire:webhooks.dashboard.latency-panel :window="$window" wire:key="ov-latency" />
+                        <livewire:webhooks.dashboard.hourly-activity-chart :window="$window" wire:key="ov-activity-{{ $window }}" />
+                        <livewire:webhooks.dashboard.latency-panel :window="$window" wire:key="ov-latency-{{ $window }}" />
                     </div>
                     <div class="flex flex-col gap-[var(--padding-wk-y-lg)]">
                         <livewire:webhooks.dashboard.setup-summary wire:key="ov-setup" />
-                        <livewire:webhooks.dashboard.top-events :window="$window" wire:key="ov-top" />
+                        <livewire:webhooks.dashboard.top-events :window="$window" wire:key="ov-top-{{ $window }}" />
                         <livewire:webhooks.dashboard.recent-queue wire:key="ov-recent" />
                     </div>
                 </div>

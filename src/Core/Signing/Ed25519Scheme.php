@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Signing;
+namespace Pushery\Webhooks\Core\Signing;
 
 use Illuminate\Support\Facades\Date;
 use InvalidArgumentException;
@@ -148,7 +148,11 @@ final readonly class Ed25519Scheme implements SignatureScheme
     {
         $key = $this->decode($token, self::PUBLIC_PREFIX);
 
-        return strlen($key) === SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES ? $key : null;
+        if (strlen($key) === SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES) {
+            return $key;
+        }
+
+        return null;
     }
 
     private function decode(string $token, string $prefix): string

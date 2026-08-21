@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard\Policies;
+namespace Pushery\Webhooks\Dashboard\Policies;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Gate;
-use Webhooks\Dashboard\DashboardScope;
-use Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Dashboard\DashboardScope;
+use Pushery\Webhooks\Models\WebhookDelivery;
 
 /**
  * Row-level authorization for dashboard actions. The panels already scope every

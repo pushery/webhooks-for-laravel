@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Delivery;
+namespace Pushery\Webhooks\Server\Delivery;
 
 /**
  * How a delivery attempt's outcome is treated: a success, a retryable failure

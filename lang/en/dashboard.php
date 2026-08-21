@@ -28,8 +28,13 @@ return [
 
     // Date patterns are translated, not just their month names: the ORDER differs by
     // locale (English leads with the month, German with the day).
+    // The `z` on 'absolute' is the whole point of it being a translatable pattern rather
+    // than a literal: a delivery timestamp is the one column an operator holds against
+    // their own records, and an hour of unexplained offset there is not cosmetic. Without
+    // the zone the reader cannot tell which clock they are being shown.
     'formats' => [
         'hour_bucket' => 'M j H:00',
+        'absolute' => 'LLL z',
     ],
 
     'api' => [

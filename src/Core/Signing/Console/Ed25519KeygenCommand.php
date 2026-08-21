@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Signing\Console;
+namespace Pushery\Webhooks\Core\Signing\Console;
 
 use Illuminate\Console\Command;
-use Webhooks\Core\Signing\Ed25519Keys;
+use Pushery\Webhooks\Core\Signing\Ed25519Keys;
 
 /**
  * Prints a fresh Ed25519 keypair for the asymmetric {@see Ed25519Scheme}.

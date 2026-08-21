@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Client\Http;
+namespace Pushery\Webhooks\Client\Http;
 
-use Webhooks\Client\PayloadFormat;
+use Pushery\Webhooks\Client\PayloadFormat;
+use Pushery\Webhooks\Core\Payload\PayloadSanitizer;
 
 /**
  * Reads the bytes of an inbound delivery into an array, and reports which way it read them.
@@ -46,11 +47,37 @@ final class BodyDecoder
     private const string BLANK = " \t\n\r\x0B";
 
     /**
-     * The format the body was read as, and the fields it yielded.
+     * The format the body was read as, and the fields it yielded — NUL-scrubbed.
+     *
+     * The scrub lives here rather than at the point of storage because both copies of the
+     * payload start here: the row the package writes, and the envelope a handler receives.
+     * It used to run only before the package's own insert, so the package had cleared a wall
+     * for itself and left it standing for every consumer — a handler writing the envelope
+     * payload into a jsonb column of its own hit the refusal the package already knew about
+     * ({@see PayloadSanitizer} for why jsonb refuses it at all).
+     *
+     * ⚠️ THE DECODED ARRAY IS SCRUBBED, NEVER THE RAW BODY, and the difference is a false claim
+     * rather than a nicety. `BLANK` below deliberately excludes NUL so that a body of NUL bytes
+     * is reported as unread rather than as `None`; scrubbing the bytes first would empty such a
+     * body and produce exactly the "the producer sent nothing" claim that exclusion exists to
+     * prevent. Scrubbing after the reading also leaves the format decision, the stored raw body
+     * and its SHA-256 untouched, so the exact received bytes stay beside the cleaned view.
      *
      * @return array{0: PayloadFormat, 1: array<array-key, mixed>}
      */
     public static function decode(string $rawBody, ?string $contentType): array
+    {
+        [$format, $payload] = self::read($rawBody, $contentType);
+
+        return [$format, PayloadSanitizer::scrub($payload)];
+    }
+
+    /**
+     * The reading itself: which format the body is, and what it yields verbatim.
+     *
+     * @return array{0: PayloadFormat, 1: array<array-key, mixed>}
+     */
+    private static function read(string $rawBody, ?string $contentType): array
     {
         // Rule 1 runs first and unconditionally, including ahead of the multipart refusal
         // below: a JSON body that reaches this decoder is read, whatever it was labeled.
@@ -158,6 +185,10 @@ final class BodyDecoder
         $encoded = json_encode($fields, JSON_INVALID_UTF8_SUBSTITUTE);
         $decoded = is_string($encoded) ? json_decode($encoded, true) : null;
 
-        return is_array($decoded) ? $decoded : [];
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        return [];
     }
 }

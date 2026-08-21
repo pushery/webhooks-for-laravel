@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Support;
+namespace Pushery\Webhooks\Support;
 
 /**
  * A name-based (version 5) UUID: the same namespace and name always yield the same

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Console;
+namespace Pushery\Webhooks\Console;
 
 use Illuminate\Console\Command;
-use Webhooks\Models\WebhookSubscription;
-use Webhooks\Platform\Health\EndpointHealth;
+use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Platform\Health\EndpointHealth;
 
 /**
  * Recomputes and caches the health score of every active endpoint from its recent

@@ -3,6 +3,10 @@
      at https://docs.pushery.com/webhooks-for-laravel/guides/styling-the-ui); place behind
      your own authorization. Publish the neutral variant
      instead with the webhooks-ui tag. --}}
+{{-- ⚠️ Pairs badly with the wirekit.delivery-log stub on the SAME page: its filter is a
+     WireKit select bound with wire:model.live, and that combination makes the confirm action
+     of the delete dialogs below unclickable. The dialog opens, the click never lands, nothing
+     is logged. Reported upstream; the comment in that stub carries the detail. --}}
 <x-wirekit::stack gap="lg" class="wh-subscriptions">
     <x-wirekit::card>
         <x-wirekit::card.body>
@@ -175,7 +179,7 @@
                                             <x-wirekit::alert-dialog.cancel />
                                     <x-wirekit::button
                                         intent="danger"
-                                        wire:click="delete({{ $subscription->id }})"
+                                        wire:click="destroy({{ $subscription->id }})"
                                     >{{ __('webhooks::management.delete_dialog.confirm') }}</x-wirekit::button>
                                 </x-wirekit::alert-dialog.actions>
                             </x-wirekit::alert-dialog>

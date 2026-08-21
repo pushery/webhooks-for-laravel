@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform\Livewire\Concerns;
+namespace Pushery\Webhooks\Platform\Livewire\Concerns;
 
 use Closure;
 use Illuminate\Container\Container;
@@ -11,11 +11,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\RateLimiter;
-use Webhooks\Core\Ssrf\SsrfGuard;
-use Webhooks\Models\WebhookSubscription;
-use Webhooks\Platform\Support\PortalRefusal;
-use Webhooks\Platform\Support\SubscriptionScope;
-use Webhooks\Support\TenantIdentity;
+use Pushery\Webhooks\Core\Ssrf\SsrfGuard;
+use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Platform\Support\PortalRefusal;
+use Pushery\Webhooks\Platform\Support\SubscriptionScope;
+use Pushery\Webhooks\Support\TenantIdentity;
 
 /**
  * Shared plumbing for the self-service portal panels: build the owner-scoped
@@ -45,6 +45,24 @@ trait InteractsWithEndpoints
      * request hits it — through {@see PortalRefusal}, so a host that answers 404 everywhere gets
      * the same answer here as from its own screens, without the gate itself changing.
      * Row-level ownership stays a separate, second guard (a foreign id fails not-found first).
+     *
+     * ⚠️ THAT SECOND GUARD IS UNREACHABLE AS THE *SOLE* REFUSAL, and knowing why saves the next
+     * reader a wasted afternoon. Mutation testing reports every `authorize('view'|'update'|
+     * 'rotateSecret', $subscription)` in these panels as a survivor — measured 2026-08-20:
+     * comment any of the five out and the whole 236-test portal suite stays green. They are not
+     * untested, they are unreachable: this boot gate reads the SAME `manage-webhook-endpoints`
+     * ability the policy consults, and the only condition the policy adds on top is
+     * `ownedByCurrentTenant()`, which findOwnedEndpoint() has already enforced —
+     * scopeToCurrentOwner() answers `1 = 0` for a null tenant, so a row that loaded at all is a
+     * row the tenant owns. Do not "kill" them by deleting them: they are what still refuses if
+     * a future caller reaches an action without the scoped query.
+     *
+     * `create` is the ONE that is genuinely reachable, and it is reachable for a structural
+     * reason: there is no row yet, so the scoping cannot speak, and the policy's
+     * `currentOwner() instanceof TenantIdentity` is the only tenant check between an
+     * ability-holding reader with no tenant in scope and an OWNERLESS endpoint that receives
+     * every tenant's payloads. All three call sites are pinned (EndpointForm's two arms, and
+     * EndpointList::newEndpoint()).
      */
     public function bootInteractsWithEndpoints(): void
     {
@@ -78,7 +96,11 @@ trait InteractsWithEndpoints
     {
         $max = Config::get('webhooks.platform.self_service.max_endpoints_per_tenant');
 
-        return is_int($max) && $max >= 0 ? $max : null;
+        if (is_int($max) && $max >= 0) {
+            return $max;
+        }
+
+        return null;
     }
 
     /**
@@ -154,12 +176,21 @@ trait InteractsWithEndpoints
      * A non-positive value reads as no brake rather than as "none allowed": a limit of
      * zero would refuse every registration, which is a way to disable the portal by typo
      * rather than a setting anyone wants.
+     *
+     * The shipped default is repeated here for the same reason as the test-ping brake: an
+     * absent key reads as null and switches the brake off, and a host on a config cache
+     * built before this version upgraded still has the old trimmed layer until it rebuilds.
+     * ConfigDefaultsAreInSyncTest holds the two numbers together.
      */
     protected function maxRegistrationsPerMinute(): ?int
     {
-        $max = Config::get('webhooks.platform.self_service.registrations_per_minute');
+        $max = Config::get('webhooks.platform.self_service.registrations_per_minute', 10);
 
-        return is_int($max) && $max > 0 ? $max : null;
+        if (is_int($max) && $max > 0) {
+            return $max;
+        }
+
+        return null;
     }
 
     /**

@@ -114,7 +114,7 @@
                              this view. --}}
                         <button
                             type="button"
-                            wire:click="delete({{ $subscription->id }})"
+                            wire:click="destroy({{ $subscription->id }})"
                             wire:confirm="{{ __('webhooks::management.delete_dialog.description') }}"
                             aria-label="{{ __('webhooks::management.a11y.delete_subscription', ['url' => $subscription->url]) }}"
                             class="ml-3 text-red-600"

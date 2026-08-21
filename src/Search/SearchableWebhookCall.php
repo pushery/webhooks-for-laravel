@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Search;
+namespace Pushery\Webhooks\Search;
 
-use Webhooks\Client\Models\WebhookCall;
+use Pushery\Webhooks\Client\Models\WebhookCall;
 
 /**
  * A ready-made searchable inbound call-log model: the standard {@see WebhookCall}

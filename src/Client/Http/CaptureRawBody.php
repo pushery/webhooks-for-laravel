@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Client\Http;
+namespace Pushery\Webhooks\Client\Http;
 
 use Closure;
 use Illuminate\Http\Request;

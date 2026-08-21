@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Signing;
+namespace Pushery\Webhooks\Core\Signing;
 
-use Webhooks\Client\Verification\InboundVerifier;
+use Pushery\Webhooks\Client\Verification\InboundVerifier;
 
 /**
  * The typed result of {@see SignatureScheme::verify()}: a status plus, on success,

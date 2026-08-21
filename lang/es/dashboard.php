@@ -30,6 +30,7 @@ return [
     // locale (English leads with the month, Spanish with the day).
     'formats' => [
         'hour_bucket' => 'j M H:00',
+        'absolute' => 'LLL z',
     ],
 
     'api' => [

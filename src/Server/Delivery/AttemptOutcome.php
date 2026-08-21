@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Delivery;
+namespace Pushery\Webhooks\Server\Delivery;
 
+use Pushery\Webhooks\Core\Http\TransportResponse;
 use Throwable;
-use Webhooks\Core\Http\TransportResponse;
 
 /**
  * The result of one delivery attempt run by the {@see DeliveryPipeline}: a

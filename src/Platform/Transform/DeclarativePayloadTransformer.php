@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform\Transform;
+namespace Pushery\Webhooks\Platform\Transform;
 
 /**
  * A safe, data-driven payload transformer. It applies a fixed, deterministic set of

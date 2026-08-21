@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform\AsyncApi;
+namespace Pushery\Webhooks\Platform\AsyncApi;
 
+use Pushery\Webhooks\Support\Settings;
 use stdClass;
 use Symfony\Component\Yaml\Yaml;
-use Webhooks\Support\Settings;
 
 /**
  * Builds an AsyncAPI 3.0 document from the event catalog, so the events your

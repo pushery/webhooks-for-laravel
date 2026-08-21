@@ -2,20 +2,21 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core;
+namespace Pushery\Webhooks\Core;
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\ServiceProvider;
 use Override;
-use Webhooks\Console\PreflightCommand;
-use Webhooks\Core\Http\HttpTransport;
-use Webhooks\Core\Signing\Console\Ed25519KeygenCommand;
-use Webhooks\Core\Signing\Jwks\JwksKeySet;
-use Webhooks\Core\Ssrf\AddressClassifier;
-use Webhooks\Core\Ssrf\DefaultSsrfGuard;
-use Webhooks\Core\Ssrf\HostResolver;
-use Webhooks\Core\Ssrf\SsrfGuard;
-use Webhooks\Core\Ssrf\SystemHostResolver;
+use Pushery\Webhooks\Console\PreflightCommand;
+use Pushery\Webhooks\Core\Http\HttpTransport;
+use Pushery\Webhooks\Core\Signing\Console\Ed25519KeygenCommand;
+use Pushery\Webhooks\Core\Signing\Jwks\JwksKeySet;
+use Pushery\Webhooks\Core\Ssrf\AddressClassifier;
+use Pushery\Webhooks\Core\Ssrf\DefaultSsrfGuard;
+use Pushery\Webhooks\Core\Ssrf\HostResolver;
+use Pushery\Webhooks\Core\Ssrf\SsrfGuard;
+use Pushery\Webhooks\Core\Ssrf\SystemHostResolver;
+use Pushery\Webhooks\Support\MergesPackageConfig;
 
 /**
  * Registers the always-on Core layer: the shared SSRF guard and IP-pinned HTTP
@@ -26,10 +27,12 @@ use Webhooks\Core\Ssrf\SystemHostResolver;
  */
 final class CoreServiceProvider extends ServiceProvider
 {
+    use MergesPackageConfig;
+
     #[Override]
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../../config/webhooks.php', 'webhooks');
+        $this->mergePackageConfig();
 
         $this->app->singleton(HostResolver::class, SystemHostResolver::class);
         $this->app->singleton(AddressClassifier::class);

@@ -2,24 +2,24 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Jobs;
+namespace Pushery\Webhooks\Server\Jobs;
 
 use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Foundation\Queue\Queueable;
+use Pushery\Webhooks\Core\Http\TransportResponse;
+use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
+use Pushery\Webhooks\Server\Delivery\DeliveryGate;
+use Pushery\Webhooks\Server\Delivery\DeliveryPipeline;
+use Pushery\Webhooks\Server\Delivery\Disposition;
+use Pushery\Webhooks\Server\Delivery\RetryAfter;
+use Pushery\Webhooks\Server\Events\WebhookAttemptDeferred;
+use Pushery\Webhooks\Server\Events\WebhookAttemptFailed;
+use Pushery\Webhooks\Server\Events\WebhookAttemptRetrying;
+use Pushery\Webhooks\Server\Events\WebhookAttemptsExhausted;
+use Pushery\Webhooks\Server\Events\WebhookAttemptStarting;
+use Pushery\Webhooks\Server\Events\WebhookAttemptSucceeded;
+use Pushery\Webhooks\Server\Exceptions\DeliveryRefused;
 use Throwable;
-use Webhooks\Core\Http\TransportResponse;
-use Webhooks\Server\Data\WebhookDeliveryData;
-use Webhooks\Server\Delivery\DeliveryGate;
-use Webhooks\Server\Delivery\DeliveryPipeline;
-use Webhooks\Server\Delivery\Disposition;
-use Webhooks\Server\Delivery\RetryAfter;
-use Webhooks\Server\Events\WebhookAttemptDeferred;
-use Webhooks\Server\Events\WebhookAttemptFailed;
-use Webhooks\Server\Events\WebhookAttemptRetrying;
-use Webhooks\Server\Events\WebhookAttemptsExhausted;
-use Webhooks\Server\Events\WebhookAttemptStarting;
-use Webhooks\Server\Events\WebhookAttemptSucceeded;
-use Webhooks\Server\Exceptions\DeliveryRefused;
 
 /**
  * The queued delivery job. It is a THIN wrapper over the {@see DeliveryPipeline}:

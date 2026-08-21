@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Support;
+namespace Pushery\Webhooks\Support;
 
 use Opis\JsonSchema\Errors\ErrorFormatter;
 use Opis\JsonSchema\Errors\ValidationError;
 use Opis\JsonSchema\Helper;
 use Opis\JsonSchema\Validator;
+use Pushery\Webhooks\Exceptions\InvalidPayloadException;
 use stdClass;
-use Webhooks\Exceptions\InvalidPayloadException;
 
 /**
  * Validates an event payload against the JSON Schema declared for its type in the

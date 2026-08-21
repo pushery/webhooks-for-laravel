@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Signing;
+namespace Pushery\Webhooks\Core\Signing;
 
 /**
  * A plain HMAC scheme for inbound verification of producers that sign the raw body

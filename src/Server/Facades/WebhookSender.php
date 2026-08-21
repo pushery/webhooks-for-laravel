@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Facades;
+namespace Pushery\Webhooks\Server\Facades;
 
-use Webhooks\Server\PendingWebhook;
+use Pushery\Webhooks\Server\PendingWebhook;
 
 /**
  * A thin, discoverable entry point to the {@see PendingWebhook} builder. The builder

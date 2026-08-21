@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Database\Dialect\Sql;
+namespace Pushery\Webhooks\Database\Dialect\Sql;
 
-use Webhooks\Database\Dialect\Dialect;
+use Pushery\Webhooks\Database\Dialect\Dialect;
 
 /**
  * The idempotent insert the spatie backfill command writes each historical row with. It is a

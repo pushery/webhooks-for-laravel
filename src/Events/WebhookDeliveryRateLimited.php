@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Events;
+namespace Pushery\Webhooks\Events;
 
-use Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Models\WebhookDelivery;
 
 /**
  * Fired when an endpoint's per-minute allowance was exceeded and the delivery was

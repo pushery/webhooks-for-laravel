@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Http;
+namespace Pushery\Webhooks\Core\Http;
 
 /**
  * Masks the credential-bearing headers before they are persisted to the inbound call log —

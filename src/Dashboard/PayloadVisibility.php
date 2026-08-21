@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard;
+namespace Pushery\Webhooks\Dashboard;
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Gate;

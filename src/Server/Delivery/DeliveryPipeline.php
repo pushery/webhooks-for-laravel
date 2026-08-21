@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Delivery;
+namespace Pushery\Webhooks\Server\Delivery;
 
 use Illuminate\Contracts\Container\Container;
+use Pushery\Webhooks\Core\Http\Exceptions\NonRetryable;
+use Pushery\Webhooks\Core\Http\HttpTransport;
+use Pushery\Webhooks\Core\Signing\SecretSet;
+use Pushery\Webhooks\Core\Signing\SignatureScheme;
+use Pushery\Webhooks\Core\Signing\WebhookMessage;
+use Pushery\Webhooks\Core\Ssrf\SsrfGuard;
+use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
+use Pushery\Webhooks\Server\Exceptions\UnknownSignatureScheme;
+use Pushery\Webhooks\Server\Signing\SecretResolver;
 use Throwable;
-use Webhooks\Core\Http\Exceptions\NonRetryable;
-use Webhooks\Core\Http\HttpTransport;
-use Webhooks\Core\Signing\SecretSet;
-use Webhooks\Core\Signing\SignatureScheme;
-use Webhooks\Core\Signing\WebhookMessage;
-use Webhooks\Core\Ssrf\SsrfGuard;
-use Webhooks\Server\Data\WebhookDeliveryData;
-use Webhooks\Server\Exceptions\UnknownSignatureScheme;
-use Webhooks\Server\Signing\SecretResolver;
 
 /**
  * Runs a single delivery attempt end-to-end and returns a typed {@see AttemptOutcome}

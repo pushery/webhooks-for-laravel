@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Signing;
+namespace Pushery\Webhooks\Server\Signing;
 
-use Webhooks\Core\Signing\SecretSet;
-use Webhooks\Server\Data\WebhookDeliveryData;
+use Pushery\Webhooks\Core\Signing\SecretSet;
+use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 
 /**
  * Resolves the signing secrets for a delivery AT HANDLE TIME, so the raw secret

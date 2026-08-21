@@ -4,45 +4,77 @@
      deterministic and server-testable. A small Alpine layer supplies the modal
      keyboard model the bespoke dialog would otherwise lack: focus moves into the panel
      on open, Tab is trapped inside it, Escape closes it, and focus returns to the
-     control that opened it on close. Styled with WireKit tokens throughout. --}}
+     control that opened it on close. Styled with WireKit tokens throughout.
+
+     THE KEYBOARD MODEL IS A REGISTERED COMPONENT, NOT AN INLINE EXPRESSION, AND THAT IS
+     LOAD-BEARING. Under a Content-Security-Policy without `unsafe-eval` a host runs
+     Alpine's CSP evaluator, which parses attribute expressions against a small grammar
+     instead of handing them to `new Function`. An object literal with methods does not
+     parse there, so an inline trap would simply not run — in the browser, with nothing in
+     any server log. It would take out the focus trap specifically, on a panel that shows
+     delivery payloads, which is the one part of this screen a keyboard or screen-reader
+     user cannot do without. A registered factory parses, and its body is ordinary
+     JavaScript that never goes through that evaluator at all.
+
+     The registration rides in `@assets`: Livewire injects it once per page into the head
+     and de-duplicates it by compile key, so this needs no layout hook, no publish tag and
+     no new file type in `resources/` — and it travels with the view when a host publishes
+     it. It carries the same CSP nonce as the theme mirror in the layout. --}}
+@assets
+    <script{!! \Pushery\Webhooks\Support\UiTheme::nonceAttribute() !!}>
+        (function () {
+            var register = function () {
+                window.Alpine.data('webhooksFocusTrap', function () {
+                    return {
+                        trigger: null,
+                        focusables() {
+                            return Array.from(this.$refs.panel.querySelectorAll('a[href], button, input, select, textarea, [tabindex]')).filter((el) => ! el.disabled && el.tabIndex !== -1 && el.offsetParent !== null);
+                        },
+                        init() {
+                            this.trigger = document.activeElement;
+                            this.$nextTick(() => {
+                                const targets = this.focusables();
+                                (targets[0] ?? this.$refs.panel).focus();
+                            });
+                        },
+                        destroy() {
+                            if (this.trigger && typeof this.trigger.focus === 'function') {
+                                this.trigger.focus();
+                            }
+                        },
+                        trapTab(event) {
+                            const targets = this.focusables();
+                            if (targets.length === 0) {
+                                event.preventDefault();
+                                return;
+                            }
+                            const first = targets[0];
+                            const last = targets[targets.length - 1];
+                            if (event.shiftKey && document.activeElement === first) {
+                                event.preventDefault();
+                                last.focus();
+                            } else if (! event.shiftKey && document.activeElement === last) {
+                                event.preventDefault();
+                                first.focus();
+                            }
+                        },
+                    };
+                });
+            };
+
+            if (window.Alpine) {
+                register();
+            } else {
+                document.addEventListener('alpine:init', register);
+            }
+        })();
+    </script>
+@endassets
 @php($delivery = $this->delivery)
 <div class="wh-dash-drawer" wire:key="delivery-drawer">
     @if ($delivery !== null)
         <div
-            x-data="{
-                trigger: null,
-                focusables() {
-                    return Array.from(this.$refs.panel.querySelectorAll('a[href], button, input, select, textarea, [tabindex]')).filter((el) => ! el.disabled && el.tabIndex !== -1 && el.offsetParent !== null);
-                },
-                init() {
-                    this.trigger = document.activeElement;
-                    this.$nextTick(() => {
-                        const targets = this.focusables();
-                        (targets[0] ?? this.$refs.panel).focus();
-                    });
-                },
-                destroy() {
-                    if (this.trigger && typeof this.trigger.focus === 'function') {
-                        this.trigger.focus();
-                    }
-                },
-                trapTab(event) {
-                    const targets = this.focusables();
-                    if (targets.length === 0) {
-                        event.preventDefault();
-                        return;
-                    }
-                    const first = targets[0];
-                    const last = targets[targets.length - 1];
-                    if (event.shiftKey && document.activeElement === first) {
-                        event.preventDefault();
-                        last.focus();
-                    } else if (! event.shiftKey && document.activeElement === last) {
-                        event.preventDefault();
-                        first.focus();
-                    }
-                },
-            }"
+            x-data="webhooksFocusTrap()"
             x-on:keydown.escape.window="$wire.close()"
             x-on:keydown.tab="trapTab($event)"
             class="fixed inset-0 z-[var(--z-wk-drawer)] flex justify-end"
@@ -79,15 +111,18 @@
                     @endif
                 </div>
 
-                {{-- Absolute timestamps in the reader's locale: this is the detail panel, where
-                     an operator correlates the delivery against their own logs. --}}
+                {{-- Absolute timestamps in the reader's locale, WITH their zone: this is the
+                     detail panel, where an operator correlates the delivery against their own
+                     records. A bare wall-clock time cannot be correlated — the reader has no
+                     way to tell whether it is theirs, and an hour of offset here reads as a
+                     delivery that did not happen when it did. --}}
                 @php($locale = ['locale' => app()->getLocale()])
                 <x-wirekit::timeline class="mb-[var(--padding-wk-y-md)]">
-                    <x-wirekit::timeline.item :time="$delivery->created_at->settings($locale)->isoFormat('LLL')" variant="default">
+                    <x-wirekit::timeline.item :time="$delivery->created_at->settings($locale)->isoFormat(__('webhooks::dashboard.formats.absolute'))" variant="default">
                         {{ __('webhooks::dashboard.drawer.queued') }}
                     </x-wirekit::timeline.item>
                     @if ($delivery->delivered_at !== null)
-                        <x-wirekit::timeline.item :time="$delivery->delivered_at->settings($locale)->isoFormat('LLL')" variant="success">
+                        <x-wirekit::timeline.item :time="$delivery->delivered_at->settings($locale)->isoFormat(__('webhooks::dashboard.formats.absolute'))" variant="success">
                             {{ __('webhooks::dashboard.drawer.delivered') }}
                         </x-wirekit::timeline.item>
                     @endif
@@ -95,7 +130,7 @@
 
                 <x-wirekit::text size="sm" weight="medium">{{ __('webhooks::dashboard.drawer.payload') }}</x-wirekit::text>
                 {{-- The body is gated separately from the rest of the drawer, and the component
-                     decides how much of it exists at all — see Webhooks\Dashboard\PayloadVisibility.
+                     decides how much of it exists at all — see Pushery\Webhooks\Dashboard\PayloadVisibility.
                      $this->payloadJson is a COMPUTED property, so a body this user may not see is
                      never serialized into the Livewire snapshot; the check below is a boundary,
                      not a curtain. Never bind the delivery or its payload as a public property. --}}

@@ -2,18 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard\Livewire;
+namespace Pushery\Webhooks\Dashboard\Livewire;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Lazy;
-use Livewire\Attributes\On;
 use Livewire\Component;
+use Pushery\Webhooks\Dashboard\Data\KpiSet;
+use Pushery\Webhooks\Dashboard\Livewire\Concerns\InteractsWithDashboard;
 use stdClass;
-use Webhooks\Dashboard\Data\KpiSet;
-use Webhooks\Dashboard\Livewire\Concerns\InteractsWithDashboard;
 
 /**
  * The latency panel: the window-level P50/P90/P95/P99 (computed live over the raw
@@ -55,18 +54,15 @@ final class LatencyPanel extends Component
             ->map(static function (stdClass $row): float {
                 $p95 = $row->p95 ?? 0;
 
-                return is_numeric($p95) ? (float) $p95 : 0.0;
+                if (is_numeric($p95)) {
+                    return (float) $p95;
+                }
+
+                return 0.0;
             })
             ->all();
 
         return $values === [] ? 1.0 : max(1.0, ...$values);
-    }
-
-    #[On('dashboard-window-changed')]
-    public function changeWindow(string $window): void
-    {
-        $this->window = $window;
-        unset($this->metrics, $this->trend, $this->peakLatency);
     }
 
     public function placeholder(): View

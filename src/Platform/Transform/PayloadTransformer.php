@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform\Transform;
+namespace Pushery\Webhooks\Platform\Transform;
 
 /**
  * Reshapes an event payload for a specific endpoint before it is signed and sent.

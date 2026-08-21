@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard\Livewire;
+namespace Pushery\Webhooks\Dashboard\Livewire;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -11,8 +11,8 @@ use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Webhooks\Dashboard\DashboardScope;
-use Webhooks\Dashboard\Livewire\Concerns\InteractsWithDashboard;
+use Pushery\Webhooks\Dashboard\DashboardScope;
+use Pushery\Webhooks\Dashboard\Livewire\Concerns\InteractsWithDashboard;
 
 /**
  * The full delivery table on the Webhooks tab: tenant-scoped, sortable, paginated

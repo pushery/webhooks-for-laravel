@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Client\Console;
+namespace Pushery\Webhooks\Client\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
@@ -10,17 +10,17 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use JsonException;
+use Pushery\Webhooks\Client\InboundMessage;
+use Pushery\Webhooks\Client\Models\WebhookCall;
+use Pushery\Webhooks\Client\WebhookCallStatus;
+use Pushery\Webhooks\Core\Http\HeaderRedactor;
+use Pushery\Webhooks\Core\Payload\PayloadSanitizer;
+use Pushery\Webhooks\Database\Dialect\Dialect;
+use Pushery\Webhooks\Database\Dialect\Sql\ImportInsert;
+use Pushery\Webhooks\Support\DeterministicUuid;
+use Pushery\Webhooks\Support\Timestamp;
+use Pushery\Webhooks\Support\WebhookConnection;
 use stdClass;
-use Webhooks\Client\InboundMessage;
-use Webhooks\Client\Models\WebhookCall;
-use Webhooks\Client\WebhookCallStatus;
-use Webhooks\Core\Http\HeaderRedactor;
-use Webhooks\Core\Payload\PayloadSanitizer;
-use Webhooks\Database\Dialect\Dialect;
-use Webhooks\Database\Dialect\Sql\ImportInsert;
-use Webhooks\Support\DeterministicUuid;
-use Webhooks\Support\Timestamp;
-use Webhooks\Support\WebhookConnection;
 
 /**
  * Copies a spatie/laravel-webhook-client `webhook_calls` backlog into this package's own
@@ -144,7 +144,11 @@ final class ImportSpatieCallsCommand extends Command
     {
         $id = $row->id ?? null;
 
-        return is_scalar($id) ? (string) $id : '';
+        if (is_scalar($id)) {
+            return (string) $id;
+        }
+
+        return '';
     }
 
     /**
@@ -276,6 +280,10 @@ final class ImportSpatieCallsCommand extends Command
     {
         $value = $this->option($name);
 
-        return is_string($value) && $value !== '' ? $value : null;
+        if (is_string($value) && $value !== '') {
+            return $value;
+        }
+
+        return null;
     }
 }

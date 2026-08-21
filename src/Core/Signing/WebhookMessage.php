@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Signing;
+namespace Pushery\Webhooks\Core\Signing;
 
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
-use Webhooks\Core\Signing\Exceptions\InvalidMessage;
+use Pushery\Webhooks\Core\Signing\Exceptions\InvalidMessage;
 
 /**
  * The immutable, signed unit of a webhook: a stable id, a Unix timestamp, and the

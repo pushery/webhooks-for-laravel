@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform\Livewire;
+namespace Pushery\Webhooks\Platform\Livewire;
 
 use Illuminate\Container\Container;
 use Illuminate\Contracts\View\View;
@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
-use Webhooks\WebhookManager;
+use Pushery\Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
+use Pushery\Webhooks\WebhookManager;
 
 /**
  * Reveal and rotate an endpoint's signing secret. Opened by a reveal-secret event, it

@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform\Livewire;
+namespace Pushery\Webhooks\Platform\Livewire;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
-use Webhooks\Platform\Support\PortalRefusal;
-use Webhooks\Platform\Support\PortalRoutes;
+use Pushery\Webhooks\Platform\Support\PortalRefusal;
+use Pushery\Webhooks\Platform\Support\PortalRoutes;
 
 /**
  * The full-page self-service portal shell. It hosts the tenant's own endpoint list,

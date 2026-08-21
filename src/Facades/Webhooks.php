@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Facades;
+namespace Pushery\Webhooks\Facades;
 
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Facade;
-use Webhooks\Models\WebhookDelivery;
-use Webhooks\Models\WebhookSubscription;
-use Webhooks\Support\TenantIdentity;
-use Webhooks\WebhookManager;
+use Pushery\Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Support\TenantIdentity;
+use Pushery\Webhooks\WebhookManager;
 
 /**
  * The Platform layer's public API: register endpoints, fan an event out to every
@@ -22,6 +22,7 @@ use Webhooks\WebhookManager;
  * @method static WebhookSubscription enable(WebhookSubscription $subscription)
  * @method static WebhookSubscription disable(WebhookSubscription $subscription)
  * @method static Collection<int, WebhookDelivery> dispatch(string $eventType, array<array-key, mixed> $payload, ?Model $tenant = null)
+ * @method static WebhookDelivery dispatchTo(WebhookSubscription $subscription, string $eventType, array<array-key, mixed> $payload)
  * @method static WebhookDelivery ping(WebhookSubscription $subscription)
  * @method static string rotateSecret(WebhookSubscription $subscription)
  * @method static bool revokeExpiredSecret(WebhookSubscription $subscription)

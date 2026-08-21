@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Client\Exceptions;
+namespace Pushery\Webhooks\Client\Exceptions;
 
 use RuntimeException;
 

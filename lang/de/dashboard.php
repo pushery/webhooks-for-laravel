@@ -30,6 +30,7 @@ return [
     // unterscheidet sich je Sprache (Englisch führt mit dem Monat, Deutsch mit dem Tag).
     'formats' => [
         'hour_bucket' => 'j. M H:00',
+        'absolute' => 'LLL z',
     ],
 
     'api' => [

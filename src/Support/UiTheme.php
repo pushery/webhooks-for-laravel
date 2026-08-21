@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Support;
+namespace Pushery\Webhooks\Support;
 
 use Closure;
 use Illuminate\Support\Facades\Config;
@@ -88,7 +88,11 @@ final class UiTheme
     {
         $view = Config::get('webhooks.ui.assets');
 
-        return is_string($view) && $view !== '' ? $view : null;
+        if (is_string($view) && $view !== '') {
+            return $view;
+        }
+
+        return null;
     }
 
     /**
@@ -123,7 +127,11 @@ final class UiTheme
         if (self::$nonceResolver instanceof Closure) {
             $resolved = (self::$nonceResolver)();
 
-            return is_string($resolved) && $resolved !== '' ? $resolved : null;
+            if (is_string($resolved) && $resolved !== '') {
+                return $resolved;
+            }
+
+            return null;
         }
 
         $configured = Config::get('webhooks.ui.csp_nonce');
@@ -143,7 +151,11 @@ final class UiTheme
             );
         }
 
-        return $configured !== '' ? $configured : null;
+        if ($configured !== '') {
+            return $configured;
+        }
+
+        return null;
     }
 
     /**

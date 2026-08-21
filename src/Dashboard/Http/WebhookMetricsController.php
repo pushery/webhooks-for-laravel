@@ -2,19 +2,21 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard\Http;
+namespace Pushery\Webhooks\Dashboard\Http;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Container\Container;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Pushery\Webhooks\Dashboard\DashboardScope;
+use Pushery\Webhooks\Dashboard\Data\KpiSet;
+use Pushery\Webhooks\Dashboard\Metrics\WebhookMetrics;
+use Pushery\Webhooks\Dashboard\WindowResolver;
+use Pushery\Webhooks\Database\Dialect\Dialect;
+use Pushery\Webhooks\Support\WebhookConnection;
 use stdClass;
 use Symfony\Component\HttpFoundation\Response;
-use Webhooks\Dashboard\DashboardScope;
-use Webhooks\Dashboard\Data\KpiSet;
-use Webhooks\Dashboard\Metrics\WebhookMetrics;
-use Webhooks\Dashboard\WindowResolver;
 
 /**
  * The optional, read-only JSON metrics endpoint behind webhooks.dashboard.expose_json_api.
@@ -83,7 +85,11 @@ final class WebhookMetricsController
             return $windows[0];
         }
 
-        return is_string($requested) && in_array($requested, $windows, true) ? $requested : null;
+        if (is_string($requested) && in_array($requested, $windows, true)) {
+            return $requested;
+        }
+
+        return null;
     }
 
     /**
@@ -190,12 +196,26 @@ final class WebhookMetricsController
     }
 
     /**
-     * A rollup bucket as a stable ISO-8601 timestamp. PostgreSQL hands the bucket back as
-     * a string; anything else is not a timestamp this view can produce.
+     * A rollup bucket as a stable ISO-8601 timestamp. Both engines hand the bucket back as a
+     * string; anything else is not a timestamp this view can produce.
+     *
+     * THE ZONE HAS TO BE SUPPLIED ON MySQL, and leaving it out is not a formatting detail. Its
+     * bucket is UTC-naive — `DATE_FORMAT` truncates a DATETIME that {@see HasZonedTimestamps}
+     * stores in UTC — and a naive string parsed without a zone resolves against PHP's default,
+     * which is app.timezone. A host in any non-UTC zone therefore had every bucket reported at
+     * an instant off by its own offset, with the counts inside the bucket still correct: a
+     * plausible chart drawn one or two hours beside the truth, and nothing anywhere goes red.
+     * PostgreSQL returns the offset in the string, so there the parse was already exact.
      */
     private function toIso(mixed $value): string
     {
-        return is_string($value) ? CarbonImmutable::parse($value)->toIso8601String() : '';
+        if (! is_string($value)) {
+            return '';
+        }
+
+        return WebhookConnection::dialect() === Dialect::MySql
+            ? CarbonImmutable::parse($value, 'UTC')->toIso8601String()
+            : CarbonImmutable::parse($value)->toIso8601String();
     }
 
     /**
@@ -203,7 +223,11 @@ final class WebhookMetricsController
      */
     private function toInt(mixed $value): int
     {
-        return is_numeric($value) ? (int) $value : 0;
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        return 0;
     }
 
     /**
@@ -211,7 +235,11 @@ final class WebhookMetricsController
      */
     private function toFloat(mixed $value): float
     {
-        return is_numeric($value) ? (float) $value : 0.0;
+        if (is_numeric($value)) {
+            return (float) $value;
+        }
+
+        return 0.0;
     }
 
     /**
@@ -219,6 +247,10 @@ final class WebhookMetricsController
      */
     private function toText(mixed $value): string
     {
-        return is_string($value) ? $value : '';
+        if (is_string($value)) {
+            return $value;
+        }
+
+        return '';
     }
 }

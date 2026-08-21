@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform\Health;
+namespace Pushery\Webhooks\Platform\Health;
 
 use Illuminate\Database\ConnectionInterface;
-use Webhooks\Database\Dialect\Dialect;
-use Webhooks\Database\Dialect\Sql\ConditionalCount;
-use Webhooks\Database\Dialect\Sql\PercentileSelect;
-use Webhooks\Models\WebhookSubscription;
-use Webhooks\Support\Settings;
-use Webhooks\Support\Timestamp;
-use Webhooks\Support\WebhookConnection;
+use Pushery\Webhooks\Database\Dialect\Dialect;
+use Pushery\Webhooks\Database\Dialect\Sql\ConditionalCount;
+use Pushery\Webhooks\Database\Dialect\Sql\PercentileSelect;
+use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Support\Settings;
+use Pushery\Webhooks\Support\Timestamp;
+use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
  * Scores the health of a webhook endpoint from its own recent delivery history.
@@ -216,7 +216,11 @@ final readonly class EndpointHealth
      */
     private function toInt(mixed $value): int
     {
-        return is_numeric($value) ? (int) $value : 0;
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        return 0;
     }
 
     /**
@@ -225,6 +229,10 @@ final readonly class EndpointHealth
      */
     private function toFloat(mixed $value): float
     {
-        return is_numeric($value) ? (float) $value : 0.0;
+        if (is_numeric($value)) {
+            return (float) $value;
+        }
+
+        return 0.0;
     }
 }

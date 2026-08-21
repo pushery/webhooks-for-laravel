@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Database\Concerns;
+namespace Pushery\Webhooks\Database\Concerns;
 
-use Webhooks\Support\WebhookConnection;
+use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
  * Binds a model to the package's configured database connection (webhooks.database.connection),

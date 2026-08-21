@@ -5,11 +5,11 @@ declare(strict_types=1);
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
-use Webhooks\Database\DatabaseRequirement;
-use Webhooks\Database\Dialect\Dialect;
-use Webhooks\Database\OwnerKeyType;
-use Webhooks\Database\PartitionManager;
-use Webhooks\Support\WebhookConnection;
+use Pushery\Webhooks\Database\DatabaseRequirement;
+use Pushery\Webhooks\Database\Dialect\Dialect;
+use Pushery\Webhooks\Database\OwnerKeyType;
+use Pushery\Webhooks\Database\PartitionManager;
+use Pushery\Webhooks\Support\WebhookConnection;
 
 return new class extends Migration
 {

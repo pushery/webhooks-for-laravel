@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Console;
+namespace Pushery\Webhooks\Console;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
-use Webhooks\Database\Dialect\Dialect;
-use Webhooks\Database\PartitionManager;
-use Webhooks\Support\Settings;
-use Webhooks\Support\Timestamp;
-use Webhooks\Support\WebhookConnection;
+use Pushery\Webhooks\Database\Dialect\Dialect;
+use Pushery\Webhooks\Database\PartitionManager;
+use Pushery\Webhooks\Support\Settings;
+use Pushery\Webhooks\Support\Timestamp;
+use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
  * Keeps the webhook_deliveries partition set rolling: drains anything the catch-all

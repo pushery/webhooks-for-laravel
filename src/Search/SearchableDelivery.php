@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Search;
+namespace Pushery\Webhooks\Search;
 
 use Illuminate\Support\Str;
 use Laravel\Scout\Builder;
 use Laravel\Scout\Searchable;
-use Webhooks\Support\Settings;
+use Pushery\Webhooks\Support\Settings;
 
 /**
  * Makes an outbound delivery-log model searchable through Laravel Scout, indexing
@@ -41,6 +41,12 @@ trait SearchableDelivery
             'status' => $this->status->value,
             'owner_type' => $this->owner_type,
             'owner_id' => $this->owner_id,
+            // No `?->` here, and the asymmetry with SearchableCall is deliberate: measured,
+            // `webhook_deliveries.created_at` is NOT NULL while `webhook_calls.created_at` is
+            // nullable. A nullsafe call would state that a delivery may have no timestamp,
+            // which the schema forbids — and it would swallow the one case that really does
+            // produce null here, a caller hydrating this model through a narrowed select that
+            // omitted the column. That is a caller error and should surface as one.
             'created_at' => $this->created_at->toIso8601String(),
             'payload_excerpt' => $this->searchablePayloadExcerpt(),
         ];

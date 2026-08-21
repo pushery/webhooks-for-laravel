@@ -29,10 +29,6 @@
         "ext-sodium": "*",
         "guzzlehttp/guzzle": "^7.15.1",
         "guzzlehttp/psr7": "^2.7",
-        "illuminate/console": "^13.0",
-        "illuminate/contracts": "^13.0",
-        "illuminate/database": "^13.0",
-        "illuminate/support": "^13.0",
         "laravel/framework": "^13.0",
         "opis/json-schema": "^2.6",
         "psr/http-message": "^2.0"
@@ -42,24 +38,24 @@
     },
     "autoload": {
         "psr-4": {
-            "Webhooks\\": "src/",
-            "Webhooks\\Database\\Factories\\": "database/factories/"
+            "Pushery\\Webhooks\\": "src/",
+            "Pushery\\Webhooks\\Database\\Factories\\": "database/factories/"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "Webhooks\\Core\\CoreServiceProvider",
-                "Webhooks\\Server\\ServerServiceProvider",
-                "Webhooks\\Client\\WebhookClientServiceProvider",
-                "Webhooks\\WebhooksServiceProvider"
+                "Pushery\\Webhooks\\Core\\CoreServiceProvider",
+                "Pushery\\Webhooks\\Server\\ServerServiceProvider",
+                "Pushery\\Webhooks\\Client\\WebhookClientServiceProvider",
+                "Pushery\\Webhooks\\WebhooksServiceProvider"
             ]
         }
     },
     "suggest": {
-        "laravel/pulse": "Enables the opt-in internal-ops delivery monitor (Webhooks\\Pulse\\WebhookPulseServiceProvider) — a Pulse recorder and card for throughput, failure rate and latency.",
-        "laravel/scout": "Enables the opt-in searchable delivery and inbound-call logs (use the ready-made Webhooks\\Search\\SearchableWebhookDelivery / SearchableWebhookCall models — or apply the Webhooks\\Search\\SearchableDelivery / SearchableCall traits to your own — and set webhooks.search.enabled).",
-        "livewire/livewire": "Required to render any UI this package ships: the observability dashboard, the self-service endpoint portal, and the optional management components (Webhooks\\WebhooksUiServiceProvider).",
+        "laravel/pulse": "Enables the opt-in internal-ops delivery monitor (Pushery\\Webhooks\\Pulse\\WebhookPulseServiceProvider) — a Pulse recorder and card for throughput, failure rate and latency.",
+        "laravel/scout": "Enables the opt-in searchable delivery and inbound-call logs (use the ready-made Pushery\\Webhooks\\Search\\SearchableWebhookDelivery / SearchableWebhookCall models — or apply the Pushery\\Webhooks\\Search\\SearchableDelivery / SearchableCall traits to your own — and set webhooks.search.enabled).",
+        "livewire/livewire": "Required to render any UI this package ships: the observability dashboard, the self-service endpoint portal, and the optional management components (Pushery\\Webhooks\\WebhooksUiServiceProvider).",
         "pushery/wirekit": "Required to render the dashboard and the self-service portal AS SHIPPED — their views are built from WireKit components. A host on another UI kit must publish the views (--tag=webhooks-dashboard-views / --tag=webhooks-self-service-views) and restyle them instead.",
         "blade-ui-kit/blade-icons": "Renders the icons the shipped screens ask WireKit for (empty states, primary actions). Without it WireKit draws an inert placeholder in their place.",
         "blade-ui-kit/blade-heroicons": "The icon set the shipped screens are drawn against (WireKit's default preset).",

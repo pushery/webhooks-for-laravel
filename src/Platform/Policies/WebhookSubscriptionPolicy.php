@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform\Policies;
+namespace Pushery\Webhooks\Platform\Policies;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Gate;
-use Webhooks\Models\WebhookSubscription;
-use Webhooks\Platform\Support\SubscriptionScope;
-use Webhooks\Support\TenantIdentity;
+use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Platform\Support\SubscriptionScope;
+use Pushery\Webhooks\Support\TenantIdentity;
 
 /**
  * Row-level authorization for self-service endpoint management. A self-service query

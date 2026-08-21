@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Support;
+namespace Pushery\Webhooks\Support;
 
 use Illuminate\Support\Facades\Config;
 use RuntimeException;
@@ -16,7 +16,7 @@ use RuntimeException;
  * DDL, with nothing to connect it to the config combination that caused it.
  *
  * This turns that into one clear sentence at boot, naming both switches, in the same
- * voice as `Webhooks\Database\PostgresRequirement`.
+ * voice as `Pushery\Webhooks\Database\PostgresRequirement`.
  *
  * @internal
  */

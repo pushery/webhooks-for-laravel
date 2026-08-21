@@ -2,16 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard\Livewire;
+namespace Pushery\Webhooks\Dashboard\Livewire;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Lazy;
-use Livewire\Attributes\On;
 use Livewire\Component;
-use Webhooks\Dashboard\Data\KpiSet;
-use Webhooks\Dashboard\Livewire\Concerns\InteractsWithDashboard;
+use Pushery\Webhooks\Dashboard\Data\KpiSet;
+use Pushery\Webhooks\Dashboard\Livewire\Concerns\InteractsWithDashboard;
 
 /**
  * The KPI ribbon: total sent, delivered, failed, pending and retry rate for the
@@ -34,13 +33,6 @@ final class KpiCards extends Component
     public function metrics(): KpiSet
     {
         return $this->metricsFor($this->window)->counts();
-    }
-
-    #[On('dashboard-window-changed')]
-    public function changeWindow(string $window): void
-    {
-        $this->window = $window;
-        unset($this->metrics);
     }
 
     public function placeholder(): View

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Pulse;
+namespace Pushery\Webhooks\Pulse;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Support\Renderable;
@@ -116,16 +116,28 @@ final class WebhookDeliveryCard extends Card
 
     private function asInt(mixed $value): int
     {
-        return is_numeric($value) ? (int) $value : 0;
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        return 0;
     }
 
     private function asFloat(mixed $value): float
     {
-        return is_numeric($value) ? (float) $value : 0.0;
+        if (is_numeric($value)) {
+            return (float) $value;
+        }
+
+        return 0.0;
     }
 
     private function asString(mixed $value): string
     {
-        return is_string($value) ? $value : '';
+        if (is_string($value)) {
+            return $value;
+        }
+
+        return '';
     }
 }

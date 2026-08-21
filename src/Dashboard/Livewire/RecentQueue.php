@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard\Livewire;
+namespace Pushery\Webhooks\Dashboard\Livewire;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Lazy;
 use Livewire\Component;
-use Webhooks\Dashboard\Livewire\Concerns\InteractsWithDashboard;
-use Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Dashboard\Livewire\Concerns\InteractsWithDashboard;
+use Pushery\Webhooks\Models\WebhookDelivery;
 
 /**
  * The live "recent queue" strip: the newest deliveries for the acting tenant with a

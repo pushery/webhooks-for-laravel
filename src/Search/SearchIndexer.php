@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Search;
+namespace Pushery\Webhooks\Search;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Config;
-use Webhooks\Models\WebhookDelivery;
-use Webhooks\Support\Settings;
+use Pushery\Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Support\Settings;
 
 /**
  * Pushes an engine-written row into Scout's search index.

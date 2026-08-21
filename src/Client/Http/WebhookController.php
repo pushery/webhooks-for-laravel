@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Client\Http;
+namespace Pushery\Webhooks\Client\Http;
 
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
+use Pushery\Webhooks\Client\WebhookConfig;
+use Pushery\Webhooks\Client\WebhookProcessor;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
-use Webhooks\Client\WebhookConfig;
-use Webhooks\Client\WebhookProcessor;
 
 /**
  * The single invokable endpoint every Route::webhooks() route points at. It reads

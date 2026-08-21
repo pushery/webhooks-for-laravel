@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Livewire;
+namespace Pushery\Webhooks\Livewire;
 
 use Illuminate\Container\Container;
 use Illuminate\Contracts\View\View;
@@ -10,12 +10,12 @@ use Illuminate\Support\Facades\View as ViewFactory;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
-use Webhooks\Core\Http\Exceptions\BlockedDestination;
-use Webhooks\Core\Ssrf\SsrfGuard;
-use Webhooks\Facades\Webhooks;
-use Webhooks\Livewire\Concerns\AuthorizesOperatorActions;
-use Webhooks\Models\WebhookSubscription;
-use Webhooks\Support\Settings;
+use Pushery\Webhooks\Core\Http\Exceptions\BlockedDestination;
+use Pushery\Webhooks\Core\Ssrf\SsrfGuard;
+use Pushery\Webhooks\Facades\Webhooks;
+use Pushery\Webhooks\Livewire\Concerns\AuthorizesOperatorActions;
+use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Support\Settings;
 
 /**
  * The OPERATOR console for webhook endpoints: register one, edit it, switch it on or off,
@@ -44,7 +44,7 @@ use Webhooks\Support\Settings;
  *   and its delivery history, its health state and its active secret go with the old one.
  *
  * The tenant-facing surface is the self-service portal
- * (`Webhooks\Platform\Livewire\EndpointList`), which is owner-scoped and
+ * (`Pushery\Webhooks\Platform\Livewire\EndpointList`), which is owner-scoped and
  * policy-guarded on every action.
  */
 final class SubscriptionManager extends Component
@@ -233,8 +233,14 @@ final class SubscriptionManager extends Component
     /**
      * Permanently remove an endpoint (and, by FK cascade, its delivery log). To stop
      * delivering while keeping the history, toggle it off instead.
+     *
+     * NOT named `delete`, and the reason is not style. Livewire's CSP-safe build parses a
+     * `wire:click` expression itself rather than handing it to the JS engine, and `delete`
+     * is a KEYWORD in that parser — `wire:click="delete(1)"` reads as the delete OPERATOR,
+     * so the button silently does nothing. No error, no log, and an operator who clicks it
+     * concludes the endpoint is gone. CspSafeMethodNameTest holds the whole class.
      */
-    public function delete(int $id): void
+    public function destroy(int $id): void
     {
         $this->authorizeAction('delete');
 
@@ -247,6 +253,23 @@ final class SubscriptionManager extends Component
         if ($this->editingId === $id) {
             $this->cancel();
         }
+    }
+
+    /**
+     * The pre-2.0.0 name, kept so a view published before the rename keeps working. Under a
+     * strict CSP that published copy is ALREADY broken — `delete` is a keyword in Livewire's
+     * own expression parser, so `wire:click="delete(1)"` parses as the delete OPERATOR rather
+     * than a call. Re-publish the view, or change that one line, to get the button back.
+     *
+     * Deliberately NOT tagged `@deprecated`, and that is not an oversight. On PHP 8.4 the
+     * code-style pass rewrites that tag into `#[\Deprecated]`, which raises E_USER_DEPRECATED
+     * on every call — and a host that runs PHPUnit with `failOnDeprecation` would then have
+     * this shim break the very tests it exists to keep working. A compatibility forwarder
+     * that fails the people who have not migrated yet is worse than no forwarder.
+     */
+    public function delete(int $id): void
+    {
+        $this->destroy($id);
     }
 
     private function register(): void
@@ -324,7 +347,11 @@ final class SubscriptionManager extends Component
 
         $subscription = WebhookSubscription::query()->find($this->editingId);
 
-        return $subscription instanceof WebhookSubscription ? array_values($subscription->event_types) : [];
+        if ($subscription instanceof WebhookSubscription) {
+            return array_values($subscription->event_types);
+        }
+
+        return [];
     }
 
     public function render(): View

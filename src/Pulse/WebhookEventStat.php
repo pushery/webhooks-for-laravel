@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Pulse;
+namespace Pushery\Webhooks\Pulse;
 
 /**
  * One row of the internal-ops Pulse card's per-event-type breakdown: the throughput,

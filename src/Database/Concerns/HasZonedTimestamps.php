@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Database\Concerns;
+namespace Pushery\Webhooks\Database\Concerns;
 
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Date;
-use Webhooks\Support\Timestamp;
+use Pushery\Webhooks\Support\Timestamp;
 
 /**
  * Writes and reads this model's timestamps as INSTANTS, not as wall-clock strings.
@@ -44,6 +44,17 @@ trait HasZonedTimestamps
      * naive DATETIME(6) column always holds UTC whatever timezone the value arrived in;
      * on PostgreSQL the offset-bearing format already carries the instant, so the parent
      * behavior is exact.
+     *
+     * ⚠️ IT RESOLVES A STRING THROUGH THE PARENT, NOT THROUGH asDateTime() BELOW, and the two
+     * are not interchangeable even though both turn a string into an instant. This is the
+     * WRITE path, so a string here came from the CALLER; asDateTime() is the READ path, where
+     * a string came from the COLUMN. A naive string is a wall clock, and only a timezone makes
+     * it an instant — the column's rule is "these bytes are UTC", the caller's is "this is my
+     * application's local time". Applying the column's rule to a caller's value stored the
+     * wrong instant: under Europe/Berlin, `'2026-07-12 14:30:00'` landed as 14:30Z instead of
+     * 12:30Z, two hours from where PostgreSQL put the identical line of host code, with nothing
+     * red to notice. The parent also reads a numeric string as the unix timestamp it is, which
+     * the column's parser cannot — that case did not diverge quietly, it threw out of a setter.
      */
     public function fromDateTime($value): ?string
     {
@@ -52,7 +63,7 @@ trait HasZonedTimestamps
         }
 
         if ($this->onMySql()) {
-            return Timestamp::mysql($this->asDateTime($value));
+            return Timestamp::mysql(parent::asDateTime($value));
         }
 
         return parent::fromDateTime($value);
@@ -63,6 +74,11 @@ trait HasZonedTimestamps
      * value carries its offset, so the instant is exact whatever the session zone is. On
      * MySQL the stored value is UTC-naive, so it is parsed as UTC before being shifted —
      * never resolved against the PHP default zone, which is what the parent would do.
+     *
+     * The `is_string()` test is what keeps this to the READ path in practice: hydration hands
+     * over the column's raw string, while application code assigning a timestamp almost always
+     * passes a date object, which falls through to the parent. See fromDateTime() above for why
+     * the write path must not share this branch at all.
      *
      * Typed CarbonInterface, not Illuminate\Support\Carbon: an application may pin the date
      * class to CarbonImmutable (Date::use(CarbonImmutable::class)), and Eloquent then hands

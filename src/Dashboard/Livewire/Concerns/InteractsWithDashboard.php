@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard\Livewire\Concerns;
+namespace Pushery\Webhooks\Dashboard\Livewire\Concerns;
 
 use Illuminate\Container\Container;
+use Pushery\Webhooks\Dashboard\DashboardScope;
+use Pushery\Webhooks\Dashboard\Events\WebhookRedeliveryRequested;
+use Pushery\Webhooks\Dashboard\Metrics\WebhookMetrics;
+use Pushery\Webhooks\Dashboard\WindowResolver;
+use Pushery\Webhooks\Models\WebhookDelivery;
 use RuntimeException;
-use Webhooks\Dashboard\DashboardScope;
-use Webhooks\Dashboard\Events\WebhookRedeliveryRequested;
-use Webhooks\Dashboard\Metrics\WebhookMetrics;
-use Webhooks\Dashboard\WindowResolver;
-use Webhooks\Models\WebhookDelivery;
 
 /**
  * Shared plumbing for the dashboard panels: build the tenant-scoped metrics query

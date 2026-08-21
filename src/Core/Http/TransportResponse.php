@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Http;
+namespace Pushery\Webhooks\Core\Http;
 
 /**
  * The captured outcome of a delivery attempt: the HTTP status, the response

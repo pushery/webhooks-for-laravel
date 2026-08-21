@@ -76,6 +76,15 @@ Every option in `config/webhooks.php` is documented inline. Publishing is
 optional — the package merges its own defaults, so publish only when overriding
 something.
 
+**Keep the published file down to what you changed.** It is merged over the
+shipped defaults all the way down, so deleting the rest is safe and is how you
+keep receiving options later versions add. A map is merged key by key; a **list**
+is replaced whole and never appended to (`platform.catalog`,
+`dashboard.windows`, `dashboard.middleware`, `server.retryable_4xx`,
+`core.ssrf.allowed_hosts` and the others are lists). To switch something off,
+write `=> null` — removing the key means "no opinion" and gives you the default
+back.
+
 Migrations are published **one tag per layer**, never all at once: a published
 migration *runs*, so publishing every tag would create tables for layers the
 application never enabled.
@@ -99,7 +108,7 @@ sends needs no database at all — see the send-only path below.
 Webhooks signature, and retried with backoff:
 
 ```php
-use Webhooks\Server\PendingWebhook;
+use Pushery\Webhooks\Server\PendingWebhook;
 
 PendingWebhook::create()
     ->url('https://example.com/webhooks')
@@ -111,6 +120,24 @@ PendingWebhook::create()
 `dispatch()` returns the queued `WebhookDeliveryData`. Its `messageId` is stable
 across retries and is the correlation key to record against the application's own
 log. Use `->dispatchSync()` to send inline instead of queueing.
+
+**Fan an event out, or aim it at one endpoint.** With the Platform layer on,
+`Webhooks::dispatch($type, $payload, $tenant)` delivers to every active endpoint
+subscribed to that type. Its third argument narrows to a **tenant**, not to an
+endpoint — two endpoints of the same customer share one — so when the application
+routes *rule to endpoint* rather than *event to every endpoint of that type*, use:
+
+```php
+use Pushery\Webhooks\Facades\Webhooks;
+
+$delivery = Webhooks::dispatchTo($subscription, 'invoice.paid', ['invoice_id' => 'in_123']);
+```
+
+One subscription in, one `WebhookDelivery` out, no other endpoint touched. It is
+the same delivery chain as a fan-out. Distinct from `ping()` (a fixed test body)
+and `redeliver()` (a replay of an existing delivery). An inactive endpoint, or one
+not subscribed to that type, raises `SubscriptionNotListening` rather than
+receiving it or being skipped in silence.
 
 **Receive and verify one.** Switch the Client layer on and describe the producer:
 
@@ -131,7 +158,7 @@ log. Use `->dispatchSync()` to send inline instead of queueing.
 ```
 
 ```php
-use Webhooks\Client\Jobs\ProcessWebhookJob;
+use Pushery\Webhooks\Client\Jobs\ProcessWebhookJob;
 
 class HandlePartnerWebhook extends ProcessWebhookJob
 {
@@ -182,7 +209,7 @@ With `register_routes` false the provider registers the components and mounts
 nothing, and the panels drop the links they cannot resolve rather than failing to
 render. The `manage-webhook-endpoints` gate still applies on every request.
 
-**Check the operator console per action.** `Webhooks\Livewire\SubscriptionManager`
+**Check the operator console per action.** `Pushery\Webhooks\Livewire\SubscriptionManager`
 and `DeliveryLog` are unscoped across every tenant and must sit behind an
 operator-only gate of the host's. That page gate does not re-run on each Livewire
 interaction, so set `admin.ability` when a revoked capability has to bite
@@ -223,7 +250,7 @@ needs no inbound receiving, no portal and no dashboard:
 ```
 
 ```php
-use Webhooks\Server\PendingWebhook;
+use Pushery\Webhooks\Server\PendingWebhook;
 
 class NotifyInvoicePaid
 {
@@ -265,7 +292,7 @@ the tables and keep the sender.
 - Do not bulk-register endpoints through the self-service portal. Two brakes ship
   **on**: `platform.self_service.registrations_per_minute` (10) and
   `platform.test_ping.max_per_minute` (5, refused with
-  `Webhooks\Exceptions\TestPingThrottled`). They bound what a *person* repeats.
+  `Pushery\Webhooks\Exceptions\TestPingThrottled`). They bound what a *person* repeats.
   An import belongs on `Webhooks::subscribe()`, which is not braked; `null` removes
   either brake if the application genuinely needs it gone.
 - Do not document package internals here; keep this skill focused on adoption in

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Events;
+namespace Pushery\Webhooks\Events;
 
-use Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Models\WebhookDelivery;
 
 /**
  * Fired when a delivery has exhausted its retries. Wire your own listener to

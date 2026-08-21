@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard\Events;
+namespace Pushery\Webhooks\Dashboard\Events;
 
 use Illuminate\Foundation\Events\Dispatchable;
-use Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Models\WebhookDelivery;
 
 /**
  * Raised from a dashboard panel when an operator asks to replay a delivery. The

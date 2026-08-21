@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks;
+namespace Pushery\Webhooks;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Collection;
@@ -12,28 +12,29 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
-use Webhooks\Core\Payload\PayloadSanitizer;
-use Webhooks\Core\Payload\PayloadStore;
-use Webhooks\Core\Ssrf\SsrfGuard;
-use Webhooks\Database\OwnerKeyType;
-use Webhooks\Enums\DeliveryStatus;
-use Webhooks\Events\WebhookDeliveryRateLimited;
-use Webhooks\Events\WebhookEndpointRegistered;
-use Webhooks\Events\WebhookSecretRotated;
-use Webhooks\Exceptions\InvalidPayloadException;
-use Webhooks\Exceptions\TestPingThrottled;
-use Webhooks\Models\WebhookDelivery;
-use Webhooks\Models\WebhookSubscription;
-use Webhooks\Platform\Transform\PayloadTransformer;
-use Webhooks\Platform\Transform\PayloadVersionRegistry;
-use Webhooks\Search\SearchIndexer;
-use Webhooks\Server\Exceptions\DeliveryRefused;
-use Webhooks\Server\PendingWebhook;
-use Webhooks\Support\PayloadValidator;
-use Webhooks\Support\Settings;
-use Webhooks\Support\TenantIdentity;
-use Webhooks\Support\Timestamp;
-use Webhooks\Support\WebhookConnection;
+use Pushery\Webhooks\Core\Payload\PayloadSanitizer;
+use Pushery\Webhooks\Core\Payload\PayloadStore;
+use Pushery\Webhooks\Core\Ssrf\SsrfGuard;
+use Pushery\Webhooks\Database\OwnerKeyType;
+use Pushery\Webhooks\Enums\DeliveryStatus;
+use Pushery\Webhooks\Events\WebhookDeliveryRateLimited;
+use Pushery\Webhooks\Events\WebhookEndpointRegistered;
+use Pushery\Webhooks\Events\WebhookSecretRotated;
+use Pushery\Webhooks\Exceptions\InvalidPayloadException;
+use Pushery\Webhooks\Exceptions\SubscriptionNotListening;
+use Pushery\Webhooks\Exceptions\TestPingThrottled;
+use Pushery\Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Platform\Transform\PayloadTransformer;
+use Pushery\Webhooks\Platform\Transform\PayloadVersionRegistry;
+use Pushery\Webhooks\Search\SearchIndexer;
+use Pushery\Webhooks\Server\Exceptions\DeliveryRefused;
+use Pushery\Webhooks\Server\PendingWebhook;
+use Pushery\Webhooks\Support\PayloadValidator;
+use Pushery\Webhooks\Support\Settings;
+use Pushery\Webhooks\Support\TenantIdentity;
+use Pushery\Webhooks\Support\Timestamp;
+use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
  * The package's public entry point: register endpoints, fan an event out to every
@@ -100,7 +101,7 @@ final readonly class WebhookManager
 
     /**
      * Bring an endpoint back into delivery — the recovery path for an endpoint the
-     * circuit breaker auto-disabled (`Webhooks\Events\WebhookEndpointAutoDisabled`), and
+     * circuit breaker auto-disabled (`Pushery\Webhooks\Events\WebhookEndpointAutoDisabled`), and
      * the ONE place that knows what re-enabling means.
      *
      * Flipping is_active alone is not enough, and getting it wrong is silent: the
@@ -243,6 +244,64 @@ final readonly class WebhookManager
                 $this->rateLimitDelayFor($subscription),
             ))
             ->values();
+    }
+
+    /**
+     * Deliver an application event to exactly ONE subscription.
+     *
+     * For a host that routes rule → endpoint rather than event → every endpoint of that
+     * type. `dispatch()` cannot express it: its third argument narrows to a TENANT, and
+     * two endpoints of the same customer share one. Neither can the two methods that do
+     * take a single subscription — `ping()` sends a fixed `webhooks.ping` body, and
+     * `redeliver()` needs a delivery that already exists.
+     *
+     * It is the same delivery, not a second kind of one. The payload goes through the
+     * catalog schema, the NUL scrub and the same offload; the send re-validates SSRF,
+     * signs, honours the circuit breaker, and is SHAPED by the rate limit rather than
+     * discarded by it. A targeted send with its own semantics would be a second surface
+     * to keep in step, and the gaps would open in the copy nobody reads.
+     *
+     * Eligibility is decided by re-running the fan-out's OWN scopes against this one
+     * subscription rather than by re-reading `is_active` here. That is the whole point:
+     * `active()` and `listeningFor()` already encode auto-disabling and the wildcard
+     * setting, and a second opinion on "may this endpoint have this event" is a second
+     * opinion that drifts.
+     *
+     * @param  array<array-key, mixed>  $payload
+     *
+     * @throws InvalidPayloadException when the payload fails its catalog schema
+     * @throws SubscriptionNotListening when the endpoint is inactive, or not subscribed
+     */
+    public function dispatchTo(WebhookSubscription $subscription, string $eventType, array $payload): WebhookDelivery
+    {
+        $this->payloadValidator->validate($eventType, $payload);
+
+        $eligible = WebhookSubscription::query()
+            ->whereKey($subscription->getKey())
+            ->active()
+            ->listeningFor($eventType)
+            ->exists();
+
+        if (! $eligible) {
+            throw new SubscriptionNotListening(
+                $subscription,
+                $eventType,
+                $subscription->is_active && $subscription->disabled_at === null
+                    ? 'it does not subscribe to that event type'
+                    : 'it is not active',
+            );
+        }
+
+        $payload = PayloadSanitizer::scrub($payload);
+
+        return $this->deliver(
+            $subscription,
+            $eventType,
+            (string) Str::uuid7(),
+            $payload,
+            null,
+            $this->rateLimitDelayFor($subscription),
+        );
     }
 
     /**

@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Client\Verification;
+namespace Pushery\Webhooks\Client\Verification;
 
 use Illuminate\Http\Request;
-use Webhooks\Client\Http\RawBody;
-use Webhooks\Client\WebhookConfig;
-use Webhooks\Core\Signing\VerificationResult;
+use Pushery\Webhooks\Client\Http\RawBody;
+use Pushery\Webhooks\Client\WebhookConfig;
+use Pushery\Webhooks\Core\Signing\VerificationResult;
 
 /**
  * Authenticates an inbound delivery when authenticity is NOT a pure comparison over the

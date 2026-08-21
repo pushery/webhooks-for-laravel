@@ -2,17 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard\Livewire;
+namespace Pushery\Webhooks\Dashboard\Livewire;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Lazy;
-use Livewire\Attributes\On;
 use Livewire\Component;
+use Pushery\Webhooks\Dashboard\Livewire\Concerns\InteractsWithDashboard;
 use stdClass;
-use Webhooks\Dashboard\Livewire\Concerns\InteractsWithDashboard;
 
 /**
  * The stacked hourly-activity panel: delivered / pending / failed per hour across
@@ -49,18 +48,15 @@ final class HourlyActivityChart extends Component
             ->map(static function (stdClass $row): int {
                 $total = $row->total;
 
-                return is_numeric($total) ? (int) $total : 0;
+                if (is_numeric($total)) {
+                    return (int) $total;
+                }
+
+                return 0;
             })
             ->all();
 
         return $totals === [] ? 1 : max(1, ...$totals);
-    }
-
-    #[On('dashboard-window-changed')]
-    public function changeWindow(string $window): void
-    {
-        $this->window = $window;
-        unset($this->hourly, $this->peak);
     }
 
     public function placeholder(): View

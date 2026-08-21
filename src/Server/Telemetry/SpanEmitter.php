@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Telemetry;
+namespace Pushery\Webhooks\Server\Telemetry;
 
 /**
  * The seam between a finished delivery and a tracer. The package binds a no-op

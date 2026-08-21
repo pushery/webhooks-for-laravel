@@ -11,7 +11,7 @@
      Dark mode: WireKit's dark tokens live behind a `.dark` class on the root element, so
      this layout puts it there — mirroring the reader's system preference by default, or
      pinned light/dark through webhooks.ui.theme. --}}
-@php($theme = Webhooks\Support\UiTheme::class)
+@php($theme = Pushery\Webhooks\Support\UiTheme::class)
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" @if ($theme::forcesDark()) class="dark" @endif>
 <head>

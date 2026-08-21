@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform\Livewire;
+namespace Pushery\Webhooks\Platform\Livewire;
 
 use Illuminate\Container\Container;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
-use Webhooks\Database\Dialect\Sql\NullsLastOrder;
-use Webhooks\Models\WebhookSubscription;
-use Webhooks\Platform\Health\EndpointHealth;
-use Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
-use Webhooks\Platform\Support\PortalRoutes;
-use Webhooks\Support\WebhookConnection;
+use Pushery\Webhooks\Database\Dialect\Sql\NullsLastOrder;
+use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Platform\Health\EndpointHealth;
+use Pushery\Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
+use Pushery\Webhooks\Platform\Support\PortalRoutes;
+use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
  * A status board of the tenant's own endpoints and their health at a glance: one row

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Ssrf;
+namespace Pushery\Webhooks\Core\Ssrf;
 
 /**
  * Classifies a resolved IP address as safe (public) or blocked. Blocked covers
@@ -11,9 +11,18 @@ namespace Webhooks\Core\Ssrf;
  * and IPv6.
  *
  * The classification is done with an explicit CIDR list rather than PHP's
- * `FILTER_FLAG_NO_RES_RANGE`, whose IPv6 coverage is incomplete — the cloud
- * metadata address `fd00:ec2::254` (within `fc00::/7`) and link-local `fe80::/10`
- * would otherwise slip through. Every IPv6 form that embeds an IPv4 address —
+ * `FILTER_FLAG_NO_PRIV_RANGE|FILTER_FLAG_NO_RES_RANGE`, because that filter reports
+ * most of the ranges below as public. Carrier-grade NAT (`100.64.0.1`), benchmarking
+ * (`198.18.0.1`), site-local IPv6 (`fec0::1`) and the IPv4-compatible loopback
+ * `::7f00:1` all pass it, and so do the transition prefixes, the documentation blocks
+ * and multicast — every one of them a reachable internal destination. The ranges the
+ * filter DOES cover, among them `fc00::/7` and `fe80::/10`, stay on the list too, so
+ * one mechanism answers for every range instead of two that disagree at the seam.
+ *
+ * The four addresses named above are pinned in the unit tests against the filter
+ * itself, not merely against this class: they are the reason the list exists, and a
+ * sentence cannot keep that claim true across a PHP upgrade or a change to the list.
+ * Every IPv6 form that embeds an IPv4 address —
  * IPv4-mapped (`::ffff:a.b.c.d`), IPv4-translated (`::ffff:0:a.b.c.d`) and the
  * deprecated IPv4-compatible form (`::a.b.c.d`) — is unwrapped first so a private
  * IPv4 cannot be smuggled in v6 clothing.
@@ -125,6 +134,16 @@ final class AddressClassifier
         $ipBin = inet_pton($ip);
         $subnetBin = inet_pton($subnet);
 
+        // Only the length clause is reachable from isBlocked(), and it is the one that matters:
+        // an IPv4 address compared against an IPv6 CIDR would otherwise match on a prefix that
+        // means something else entirely — 32.1.0.0 shares its first four bytes with 2001::/32
+        // — and ordinary public IPv4 space would be refused. Pinned from both sides in the tests.
+        //
+        // The two inet_pton checks cannot fire on this path: isBlocked() has already run the
+        // address through FILTER_VALIDATE_IP, and the subnets come from the constant above.
+        // They stay because this method must not depend on its only caller's validation, and
+        // mutation testing reports them as survivors for exactly that reason — an unreachable
+        // guard has no observable behavior to assert. Do not "kill" them by removing them.
         if ($ipBin === false || $subnetBin === false || strlen($ipBin) !== strlen($subnetBin)) {
             return false;
         }

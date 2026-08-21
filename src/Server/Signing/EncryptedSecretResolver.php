@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Signing;
+namespace Pushery\Webhooks\Server\Signing;
 
 use Illuminate\Support\Facades\Crypt;
+use Pushery\Webhooks\Core\Signing\SecretSet;
+use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 use RuntimeException;
-use Webhooks\Core\Signing\SecretSet;
-use Webhooks\Server\Data\WebhookDeliveryData;
 
 /**
  * The default resolver: the secret travels through the queue SEALED with the app

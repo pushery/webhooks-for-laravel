@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Signing\Jwks;
+namespace Pushery\Webhooks\Core\Signing\Jwks;
 
 use Illuminate\Contracts\Cache\Repository as Cache;
 use InvalidArgumentException;
-use Webhooks\Core\Http\HttpTransport;
-use Webhooks\Core\Http\TransportOptions;
-use Webhooks\Core\Signing\SecretSet;
-use Webhooks\Core\Ssrf\SsrfGuard;
+use Pushery\Webhooks\Core\Http\HttpTransport;
+use Pushery\Webhooks\Core\Http\TransportOptions;
+use Pushery\Webhooks\Core\Signing\SecretSet;
+use Pushery\Webhooks\Core\Ssrf\SsrfGuard;
 
 /**
  * Fetches, parses and caches a provider's JWKS (JSON Web Key Set) of Ed25519 public

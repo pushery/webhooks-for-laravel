@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Exceptions;
+namespace Pushery\Webhooks\Server\Exceptions;
 
+use Pushery\Webhooks\Core\Http\Exceptions\NonRetryable;
 use RuntimeException;
-use Webhooks\Core\Http\Exceptions\NonRetryable;
 
 /**
  * A queued delivery was refused before it went out — its endpoint was switched off or

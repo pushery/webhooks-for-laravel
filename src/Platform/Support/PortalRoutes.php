@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform\Support;
+namespace Pushery\Webhooks\Platform\Support;
 
 use Illuminate\Support\Facades\Route;
 
@@ -45,6 +45,10 @@ final class PortalRoutes
      */
     public static function url(string $name, mixed ...$parameters): ?string
     {
-        return self::has($name) ? route($name, $parameters) : null;
+        if (self::has($name)) {
+            return route($name, $parameters);
+        }
+
+        return null;
     }
 }
