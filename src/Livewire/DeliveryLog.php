@@ -27,11 +27,15 @@ use Pushery\Webhooks\Models\WebhookSubscription;
  * webhooks.admin.ability (or an overridden authorizeAction()) when a host sets one, so the
  * whole console gates the same way rather than only half of it. Left unset, nothing changes.
  *
+ * ⚠️ Not `final`, and deliberately so: the override that sentence offers has to be reachable.
+ * See {@see AuthorizesOperatorActions} — a spatie/laravel-permission name in the config key
+ * denies every action silently, and the subclass is the documented way past it.
+ *
  * The tenant-facing surface is the observability dashboard
  * (`Pushery\Webhooks\Dashboard\Livewire\DeliveriesTable`), which is owner-scoped and
  * policy-guarded.
  */
-final class DeliveryLog extends Component
+class DeliveryLog extends Component
 {
     use AuthorizesOperatorActions;
     use WithPagination;

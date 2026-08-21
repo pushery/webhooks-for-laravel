@@ -124,4 +124,6 @@
             @endforeach
         </tbody>
     </table>
+
+    {{ $subscriptions->links() }}
 </div>

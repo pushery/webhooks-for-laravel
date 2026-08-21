@@ -25,6 +25,35 @@ use Illuminate\Support\Facades\Config;
  * exactly the behavior the console shipped with — a host that wants none of this notices
  * nothing.
  *
+ * ⚠️ THE ABILITY MUST BE ONE `Gate::define()` DECLARED — NOT A spatie/laravel-permission
+ * PERMISSION NAME. That package installs a `Gate::before` hook which reads the FIRST
+ * positional gate argument as a GUARD name and shifts it off the argument list:
+ *
+ *     if (is_string($args[0] ?? null) && ! class_exists($args[0])) {
+ *         $guard = array_shift($args);
+ *     }
+ *
+ * This seam passes the action name in exactly that position, so on such a host `'create'`
+ * becomes the guard, the permission lookup asks for a guard nobody defined, the hook
+ * declines to decide, and the check falls through to an ability that does not exist —
+ * a DENY. Every action then refuses every operator, including the one the permission was
+ * granted to, and it refuses SILENTLY: nothing throws and nothing is logged, so the form
+ * simply does nothing when submitted.
+ *
+ * That failure is invisible to the obvious tests, and this is the part worth remembering:
+ * a surface that denies everything looks exactly like a surface that is well guarded. Only
+ * a POSITIVE arm — one asserting that a permitted operator really CAN act — can tell the
+ * two apart, and that is the arm people rarely write.
+ *
+ * The way through on such a host is one line: declare an ability of your own that asks the
+ * permission internally, and point webhooks.admin.ability at THAT. A closure declared with
+ * `fn ($user) => …` ignores an argument it does not accept, which makes the action name
+ * harmless again.
+ *
+ * The consuming components are deliberately NOT final, so the override this docblock offers
+ * is actually reachable. It used to be advertised on two final classes, which made the only
+ * documented escape from the trap above impossible to take.
+ *
  * The consuming component is a Livewire component, so $this->authorize() comes from its
  * base class.
  *
@@ -38,6 +67,11 @@ trait AuthorizesOperatorActions
      * The name travels to the gate as its argument, so one ability can answer differently
      * for a delete than for a toggle without the host having to define five abilities. A
      * gate closure that ignores the extra argument is unaffected.
+     *
+     * ⚠️ That argument is also what makes a spatie/laravel-permission NAME unusable here —
+     * see the class docblock. The argument is kept because removing it would take a
+     * documented capability away from every host that does use it; the incompatibility is
+     * named instead, at the config key and here.
      */
     protected function authorizeAction(string $action): void
     {

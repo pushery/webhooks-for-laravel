@@ -271,6 +271,37 @@ final class WebhookConfig
      */
     public function eventTypeFor(SignatureHeaders $headers, string $rawBody, ?string $bodyType): ?string
     {
+        return $this->boundedEventType($this->resolvedEventType($headers, $rawBody, $bodyType));
+    }
+
+    /**
+     * Bound an event type to the column that stores it.
+     *
+     * `event_type` is `varchar(255)` on both engines, and since v2.0.0 the value can come
+     * straight from a producer's header. The write happens AFTER the signature verifies and
+     * BEFORE the 2xx goes back, so an over-long value does not truncate — it fails the
+     * insert, answers 500, and the producer retries into the same failure until its budget
+     * runs out. The delivery is authentic, it was accepted, and it is lost.
+     *
+     * Truncating is the same lossy-but-valid trade the stored payload makes for NUL bytes:
+     * the delivery survives, the exact bytes stay in the raw body, and a value this long
+     * routes to the catch-all either way — no 'process' map key is 255 characters long.
+     *
+     * ⚠️ THE DEDUPE KEY MUST NOT GET THIS TREATMENT, which is why the bound lives here and
+     * not in nonEmpty() where both paths meet. `webhook_id` is the same width and has the
+     * same exposure, but truncating it makes two different producer ids collide on their
+     * prefix — and a collision there drops a genuine delivery as a duplicate, silently.
+     * That one is filed rather than fixed the same way.
+     */
+    private function boundedEventType(?string $value): ?string
+    {
+        // Characters, not bytes: varchar(255) counts characters on PostgreSQL and on MySQL
+        // under utf8mb4 alike, and a byte-wise cut could also split a multi-byte character.
+        return $value === null ? null : mb_substr($value, 0, 255);
+    }
+
+    private function resolvedEventType(SignatureHeaders $headers, string $rawBody, ?string $bodyType): ?string
+    {
         $spec = $this->eventTypeSpec;
 
         if ($spec === null) {

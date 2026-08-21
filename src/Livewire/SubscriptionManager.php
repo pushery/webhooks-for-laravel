@@ -33,6 +33,14 @@ use Pushery\Webhooks\Support\Settings;
  * authorizeAction() in a subclass. Left unset it does nothing, so this component behaves
  * exactly as it always has. See {@see AuthorizesOperatorActions} for why the two differ.
  *
+ * ⚠️ THE SECOND WAY WAS BARRED UNTIL v2.0.1, AND THAT MATTERED MORE THAN IT LOOKS. This
+ * class was `final`, so the subclass override the sentence above offers could not be
+ * written — `cannot extend final class`. A host whose ability name comes from
+ * spatie/laravel-permission has exactly one screw to turn, and the config one silently
+ * denies every action there (the seam's docblock has the mechanism). Taking the only
+ * documented way out and making it impossible is what turned a compatibility wrinkle into
+ * a dead console.
+ *
  * Two of the actions are here because their absence cost something the console exists for:
  *
  * - **rotate is the emergency action.** A leaked signing secret has to be rollable from the
@@ -47,7 +55,7 @@ use Pushery\Webhooks\Support\Settings;
  * (`Pushery\Webhooks\Platform\Livewire\EndpointList`), which is owner-scoped and
  * policy-guarded on every action.
  */
-final class SubscriptionManager extends Component
+class SubscriptionManager extends Component
 {
     use AuthorizesOperatorActions;
 
@@ -357,7 +365,13 @@ final class SubscriptionManager extends Component
     public function render(): View
     {
         return ViewFactory::make('webhooks::livewire.subscription-manager', [
-            'subscriptions' => WebhookSubscription::query()->latest()->get(),
+            // simplePaginate, not paginate, and not a bare get(): this stub is unscoped over
+            // the whole installation, so the list grows with every endpoint anyone ever
+            // registered. A bare get() hydrates all of them into memory to render one screen.
+            // simplePaginate asks for one page and one row beyond it — no count(*) over a
+            // table whose size is the thing being complained about. Same reasoning, same
+            // page size as the delivery log beside it.
+            'subscriptions' => WebhookSubscription::query()->latest()->simplePaginate(25),
             // The catalog, plus anything the OPENED ROW already holds that the catalog no
             // longer declares. Without the second half the stale value has no checkbox, so
             // it can be neither kept nor dropped — Livewire's checkbox binding only ever

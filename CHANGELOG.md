@@ -4,6 +4,64 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-08-21
+
+### Fixed
+
+- **An event type read from a producer's header could lose the delivery it named.**
+  `event_type` became host-configurable in 2.0.0 — `'header:X-GitHub-Event'`, a body path,
+  or a resolver — and the column it lands in is `varchar(255)`. Nothing between the two
+  applied a length.
+
+  **The failure is a lost webhook, not a truncated string.** The row is written *after* the
+  signature verifies and *before* the 2xx goes back, so an over-long value fails the insert,
+  the request answers 500, and the producer retries into the same failure until its budget
+  runs out. The delivery was authentic and accepted, and then it was gone.
+
+  The value is now truncated to the column width — the same lossy-but-valid trade the stored
+  payload already makes for NUL bytes. The exact bytes stay in the raw body, and a value that
+  long routes to the catch-all either way, because no `process` map key is 255 characters
+  long. **Nothing changes for an ordinary event type.**
+
+- **The operator console's endpoint list is paginated.** It is unscoped by design — it reads
+  every tenant's subscriptions, which is why it must sit behind an operator-only gate — and
+  that means its size is the size of the installation. It asked for all of them at once, so
+  opening one screen hydrated every endpoint anyone had ever registered. It now asks for one
+  page of 25, the same way and the same size as the delivery log beside it, which has worked
+  like that since 1.4.4.
+
+  ⚠️ **If you published the console view, add `{{ $subscriptions->links() }}`** below the
+  table — your copy still receives the full set otherwise, which is the trade a published
+  view always makes.
+
+- **Both operator console components can be subclassed again.** Three docblocks and the
+  config reference offer the same two ways to authorize an action: set
+  `webhooks.admin.ability`, *or* override `authorizeAction()` in a subclass. The second was
+  impossible — `SubscriptionManager` and `DeliveryLog` were `final`, so the subclass was a
+  fatal error.
+
+  That mattered more than a documentation slip, because **the first way does not work on a
+  host using spatie/laravel-permission**. That package installs a `Gate::before` hook which
+  reads the first positional gate argument as a *guard* name and shifts it off the list. The
+  action name travels in exactly that position, so `'create'` becomes the guard, the
+  permission lookup asks for a guard nobody defined, and the check falls through to an
+  ability that does not exist — a deny. The console then refuses every action to every
+  operator, **silently**: nothing throws, nothing is logged, the form simply does nothing.
+
+  Such a host had one route broken and the other barred. The classes are no longer `final`,
+  so the documented override is real, and the incompatibility is now named at the config key
+  and at the seam — including the one-line way through: declare an ability that asks the
+  permission itself, since a closure written `fn ($user) => …` ignores an argument it does
+  not accept.
+
+  **If you relied on either class being `final`, nothing breaks** — removing it only widens
+  what a host may do.
+
+### Changed
+
+- **`SubscriptionManager`'s docblock no longer offers an override it cannot honor**, and the
+  delivery-log stub beside it says why it is not `final` either.
+
 ## [2.0.0] - 2026-08-21
 
 ### Changed
@@ -1859,7 +1917,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/pushery/webhooks-for-laravel/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.12.0...v2.0.0
 [1.12.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.10.1...v1.11.0
