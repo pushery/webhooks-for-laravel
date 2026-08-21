@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Database\Factories;
+namespace Pushery\Webhooks\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
-use Webhooks\Client\Models\WebhookCall;
-use Webhooks\Client\WebhookCallStatus;
+use Pushery\Webhooks\Client\Models\WebhookCall;
+use Pushery\Webhooks\Client\WebhookCallStatus;
 
 /**
  * @extends Factory<WebhookCall>

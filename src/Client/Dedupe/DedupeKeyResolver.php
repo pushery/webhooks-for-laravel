@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Client\Dedupe;
+namespace Pushery\Webhooks\Client\Dedupe;
 
-use Webhooks\Core\Signing\SignatureHeaders;
+use Pushery\Webhooks\Core\Signing\SignatureHeaders;
 
 /**
  * Derives the idempotency key for one inbound delivery when it lives somewhere the

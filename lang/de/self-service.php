@@ -16,6 +16,7 @@ return [
         'heading' => 'Deine Endpunkte',
         'new_endpoint' => 'Neuer Endpunkt',
         'cap_reached' => 'Endpunkt-Limit erreicht.',
+        'ping' => 'Test senden',
         'secret' => 'Schlüssel',
         'edit' => 'Bearbeiten',
         'transform' => 'Transformation',
@@ -193,6 +194,9 @@ return [
         'health_recomputed' => 'Endpunkt-Zustand neu berechnet.',
         'health_recomputed_all' => 'Endpunkt-Zustand für alle Endpunkte neu berechnet.',
         'transform_saved' => 'Payload-Transformation gespeichert.',
+        'ping_sent' => 'Test-Event gesendet.',
+        'ping_disabled' => 'Dieser Endpunkt ist ausgeschaltet — ein Test-Event käme nicht an.',
+        'ping_throttled' => 'Dieser Endpunkt hat seine Test-Events vorerst aufgebraucht. Versuch es in :seconds Sekunde(n) erneut.',
     ],
 
     // The form's own validation copy, passed to the validator as custom messages and
@@ -230,6 +234,7 @@ return [
         'health_table' => 'Endpunkt-Zustand',
         'toggle_active' => 'Aktiv-Status für :url umschalten',
         'reveal_secret' => 'Signaturschlüssel für :url anzeigen',
+        'ping_endpoint' => 'Test-Event an :url senden',
         'edit_endpoint' => 'Endpunkt :url bearbeiten',
         'edit_transform' => 'Payload-Transformation für :url bearbeiten',
         'delete_endpoint' => 'Endpunkt :url löschen',

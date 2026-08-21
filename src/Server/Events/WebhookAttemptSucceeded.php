@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Events;
+namespace Pushery\Webhooks\Server\Events;
 
-use Webhooks\Core\Http\TransportResponse;
-use Webhooks\Server\Data\WebhookDeliveryData;
+use Pushery\Webhooks\Core\Http\TransportResponse;
+use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 
 /**
  * ONE HTTP attempt returned a 2xx. Carries the captured response so a listener can
@@ -13,7 +13,7 @@ use Webhooks\Server\Data\WebhookDeliveryData;
  *
  * Attempt-scoped, like every event in this namespace. The once-per-delivery domain
  * counterpart, which carries the WebhookDelivery model and is only dispatched while the
- * Platform layer is enabled, is `Webhooks\Events\WebhookDeliverySucceeded`.
+ * Platform layer is enabled, is `Pushery\Webhooks\Events\WebhookDeliverySucceeded`.
  */
 final readonly class WebhookAttemptSucceeded
 {

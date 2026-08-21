@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform\Livewire;
+namespace Pushery\Webhooks\Platform\Livewire;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
@@ -11,10 +11,10 @@ use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Webhooks\Models\WebhookDelivery;
-use Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
-use Webhooks\Platform\Support\SubscriptionScope;
-use Webhooks\Support\TenantIdentity;
+use Pushery\Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
+use Pushery\Webhooks\Platform\Support\SubscriptionScope;
+use Pushery\Webhooks\Support\TenantIdentity;
 
 /**
  * The tenant's own delivery log: what was sent to their endpoints, when, and what came

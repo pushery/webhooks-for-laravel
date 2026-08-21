@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Client\Jobs;
+namespace Pushery\Webhooks\Client\Jobs;
 
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Webhooks\Client\InboundMessage;
-use Webhooks\Client\Models\WebhookCall;
+use Pushery\Webhooks\Client\InboundMessage;
+use Pushery\Webhooks\Client\Models\WebhookCall;
 
 /**
  * The base queued handler for a stored incoming webhook. Extend it in your app and

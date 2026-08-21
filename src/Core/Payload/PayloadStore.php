@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Payload;
+namespace Pushery\Webhooks\Core\Payload;
 
 use Illuminate\Support\Facades\Storage;
-use Webhooks\Core\Payload\Exceptions\OffloadFailed;
+use Pushery\Webhooks\Core\Payload\Exceptions\OffloadFailed;
 
 /**
  * Moves an over-sized webhook body off the database and onto a Storage disk,

@@ -2,11 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Client\Events;
+namespace Pushery\Webhooks\Client\Events;
 
 use Illuminate\Foundation\Events\Dispatchable;
-use Webhooks\Client\Models\WebhookCall;
-use Webhooks\Client\WebhookConfig;
+use Pushery\Webhooks\Client\Models\WebhookCall;
 
 /**
  * Fired when an authentic delivery arrived in a format nothing could read: the signature
@@ -30,6 +29,14 @@ use Webhooks\Client\WebhookConfig;
  * That row travels whole into a queued listener's job payload, body included. On a queue driver
  * with a message-size limit, keep such a listener synchronous, or read what is needed here and
  * dispatch a job carrying only the call's id.
+ *
+ * ⚠️ IT CARRIES THE CONFIG'S NAME, NOT THE CONFIG, for a reason the paragraph above missed while
+ * it was busy with the request. A WebhookConfig holds the signing secret and the rotation secret
+ * in cleartext, and this row travels into a queued listener's job payload — so the config went
+ * with it, into the queue store, and into the log of any listener that recorded the event. That
+ * needed no queue either: a reporter serializing the event after a listener threw did the same.
+ * `WebhookConfig::forName($event->source)` returns the whole config, read from configuration
+ * rather than from a payload that travelled.
  */
 final class UnreadableWebhookPayload
 {
@@ -37,7 +44,7 @@ final class UnreadableWebhookPayload
 
     public function __construct(
         public WebhookCall $call,
-        public WebhookConfig $config,
+        public string $source,
         public ?string $contentType,
     ) {}
 }

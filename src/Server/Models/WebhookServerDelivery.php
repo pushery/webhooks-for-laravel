@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Models;
+namespace Pushery\Webhooks\Server\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,11 +13,11 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Override;
-use Webhooks\Database\Concerns\HasZonedTimestamps;
-use Webhooks\Database\Concerns\ScopesByTimestamp;
-use Webhooks\Database\Concerns\UsesWebhookConnection;
-use Webhooks\Database\Factories\WebhookServerDeliveryFactory;
-use Webhooks\Enums\DeliveryStatus;
+use Pushery\Webhooks\Database\Concerns\HasZonedTimestamps;
+use Pushery\Webhooks\Database\Concerns\ScopesByTimestamp;
+use Pushery\Webhooks\Database\Concerns\UsesWebhookConnection;
+use Pushery\Webhooks\Database\Factories\WebhookServerDeliveryFactory;
+use Pushery\Webhooks\Enums\DeliveryStatus;
 
 /**
  * A single row in the standalone Server delivery log — one delivered message,

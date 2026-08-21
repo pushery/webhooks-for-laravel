@@ -7,6 +7,15 @@
     <x-wirekit::row gap="md" class="flex-wrap items-end">
         {{-- Both filters hide their label visually, so the label reaches sighted readers
              only through assistive technology — it is translated like any other. --}}
+        {{-- ⚠️ THIS FILTER AND THE SUBSCRIPTION-MANAGER STUB'S DELETE DIALOG ARE A KNOWN BAD PAIR.
+             On one page, a WireKit select bound with wire:model.live makes the confirm action
+             of an alert-dialog beside it unclickable: the dialog opens, the click never lands,
+             and nothing is logged. The package's own portal hits this and answers it with a
+             native <select> carrying the same tokens — see the comment in
+             self-service/livewire/endpoint-deliveries.blade.php. Reported upstream; until it
+             lands, either keep these two stubs on separate pages or swap this control for the
+             native one. Left as the library component here on purpose: the trade-off is a
+             reader's to make, and it is stated rather than hidden. --}}
         <x-wirekit::select wire:model.live="status" :label="__('webhooks::management.filters.status')" hideLabel>
             <option value="">{{ __('webhooks::management.filters.all_statuses') }}</option>
             <option value="pending">{{ __('webhooks::management.status_options.pending') }}</option>

@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard\Listeners;
+namespace Pushery\Webhooks\Dashboard\Listeners;
 
-use Webhooks\Dashboard\Events\WebhookRedeliveryRequested;
-use Webhooks\WebhookManager;
+use Pushery\Webhooks\Dashboard\Events\WebhookRedeliveryRequested;
+use Pushery\Webhooks\WebhookManager;
 
 /**
  * Carries out a requested redelivery by handing the original log entry back to the

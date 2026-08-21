@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
-use Webhooks\Database\DatabaseRequirement;
-use Webhooks\Database\Dialect\Dialect;
-use Webhooks\Support\WebhookConnection;
+use Pushery\Webhooks\Database\DatabaseRequirement;
+use Pushery\Webhooks\Database\Dialect\Dialect;
+use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
  * Adds the global newest-first index to an EXISTING webhook_deliveries table.

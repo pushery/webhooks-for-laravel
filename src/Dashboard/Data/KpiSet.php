@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard\Data;
+namespace Pushery\Webhooks\Dashboard\Data;
 
 /**
  * The summarized delivery KPIs for one owner over one window: additive counts

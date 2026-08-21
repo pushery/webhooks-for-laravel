@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard\Livewire;
+namespace Pushery\Webhooks\Dashboard\Livewire;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use Webhooks\Dashboard\DashboardScope;
-use Webhooks\Dashboard\Livewire\Concerns\InteractsWithDashboard;
-use Webhooks\Dashboard\PayloadVisibility;
-use Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Dashboard\DashboardScope;
+use Pushery\Webhooks\Dashboard\Livewire\Concerns\InteractsWithDashboard;
+use Pushery\Webhooks\Dashboard\PayloadVisibility;
+use Pushery\Webhooks\Models\WebhookDelivery;
 
 /**
  * The slide-in detail drawer for one delivery: payload, the attempt count and a

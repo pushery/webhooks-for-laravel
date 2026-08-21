@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Client;
+namespace Pushery\Webhooks\Client;
 
 /**
  * Lifecycle state of a stored incoming webhook call. A call is stored as Received;

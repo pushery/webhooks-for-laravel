@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform\Livewire;
+namespace Pushery\Webhooks\Platform\Livewire;
 
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\View\View;
@@ -11,12 +11,12 @@ use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use Webhooks\Core\Http\Exceptions\BlockedDestination;
-use Webhooks\Facades\Webhooks;
-use Webhooks\Models\WebhookSubscription;
-use Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
-use Webhooks\Platform\Support\SubscriptionScope;
-use Webhooks\Support\Settings;
+use Pushery\Webhooks\Core\Http\Exceptions\BlockedDestination;
+use Pushery\Webhooks\Facades\Webhooks;
+use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
+use Pushery\Webhooks\Platform\Support\SubscriptionScope;
+use Pushery\Webhooks\Support\Settings;
 
 /**
  * Create or edit a single endpoint. Opened by the list via the new-endpoint /

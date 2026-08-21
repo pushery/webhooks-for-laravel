@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Ssrf;
+namespace Pushery\Webhooks\Core\Ssrf;
 
 /**
  * Resolves a hostname to its IP addresses. Abstracted so the SSRF guard can be

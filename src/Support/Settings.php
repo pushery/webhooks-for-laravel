@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Support;
+namespace Pushery\Webhooks\Support;
 
 use Illuminate\Support\Facades\Config;
-use Webhooks\Core\Signing\Ed25519Scheme;
-use Webhooks\Core\Signing\SignatureScheme;
-use Webhooks\Core\Signing\StandardWebhooksScheme;
-use Webhooks\Server\Backoff\BackoffStrategy;
-use Webhooks\Server\Backoff\ExponentialWithJitter;
-use Webhooks\Server\Exceptions\MissingSigningKey;
-use Webhooks\Server\Exceptions\UnknownSignatureScheme;
+use Pushery\Webhooks\Core\Signing\Ed25519Scheme;
+use Pushery\Webhooks\Core\Signing\SignatureScheme;
+use Pushery\Webhooks\Core\Signing\StandardWebhooksScheme;
+use Pushery\Webhooks\Server\Backoff\BackoffStrategy;
+use Pushery\Webhooks\Server\Backoff\ExponentialWithJitter;
+use Pushery\Webhooks\Server\Exceptions\MissingSigningKey;
+use Pushery\Webhooks\Server\Exceptions\UnknownSignatureScheme;
 
 /**
  * Typed reader over the package configuration, so the rest of the code never
@@ -162,7 +162,11 @@ final class Settings
     {
         $connection = Config::get('webhooks.server.connection');
 
-        return is_string($connection) ? $connection : null;
+        if (is_string($connection)) {
+            return $connection;
+        }
+
+        return null;
     }
 
     public function rateLimitEnabled(): bool
@@ -182,12 +186,22 @@ final class Settings
      * Null and a non-positive value mean the same thing on purpose: a "limit" of zero
      * would refuse every ping, which is a way to break the feature by typo rather than a
      * setting anyone wants. Switching the brake off is spelled null.
+     *
+     * The shipped default is repeated here rather than left to the merge, and only because
+     * of what an ABSENT key costs: it reads as null, which switches the brake off entirely.
+     * A host running on a config cache built before this version upgraded still has the old
+     * trimmed layer until it rebuilds, and that window should not be an unbraked one.
+     * ConfigDefaultsAreInSyncTest holds the two numbers together.
      */
     public function testPingPerMinute(): ?int
     {
-        $max = Config::get('webhooks.platform.test_ping.max_per_minute');
+        $max = Config::get('webhooks.platform.test_ping.max_per_minute', 5);
 
-        return is_int($max) && $max > 0 ? $max : null;
+        if (is_int($max) && $max > 0) {
+            return $max;
+        }
+
+        return null;
     }
 
     /**
@@ -385,7 +399,11 @@ final class Settings
 
         $proxy = Config::get('webhooks.core.egress.proxy');
 
-        return is_string($proxy) && $proxy !== '' ? $proxy : null;
+        if (is_string($proxy) && $proxy !== '') {
+            return $proxy;
+        }
+
+        return null;
     }
 
     /**
@@ -485,6 +503,10 @@ final class Settings
         $entry = Config::array('webhooks.platform.catalog', [])[$eventType] ?? null;
         $schema = is_array($entry) ? ($entry['schema'] ?? null) : null;
 
-        return is_array($schema) ? $schema : null;
+        if (is_array($schema)) {
+            return $schema;
+        }
+
+        return null;
     }
 }

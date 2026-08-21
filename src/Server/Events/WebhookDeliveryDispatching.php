@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Events;
+namespace Pushery\Webhooks\Server\Events;
 
-use Webhooks\Server\Data\WebhookDeliveryData;
+use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 
 /**
  * A delivery is about to be QUEUED: fired synchronously at dispatch time, before any

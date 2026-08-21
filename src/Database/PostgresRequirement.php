@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Database;
+namespace Pushery\Webhooks\Database;
 
 use Illuminate\Support\Facades\DB;
 use RuntimeException;

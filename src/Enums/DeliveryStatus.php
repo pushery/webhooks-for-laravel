@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Enums;
+namespace Pushery\Webhooks\Enums;
 
 /**
  * Lifecycle state of a single delivery-log entry.

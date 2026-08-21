@@ -2,12 +2,13 @@
 
 ## Supported versions
 
-Security fixes are released against the latest `1.x` minor version. Upgrade to it to stay covered — under Semantic Versioning a minor release never breaks a `1.x` integration.
+Security fixes are released against the latest `2.x` minor version. Upgrade to it to stay covered — under Semantic Versioning a minor release never breaks a `2.x` integration.
 
 | Version | Supported |
 |---|---|
-| `1.x` (latest minor) | :white_check_mark: |
-| `1.x` (older minor) | :x: — upgrade to the latest `1.x` |
+| `2.x` (latest minor) | :white_check_mark: |
+| `2.x` (older minor) | :x: — upgrade to the latest `2.x` |
+| `1.x` | :x: — end of life since `2.0.0`; see [Upgrading from 1.x](https://docs.pushery.com/webhooks-for-laravel/guides/upgrading-from-1x) |
 | `0.x` | :x: — end of life since `1.0.0` |
 
 ## Reporting a vulnerability

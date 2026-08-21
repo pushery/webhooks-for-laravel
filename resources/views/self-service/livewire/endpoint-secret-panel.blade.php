@@ -2,7 +2,56 @@
      reveal window is open (enforced server-side by visibleCurrentSecret); an Alpine
      timer counts the TTL down visibly and auto-hides in the browser when it elapses.
      Rotation keeps the old secret as the verify-only rotation secret. Styled with
-     WireKit tokens throughout. --}}
+     WireKit tokens throughout.
+
+     THE TIMER IS A REGISTERED COMPONENT, NOT AN INLINE EXPRESSION. Under a
+     Content-Security-Policy without `unsafe-eval`, Alpine parses attribute expressions
+     against a small grammar rather than handing them to `new Function`, and an object
+     literal with methods does not parse there — the countdown would silently never start
+     and the secret would stay on screen past its window. Its inputs arrive through a data
+     attribute rather than as an argument, so the expression stays a bare factory call and
+     no `JSON.parse` appears in an Alpine expression, where `JSON` is not resolvable. --}}
+@assets
+    <script{!! \Pushery\Webhooks\Support\UiTheme::nonceAttribute() !!}>
+        (function () {
+            var register = function () {
+                window.Alpine.data('webhooksSecretCountdown', function () {
+                    return {
+                        remaining: 0,
+                        announce: '',
+                        countdown: '',
+                        warning: '',
+                        tick: null,
+                        init() {
+                            const config = JSON.parse(this.$el.dataset.webhooksCountdown ?? '{}');
+                            this.remaining = config.remaining ?? 0;
+                            this.countdown = config.countdown ?? '';
+                            this.warning = config.warning ?? '';
+
+                            this.tick = setInterval(() => {
+                                this.remaining = Math.max(0, this.remaining - 1);
+                                if (this.remaining === 10) this.announce = this.warning;
+                                if (this.remaining <= 0) { this.stop(); this.$wire.hide(); }
+                            }, 1000);
+                        },
+                        stop() {
+                            if (this.tick !== null) { clearInterval(this.tick); this.tick = null; }
+                        },
+                        destroy() {
+                            this.stop();
+                        },
+                    };
+                });
+            };
+
+            if (window.Alpine) {
+                register();
+            } else {
+                document.addEventListener('alpine:init', register);
+            }
+        })();
+    </script>
+@endassets
 @php($secret = $this->visibleCurrentSecret)
 @php($previous = $this->visiblePreviousSecret)
 <div class="wh-portal-secret" wire:key="secret-panel">
@@ -12,38 +61,22 @@
         @if ($hidden){{ __('webhooks::self-service.secret.hidden_announcement') }}@endif
     </x-wirekit::visually-hidden>
     @if ($secret !== null)
-        {{-- The countdown sentence and the impending-expiry cue are handed to Alpine as
-             whole translated strings, so the timer speaks the reader's language without
-             the view splitting a sentence into fragments a translator cannot reorder.
-             Js::from quotes and escapes them into safe JS literals; it is echoed rather
-             than written as @js because a component tag's attribute compiles echoes but
-             not directives. --}}
-        {{-- The timer lives IN the Alpine component and is cleared in destroy(), never in a
+        {{-- The countdown sentence and the impending-expiry cue are handed over as whole
+             translated strings, so the timer speaks the reader's language without the view
+             splitting a sentence into fragments a translator cannot reorder.
+
+             The timer lives IN the Alpine component and is cleared in destroy(), never in a
              bare x-init: Alpine cleans up its own effects and listeners, but not a raw
              setInterval. Clicking Hide tears this card out of the DOM, and an interval left
              behind would keep ticking against a dead scope — calling $wire.hide() on a
              component that no longer exists, once per second, for every reveal. --}}
         <x-wirekit::card
-            x-data="{
-                remaining: {{ $this->remainingSeconds() }},
-                announce: '',
-                tick: null,
-                countdown: {{ \Illuminate\Support\Js::from(__('webhooks::self-service.secret.countdown')) }},
-                warning: {{ \Illuminate\Support\Js::from(__('webhooks::self-service.secret.countdown_warning')) }},
-                init() {
-                    this.tick = setInterval(() => {
-                        this.remaining = Math.max(0, this.remaining - 1);
-                        if (this.remaining === 10) this.announce = this.warning;
-                        if (this.remaining <= 0) { this.stop(); this.$wire.hide(); }
-                    }, 1000);
-                },
-                stop() {
-                    if (this.tick !== null) { clearInterval(this.tick); this.tick = null; }
-                },
-                destroy() {
-                    this.stop();
-                },
-            }"
+            x-data="webhooksSecretCountdown()"
+            data-webhooks-countdown="{{ json_encode([
+                'remaining' => $this->remainingSeconds(),
+                'countdown' => __('webhooks::self-service.secret.countdown'),
+                'warning' => __('webhooks::self-service.secret.countdown_warning'),
+            ], JSON_THROW_ON_ERROR) }}"
         >
             <x-wirekit::card.body>
                 <div class="flex flex-col gap-[var(--padding-wk-y-md)]" role="status" aria-live="polite">

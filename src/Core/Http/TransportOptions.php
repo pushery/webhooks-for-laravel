@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Http;
+namespace Pushery\Webhooks\Core\Http;
 
 /**
  * Transport-level options for a single delivery attempt: the HTTP verb, the

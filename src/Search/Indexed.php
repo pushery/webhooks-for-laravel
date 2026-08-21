@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Search;
+namespace Pushery\Webhooks\Search;
 
 /**
  * A model that pushes itself into Laravel Scout's index. The shipped searchable log models

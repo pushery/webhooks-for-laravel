@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks;
+namespace Pushery\Webhooks;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -11,24 +11,27 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Override;
-use Webhooks\Console\AsyncApiCommand;
-use Webhooks\Console\EgressIpsCommand;
-use Webhooks\Console\PartitionMaintenanceCommand;
-use Webhooks\Console\PruneOrphanedPayloadsCommand;
-use Webhooks\Console\RefreshEndpointHealthCommand;
-use Webhooks\Console\RevokeRotatedSecretsCommand;
-use Webhooks\Listeners\WebhookServerEventSubscriber;
-use Webhooks\Models\WebhookSubscription;
-use Webhooks\Platform\Delivery\SubscriptionDeliveryGate;
-use Webhooks\Platform\Health\RefreshEndpointHealthOnDelivery;
-use Webhooks\Platform\Policies\WebhookSubscriptionPolicy;
-use Webhooks\Platform\Transform\DeclarativePayloadTransformer;
-use Webhooks\Platform\Transform\PayloadTransformer;
-use Webhooks\Server\Delivery\DeliveryGate;
-use Webhooks\Support\ScheduleCadence;
+use Pushery\Webhooks\Console\AsyncApiCommand;
+use Pushery\Webhooks\Console\EgressIpsCommand;
+use Pushery\Webhooks\Console\PartitionMaintenanceCommand;
+use Pushery\Webhooks\Console\PruneOrphanedPayloadsCommand;
+use Pushery\Webhooks\Console\RefreshEndpointHealthCommand;
+use Pushery\Webhooks\Console\RevokeRotatedSecretsCommand;
+use Pushery\Webhooks\Listeners\WebhookServerEventSubscriber;
+use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Platform\Delivery\SubscriptionDeliveryGate;
+use Pushery\Webhooks\Platform\Health\RefreshEndpointHealthOnDelivery;
+use Pushery\Webhooks\Platform\Policies\WebhookSubscriptionPolicy;
+use Pushery\Webhooks\Platform\Transform\DeclarativePayloadTransformer;
+use Pushery\Webhooks\Platform\Transform\PayloadTransformer;
+use Pushery\Webhooks\Server\Delivery\DeliveryGate;
+use Pushery\Webhooks\Support\MergesPackageConfig;
+use Pushery\Webhooks\Support\ScheduleCadence;
 
 final class WebhooksServiceProvider extends ServiceProvider
 {
+    use MergesPackageConfig;
+
     /**
      * Whether the bundled migrations are registered automatically. Disable with
      * self::ignoreMigrations() to publish and manage them in the host app instead.
@@ -43,7 +46,7 @@ final class WebhooksServiceProvider extends ServiceProvider
     #[Override]
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../config/webhooks.php', 'webhooks');
+        $this->mergePackageConfig();
 
         // The declarative payload transformer is the safe, data-driven default the
         // fan-out uses to reshape a body per endpoint before signing.

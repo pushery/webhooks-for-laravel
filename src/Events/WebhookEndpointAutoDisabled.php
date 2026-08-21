@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Events;
+namespace Pushery\Webhooks\Events;
 
-use Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Models\WebhookSubscription;
 
 /**
  * Fired when an endpoint is disabled automatically after too many consecutive

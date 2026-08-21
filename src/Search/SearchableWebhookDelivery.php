@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Search;
+namespace Pushery\Webhooks\Search;
 
-use Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Models\WebhookDelivery;
 
 /**
  * A ready-made searchable delivery-log model: the standard {@see WebhookDelivery}

@@ -16,6 +16,7 @@ return [
         'heading' => 'Jouw endpoints',
         'new_endpoint' => 'Nieuw endpoint',
         'cap_reached' => 'Endpoint-limiet bereikt.',
+        'ping' => 'Testen',
         'secret' => 'Sleutel',
         'edit' => 'Bewerken',
         'transform' => 'Transformatie',
@@ -191,6 +192,9 @@ return [
         'health_recomputed' => 'Endpoint-gezondheid opnieuw berekend.',
         'health_recomputed_all' => 'Endpoint-gezondheid voor alle endpoints opnieuw berekend.',
         'transform_saved' => 'Payload-transformatie opgeslagen.',
+        'ping_sent' => 'Testgebeurtenis verstuurd.',
+        'ping_disabled' => 'Dit endpoint staat uit, dus een testgebeurtenis zou niet aankomen.',
+        'ping_throttled' => 'Dit endpoint heeft zijn testgebeurtenissen voorlopig opgebruikt. Probeer het over :seconds seconde(n) opnieuw.',
     ],
 
     // The form's own validation copy, passed to the validator as custom messages and
@@ -228,6 +232,7 @@ return [
         'health_table' => 'Endpoint-gezondheid',
         'toggle_active' => 'Actief-status voor :url omschakelen',
         'reveal_secret' => 'Ondertekeningssleutel voor :url tonen',
+        'ping_endpoint' => 'Een testgebeurtenis naar :url sturen',
         'edit_endpoint' => 'Endpoint :url bewerken',
         'edit_transform' => 'Payload-transformatie voor :url bewerken',
         'delete_endpoint' => 'Endpoint :url verwijderen',

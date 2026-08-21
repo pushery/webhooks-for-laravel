@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Client\Models;
+namespace Pushery\Webhooks\Client\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -13,13 +13,13 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Date;
 use Override;
-use Webhooks\Client\Exceptions\CorruptRawBody;
-use Webhooks\Client\WebhookCallStatus;
-use Webhooks\Core\Payload\PayloadStore;
-use Webhooks\Database\Concerns\HasZonedTimestamps;
-use Webhooks\Database\Concerns\ScopesByTimestamp;
-use Webhooks\Database\Concerns\UsesWebhookConnection;
-use Webhooks\Database\Factories\WebhookCallFactory;
+use Pushery\Webhooks\Client\Exceptions\CorruptRawBody;
+use Pushery\Webhooks\Client\WebhookCallStatus;
+use Pushery\Webhooks\Core\Payload\PayloadStore;
+use Pushery\Webhooks\Database\Concerns\HasZonedTimestamps;
+use Pushery\Webhooks\Database\Concerns\ScopesByTimestamp;
+use Pushery\Webhooks\Database\Concerns\UsesWebhookConnection;
+use Pushery\Webhooks\Database\Factories\WebhookCallFactory;
 
 /**
  * A stored incoming webhook: the exact body hash, the (redacted) headers, the

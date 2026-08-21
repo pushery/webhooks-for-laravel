@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform\Livewire;
+namespace Pushery\Webhooks\Platform\Livewire;
 
 use Illuminate\Container\Container;
 use Illuminate\Contracts\View\View;
@@ -10,11 +10,11 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
-use Webhooks\Models\WebhookSubscription;
-use Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
-use Webhooks\Platform\Support\PortalRoutes;
-use Webhooks\Platform\Transform\DeclarativePayloadTransformer;
-use Webhooks\Platform\Transform\PayloadVersionRegistry;
+use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
+use Pushery\Webhooks\Platform\Support\PortalRoutes;
+use Pushery\Webhooks\Platform\Transform\DeclarativePayloadTransformer;
+use Pushery\Webhooks\Platform\Transform\PayloadVersionRegistry;
 
 /**
  * A structured editor for one endpoint's payload version and declarative transform.
@@ -178,7 +178,11 @@ final class PayloadTransformEditor extends Component
     {
         $decoded = json_decode($this->sampleJson, true);
 
-        return is_array($decoded) ? $decoded : [];
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        return [];
     }
 
     /**
@@ -274,7 +278,11 @@ final class PayloadTransformEditor extends Component
      */
     private function selectedVersion(): ?string
     {
-        return $this->payloadVersion !== '' ? $this->payloadVersion : null;
+        if ($this->payloadVersion !== '') {
+            return $this->payloadVersion;
+        }
+
+        return null;
     }
 
     /**

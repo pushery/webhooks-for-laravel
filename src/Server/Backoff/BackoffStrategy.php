@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Backoff;
+namespace Pushery\Webhooks\Server\Backoff;
 
 /**
  * Computes how long to wait before the retry that follows a failed attempt. The

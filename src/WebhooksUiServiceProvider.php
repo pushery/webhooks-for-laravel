@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Webhooks;
+namespace Pushery\Webhooks;
 
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
-use Webhooks\Livewire\DeliveryLog;
-use Webhooks\Livewire\SubscriptionManager;
+use Pushery\Webhooks\Livewire\DeliveryLog;
+use Pushery\Webhooks\Livewire\SubscriptionManager;
 
 /**
  * The optional OPERATOR console. This provider is NOT auto-registered — register it in a
@@ -26,8 +26,8 @@ use Webhooks\Livewire\SubscriptionManager;
  * gate above cannot give — but the page gate is what keeps the screen off a customer's
  * browser, and no config setting replaces it. The customer-facing
  * equivalents are the self-service portal
- * (`Webhooks\Platform\SelfServicePortalServiceProvider`) and the observability
- * dashboard (`Webhooks\Dashboard\WebhooksDashboardServiceProvider`), both of which
+ * (`Pushery\Webhooks\Platform\SelfServicePortalServiceProvider`) and the observability
+ * dashboard (`Pushery\Webhooks\Dashboard\WebhooksDashboardServiceProvider`), both of which
  * are owner-scoped and policy-guarded — use those for anything a customer touches.
  *
  * Two publishable stub variants render the same components; publish exactly one:

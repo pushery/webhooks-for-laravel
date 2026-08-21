@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Client\Responses;
+namespace Pushery\Webhooks\Client\Responses;
 
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;

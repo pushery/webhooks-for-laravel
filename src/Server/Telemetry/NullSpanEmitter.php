@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Telemetry;
+namespace Pushery\Webhooks\Server\Telemetry;
 
 /**
  * The default emitter: it deliberately does nothing. It is the bound implementation

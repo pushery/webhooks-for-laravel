@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Payload;
+namespace Pushery\Webhooks\Core\Payload;
 
 /**
  * Strips NUL bytes out of a payload so it can be stored.

@@ -16,6 +16,7 @@ return [
         'heading' => 'Your endpoints',
         'new_endpoint' => 'New endpoint',
         'cap_reached' => 'Endpoint limit reached.',
+        'ping' => 'Test',
         'secret' => 'Secret',
         'edit' => 'Edit',
         'transform' => 'Transform',
@@ -192,6 +193,9 @@ return [
         'health_recomputed' => 'Endpoint health recomputed.',
         'health_recomputed_all' => 'Endpoint health recomputed for all endpoints.',
         'transform_saved' => 'Payload transform saved.',
+        'ping_sent' => 'Test event sent.',
+        'ping_disabled' => 'This endpoint is switched off, so a test event would not arrive.',
+        'ping_throttled' => 'This endpoint has had its test events for now. Try again in :seconds second(s).',
     ],
 
     // The form's own validation copy, passed to the validator as custom messages and
@@ -229,6 +233,7 @@ return [
         'health_table' => 'Endpoint health',
         'toggle_active' => 'Toggle active state for :url',
         'reveal_secret' => 'Reveal signing secret for :url',
+        'ping_endpoint' => 'Send a test event to :url',
         'edit_endpoint' => 'Edit endpoint :url',
         'edit_transform' => 'Edit payload transform for :url',
         'delete_endpoint' => 'Delete endpoint :url',

@@ -1,8 +1,8 @@
 <?php
 
 declare(strict_types=1);
-use Webhooks\Core\Signing\StandardWebhooksScheme;
-use Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Core\Signing\StandardWebhooksScheme;
+use Pushery\Webhooks\Models\WebhookDelivery;
 
 return [
 
@@ -62,7 +62,7 @@ return [
     'core' => [
         // The dialect every outbound delivery is signed with unless a single call
         // overrides it with ->signUsing(). Must implement
-        // Webhooks\Core\Signing\SignatureScheme.
+        // Pushery\Webhooks\Core\Signing\SignatureScheme.
         'signing' => [
             'scheme' => StandardWebhooksScheme::class,
         ],
@@ -235,15 +235,15 @@ return [
     | rate limit, and the delivery-log retention window.
     |
     | The 'catalog' lists the event types dispatched with
-    | Webhooks\WebhookEvent::dispatch('type', $payload). The optional 'schema' (a
+    | Pushery\Webhooks\WebhookEvent::dispatch('type', $payload). The optional 'schema' (a
     | JSON Schema array) validates the payload before delivery when
     | 'validate_payloads' is enabled; 'example' and 'description' document the
     | shape for the management UI and your public API reference. A type without a
     | schema, and every event while 'validate_payloads' is false, passes through
-    | unchecked; a mismatch throws Webhooks\Exceptions\InvalidPayloadException.
+    | unchecked; a mismatch throws Pushery\Webhooks\Exceptions\InvalidPayloadException.
     |
     | After 'circuit_breaker.threshold' consecutive final failures an endpoint is
-    | disabled automatically and a Webhooks\Events\WebhookEndpointAutoDisabled
+    | disabled automatically and a Pushery\Webhooks\Events\WebhookEndpointAutoDisabled
     | event is fired; a single successful delivery resets the counter. The
     | 'rate_limit' caps how many deliveries a single subscription may enqueue per
     | minute, backed by the cache store so any driver (including 'array' in tests)
@@ -307,7 +307,7 @@ return [
         // subscription over its per-minute allowance still gets its delivery-log row and
         // its delivery; the delivery is simply enqueued with a delay, so a burst is spread
         // across the following minutes at max_per_minute instead of arriving at once. A
-        // Webhooks\Events\WebhookDeliveryRateLimited event fires for every delivery that
+        // Pushery\Webhooks\Events\WebhookDeliveryRateLimited event fires for every delivery that
         // is deferred this way, so the shaping is visible rather than a silent gap.
         'rate_limit' => [
             'enabled' => true,
@@ -324,7 +324,7 @@ return [
         // Counted per ENDPOINT rather than per account, because that is the bound the
         // destination cares about — how often IT is hit, not how many pings one account
         // made across all of its endpoints. Over the allowance the ping is REFUSED
-        // (Webhooks\Exceptions\TestPingThrottled), not deferred: a test send that arrives
+        // (Pushery\Webhooks\Exceptions\TestPingThrottled), not deferred: a test send that arrives
         // two minutes later has already failed at the only thing it was for.
         //
         // Set to null to remove the brake. On by default — a deliberate behavior change.
@@ -351,7 +351,7 @@ return [
         // payload-transform editor — mounted at 'route_prefix' behind 'middleware'.
         //
         // TWO things switch it on, and both are required: set 'enabled' to true AND
-        // register Webhooks\Platform\SelfServicePortalServiceProvider in the host's
+        // register Pushery\Webhooks\Platform\SelfServicePortalServiceProvider in the host's
         // bootstrap/providers.php — it is NOT auto-registered. It needs livewire/livewire
         // (and pushery/wirekit to render as shipped); a host on another UI kit publishes
         // the views with --tag=webhooks-self-service-views and restyles them.
@@ -503,7 +503,7 @@ return [
     | is never processed twice.
     |
     | 'process' is either a single job class (extend
-    | Webhooks\Client\Jobs\ProcessWebhookJob — it receives the stored call and the
+    | Pushery\Webhooks\Client\Jobs\ProcessWebhookJob — it receives the stored call and the
     | parsed envelope) or a [event-type => job class] map for per-type routing.
     | 'store_headers' controls which request headers are persisted ('*' for all, a
     | list of names, or [] for none); the names in 'redact' (plus Authorization and
@@ -546,19 +546,41 @@ return [
             // [
             //     'name' => 'stripe',
             //     'secret' => env('STRIPE_WEBHOOK_SECRET'),
+            //     // The producer's PREVIOUS secret, kept verifying while a rotation is in
+            //     // flight. Without it a rotation is an outage: the producer switches, and
+            //     // every delivery signed with the new secret is refused 401 until you have
+            //     // deployed — with retries burning down in between. Set it to the old value
+            //     // for the length of the window, then remove it.
+            //     //
+            //     // BOTH secrets verify at the same time, so the window has no gap in it:
+            //     // every scheme walks the set and accepts the first that matches, current
+            //     // first, so the normal case still costs one comparison. Closing the window
+            //     // is therefore a decision about the producer's timeline — and it IS
+            //     // observable: every verified delivery fires InboundWebhookVerified naming
+            //     // the secret that matched, so the window closes on evidence rather than on
+            //     // a guess. Listen for matchedKeyId === SecretSet::PREVIOUS.
+            //     'previous_secret' => env('STRIPE_WEBHOOK_SECRET_PREVIOUS'),
             //     'scheme' => StandardWebhooksScheme::class, // or 'auto' for first-party
             //     // Asymmetric verification: set the scheme to Ed25519Scheme and supply
             //     // the producer's public key either as a static base64 'secret'
             //     // (whpk_… / raw base64), or via a JWKS endpoint of OKP/Ed25519 keys.
             //     // The JWKS document is fetched through the SSRF guard and cached for
-            //     // 'cache_ttl' seconds; 'kid' pins one key, otherwise the current plus
-            //     // previous key (the rotation window) are tried.
-            //     'scheme' => \Webhooks\Core\Signing\Ed25519Scheme::class,
+            //     // 'cache_ttl' seconds. 'kid' pins one key exactly; without it the FIRST TWO
+            //     // keys of the document are tried, in the order the document publishes them.
+            //     //
+            //     // ⚠️ That is a statement about POSITION, not about age — a JWK carries no
+            //     // reliable one, and RFC 7517 defines no ordering for 'keys'. With one or two
+            //     // keys it makes no difference (both are tried either way). With THREE or
+            //     // more, everything past the second is never tried, and a delivery signed
+            //     // with one of them is refused as unsigned: no error, no log, just a producer
+            //     // retrying until its budget is gone. Pin 'kid' when the producer publishes
+            //     // more than two.
+            //     'scheme' => \Pushery\Webhooks\Core\Signing\Ed25519Scheme::class,
             //     'jwks' => ['url' => env('STRIPE_JWKS_URL'), 'cache_ttl' => 3600, 'kid' => null],
             //     // Authenticity that is NOT a signature over the bytes — a provider API
             //     // callback (Mollie) or a cert chain (PayPal). A verifier is
             //     // container-resolved, takes precedence over 'scheme', and makes
-            //     // 'secret' optional. See Webhooks\Client\Verification\InboundVerifier.
+            //     // 'secret' optional. See Pushery\Webhooks\Client\Verification\InboundVerifier.
             //     'verifier' => \App\Webhooks\MollieVerifier::class,
             //     // Header names the producer uses. Applies to ANY header-overridable
             //     // scheme, not just the two above — set 'signature' to bind e.g.
@@ -583,15 +605,27 @@ return [
             //     // noise a producer sends); 'response' decides what the producer gets
             //     // back on success (status, body, headers); 'model' is the Eloquent
             //     // model the received call is stored as — point it at your own (or at
-            //     // Webhooks\Search\SearchableWebhookCall) to add columns or indexing.
-            //     'profile' => \Webhooks\Client\Profiles\ProcessEverythingWebhookProfile::class,
-            //     'response' => \Webhooks\Client\Responses\DefaultRespondsTo::class,
-            //     'model' => \Webhooks\Client\Models\WebhookCall::class,
+            //     // Pushery\Webhooks\Search\SearchableWebhookCall) to add columns or indexing.
+            //     'profile' => \Pushery\Webhooks\Client\Profiles\ProcessEverythingWebhookProfile::class,
+            //     'response' => \Pushery\Webhooks\Client\Responses\DefaultRespondsTo::class,
+            //     'model' => \Pushery\Webhooks\Client\Models\WebhookCall::class,
             //     'process' => \App\Jobs\HandleStripeWebhook::class,
             //     // 'process' => [
             //     //     'invoice.paid' => \App\Jobs\HandleInvoicePaid::class,
             //     //     '*'            => \App\Jobs\HandleUnknownEvent::class,
             //     // ],
+            //     // Where the EVENT TYPE comes from — the column a stream is split on and
+            //     // what 'process' routes by. Unset, it is the body's own `type`, which is
+            //     // what a Standard Webhooks producer sends. Producers that name their
+            //     // events elsewhere need this: GitHub puts it in X-GitHub-Event and leaves
+            //     // the body carrying only `action`, so without it every delivery is logged
+            //     // with an EMPTY type and per-type routing falls to '*' every time. Same
+            //     // grammar as 'dedupe_id' below.
+            //     'event_type' => 'header:X-GitHub-Event',
+            //     // 'event_type' => 'body:data.kind',
+            //     // A resolver is the form GitHub actually wants, because the useful type is
+            //     // the header AND `action` together ('release.published'):
+            //     // 'event_type' => \App\Webhooks\GitHubEventType::class, // an EventTypeResolver
             //     'store_headers' => [],
             //     'redact' => ['Authorization', 'Cookie'],
             //     // Idempotency driver. 'redis+db' (the default) runs the cache fast path
@@ -606,9 +640,16 @@ return [
             //     // SendCloud sends none) need it read elsewhere, or dedupe silently
             //     // does nothing:
             //     //   'dedupe_id' => 'header:X-Delivery-Id'   // an arbitrary header
-            //     //   'dedupe_id' => 'body:data.object.id'    // a dotted path into the body,
+            //     //   'dedupe_id' => 'body:id'                // a dotted path into the body,
             //     //                                           // in whichever format it arrived
             //     //   'dedupe_id' => \App\Webhooks\MyDedupeKey::class // a DedupeKeyResolver
+            //     //
+            //     // ⚠️ It has to be the DELIVERY id, not the id of the thing the delivery is
+            //     // about. Stripe's 'data.object.id' is the invoice or the charge, so every
+            //     // event about that object carries the same value — keyed on it, an
+            //     // 'invoice.payment_failed' is a duplicate of the 'invoice.paid' before it
+            //     // and is acknowledged and dropped without a trace. Stripe's delivery id is
+            //     // the envelope's own 'id' (evt_…), which is what the line below reads.
             //     'dedupe_id' => 'body:id',
             //     'rate_limit' => ['max_attempts' => 60, 'decay_seconds' => 60],
             //     'large_payload' => ['enabled' => false, 'threshold' => 262144, 'disk' => 's3'],
@@ -624,7 +665,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | The folded-in, opt-in analytics layer over the delivery log. It reads; it
-    | records nothing. Its provider (Webhooks\Dashboard\WebhooksDashboardServiceProvider)
+    | records nothing. Its provider (Pushery\Webhooks\Dashboard\WebhooksDashboardServiceProvider)
     | is NOT auto-registered — enable 'enabled' AND register the provider to boot the
     | hourly materialized view, the webhooks:refresh-metrics command and its schedule.
     | The Livewire/WireKit panels are the presentation layer on top of this read model:
@@ -748,7 +789,7 @@ return [
     | the dashboard's materialized view.
     |
     | Strictly opt-in and off by default. Its provider
-    | (Webhooks\Pulse\WebhookPulseServiceProvider) is NOT auto-registered: register
+    | (Pushery\Webhooks\Pulse\WebhookPulseServiceProvider) is NOT auto-registered: register
     | it in a host app, set 'enabled' to true, AND require laravel/pulse (a Composer
     | suggestion). With any of those absent nothing boots — the recorder never
     | listens and the card is never registered. Once enabled, add the card to the
@@ -769,9 +810,9 @@ return [
     | searchable through Laravel Scout. Off by default and adds no dependency:
     | laravel/scout is a Composer suggestion, so nothing is indexed and no engine
     | is contacted until a host installs Scout and sets 'enabled' to true. Use the
-    | ready-made Webhooks\Search\SearchableWebhookDelivery / SearchableWebhookCall
+    | ready-made Pushery\Webhooks\Search\SearchableWebhookDelivery / SearchableWebhookCall
     | models (point dashboard.source_model and a client config's 'model' at them),
-    | or apply the Webhooks\Search\SearchableDelivery / SearchableCall trait to your
+    | or apply the Pushery\Webhooks\Search\SearchableDelivery / SearchableCall trait to your
     | own model. While 'enabled' is false the models report shouldBeSearchable() as
     | false, so no row is ever written to an index.
     |
@@ -801,9 +842,9 @@ return [
     |
     | A dependency-free seam for emitting an OpenTelemetry span per finished
     | delivery. Off by default and pulls in no tracing SDK: the default
-    | Webhooks\Server\Telemetry\SpanEmitter binding is a no-op, so with 'enabled'
+    | Pushery\Webhooks\Server\Telemetry\SpanEmitter binding is a no-op, so with 'enabled'
     | false nothing is emitted and no collector is needed. To use it, bind your own
-    | SpanEmitter implementation (forwarding Webhooks\Server\Telemetry\DeliverySpanAttributes
+    | SpanEmitter implementation (forwarding Pushery\Webhooks\Server\Telemetry\DeliverySpanAttributes
     | to your OpenTelemetry tracer) and set 'enabled' to true; a listener then maps
     | each succeeded / finally-failed delivery to a span name plus attributes (event
     | type, status, duration, attempt, HTTP status code) and hands it to your emitter.
@@ -869,8 +910,8 @@ return [
     | Operator console
     |--------------------------------------------------------------------------
     |
-    | The two publishable OPERATOR components (Webhooks\Livewire\SubscriptionManager
-    | and Webhooks\Livewire\DeliveryLog, registered by WebhooksUiServiceProvider).
+    | The two publishable OPERATOR components (Pushery\Webhooks\Livewire\SubscriptionManager
+    | and Pushery\Webhooks\Livewire\DeliveryLog, registered by WebhooksUiServiceProvider).
     | They are unscoped by design: they read and mutate EVERY tenant's endpoints and
     | deliveries, which is what an operator screen is for and exactly what a customer
     | may never see. They must be embedded behind an operator-only gate of your own.

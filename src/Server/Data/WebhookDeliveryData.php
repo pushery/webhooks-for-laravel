@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Data;
+namespace Pushery\Webhooks\Server\Data;
 
-use Webhooks\Core\Signing\SignatureScheme;
-use Webhooks\Server\Backoff\BackoffStrategy;
+use Pushery\Webhooks\Core\Signing\SignatureScheme;
+use Pushery\Webhooks\Server\Backoff\BackoffStrategy;
 
 /**
  * The immutable, queue-serializable context for one webhook delivery. Carries

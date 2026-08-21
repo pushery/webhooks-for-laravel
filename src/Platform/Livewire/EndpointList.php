@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform\Livewire;
+namespace Pushery\Webhooks\Platform\Livewire;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\View as ViewFactory;
@@ -11,14 +11,15 @@ use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Webhooks\Facades\Webhooks;
-use Webhooks\Models\WebhookSubscription;
-use Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
-use Webhooks\Platform\Support\PortalRoutes;
+use Pushery\Webhooks\Exceptions\TestPingThrottled;
+use Pushery\Webhooks\Facades\Webhooks;
+use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
+use Pushery\Webhooks\Platform\Support\PortalRoutes;
 
 /**
  * The tenant's own endpoint list: each row shows the URL, an active toggle, a cached
- * health badge, its event-type summary and the edit / reveal-secret / delete actions.
+ * health badge, its event-type summary and the test / reveal-secret / edit / delete actions.
  * Paginated and always scoped to the acting tenant, so a foreign owner's endpoints are
  * never listed. The "New endpoint" action is refused once the tenant hits its cap.
  *
@@ -101,10 +102,56 @@ final class EndpointList extends Component
     }
 
     /**
+     * Send one test event to an owned endpoint, so a tenant can prove the destination
+     * answers without waiting for a real one to happen. It is the only question the
+     * portal could not answer before: until an actual product event fired, a freshly
+     * registered endpoint told its owner nothing — and by then a failure is a lost
+     * event rather than a test.
+     *
+     * A spent allowance is reported as a message, not thrown. This is a screen, and
+     * running out of test events is an ordinary outcome of pressing the button rather
+     * than a fault — the same call the operator console makes.
+     */
+    public function ping(int $id): void
+    {
+        $subscription = $this->findOwnedEndpoint($id);
+        $this->authorize('update', $subscription);
+
+        // A disabled endpoint accepts the ping, logs a delivery and is then dropped at
+        // send time by the delivery gate. The tenant would read "sent" over nothing ever
+        // arriving, which is worse than a refusal — so refuse here, where the reason can
+        // still be given.
+        if (! $subscription->is_active) {
+            $this->dispatch('wirekit-toast', variant: 'warning', message: __('webhooks::self-service.toast.ping_disabled'));
+
+            return;
+        }
+
+        try {
+            Webhooks::ping($subscription);
+        } catch (TestPingThrottled $throttled) {
+            $this->dispatch('wirekit-toast', variant: 'warning', message: __('webhooks::self-service.toast.ping_throttled', [
+                'seconds' => $throttled->secondsUntilAvailable,
+            ]));
+
+            return;
+        }
+
+        $this->dispatch('endpoint-pinged');
+        $this->dispatch('wirekit-toast', variant: 'success', message: __('webhooks::self-service.toast.ping_sent'));
+    }
+
+    /**
      * Permanently remove one owned endpoint, gated by both the row-level policy and the
      * allow_delete switch (the policy already honours the switch).
+     *
+     * NOT named `delete`, and the reason is not style. Livewire's CSP-safe build parses a
+     * `wire:click` expression itself rather than handing it to the JS engine, and `delete`
+     * is a KEYWORD in that parser — `wire:click="delete(1)"` reads as the delete OPERATOR,
+     * so the button silently does nothing. No error, no log, and an operator who clicks it
+     * concludes the endpoint is gone. CspSafeMethodNameTest holds the whole class.
      */
-    public function delete(int $id): void
+    public function destroy(int $id): void
     {
         $subscription = $this->findOwnedEndpoint($id);
         $this->authorize('delete', $subscription);
@@ -114,6 +161,23 @@ final class EndpointList extends Component
         $this->resetPage();
         $this->dispatch('endpoint-deleted');
         $this->dispatch('wirekit-toast', variant: 'success', message: __('webhooks::self-service.toast.endpoint_deleted'));
+    }
+
+    /**
+     * The pre-2.0.0 name, kept so a view published before the rename keeps working. Under a
+     * strict CSP that published copy is ALREADY broken — `delete` is a keyword in Livewire's
+     * own expression parser, so `wire:click="delete(1)"` parses as the delete OPERATOR rather
+     * than a call. Re-publish the view, or change that one line, to get the button back.
+     *
+     * Deliberately NOT tagged `@deprecated`, and that is not an oversight. On PHP 8.4 the
+     * code-style pass rewrites that tag into `#[\Deprecated]`, which raises E_USER_DEPRECATED
+     * on every call — and a host that runs PHPUnit with `failOnDeprecation` would then have
+     * this shim break the very tests it exists to keep working. A compatibility forwarder
+     * that fails the people who have not migrated yet is worse than no forwarder.
+     */
+    public function delete(int $id): void
+    {
+        $this->destroy($id);
     }
 
     /**

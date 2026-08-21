@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Backoff;
+namespace Pushery\Webhooks\Server\Backoff;
 
 /**
  * Exponential backoff with FULL jitter: the delay before retry N is a uniform

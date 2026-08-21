@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Database;
+namespace Pushery\Webhooks\Database;
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Schema\ColumnDefinition;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
-use Webhooks\Database\Dialect\Dialect;
+use Pushery\Webhooks\Database\Dialect\Dialect;
 
 /**
  * The storage type of the denormalised owner key (`owner_id`) — the one decision that has to

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Database;
+namespace Pushery\Webhooks\Database;
 
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\ConnectionInterface;
-use Webhooks\Support\Timestamp;
-use Webhooks\Support\WebhookConnection;
+use Pushery\Webhooks\Support\Timestamp;
+use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
  * Creates and drops the monthly range partitions behind the webhook_deliveries
@@ -135,7 +135,11 @@ final class PartitionManager
 
         $total = data_get($this->db()->selectOne($sql, $bindings), 'total');
 
-        return is_numeric($total) ? (int) $total : 0;
+        if (is_numeric($total)) {
+            return (int) $total;
+        }
+
+        return 0;
     }
 
     /**

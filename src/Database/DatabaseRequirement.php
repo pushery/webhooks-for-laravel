@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Database;
+namespace Pushery\Webhooks\Database;
 
 use Illuminate\Database\MySqlConnection;
 use Illuminate\Support\Facades\DB;

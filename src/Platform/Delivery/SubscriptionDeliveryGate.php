@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform\Delivery;
+namespace Pushery\Webhooks\Platform\Delivery;
 
-use Webhooks\Models\WebhookSubscription;
-use Webhooks\Server\Data\WebhookDeliveryData;
-use Webhooks\Server\Delivery\DeliveryGate;
+use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
+use Pushery\Webhooks\Server\Delivery\DeliveryGate;
 
 /**
  * Re-reads the endpoint a queued delivery was addressed to, immediately before it is

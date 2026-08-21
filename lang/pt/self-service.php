@@ -16,6 +16,7 @@ return [
         'heading' => 'Os teus endpoints',
         'new_endpoint' => 'Novo endpoint',
         'cap_reached' => 'Limite de endpoints atingido.',
+        'ping' => 'Testar',
         'secret' => 'Chave',
         'edit' => 'Editar',
         'transform' => 'Transformar',
@@ -191,6 +192,9 @@ return [
         'health_recomputed' => 'Saúde do endpoint recalculada.',
         'health_recomputed_all' => 'Saúde recalculada para todos os endpoints.',
         'transform_saved' => 'Transformação de payload guardada.',
+        'ping_sent' => 'Evento de teste enviado.',
+        'ping_disabled' => 'Este endpoint está desligado, portanto um evento de teste não chegaria.',
+        'ping_throttled' => 'Este endpoint esgotou os seus eventos de teste por agora. Tenta novamente em :seconds segundo(s).',
     ],
 
     // The form's own validation copy, passed to the validator as custom messages and
@@ -228,6 +232,7 @@ return [
         'health_table' => 'Saúde dos endpoints',
         'toggle_active' => 'Alternar o estado ativo de :url',
         'reveal_secret' => 'Mostrar a chave de assinatura de :url',
+        'ping_endpoint' => 'Enviar um evento de teste para :url',
         'edit_endpoint' => 'Editar o endpoint :url',
         'edit_transform' => 'Editar a transformação de payload de :url',
         'delete_endpoint' => 'Eliminar o endpoint :url',

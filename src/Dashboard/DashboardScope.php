@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard;
+namespace Pushery\Webhooks\Dashboard;
 
 use Closure;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -11,8 +11,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Gate;
+use Pushery\Webhooks\Support\TenantIdentity;
 use RuntimeException;
-use Webhooks\Support\TenantIdentity;
 
 /**
  * Resolves the tenant every dashboard query is scoped by. A customer-facing dashboard
@@ -245,6 +245,10 @@ final class DashboardScope
 
         $team = $user->getAttribute('currentTeam');
 
-        return $team instanceof Model ? $team : null;
+        if ($team instanceof Model) {
+            return $team;
+        }
+
+        return null;
     }
 }

@@ -2,33 +2,33 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server;
+namespace Pushery\Webhooks\Server;
 
 use Closure;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
 use JsonException;
-use Webhooks\Core\Signing\JsonCanonicalizer;
-use Webhooks\Core\Signing\SecretSet;
-use Webhooks\Core\Signing\SignatureScheme;
-use Webhooks\Core\Signing\StandardWebhooksScheme;
-use Webhooks\Server\Backoff\BackoffStrategy;
-use Webhooks\Server\Backoff\ExponentialWithJitter;
-use Webhooks\Server\Data\DeliveryOptions;
-use Webhooks\Server\Data\WebhookDeliveryData;
-use Webhooks\Server\Events\WebhookDeliveryDispatching;
-use Webhooks\Server\Jobs\CallWebhookJob;
-use Webhooks\Server\Signing\EncryptedSecretResolver;
-use Webhooks\Support\Settings;
+use Pushery\Webhooks\Core\Signing\JsonCanonicalizer;
+use Pushery\Webhooks\Core\Signing\SecretSet;
+use Pushery\Webhooks\Core\Signing\SignatureScheme;
+use Pushery\Webhooks\Core\Signing\StandardWebhooksScheme;
+use Pushery\Webhooks\Server\Backoff\BackoffStrategy;
+use Pushery\Webhooks\Server\Backoff\ExponentialWithJitter;
+use Pushery\Webhooks\Server\Data\DeliveryOptions;
+use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
+use Pushery\Webhooks\Server\Events\WebhookDeliveryDispatching;
+use Pushery\Webhooks\Server\Jobs\CallWebhookJob;
+use Pushery\Webhooks\Server\Signing\EncryptedSecretResolver;
+use Pushery\Webhooks\Support\Settings;
 
 /**
  * The immutable, fluent builder for sending a webhook — the shape of Laravel's own
  * PendingRequest/PendingMail, and named for it. Each setter returns a CLONE, so a
  * half-built call is a reusable template. Consumers never write a service/action class
- * to send; they call this builder and react to the Webhooks\Server\Events\* attempt
+ * to send; they call this builder and react to the Pushery\Webhooks\Server\Events\* attempt
  * events via listeners.
  *
- * `Webhooks\Server\Facades\WebhookSender::to($url)` is the same builder behind a name
+ * `Pushery\Webhooks\Server\Facades\WebhookSender::to($url)` is the same builder behind a name
  * that reads as a verb, and is how most application code reaches it.
  *
  *     PendingWebhook::create()
@@ -377,7 +377,11 @@ final class PendingWebhook
      */
     public function dispatchIf(bool $condition): ?WebhookDeliveryData
     {
-        return $condition ? $this->dispatch() : null;
+        if ($condition) {
+            return $this->dispatch();
+        }
+
+        return null;
     }
 
     /**

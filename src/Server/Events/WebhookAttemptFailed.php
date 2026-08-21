@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Events;
+namespace Pushery\Webhooks\Server\Events;
 
+use Pushery\Webhooks\Core\Http\TransportResponse;
+use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 use Throwable;
-use Webhooks\Core\Http\TransportResponse;
-use Webhooks\Server\Data\WebhookDeliveryData;
 
 /**
  * ONE HTTP attempt failed (a non-2xx response, or a thrown transport error) and the
@@ -16,7 +16,7 @@ use Webhooks\Server\Data\WebhookDeliveryData;
  * This is NOT the event to notify an endpoint owner from — it fires on every attempt,
  * so a notification wired here goes out once per retry. The delivery gives up exactly
  * once, and announces it as {@see WebhookAttemptsExhausted} (transport-level) and
- * `Webhooks\Events\WebhookDeliveryFailed` (domain-level, carrying the model).
+ * `Pushery\Webhooks\Events\WebhookDeliveryFailed` (domain-level, carrying the model).
  */
 final readonly class WebhookAttemptFailed
 {

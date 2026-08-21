@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Events;
+namespace Pushery\Webhooks\Events;
 
 use Illuminate\Contracts\Auth\Authenticatable;
-use Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Models\WebhookSubscription;
 
 /**
  * Fired when an endpoint's signing secret is rotated, naming WHO rotated it.

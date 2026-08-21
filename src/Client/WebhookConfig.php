@@ -2,26 +2,26 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Client;
+namespace Pushery\Webhooks\Client;
 
 use Illuminate\Support\Facades\Config;
 use InvalidArgumentException;
-use Webhooks\Client\Dedupe\DedupeKeyResolver;
-use Webhooks\Client\Http\BodyDecoder;
-use Webhooks\Client\Jobs\ProcessWebhookJob;
-use Webhooks\Client\Models\WebhookCall;
-use Webhooks\Client\Profiles\ProcessEverythingWebhookProfile;
-use Webhooks\Client\Profiles\WebhookProfile;
-use Webhooks\Client\Responses\DefaultRespondsTo;
-use Webhooks\Client\Responses\RespondsToWebhook;
-use Webhooks\Client\Verification\InboundVerifier;
-use Webhooks\Core\Signing\AcceptsSignatureHeaders;
-use Webhooks\Core\Signing\Ed25519Scheme;
-use Webhooks\Core\Signing\Jwks\JwksKeySet;
-use Webhooks\Core\Signing\SecretSet;
-use Webhooks\Core\Signing\SignatureHeaders;
-use Webhooks\Core\Signing\SignatureScheme;
-use Webhooks\Core\Signing\StandardWebhooksScheme;
+use Pushery\Webhooks\Client\Dedupe\DedupeKeyResolver;
+use Pushery\Webhooks\Client\Http\BodyDecoder;
+use Pushery\Webhooks\Client\Jobs\ProcessWebhookJob;
+use Pushery\Webhooks\Client\Models\WebhookCall;
+use Pushery\Webhooks\Client\Profiles\ProcessEverythingWebhookProfile;
+use Pushery\Webhooks\Client\Profiles\WebhookProfile;
+use Pushery\Webhooks\Client\Responses\DefaultRespondsTo;
+use Pushery\Webhooks\Client\Responses\RespondsToWebhook;
+use Pushery\Webhooks\Client\Verification\InboundVerifier;
+use Pushery\Webhooks\Core\Signing\AcceptsSignatureHeaders;
+use Pushery\Webhooks\Core\Signing\Ed25519Scheme;
+use Pushery\Webhooks\Core\Signing\Jwks\JwksKeySet;
+use Pushery\Webhooks\Core\Signing\SecretSet;
+use Pushery\Webhooks\Core\Signing\SignatureHeaders;
+use Pushery\Webhooks\Core\Signing\SignatureScheme;
+use Pushery\Webhooks\Core\Signing\StandardWebhooksScheme;
 
 /**
  * A typed, resolved view of a single webhooks.client.configs entry, selected by
@@ -65,6 +65,7 @@ final class WebhookConfig
         private readonly string|array $storeHeaders,
         private readonly string $dedupe,
         private readonly ?string $dedupeId,
+        private readonly ?string $eventTypeSpec,
         private readonly ?string $jwksUrl,
         private readonly int $jwksCacheTtl,
         private readonly ?string $jwksKid,
@@ -247,6 +248,57 @@ final class WebhookConfig
     }
 
     /**
+     * The delivery's event type — the column a stream is split on, and what picks the
+     * handler job. The 'event_type' config selects where it comes from:
+     *
+     *   - unset          the body's own `type` field (the default, and what a producer
+     *                    following the Standard Webhooks envelope sends)
+     *   - 'header:Name'  an arbitrary header
+     *   - 'body:path'    a dotted path into the decoded body
+     *   - a class-string an {@see EventTypeResolver} the container resolves
+     *
+     * The header form exists because real producers put it there and nowhere else: GitHub
+     * sends `X-GitHub-Event`, and its body carries only `action` — the sub-kind. Read from
+     * the body alone, such an installation logs every delivery with an EMPTY type, so the
+     * generated column is empty too and per-type job routing falls to the catch-all every
+     * time. Nothing goes red; the stream simply cannot be split.
+     *
+     * The resolver form is the one GitHub actually wants, because the useful type is the
+     * header AND `action` together (`release.published`) rather than either half.
+     *
+     * Deliberately the same grammar as 'dedupe_id', so one validator, one set of prefixes,
+     * and one thing to learn.
+     */
+    public function eventTypeFor(SignatureHeaders $headers, string $rawBody, ?string $bodyType): ?string
+    {
+        $spec = $this->eventTypeSpec;
+
+        if ($spec === null) {
+            return $this->nonEmpty($bodyType);
+        }
+
+        if (str_starts_with($spec, 'header:')) {
+            return $this->nonEmpty($headers->get(substr($spec, 7)));
+        }
+
+        if (str_starts_with($spec, 'body:')) {
+            $value = data_get($this->decodeBody($rawBody, $headers), substr($spec, 5));
+
+            return match (true) {
+                is_string($value) => $this->nonEmpty($value),
+                is_int($value) => (string) $value,
+                default => null,
+            };
+        }
+
+        $resolver = app()->make($spec);
+
+        return $resolver instanceof EventTypeResolver
+            ? $this->nonEmpty($resolver->resolve($this->decodeBody($rawBody, $headers), $rawBody, $headers))
+            : throw new InvalidArgumentException("The 'event_type' resolver for webhook client config [{$this->name}] did not resolve to an EventTypeResolver.");
+    }
+
+    /**
      * The handler job for an event type: the single configured job, the map entry
      * for this type, its '*' fallback, or the base job when nothing is configured.
      *
@@ -375,6 +427,7 @@ final class WebhookConfig
             storeHeaders: self::resolveStoreHeaders($entry['store_headers'] ?? null),
             dedupe: self::resolveDedupe($name, $entry['dedupe'] ?? null),
             dedupeId: self::resolveDedupeId($name, $entry['dedupe_id'] ?? null),
+            eventTypeSpec: self::resolveEventType($name, $entry['event_type'] ?? null),
             jwksUrl: $jwks['url'] ?? null,
             jwksCacheTtl: $jwks['cacheTtl'] ?? 3600,
             jwksKid: $jwks['kid'] ?? null,
@@ -524,6 +577,33 @@ final class WebhookConfig
         }
 
         throw new InvalidArgumentException("The webhook client config [{$name}] has an invalid 'dedupe_id'; expected 'header:Name', 'body:dotted.path', or a DedupeKeyResolver class-string.");
+    }
+
+    /**
+     * Validate the optional 'event_type' strategy up front, so a typo fails at config load
+     * rather than by silently logging every delivery with an empty type — a failure with no
+     * red anywhere, discovered when somebody tries to split the stream. Returns the spec
+     * verbatim, or null for the default (the body's own `type`).
+     */
+    private static function resolveEventType(string $name, mixed $spec): ?string
+    {
+        if ($spec === null) {
+            return null;
+        }
+
+        if (is_string($spec) && (str_starts_with($spec, 'header:') || str_starts_with($spec, 'body:'))) {
+            if ($spec === 'header:' || $spec === 'body:') {
+                throw new InvalidArgumentException("The webhook client config [{$name}] 'event_type' must name a header or body path after the prefix, e.g. 'header:X-GitHub-Event' or 'body:eventType'.");
+            }
+
+            return $spec;
+        }
+
+        if (is_string($spec) && is_a($spec, EventTypeResolver::class, true)) {
+            return $spec;
+        }
+
+        throw new InvalidArgumentException("The webhook client config [{$name}] has an invalid 'event_type'; expected 'header:Name', 'body:dotted.path', or an EventTypeResolver class-string.");
     }
 
     private function nonEmpty(?string $value): ?string

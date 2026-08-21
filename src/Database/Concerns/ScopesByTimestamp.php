@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Database\Concerns;
+namespace Pushery\Webhooks\Database\Concerns;
 
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
-use Webhooks\Support\Timestamp;
+use Pushery\Webhooks\Support\Timestamp;
 
 /**
  * Query scopes that bind a moment against this package's timestamp columns as an

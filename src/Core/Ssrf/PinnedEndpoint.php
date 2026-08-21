@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Ssrf;
+namespace Pushery\Webhooks\Core\Ssrf;
 
 /**
  * A vetted, connection-pinned destination: the original URL plus the exact IP

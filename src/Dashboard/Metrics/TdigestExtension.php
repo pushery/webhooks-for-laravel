@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard\Metrics;
+namespace Pushery\Webhooks\Dashboard\Metrics;
 
 use Illuminate\Support\Facades\DB;
 use RuntimeException;

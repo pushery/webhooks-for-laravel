@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Console;
+namespace Pushery\Webhooks\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Pushery\Webhooks\Database\DatabaseRequirement;
 use RuntimeException;
-use Webhooks\Database\DatabaseRequirement;
 
 /**
  * Checks that the database webhooks-for-laravel stores its tables in is one the package

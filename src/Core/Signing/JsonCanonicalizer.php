@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Signing;
+namespace Pushery\Webhooks\Core\Signing;
 
 use JsonException;
 

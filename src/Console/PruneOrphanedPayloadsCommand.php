@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Console;
+namespace Pushery\Webhooks\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Number;
-use Webhooks\Support\PayloadReclaimer;
+use Pushery\Webhooks\Support\PayloadReclaimer;
 
 /**
  * Deletes offloaded payload objects on the configured Storage disk(s) that no log row still

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Signing;
+namespace Pushery\Webhooks\Core\Signing;
 
 /**
  * Generates an Ed25519 keypair in the exact base64 encoding {@see Ed25519Scheme}

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Database\Dialect\Sql;
+namespace Pushery\Webhooks\Database\Dialect\Sql;
 
-use Webhooks\Database\OwnerKeyType;
+use Pushery\Webhooks\Database\OwnerKeyType;
 
 /**
  * Recomputes the hourly delivery rollup on MySQL, which has no materialized view to REFRESH.

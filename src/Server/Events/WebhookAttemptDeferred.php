@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Events;
+namespace Pushery\Webhooks\Server\Events;
 
-use Webhooks\Server\Data\WebhookDeliveryData;
+use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 
 /**
  * A rate-limiting endpoint asked to be retried later than the queue can hold a job for

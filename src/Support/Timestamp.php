@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Support;
+namespace Pushery\Webhooks\Support;
 
 use DateTimeImmutable;
 use DateTimeInterface;
 use DateTimeZone;
-use Webhooks\Database\Dialect\Dialect;
+use Pushery\Webhooks\Database\Dialect\Dialect;
 
 /**
  * Renders a moment as an UNAMBIGUOUS SQL timestamp literal: the same instant in UTC,

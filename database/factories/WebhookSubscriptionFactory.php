@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Database\Factories;
+namespace Pushery\Webhooks\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
-use Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Models\WebhookSubscription;
 
 /**
  * @extends Factory<WebhookSubscription>

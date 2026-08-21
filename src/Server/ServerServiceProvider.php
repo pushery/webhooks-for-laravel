@@ -2,25 +2,25 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server;
+namespace Pushery\Webhooks\Server;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Override;
-use Webhooks\Server\Delivery\DeliveryGate;
-use Webhooks\Server\Delivery\OpenDeliveryGate;
-use Webhooks\Server\Delivery\ResponseClassifier;
-use Webhooks\Server\Events\WebhookAttemptsExhausted;
-use Webhooks\Server\Events\WebhookAttemptSucceeded;
-use Webhooks\Server\Listeners\PersistServerDelivery;
-use Webhooks\Server\Models\WebhookServerDelivery;
-use Webhooks\Server\Signing\EncryptedSecretResolver;
-use Webhooks\Server\Signing\SecretResolver;
-use Webhooks\Server\Telemetry\NullSpanEmitter;
-use Webhooks\Server\Telemetry\RecordDeliverySpan;
-use Webhooks\Server\Telemetry\SpanEmitter;
+use Pushery\Webhooks\Server\Delivery\DeliveryGate;
+use Pushery\Webhooks\Server\Delivery\OpenDeliveryGate;
+use Pushery\Webhooks\Server\Delivery\ResponseClassifier;
+use Pushery\Webhooks\Server\Events\WebhookAttemptsExhausted;
+use Pushery\Webhooks\Server\Events\WebhookAttemptSucceeded;
+use Pushery\Webhooks\Server\Listeners\PersistServerDelivery;
+use Pushery\Webhooks\Server\Models\WebhookServerDelivery;
+use Pushery\Webhooks\Server\Signing\EncryptedSecretResolver;
+use Pushery\Webhooks\Server\Signing\SecretResolver;
+use Pushery\Webhooks\Server\Telemetry\NullSpanEmitter;
+use Pushery\Webhooks\Server\Telemetry\RecordDeliverySpan;
+use Pushery\Webhooks\Server\Telemetry\SpanEmitter;
 
 /**
  * Registers the Server delivery layer: the by-reference secret resolver and the

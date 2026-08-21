@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Http;
+namespace Pushery\Webhooks\Core\Http;
 
 use Illuminate\Support\Facades\Http;
 use Psr\Http\Message\StreamInterface;
-use Webhooks\Core\Ssrf\PinnedEndpoint;
+use Pushery\Webhooks\Core\Ssrf\PinnedEndpoint;
 
 /**
  * Sends the exact signed bytes to a vetted, IP-pinned destination over Laravel's

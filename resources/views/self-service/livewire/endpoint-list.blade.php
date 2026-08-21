@@ -1,7 +1,7 @@
 {{-- The tenant's own endpoint list: URL, cached health badge, event-type summary, an
-     active toggle button (aria-pressed) and the per-row edit / reveal-secret / delete
-     actions. Always owner-scoped, paginated, with a WireKit empty state. Deletion uses
-     the WireKit alert-dialog (never wire:confirm) and is hidden when disallowed. --}}
+     active toggle button (aria-pressed) and the per-row test / reveal-secret / edit /
+     delete actions. Always owner-scoped, paginated, with a WireKit empty state. Deletion
+     uses the WireKit alert-dialog (never wire:confirm) and is hidden when disallowed. --}}
 <div class="wh-portal-list" wire:key="endpoint-list">
     <div class="mb-[var(--padding-wk-y-md)] flex flex-wrap items-center justify-between gap-[var(--padding-wk-x-md)]">
         <x-wirekit::heading :level="2" size="md">{{ __('webhooks::self-service.list.heading') }}</x-wirekit::heading>
@@ -80,6 +80,19 @@
                         </x-wirekit::table.td>
                         <x-wirekit::table.td align="right">
                             <div class="inline-flex items-center gap-[var(--gap-wk-sm)]">
+                                {{-- First, and the order is the point: this is the action a
+                                     tenant reaches for most and the only one that costs
+                                     nothing. Destructive stays last. It carries a loading
+                                     state the neighbours do not, because it is the only one
+                                     that waits on a network round trip. --}}
+                                <x-wirekit::button
+                                    size="sm"
+                                    surface="ghost"
+                                    wire:click="ping({{ $endpoint->id }})"
+                                    wire:loading.attr="disabled"
+                                    wire:target="ping"
+                                    :aria-label="__('webhooks::self-service.a11y.ping_endpoint', ['url' => $endpoint->url])"
+                                >{{ __('webhooks::self-service.list.ping') }}</x-wirekit::button>
                                 <x-wirekit::button
                                     size="sm"
                                     surface="ghost"
@@ -131,7 +144,7 @@
                                             <x-wirekit::alert-dialog.cancel />
                                             <x-wirekit::button
                                                 intent="danger"
-                                                wire:click="delete({{ $endpoint->id }})"
+                                                wire:click="destroy({{ $endpoint->id }})"
                                             >{{ __('webhooks::self-service.delete_dialog.confirm') }}</x-wirekit::button>
                                         </x-wirekit::alert-dialog.actions>
                                     </x-wirekit::alert-dialog>

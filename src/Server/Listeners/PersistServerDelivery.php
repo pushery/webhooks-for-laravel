@@ -2,24 +2,24 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Listeners;
+namespace Pushery\Webhooks\Server\Listeners;
 
 use DateTimeInterface;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Date;
+use Pushery\Webhooks\Enums\DeliveryStatus;
+use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
+use Pushery\Webhooks\Server\Events\WebhookAttemptFailed;
+use Pushery\Webhooks\Server\Events\WebhookAttemptRetrying;
+use Pushery\Webhooks\Server\Events\WebhookAttemptsExhausted;
+use Pushery\Webhooks\Server\Events\WebhookAttemptStarting;
+use Pushery\Webhooks\Server\Events\WebhookAttemptSucceeded;
+use Pushery\Webhooks\Server\Events\WebhookDeliveryDispatching;
+use Pushery\Webhooks\Server\Models\WebhookServerDelivery;
+use Pushery\Webhooks\Support\WebhookConnection;
 use Throwable;
-use Webhooks\Enums\DeliveryStatus;
-use Webhooks\Server\Data\WebhookDeliveryData;
-use Webhooks\Server\Events\WebhookAttemptFailed;
-use Webhooks\Server\Events\WebhookAttemptRetrying;
-use Webhooks\Server\Events\WebhookAttemptsExhausted;
-use Webhooks\Server\Events\WebhookAttemptStarting;
-use Webhooks\Server\Events\WebhookAttemptSucceeded;
-use Webhooks\Server\Events\WebhookDeliveryDispatching;
-use Webhooks\Server\Models\WebhookServerDelivery;
-use Webhooks\Support\WebhookConnection;
 
 /**
  * The standalone counterpart to the Platform delivery-log subscriber: it maps the

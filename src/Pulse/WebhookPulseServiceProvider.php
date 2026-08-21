@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Pulse;
+namespace Pushery\Webhooks\Pulse;
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
@@ -10,8 +10,9 @@ use Illuminate\Support\ServiceProvider;
 use Laravel\Pulse\Pulse;
 use Livewire\Livewire;
 use Override;
-use Webhooks\Server\Events\WebhookAttemptsExhausted;
-use Webhooks\Server\Events\WebhookAttemptSucceeded;
+use Pushery\Webhooks\Server\Events\WebhookAttemptsExhausted;
+use Pushery\Webhooks\Server\Events\WebhookAttemptSucceeded;
+use Pushery\Webhooks\Support\MergesPackageConfig;
 
 /**
  * Boots the internal-ops Laravel Pulse integration — the delivery recorder and its
@@ -21,16 +22,18 @@ use Webhooks\Server\Events\WebhookAttemptSucceeded;
  * nor wants the internal monitor pays nothing and nothing boots.
  *
  * This is the single-view engineering monitor, distinct from the multi-tenant
- * customer dashboard (Webhooks\Dashboard). laravel/pulse is a Composer suggestion, so
+ * customer dashboard (Pushery\Webhooks\Dashboard). laravel/pulse is a Composer suggestion, so
  * the recorder and card are referenced directly here but every runtime path is guarded
  * by class_exists + config before anything touches Pulse.
  */
 final class WebhookPulseServiceProvider extends ServiceProvider
 {
+    use MergesPackageConfig;
+
     #[Override]
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../../config/webhooks.php', 'webhooks');
+        $this->mergePackageConfig();
     }
 
     /**

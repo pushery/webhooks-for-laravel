@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Models;
+namespace Pushery\Webhooks\Models;
 
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -12,13 +12,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 use Override;
-use Webhooks\Core\Payload\PayloadStore;
-use Webhooks\Database\Concerns\HasZonedTimestamps;
-use Webhooks\Database\Concerns\ScopesByTimestamp;
-use Webhooks\Database\Concerns\UsesWebhookConnection;
-use Webhooks\Database\Factories\WebhookDeliveryFactory;
-use Webhooks\Database\OwnerKeyType;
-use Webhooks\Enums\DeliveryStatus;
+use Pushery\Webhooks\Core\Payload\PayloadStore;
+use Pushery\Webhooks\Database\Concerns\HasZonedTimestamps;
+use Pushery\Webhooks\Database\Concerns\ScopesByTimestamp;
+use Pushery\Webhooks\Database\Concerns\UsesWebhookConnection;
+use Pushery\Webhooks\Database\Factories\WebhookDeliveryFactory;
+use Pushery\Webhooks\Database\OwnerKeyType;
+use Pushery\Webhooks\Enums\DeliveryStatus;
 
 /**
  * A single delivery-log entry: one event sent to one subscription.
@@ -119,7 +119,11 @@ class WebhookDelivery extends Model
             flags: JSON_THROW_ON_ERROR,
         );
 
-        return is_array($decoded) ? $decoded : [];
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        return [];
     }
 
     /**

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform\Support;
+namespace Pushery\Webhooks\Platform\Support;
 
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Config;

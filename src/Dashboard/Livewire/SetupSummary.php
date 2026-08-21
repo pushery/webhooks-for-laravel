@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard\Livewire;
+namespace Pushery\Webhooks\Dashboard\Livewire;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Lazy;
 use Livewire\Component;
-use Webhooks\Dashboard\DashboardScope;
-use Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Dashboard\DashboardScope;
+use Pushery\Webhooks\Models\WebhookSubscription;
 
 /**
  * The setup / endpoint-health summary: how many endpoints the acting tenant has

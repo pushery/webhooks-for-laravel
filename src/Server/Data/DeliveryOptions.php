@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Data;
+namespace Pushery\Webhooks\Server\Data;
 
 use Illuminate\Support\Facades\Crypt;
-use Webhooks\Core\Http\TransportOptions;
+use Pushery\Webhooks\Core\Http\TransportOptions;
 
 /**
- * The transport + delivery options collected by the `Webhooks\Server\PendingWebhook`
+ * The transport + delivery options collected by the `Pushery\Webhooks\Server\PendingWebhook`
  * builder for one call, queue-serializable as part of {@see WebhookDeliveryData}.
  * A superset of {@see TransportOptions} that also carries the large-payload offload
  * threshold — a day-zero seam so a later offload feature is a pure activation, not

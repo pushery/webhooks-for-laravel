@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform\Support;
+namespace Pushery\Webhooks\Platform\Support;
 
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Support\TenantIdentity;
 use RuntimeException;
-use Webhooks\Models\WebhookSubscription;
-use Webhooks\Support\TenantIdentity;
 
 /**
  * Resolves the tenant every self-service subscription query is scoped by, so a tenant
@@ -182,6 +182,10 @@ final class SubscriptionScope
 
         $team = $user->getAttribute('currentTeam');
 
-        return $team instanceof Model ? $team : null;
+        if ($team instanceof Model) {
+            return $team;
+        }
+
+        return null;
     }
 }

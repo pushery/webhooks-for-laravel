@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard\Metrics;
+namespace Pushery\Webhooks\Dashboard\Metrics;
 
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterval;
@@ -11,15 +11,15 @@ use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Config;
+use Pushery\Webhooks\Dashboard\DashboardTenant;
+use Pushery\Webhooks\Dashboard\Data\KpiSet;
+use Pushery\Webhooks\Database\Dialect\Dialect;
+use Pushery\Webhooks\Database\Dialect\Sql\PercentileSelect;
+use Pushery\Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Support\Timestamp;
+use Pushery\Webhooks\Support\WebhookConnection;
 use RuntimeException;
 use stdClass;
-use Webhooks\Dashboard\DashboardTenant;
-use Webhooks\Dashboard\Data\KpiSet;
-use Webhooks\Database\Dialect\Dialect;
-use Webhooks\Database\Dialect\Sql\PercentileSelect;
-use Webhooks\Models\WebhookDelivery;
-use Webhooks\Support\Timestamp;
-use Webhooks\Support\WebhookConnection;
 
 /**
  * The dashboard's reporting query object, scoped to one tenant and one time window.
@@ -277,7 +277,11 @@ final readonly class WebhookMetrics
      */
     private function toInt(mixed $value): int
     {
-        return is_numeric($value) ? (int) $value : 0;
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        return 0;
     }
 
     /**
@@ -286,7 +290,11 @@ final readonly class WebhookMetrics
      */
     private function toFloat(mixed $value): float
     {
-        return is_numeric($value) ? (float) $value : 0.0;
+        if (is_numeric($value)) {
+            return (float) $value;
+        }
+
+        return 0.0;
     }
 
     /**

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Database\Dialect\Sql;
+namespace Pushery\Webhooks\Database\Dialect\Sql;
 
 /**
  * A COUNT of the rows matching a condition, portable across PostgreSQL and MySQL.

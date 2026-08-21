@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Ssrf;
+namespace Pushery\Webhooks\Core\Ssrf;
 
-use Webhooks\Core\Http\Exceptions\BlockedDestination;
+use Pushery\Webhooks\Core\Http\Exceptions\BlockedDestination;
 
 /**
  * The default SSRF guard. Refuses non-HTTP(S) schemes, plaintext HTTP when HTTPS

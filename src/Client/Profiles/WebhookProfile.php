@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Client\Profiles;
+namespace Pushery\Webhooks\Client\Profiles;
 
 use Illuminate\Http\Request;
 

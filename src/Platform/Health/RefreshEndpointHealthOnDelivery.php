@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform\Health;
+namespace Pushery\Webhooks\Platform\Health;
 
 use Illuminate\Contracts\Events\Dispatcher;
-use Webhooks\Events\WebhookDeliveryFailed;
-use Webhooks\Events\WebhookDeliverySucceeded;
-use Webhooks\Models\WebhookSubscription;
-use Webhooks\Support\Settings;
+use Pushery\Webhooks\Events\WebhookDeliveryFailed;
+use Pushery\Webhooks\Events\WebhookDeliverySucceeded;
+use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Support\Settings;
 
 /**
  * Keeps an endpoint's cached health fresh by recomputing it whenever one of its

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard;
+namespace Pushery\Webhooks\Dashboard;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -12,22 +12,23 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 use Override;
-use Webhooks\Dashboard\Console\RefreshMetricsCommand;
-use Webhooks\Dashboard\Events\WebhookRedeliveryRequested;
-use Webhooks\Dashboard\Listeners\RedeliverWebhookListener;
-use Webhooks\Dashboard\Livewire\DeliveriesTable;
-use Webhooks\Dashboard\Livewire\DeliveryDetailDrawer;
-use Webhooks\Dashboard\Livewire\HourlyActivityChart;
-use Webhooks\Dashboard\Livewire\KpiCards;
-use Webhooks\Dashboard\Livewire\LatencyPanel;
-use Webhooks\Dashboard\Livewire\RecentQueue;
-use Webhooks\Dashboard\Livewire\SetupSummary;
-use Webhooks\Dashboard\Livewire\TopEvents;
-use Webhooks\Dashboard\Livewire\WebhooksDashboardPage;
-use Webhooks\Dashboard\Policies\WebhookDeliveryPolicy;
-use Webhooks\Models\WebhookDelivery;
-use Webhooks\Support\PlatformRequirement;
-use Webhooks\Support\ScheduleCadence;
+use Pushery\Webhooks\Dashboard\Console\RefreshMetricsCommand;
+use Pushery\Webhooks\Dashboard\Events\WebhookRedeliveryRequested;
+use Pushery\Webhooks\Dashboard\Listeners\RedeliverWebhookListener;
+use Pushery\Webhooks\Dashboard\Livewire\DeliveriesTable;
+use Pushery\Webhooks\Dashboard\Livewire\DeliveryDetailDrawer;
+use Pushery\Webhooks\Dashboard\Livewire\HourlyActivityChart;
+use Pushery\Webhooks\Dashboard\Livewire\KpiCards;
+use Pushery\Webhooks\Dashboard\Livewire\LatencyPanel;
+use Pushery\Webhooks\Dashboard\Livewire\RecentQueue;
+use Pushery\Webhooks\Dashboard\Livewire\SetupSummary;
+use Pushery\Webhooks\Dashboard\Livewire\TopEvents;
+use Pushery\Webhooks\Dashboard\Livewire\WebhooksDashboardPage;
+use Pushery\Webhooks\Dashboard\Policies\WebhookDeliveryPolicy;
+use Pushery\Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Support\MergesPackageConfig;
+use Pushery\Webhooks\Support\PlatformRequirement;
+use Pushery\Webhooks\Support\ScheduleCadence;
 
 /**
  * Boots the folded-in, customer-facing observability read model — the hourly
@@ -42,6 +43,8 @@ use Webhooks\Support\ScheduleCadence;
  */
 final class WebhooksDashboardServiceProvider extends ServiceProvider
 {
+    use MergesPackageConfig;
+
     /**
      * Whether the bundled materialized-view migration is registered automatically.
      * Disable with self::ignoreMigrations() to publish and manage it in the host app.
@@ -56,7 +59,7 @@ final class WebhooksDashboardServiceProvider extends ServiceProvider
     #[Override]
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../../config/webhooks.php', 'webhooks');
+        $this->mergePackageConfig();
     }
 
     /**

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard;
+namespace Pushery\Webhooks\Dashboard;
 
-use Webhooks\Database\Dialect\Dialect;
-use Webhooks\Database\OwnerKeyType;
-use Webhooks\Support\TenantIdentity;
+use Pushery\Webhooks\Database\Dialect\Dialect;
+use Pushery\Webhooks\Database\OwnerKeyType;
+use Pushery\Webhooks\Support\TenantIdentity;
 
 /**
  * What a dashboard read is scoped to. Three scopes, and the distinction between the last

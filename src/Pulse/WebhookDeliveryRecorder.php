@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Pulse;
+namespace Pushery\Webhooks\Pulse;
 
 use Laravel\Pulse\Pulse;
-use Webhooks\Server\Events\WebhookAttemptsExhausted;
-use Webhooks\Server\Events\WebhookAttemptSucceeded;
+use Pushery\Webhooks\Server\Events\WebhookAttemptsExhausted;
+use Pushery\Webhooks\Server\Events\WebhookAttemptSucceeded;
 
 /**
  * Feeds each terminal delivery outcome into Laravel Pulse for the internal-ops card

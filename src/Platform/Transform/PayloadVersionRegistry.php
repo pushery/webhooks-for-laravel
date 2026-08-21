@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform\Transform;
+namespace Pushery\Webhooks\Platform\Transform;
 
 use Illuminate\Support\Facades\Config;
 
@@ -33,6 +33,10 @@ final class PayloadVersionRegistry
 
         $rules = $versions[$version] ?? null;
 
-        return is_array($rules) ? $rules : null;
+        if (is_array($rules)) {
+            return $rules;
+        }
+
+        return null;
     }
 }

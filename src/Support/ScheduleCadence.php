@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Support;
+namespace Pushery\Webhooks\Support;
 
 use Illuminate\Console\Scheduling\Event;
 use InvalidArgumentException;

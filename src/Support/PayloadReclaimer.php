@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Support;
+namespace Pushery\Webhooks\Support;
 
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
-use Webhooks\Client\Models\WebhookCall;
-use Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Client\Models\WebhookCall;
+use Pushery\Webhooks\Models\WebhookDelivery;
 
 /**
  * Deletes offloaded payload objects on a Storage disk that no log row still points at.

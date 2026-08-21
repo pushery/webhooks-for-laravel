@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Support;
+namespace Pushery\Webhooks\Support;
 
 use Illuminate\Database\Eloquent\Model;
 use RuntimeException;

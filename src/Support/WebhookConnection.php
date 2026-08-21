@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Support;
+namespace Pushery\Webhooks\Support;
 
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
-use Webhooks\Database\Dialect\Dialect;
+use Pushery\Webhooks\Database\Dialect\Dialect;
 
 /**
  * Resolves the database connection the package stores its tables on.
@@ -32,7 +32,11 @@ final class WebhookConnection
         // returning the default. A null or empty value both mean "the application default".
         $connection = Config::get('webhooks.database.connection');
 
-        return is_string($connection) && $connection !== '' ? $connection : null;
+        if (is_string($connection) && $connection !== '') {
+            return $connection;
+        }
+
+        return null;
     }
 
     /**

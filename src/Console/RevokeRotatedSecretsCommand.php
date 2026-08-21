@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Console;
+namespace Pushery\Webhooks\Console;
 
 use Illuminate\Console\Command;
-use Webhooks\Models\WebhookSubscription;
-use Webhooks\WebhookManager;
+use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\WebhookManager;
 
 /**
  * Clears every rotated-away signing secret whose rotation window has closed.

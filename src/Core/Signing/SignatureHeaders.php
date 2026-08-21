@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Signing;
+namespace Pushery\Webhooks\Core\Signing;
 
 /**
  * A scheme-agnostic, case-insensitive carrier for the signature headers a scheme

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Route;
-use Webhooks\Dashboard\Http\WebhookMetricsController;
-use Webhooks\Dashboard\Livewire\WebhooksDashboardPage;
+use Pushery\Webhooks\Dashboard\Http\WebhookMetricsController;
+use Pushery\Webhooks\Dashboard\Livewire\WebhooksDashboardPage;
 
 // The customer-facing dashboard route. Loaded by the dashboard service provider
 // only when the layer is enabled. Both the middleware stack (which carries the

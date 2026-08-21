@@ -2,20 +2,21 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform;
+namespace Pushery\Webhooks\Platform;
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 use Override;
-use Webhooks\Platform\Livewire\EndpointDeliveries;
-use Webhooks\Platform\Livewire\EndpointForm;
-use Webhooks\Platform\Livewire\EndpointHealthMatrix;
-use Webhooks\Platform\Livewire\EndpointList;
-use Webhooks\Platform\Livewire\EndpointSecretPanel;
-use Webhooks\Platform\Livewire\PayloadTransformEditor;
-use Webhooks\Platform\Livewire\SelfServicePortalPage;
-use Webhooks\Support\PlatformRequirement;
+use Pushery\Webhooks\Platform\Livewire\EndpointDeliveries;
+use Pushery\Webhooks\Platform\Livewire\EndpointForm;
+use Pushery\Webhooks\Platform\Livewire\EndpointHealthMatrix;
+use Pushery\Webhooks\Platform\Livewire\EndpointList;
+use Pushery\Webhooks\Platform\Livewire\EndpointSecretPanel;
+use Pushery\Webhooks\Platform\Livewire\PayloadTransformEditor;
+use Pushery\Webhooks\Platform\Livewire\SelfServicePortalPage;
+use Pushery\Webhooks\Support\MergesPackageConfig;
+use Pushery\Webhooks\Support\PlatformRequirement;
 
 /**
  * Boots the self-service endpoint portal — the customer-facing Livewire/WireKit
@@ -37,10 +38,12 @@ use Webhooks\Support\PlatformRequirement;
  */
 final class SelfServicePortalServiceProvider extends ServiceProvider
 {
+    use MergesPackageConfig;
+
     #[Override]
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../../config/webhooks.php', 'webhooks');
+        $this->mergePackageConfig();
     }
 
     /**

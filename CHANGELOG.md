@@ -4,6 +4,383 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-08-21
+
+### Changed
+
+- **Every `return` whose fallback is a constant is now an early exit.** 37 of them across 22
+  files, mechanically: `return is_numeric($v) ? (int) $v : 0;` became an `if` with the fallback
+  on its own line. **No behavior changes** — the condition is not negated and the two arms are
+  the same two arms, only as two statements.
+
+  Why it is worth 22 files: line coverage records *was this line executed*, not *which arm ran*.
+  On one line, the fallback counts as covered the first time anything takes the true arm, so it
+  can go years unexercised under a green 100% floor. That matters most where mutation cannot
+  help either — no mutator moves a `null` or `[]` fallback while leaving the true arm standing,
+  so for those the floor is the only instrument there is, and one-lining them switched it off.
+
+- **Both receiving events name their config instead of carrying it, and the refusal event no
+  longer carries the request.** `InvalidWebhookSignature` now has `source`, `reason`, `ip`,
+  `path` and `userAgent`; `UnreadableWebhookPayload` has `call`, `source` and `contentType`.
+  `$event->source` is the client config's name, and `WebhookConfig::forName($event->source)`
+  returns the whole config wherever you need it, queued listeners included.
+
+  **Two defects closed at once, and both were silent.** A `WebhookConfig` holds the signing
+  secret and the rotation secret in cleartext, so an event carrying one wrote `whsec_…` into any
+  log that recorded it and into any queue payload that shipped it — copies no retention policy
+  covers, and it needed no queue to happen. And a listener marked `ShouldQueue` on
+  `InvalidWebhookSignature` turned **every forged, unsigned or expired request into a 500
+  instead of a 401**, on the default configuration: Laravel serializes a job even on the `sync`
+  driver, a request holds unserializable closures, and the throw landed before the line that
+  answers 401. The listener never ran, so the rate-limiting it was queued for did not happen
+  either — on the one path three docblocks promise is never a 500.
+
+  **If you have a listener on either event**, replace `$event->config` with
+  `WebhookConfig::forName($event->source)`, or read `$event->source` where you only wanted the
+  name. On `InvalidWebhookSignature`, `$event->request` is gone: `ip`, `path` and `userAgent`
+  are on the event, and a listener that needs the rest of the request can call `request()` —
+  but must then not be queued.
+
+- **The root namespace is now `Pushery\Webhooks\`.** It was `Webhooks\`, which made this the
+  only package in the family without the shared prefix — `pushery/wirekit` is
+  `Pushery\WireKit\`, `pushery/legal-consent` is `Pushery\LegalConsent\`. A consuming
+  application wrote `Pushery\Webhooks\Enums\DeliveryStatus` from memory and got a
+  class-not-found: right about the convention, wrong about this package.
+
+  **Nothing else changes.** Every class keeps its name and its position, no configuration key
+  moves, no behavior differs, and the Composer package name is still
+  `pushery/webhooks-for-laravel`. For most applications the upgrade is a search and replace
+  over `use Webhooks\` and `\Webhooks\`.
+
+  **What that does not cover, in the order it matters:**
+
+  1. **Drain the queue before deploying.** A queued job carries its own class name in its
+     serialized payload, so any `CallWebhookJob` or `ProcessWebhookJob` still waiting when the
+     new code goes live cannot be unserialized. Check `failed_jobs` too — a retry after the
+     upgrade hits the same wall. This is the only step with a deadline.
+  2. **Fix `bootstrap/providers.php` by hand — the search and replace does not reach it.** A
+     provider list holds a **bare** class name, with no `use` and no leading backslash, so
+     neither pattern matches. Four providers are auto-discovered and move on their own; the
+     three opt-in ones you registered yourself do not (`WebhooksDashboardServiceProvider`,
+     `SelfServicePortalServiceProvider`, `WebhooksUiServiceProvider`). Laravel resolves that
+     list on every request, so a missed line is a fatal on boot rather than a feature that
+     quietly stops working.
+  3. **Re-publish, or fix the imports in, anything you published** — migrations and views hold
+     `use Webhooks\…` in your application, not in ours. Livewire component aliases are plain
+     strings and need no edit.
+  4. **`config:clear`, `route:clear`, `optimize:clear`.** A cached configuration holds the
+     resolved signature-scheme class; a cached route table holds the controller class.
+  5. **Config values that name a package class** — `core.signing.scheme`,
+     `client.configs.*.{scheme,profile,response,model,dedupe_id}`, `dashboard.source_model`. A
+     class of your own in any of them is unaffected.
+
+  **No database migration, and no stored row holds a package class name** — the package
+  registers no morph map, `owner_type` holds *your* model, and no shipped migration writes a
+  class name into a column. Deliveries, subscriptions and secrets all survive untouched.
+
+  Full instructions: [Upgrading from 1.x](https://docs.pushery.com/webhooks-for-laravel/guides/upgrading-from-1x).
+
+- **The security policy now covers `2.x`.** `1.x` is end of life as of this release.
+
+- **`require` no longer lists `illuminate/*` components beside `laravel/framework`.** The
+  four that were there — `console`, `contracts`, `database`, `support` — are all `replace`d
+  by the framework at the same version, so they bought no resolution: removing them left the
+  resolved dependency graph **bit-identical**, 76 runtime and 106 development packages, same
+  names and same versions. **Nothing about what gets installed changes.**
+
+  What they did buy was a second constraint per component to carry across the next Laravel
+  major, whose failure message would point at `illuminate/support` rather than at the
+  framework that had just moved — and a manifest asserting two postures at once, "I am lean,
+  I name what I use" and "I need all of it", with no way for a reader to tell which holds.
+
+  The framework is declared deliberately: the shipped tree makes 88 calls across 14 helpers
+  that only `Illuminate\Foundation` declares, and Foundation ships exclusively inside the
+  metapackage.
+
+- **The delete action on both consoles is now `destroy()`.** Under a strict
+  Content-Security-Policy, Livewire serves its CSP-safe bundle, which parses a `wire:` value
+  with its own parser instead of handing it to the JS engine — `eval` is exactly what the
+  policy forbids. `delete` is a **keyword** in that parser, so `wire:click="delete(1)"` read
+  as the delete *operator* rather than a call to the method.
+
+  It failed in the worst possible way: nothing threw, the page rendered, the button was
+  there — and clicking it did nothing at all. No error, no log, no toast. An operator who
+  clicked "delete" and saw no complaint concluded the endpoint was gone. It also blocked a
+  consumer from adopting the operator console at all.
+
+  **Nothing breaks.** `delete()` stays as a `@deprecated` forwarder, so a view you published
+  before this release keeps working. ⚠️ **But that published copy was already broken under a
+  strict CSP** — it still calls `delete(…)`, which still parses as the operator there.
+  Re-publish the view, or change that one line to `destroy(…)`, to get the button back.
+
+  The gate ability is **unchanged**: `admin.ability` still receives `'delete'`, so a host's
+  authorization callback needs no edit. The forwarder deliberately carries no `@deprecated`
+  tag either — on PHP 8.4 that becomes `#[\Deprecated]`, which raises a deprecation on every
+  call, and a shim that fails the test suites of the hosts who have not migrated yet is worse
+  than no shim.
+
+  `CspSafeMethodNameTest` now holds the whole class, not this one name — `new`, `in`,
+  `typeof` and `void` are plausible method names too. It reads the keyword list out of the
+  shipped Livewire bundle rather than restating it, so a keyword added upstream arrives with
+  the next `composer update`.
+
+- **The KPI ribbon's loading skeleton no longer carries the `wh-dash-kpis` class**; it uses
+  `wh-dash-kpis-placeholder`, matching the three other dashboard placeholders. A host that
+  styled `.wh-dash-kpis` was styling both states without a way to tell them apart.
+
+- **The two WireKit stubs now say that they are a bad pair on one page.** The delivery log's
+  filter is a WireKit select bound with `wire:model.live`; the subscription manager ships the
+  delete dialogs. Together on one screen, the dialog's destructive action stops being
+  clickable — it opens, the click never lands, and nothing is logged. The package's own portal
+  hits this and answers it with a native `<select>` carrying the same tokens. Both stubs now
+  carry the warning and name the escape; neither renders anything different. Copy them onto
+  one screen and you were reproducing a defect the portal already worked around.
+
+- **The README badge row follows the shared layout used across the published packages.** It is
+  now two rows — identity first (version, PHP range, Laravel range, license, all read live from
+  Packagist), then the toolchain — and the singular "Laravel Version" label is corrected to the
+  plural the rest of the family uses. A new badge names the databases the package is exercised
+  against, **PostgreSQL and MySQL**; MariaDB is absent because the package rejects it outright,
+  which the requirements section has always said in words.
+
+### Added
+
+- **`InboundWebhookVerified` — close a rotation window on evidence instead of on a guess.** Every
+  authenticated delivery now fires an event naming the secret that verified it, so the one
+  question a rotation raises has an answer: *is anything still arriving on the old secret?* Set
+  `previous_secret`, listen for `matchedKeyId === SecretSet::PREVIOUS`, and retire the old key
+  when it stops appearing. `matchedKeyId` is `current` or `previous` for a static secret, the
+  JWKS `kid` when the keys come from a JWKS document, and whatever a custom verifier reported.
+
+  The value was always there — `VerificationResult` has carried it from the start and its
+  docblock says "so a rotation can be observed" — and every shipped scheme filled it in. Nothing
+  read it back, so the promise was kept by the schemes and dropped by the pipeline; the config
+  template said as much in a comment, which is now gone because it is no longer true.
+
+  It fires on **every** verified delivery rather than only the rare one, deliberately: firing
+  only on `previous` makes silence ambiguous, because a finished migration and no traffic at all
+  look identical and call for opposite actions. Filter in your listener if you only want the rare
+  case. A listener that throws cannot cost the delivery — the dispatch is guarded and the failure
+  is reported.
+
+- **`event_type` — say where an inbound delivery's event type comes from.** It was read from
+  the body's `type` field and nowhere else. GitHub puts it in `X-GitHub-Event` and leaves the
+  body carrying only `action`, so a GitHub installation logged **every** delivery with an
+  empty `event_type`: the generated column empty too, and per-type `process` routing falling
+  to the catch-all every single time. Nothing went red — receiving worked, dedupe worked, the
+  payload was all there; only the column a stream is split on was blank.
+
+  Same grammar as `dedupe_id`, deliberately, so there is one validator and one thing to learn:
+  `'header:X-GitHub-Event'`, `'body:data.kind'`, or a `Webhooks\Client\EventTypeResolver`
+  class-string. The resolver form is what GitHub actually wants — the useful type is the
+  header **and** `action` together (`release.published`), which neither half gives alone. A
+  malformed spec now fails at config load rather than at an empty column.
+
+  Unset, behavior is unchanged.
+
+- **`Webhooks::dispatchTo()` — deliver an application event to exactly one endpoint.**
+  `dispatch()` fans out, and its third argument narrows to a *tenant*, not to an endpoint:
+  two endpoints of the same customer share one. An application that routes rule → endpoint
+  rather than event → every endpoint of that type had nowhere to go. The two methods that
+  do take a single subscription were not a way in either — `ping()` sends a fixed
+  `webhooks.ping` body, `redeliver()` needs a delivery that already exists.
+
+  One subscription in, one `WebhookDelivery` out, and **no other endpoint gets a delivery
+  row** — not even one that would then fail to send. It runs the same chain as a fan-out:
+  catalog schema, NUL scrub, payload offload, SSRF re-validation, signing, circuit breaker,
+  and the rate limit *shaping* the send rather than discarding it.
+
+  An endpoint the fan-out would not have reached — inactive, auto-disabled, or never
+  subscribed to that event type — raises the new `SubscriptionNotListening` instead. Not
+  delivered, because sending an endpoint an event it never asked for is the one thing a
+  subscription list exists to prevent; and not skipped, because a caller that named one
+  subscription and got nothing back has an event that vanished.
+
+- **The self-service portal can send a test event.** Every row of the endpoint list now
+  carries a **Test** action that sends one `webhooks.ping` delivery to that endpoint. It was
+  the one question the portal could not answer: until a real product event fired, a customer
+  who had just registered an endpoint learned nothing about it — and by then a failure is a
+  lost event rather than a test. The capability already existed on the manager and in the
+  operator console; only the tenant-facing surface was missing it.
+
+  It is bounded by the existing `platform.test_ping.max_per_minute` (default `5`). Note that
+  the allowance is **per endpoint, not per tenant** — pair it with
+  `platform.self_service.max_endpoints_per_tenant` if the total matters for your
+  installation.
+
+  A **disabled** endpoint is refused rather than pinged: it would otherwise accept the
+  request, record a delivery, and have it dropped at send time, leaving the customer reading
+  "sent" over nothing arriving. A spent allowance is reported with the seconds to wait rather
+  than raised as an error. Copy is shipped in all seven locales.
+
+### Fixed
+
+- **A timestamp you assign yourself now means the same instant on MySQL as on PostgreSQL.** A
+  naive string is a wall clock, and only a timezone turns it into an instant. Reading one back
+  out of a MySQL column follows the column's rule — those bytes are UTC. Assigning one in your
+  own code follows yours — it is your application's local time. Both went through the same
+  branch, so the column's rule was applied to your value: under `Europe/Berlin`,
+  `WebhookCall::create([… 'created_at' => '2026-07-12 14:30:00'])` stored **14:30Z on MySQL and
+  12:30Z on PostgreSQL** — two hours apart from the identical line of code, with nothing to
+  notice it. Retention and every window query read those rows, so the same delivery was pruned
+  on different days depending on the engine.
+
+  The write path is now resolved the way PostgreSQL has always resolved it, so the two engines
+  agree. **This changes stored values on MySQL** for timestamps an application assigns as a
+  naive string; the package's own writes were never affected, because it always passes a date
+  object. A numeric string is also read as the unix timestamp it is — that case did not diverge
+  quietly, it threw `InvalidFormatException` out of a model setter on MySQL while PostgreSQL
+  stored it.
+
+- **The envelope a handler receives is NUL-scrubbed, like the row the package stores.** A NUL
+  byte in a payload string is never intentional but entirely real, and PostgreSQL's `jsonb` type
+  categorically refuses one. The package removed them before its own insert and left the copy a
+  handler reads untouched, so an application writing `$this->message->payload` into a `jsonb`
+  column of its own hit the wall the package had already cleared for itself — and hit it badly:
+  the producer already had its 2xx so nothing was retried, the call row stayed on `received`
+  because the status line sits after the write that threw, and the exception carried the whole
+  payload into `failed_jobs` and from there into whatever collects errors, a second copy no
+  retention policy on the payload column covers.
+
+  The removal now happens where the body is read, so both copies come from one place. **Nothing
+  else changes**: the raw body, its SHA-256 and the format a body was read as are all untouched,
+  `$call->body()` still returns the exact bytes that were received and signature-verified, and a
+  body made only of NUL bytes is still reported as unreadable rather than as absent. If you
+  wrapped a handler in a scrub of your own, you can drop it.
+
+- **The PostgreSQL dedupe upsert no longer runs on the read connection.** Reading the id back
+  out of `INSERT … ON CONFLICT … RETURNING id` means the statement travels through
+  `selectOne()`, whose third argument defaults to the **read** PDO — so on a host running the
+  webhooks connection with Laravel's `read`/`write` split, every inbound delivery sent its
+  insert to a replica. Against a streaming replica that is `SQLSTATE 25006` and a 500 on
+  authentic traffic; against a read node that accepts writes it is quieter and worse, because
+  the row lands off the write path and the read that follows reports the delivery as a
+  **duplicate**. The connection is now also marked as modified, so a `sticky` split protects
+  that read. The MySQL arm was never affected — `affectingStatement()` does both by itself.
+
+- **The JSON metrics endpoint reports the right hour on MySQL.** The hourly rollup stores its
+  bucket the way this package stores every timestamp on MySQL — UTC-naive in a `DATETIME` — and
+  the controller parsed that string without saying which zone it was in. PHP then supplied its
+  default, which is `app.timezone`, so on a host in any non-UTC zone every bucket came back at an
+  instant off by that host's own offset: two hours in a German summer. **The counts inside each
+  bucket were right**, which is what made it survive — a chart, a status page or an alerting rule
+  driven off this endpoint drew a completely plausible curve beside the truth, and nothing
+  anywhere went red. PostgreSQL puts the offset in the string it returns and was never affected.
+
+  The gap that hid it was in the suite's shape rather than in anyone's attention: the endpoint's
+  tests run only on PostgreSQL, and the MySQL lane drives no HTTP route at all, so no run ever
+  crossed the two. That crossing now exists as its own lane, and it is what fails when this
+  regresses.
+
+- **The JWKS key window is documented as what it is.** The config template promised that
+  without a pinned `kid` "the current plus previous key" are tried — a claim about **age**. The
+  code takes the **first two keys of the document**, and a JWK carries no reliable age (RFC 7517
+  defines no ordering for `keys`). With one or two keys the two readings agree; with three or
+  more, everything past the second is never tried and a delivery signed with one of those keys
+  is refused as unsigned — no error, no log, just a producer retrying until its budget is gone.
+  The template and the interop page now say so and point at `kid`, and a test pins the limit
+  rather than leaving it implicit.
+
+- **The dedupe example no longer points at the object id.** The config template and the
+  receiving page both offered `body:data.object.id` in the same breath as Stripe — and that
+  path is the invoice or the charge, which **every** event about that object carries. Copied
+  as written, `invoice.payment_failed` became a duplicate of the `invoice.paid` before it:
+  acknowledged, dropped, no trace, and the producer never repeats a delivery it was told
+  succeeded. Both now read `body:id` — Stripe's delivery id is the envelope's own `evt_…` —
+  and both name the wrong answer beside the right one, because a reader who already wrote it
+  needs to be able to find out why.
+
+- **`previous_secret` is documented.** The receive-side key has been implemented for a long
+  time and was named in no configuration template and no page — and a capability nobody can
+  find is one that does not exist. It is what keeps a producer's old secret verifying during a
+  rotation; without it a rotation is an outage, with the producer's retries burning down while
+  every new-secret delivery is refused `401`. The occasion for looking it up is usually an
+  incident. The template now also says what makes the key usable: **both secrets verify at the
+  same time**, current first, so the rotation window has no gap in it and the normal case still
+  costs one comparison.
+
+- **A published config file no longer has to be a complete copy.** The merge was Laravel's
+  `mergeConfigFrom`, which is an `array_merge` at the top level only. This package ships
+  twelve top-level keys and every one is a deep tree, so a host that published the file and
+  kept just the block it changed replaced that whole layer: the siblings it trimmed away
+  became **undefined**, and every key a later release added to that layer never reached it.
+
+  Nothing reported it, and it failed in the bad direction — an absent key reads as `null`,
+  and `null` on a brake means "no brake". A host that set
+  `platform.self_service.max_endpoints_per_tenant` and deleted the rest was running with the
+  registration and test-ping brakes switched off, silently.
+
+  The merge is now recursive, at all **six** providers rather than one — the layers are
+  independently mountable, so a host may boot any single one of them.
+
+  **A list is replaced whole, never merged by index.** `dashboard.windows`,
+  `core.ssrf.allowed_hosts`, `platform.catalog`, `server.retryable_4xx` and the six other
+  lists are values you set, not containers to descend into. Narrowing `windows` to `['7d']`
+  gives exactly `['7d']` — a recursive merge without that distinction would hand back the
+  entries you removed, which on an allow-list is not a cosmetic difference.
+
+  Switching something off is still spelled `=> null`. **Behavior change:** a host that
+  switched a brake off by *deleting* its key instead gets the shipped default back — 5/min
+  for test pings, 10/min for registrations. Deleting a key now means "no opinion", which is
+  what a trimmed publish always looked like it meant.
+
+  **If you run `config:cache`, rebuild it after upgrading.** The merge happens at boot, so a
+  cache built by the previous version keeps serving what that version merged.
+
+- **A dashboard panel that was still loading when the time window changed stayed on the old
+  window — permanently.** The header read `7d` while the panel counted `24h`, and nothing
+  reported it: no error, no log, and no later refresh that corrected it. It needed the panel
+  to be mid-load at the moment of the click, so it showed up as an occasional oddity rather
+  than a reproducible fault.
+
+  The window switch was a broadcast, and a broadcast cannot reach a panel that has not
+  finished loading — Livewire drops the event for one. The panel then finished loading from
+  parameters captured when the page first rendered, which still named the old window, and
+  the page's own re-render could not correct them.
+
+  The window is now part of each panel's identity instead of an event, so changing it loads
+  those panels again on the new window. **Visible change:** switching the window now shows
+  the panels' skeletons for one round trip rather than replacing the numbers in place.
+
+- **Under a Content-Security-Policy without `unsafe-eval`, the delivery drawer's focus trap
+  and the secret panel's countdown did not run at all.** Both were inline Alpine object
+  literals, and such a literal does not parse under Alpine's CSP evaluator — the directive is
+  simply skipped, in the browser, with nothing in any server log.
+
+  It removed the focus trap from a panel that shows delivery payloads: focus escaped behind
+  the overlay and never returned to the control that opened it, so the drawer became
+  unusable by keyboard and screen reader while looking correct to everyone else. In the
+  portal it left a revealed signing secret on screen past the window it was meant to close in.
+
+  Both are registered Alpine components now, injected once per page with the same CSP nonce
+  the layouts already use for the theme mirror. Behavior is unchanged. `AlpineExpressionShapeTest`
+  holds every shipped `x-data` to a bare factory call so logic cannot creep back into an
+  attribute.
+
+  **If you run a strict CSP: give the nonce.** Pinning `ui.theme` used to remove the only
+  inline script; it no longer does, and the styling guide now lists all three.
+
+- **The drawer's timestamps did not say which clock they were showing.** They rendered
+  through a bare `LLL` pattern, which prints a wall-clock time with no zone. The detail panel
+  is where an operator holds a delivery against their own records, and an unexplained hour of
+  offset there reads as a delivery that did not happen when it did. The pattern is a
+  translatable key now and carries the zone (`July 12, 2026 2:30 PM CEST`). The display zone
+  itself is unchanged — it is `app.timezone`, as before.
+
+- **`AddressClassifier`'s docblock explained the CIDR list with two addresses PHP's own filter
+  already blocks.** The behavior of the class is unchanged and was never wrong — only the
+  reason given for it was, and it was wrong in both directions. It cited `fd00:ec2::254` and
+  `fe80::/10` as ranges that `FILTER_FLAG_NO_RES_RANGE` lets through; the filter blocks both.
+  The ranges it genuinely reports as public went unmentioned: carrier-grade NAT, benchmarking,
+  site-local IPv6, the IPv4-compatible loopback, the transition prefixes, the documentation
+  blocks and multicast — 17 of the 28 entries in the list.
+
+  That is the worst shape a wrong comment can take, because it invites the wrong action:
+  anyone checking the stated reason finds both addresses blocked and concludes the list is
+  redundant. The rationale now names ranges the filter really does pass, and a unit-test arm
+  asserts that claim against `filter_var()` itself rather than against this class — so the
+  sentence cannot rot again through a PHP upgrade or a change to the list.
+
 ## [1.12.0] - 2026-08-16
 
 ### Changed
@@ -1482,7 +1859,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v1.12.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.12.0...v2.0.0
 [1.12.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.10.1...v1.11.0
 [1.10.1]: https://github.com/pushery/webhooks-for-laravel/compare/v1.10.0...v1.10.1

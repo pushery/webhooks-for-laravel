@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Route;
-use Webhooks\Platform\Livewire\EndpointHealthMatrix;
-use Webhooks\Platform\Livewire\PayloadTransformEditor;
-use Webhooks\Platform\Livewire\SelfServicePortalPage;
+use Pushery\Webhooks\Platform\Livewire\EndpointHealthMatrix;
+use Pushery\Webhooks\Platform\Livewire\PayloadTransformEditor;
+use Pushery\Webhooks\Platform\Livewire\SelfServicePortalPage;
 
 // The self-service endpoint portal routes. Loaded by the portal service provider only
 // when the layer is enabled. Both the middleware stack (which should carry the auth +

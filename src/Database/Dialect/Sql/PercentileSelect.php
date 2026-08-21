@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Database\Dialect\Sql;
+namespace Pushery\Webhooks\Database\Dialect\Sql;
 
 /**
  * A continuous (interpolating) percentile of duration_ms over a bounded set of delivery rows.

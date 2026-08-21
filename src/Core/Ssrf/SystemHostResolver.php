@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Ssrf;
+namespace Pushery\Webhooks\Core\Ssrf;
 
 /**
  * The production resolver: resolves BOTH A (IPv4) and AAAA (IPv6) records via the

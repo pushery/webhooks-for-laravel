@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Events;
+namespace Pushery\Webhooks\Server\Events;
 
+use Pushery\Webhooks\Core\Http\TransportResponse;
+use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 use Throwable;
-use Webhooks\Core\Http\TransportResponse;
-use Webhooks\Server\Data\WebhookDeliveryData;
 
 /**
  * The delivery is over and it never landed: its attempts are spent, or one of them hit
@@ -16,7 +16,7 @@ use Webhooks\Server\Data\WebhookDeliveryData;
  * consecutive failures and auto-disable an endpoint.
  *
  * A consumer that runs the Platform layer can listen to
- * `Webhooks\Events\WebhookDeliveryFailed` instead, which fires at the same moment and
+ * `Pushery\Webhooks\Events\WebhookDeliveryFailed` instead, which fires at the same moment and
  * carries the WebhookDelivery model rather than the transport's value object.
  */
 final readonly class WebhookAttemptsExhausted

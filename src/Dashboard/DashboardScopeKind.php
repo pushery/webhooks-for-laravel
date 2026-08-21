@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard;
+namespace Pushery\Webhooks\Dashboard;
 
 /**
  * Which of the three dashboard scopes a {@see DashboardTenant} is.

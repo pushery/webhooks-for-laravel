@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Delivery;
+namespace Pushery\Webhooks\Server\Delivery;
 
-use Webhooks\Server\Data\WebhookDeliveryData;
+use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 
 /**
  * The Server layer's own gate: everything the engine was asked to send, it sends.
- * A consumer driving `Webhooks\Server\PendingWebhook` directly owns the decision
+ * A consumer driving `Pushery\Webhooks\Server\PendingWebhook` directly owns the decision
  * to enqueue, and the engine has no registry of endpoints to re-check it against.
  * The Platform layer replaces this binding with one that does.
  *

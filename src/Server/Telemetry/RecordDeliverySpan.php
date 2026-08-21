@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Telemetry;
+namespace Pushery\Webhooks\Server\Telemetry;
 
-use Webhooks\Server\Events\WebhookAttemptsExhausted;
-use Webhooks\Server\Events\WebhookAttemptSucceeded;
+use Pushery\Webhooks\Server\Events\WebhookAttemptsExhausted;
+use Pushery\Webhooks\Server\Events\WebhookAttemptSucceeded;
 
 /**
  * The listener that turns a finished delivery into a span and hands it to the bound

@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Search;
+namespace Pushery\Webhooks\Search;
 
 use Illuminate\Support\Str;
 use Laravel\Scout\Builder;
 use Laravel\Scout\Searchable;
-use Webhooks\Support\Settings;
+use Pushery\Webhooks\Support\Settings;
 
 /**
  * Makes an inbound call-log model searchable through Laravel Scout, indexing only

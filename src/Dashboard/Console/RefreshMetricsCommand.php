@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Dashboard\Console;
+namespace Pushery\Webhooks\Dashboard\Console;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Database\ConnectionInterface;
-use Webhooks\Dashboard\Metrics\WebhookMetrics;
-use Webhooks\Database\Dialect\Dialect;
-use Webhooks\Database\Dialect\Sql\RollupRefresh;
-use Webhooks\Support\Timestamp;
-use Webhooks\Support\WebhookConnection;
+use Pushery\Webhooks\Dashboard\Metrics\WebhookMetrics;
+use Pushery\Webhooks\Database\Dialect\Dialect;
+use Pushery\Webhooks\Database\Dialect\Sql\RollupRefresh;
+use Pushery\Webhooks\Support\Timestamp;
+use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
  * Refreshes the hourly delivery-metrics materialized view. Runs CONCURRENTLY so the

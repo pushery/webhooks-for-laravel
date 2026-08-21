@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Client;
+namespace Pushery\Webhooks\Client;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Http\Kernel;
@@ -12,10 +12,11 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Route as RouteFacade;
 use Illuminate\Support\ServiceProvider;
 use Override;
-use Webhooks\Client\Console\ImportSpatieCallsCommand;
-use Webhooks\Client\Http\CaptureRawBody;
-use Webhooks\Client\Http\WebhookController;
-use Webhooks\Client\Models\WebhookCall;
+use Pushery\Webhooks\Client\Console\ImportSpatieCallsCommand;
+use Pushery\Webhooks\Client\Http\CaptureRawBody;
+use Pushery\Webhooks\Client\Http\WebhookController;
+use Pushery\Webhooks\Client\Models\WebhookCall;
+use Pushery\Webhooks\Support\MergesPackageConfig;
 
 /**
  * Boots the inbound Client layer, but only when webhooks.client.enabled — an app
@@ -25,6 +26,8 @@ use Webhooks\Client\Models\WebhookCall;
  */
 final class WebhookClientServiceProvider extends ServiceProvider
 {
+    use MergesPackageConfig;
+
     /**
      * Whether the bundled client migration is registered automatically. Disable with
      * self::ignoreMigrations() to publish and manage it in the host app instead.
@@ -39,7 +42,7 @@ final class WebhookClientServiceProvider extends ServiceProvider
     #[Override]
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../../config/webhooks.php', 'webhooks');
+        $this->mergePackageConfig();
     }
 
     /**

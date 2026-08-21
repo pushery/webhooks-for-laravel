@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Delivery;
+namespace Pushery\Webhooks\Server\Delivery;
 
-use Webhooks\Core\Http\TransportResponse;
+use Pushery\Webhooks\Core\Http\TransportResponse;
 
 /**
  * Classifies a delivery response into success / retry / final-failure.

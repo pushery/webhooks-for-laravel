@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Core\Signing;
+namespace Pushery\Webhooks\Core\Signing;
 
-use Webhooks\Client\Verification\InboundVerifier;
+use Pushery\Webhooks\Client\Verification\InboundVerifier;
 
 /**
  * The outcome of verifying an incoming webhook. Only {@see self::Valid} lets a request

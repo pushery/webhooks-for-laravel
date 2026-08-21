@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Webhooks;
+namespace Pushery\Webhooks;
 
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Models\WebhookDelivery;
 
 /**
  * Ergonomic entry point for emitting a domain event to its subscribers:

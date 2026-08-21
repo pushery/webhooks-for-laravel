@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Exceptions;
+namespace Pushery\Webhooks\Server\Exceptions;
 
 use InvalidArgumentException;
 
@@ -15,6 +15,6 @@ final class UnknownSignatureScheme extends InvalidArgumentException
 {
     public static function for(string $class): self
     {
-        return new self("The signature scheme [{$class}] must implement Webhooks\\Core\\Signing\\SignatureScheme.");
+        return new self("The signature scheme [{$class}] must implement Pushery\Webhooks\\Core\\Signing\\SignatureScheme.");
     }
 }

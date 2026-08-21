@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Models;
+namespace Pushery\Webhooks\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -13,11 +13,13 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Override;
-use Webhooks\Database\Concerns\HasZonedTimestamps;
-use Webhooks\Database\Concerns\ScopesByTimestamp;
-use Webhooks\Database\Concerns\UsesWebhookConnection;
-use Webhooks\Database\Factories\WebhookSubscriptionFactory;
-use Webhooks\Support\Settings;
+use Pushery\Webhooks\Database\Concerns\HasZonedTimestamps;
+use Pushery\Webhooks\Database\Concerns\ScopesByTimestamp;
+use Pushery\Webhooks\Database\Concerns\UsesWebhookConnection;
+use Pushery\Webhooks\Database\Factories\WebhookSubscriptionFactory;
+use Pushery\Webhooks\Livewire\SubscriptionManager;
+use Pushery\Webhooks\Platform\Livewire\EndpointForm;
+use Pushery\Webhooks\Support\Settings;
 
 /**
  * A registered webhook endpoint and the event types it listens for.
@@ -135,6 +137,18 @@ final class WebhookSubscription extends Model
      * is then delivered to subscribers of `order.line.added`, `order.line.*` and `order.*` —
      * one prefix per dot boundary. Each arm is still a `whereJsonContains`, so the GIN /
      * multi-valued index serves the lookup as before.
+     *
+     * ⚠️ EVERY LOOKUP HERE DEPENDS ON `event_types` BEING A JSON *LIST*, and that is an
+     * invariant the writers hold, not one the column enforces. `whereJsonContains` looks for a
+     * member of an array; against an OBJECT it matches nothing — measured: a row stored as
+     * `{"5":"invoice.paid"}` is invisible to `listeningFor('invoice.paid')` while looking
+     * perfectly configured in both consoles, with no error, no empty state and no log line.
+     *
+     * The shape is reachable because both management components bind `$eventTypes` to a PUBLIC
+     * Livewire property, so a payload decides its keys. All three writers therefore re-index:
+     * {@see WebhookManager::subscribe()}, {@see EndpointForm} and
+     * {@see SubscriptionManager}, each with its own arm. A fourth writer
+     * needs one too — including anything a host reaches through `$fillable`.
      *
      * @param  Builder<WebhookSubscription>  $query
      * @return Builder<WebhookSubscription>

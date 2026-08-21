@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Livewire;
+namespace Pushery\Webhooks\Livewire;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Webhooks\Exceptions\TestPingThrottled;
-use Webhooks\Facades\Webhooks;
-use Webhooks\Livewire\Concerns\AuthorizesOperatorActions;
-use Webhooks\Models\WebhookDelivery;
-use Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Exceptions\TestPingThrottled;
+use Pushery\Webhooks\Facades\Webhooks;
+use Pushery\Webhooks\Livewire\Concerns\AuthorizesOperatorActions;
+use Pushery\Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Models\WebhookSubscription;
 
 /**
  * The OPERATOR view of the delivery log: browse every delivery, filter it, and replay or
@@ -28,7 +28,7 @@ use Webhooks\Models\WebhookSubscription;
  * whole console gates the same way rather than only half of it. Left unset, nothing changes.
  *
  * The tenant-facing surface is the observability dashboard
- * (`Webhooks\Dashboard\Livewire\DeliveriesTable`), which is owner-scoped and
+ * (`Pushery\Webhooks\Dashboard\Livewire\DeliveriesTable`), which is owner-scoped and
  * policy-guarded.
  */
 final class DeliveryLog extends Component
@@ -109,6 +109,13 @@ final class DeliveryLog extends Component
             // simplePaginate, not paginate: this operator stub is unscoped over the whole
             // delivery log, and a full count(*) on every render does not scale on a partitioned
             // table with millions of rows. Prev/next navigation needs no total.
+            //
+            // That choice is also why this screen has no counterpart to the portal's
+            // "land a reader who ran past the end on the last page that exists": that recovery
+            // reads total() and lastPage(), and a simple paginator has neither — knowing them
+            // is precisely the count this call refuses to pay. An operator who pages past a
+            // tail the retention window dropped therefore gets an empty page and steps back,
+            // rather than a count(*) over millions of rows on every render for everyone else.
             ->simplePaginate(25);
 
         return ViewFactory::make('webhooks::livewire.delivery-log', [

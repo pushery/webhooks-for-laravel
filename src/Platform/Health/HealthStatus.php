@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Platform\Health;
+namespace Pushery\Webhooks\Platform\Health;
 
 use Illuminate\Support\Facades\Config;
 

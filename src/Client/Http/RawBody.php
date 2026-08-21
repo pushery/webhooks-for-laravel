@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Client\Http;
+namespace Pushery\Webhooks\Client\Http;
 
 use Illuminate\Http\Request;
-use Webhooks\Client\Verification\InboundVerifier;
+use Pushery\Webhooks\Client\Verification\InboundVerifier;
 
 /**
  * The exact bytes of an inbound delivery, for code that has to verify over them.

@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Client;
+namespace Pushery\Webhooks\Client;
 
-use Webhooks\Client\Http\BodyDecoder;
+use Pushery\Webhooks\Client\Http\BodyDecoder;
 
 /**
  * The parsed envelope of an incoming webhook: the producer's id, the event type, the
  * created-at timestamp and the data payload, read from the body in whichever format the
  * producer sent it. This is the RECEIVE-side view of a message — the one a handler job
- * reads via $this->message — as distinct from `Webhooks\Core\Signing\WebhookMessage`,
+ * reads via $this->message — as distinct from `Pushery\Webhooks\Core\Signing\WebhookMessage`,
  * which models the exact bytes a signature is computed over. Every field is nullable
  * because an arbitrary producer need not follow any particular body convention.
  *

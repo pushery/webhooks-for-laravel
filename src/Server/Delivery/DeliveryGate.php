@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Webhooks\Server\Delivery;
+namespace Pushery\Webhooks\Server\Delivery;
 
-use Webhooks\Server\Data\WebhookDeliveryData;
+use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 
 /**
  * The last word on whether a QUEUED delivery may still go out.
@@ -17,7 +17,7 @@ use Webhooks\Server\Data\WebhookDeliveryData;
  *
  * The Server layer knows nothing about subscriptions, so it ships an open gate; the
  * Platform layer binds the one that re-reads the endpoint (see
- * `Webhooks\Platform\Delivery\SubscriptionDeliveryGate`).
+ * `Pushery\Webhooks\Platform\Delivery\SubscriptionDeliveryGate`).
  */
 interface DeliveryGate
 {
