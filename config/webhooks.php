@@ -765,6 +765,29 @@ return [
             'denied' => env('WEBHOOKS_DASHBOARD_PAYLOAD_DENIED', 'redacted'),
         ],
         'source_model' => WebhookDelivery::class,
+        // The zone the dashboard RENDERS timestamps in, which is a different question from
+        // the zone they are stored or read in. Null (the default) changes nothing: every
+        // value stays in app.timezone, and the absolute format ends in `z` so the reader can
+        // see which clock they are being shown.
+        //
+        // Set it when app.timezone is not the right DISPLAY zone — which in a multi-tenant
+        // back-office it usually is not: UTC is right for storage and wrong for the operator
+        // reading the delivery log, and there is no single value the application could set
+        // that is correct for every reader. Labelling the offset only tells them to do the
+        // arithmetic themselves, on the one surface where they compare against their own
+        // records.
+        //
+        //     'timezone' => 'Europe/Berlin',              // one operator, or one tenant
+        //     'timezone' => TenantDisplayZone::class,     // resolved per render
+        //
+        // The class form must implement Pushery\Webhooks\Dashboard\DashboardTimezoneResolver
+        // — the same "the host decides, the package asks" shape as the payload seam above. A
+        // zone identifier the runtime does not know falls back to the application zone rather
+        // than throwing: a typo in a display setting must not take a dashboard down, and the
+        // `z` in the format means the fallback names itself instead of showing a plausible
+        // wrong number. A class that does not implement the contract DOES throw — that is
+        // wiring, not a typo.
+        'timezone' => env('WEBHOOKS_DASHBOARD_TIMEZONE'),
         'windows' => ['24h', '7d', '30d'],
         'poll_interval' => '30s',
         'percentiles' => [
@@ -958,9 +981,30 @@ return [
     | Only a POSITIVE arm — asserting a permitted operator really CAN act — separates the
     | two, and that is the arm people rarely write.
     |
-    | The way through is one line. Declare an ability that asks the permission itself and
-    | point this key at THAT; a closure declared as fn ($user) => … ignores an argument it
-    | does not accept, which makes the action name harmless:
+    | 'abilities' is the way past that, and it is the key a permission-based host wants.
+    | It names an ability PER ACTION, and an ability that comes from it is authorized
+    | ALONE — nothing travels in the slot the hook reads as a guard, so a permission name
+    | works as itself:
+    |
+    |     'abilities' => ['*' => 'manage webhooks'],           // one permission, every action
+    |     'abilities' => [                                     // or one per action
+    |         '*'      => 'manage webhooks',
+    |         'delete' => 'delete webhooks',
+    |     ],
+    |
+    | '*' is the catch-all and the exact action wins over it, so you can hold the console
+    | at one capability and lift just the destructive one. The actions are: create, edit,
+    | toggle, rotate, delete, redeliver, ping. An entry that is not a non-empty string is
+    | ignored rather than denying — a half-written map must not become a console that
+    | refuses everything, which is the failure this seam exists to end.
+    |
+    | Both keys may be set: the map answers where it names an action (or has '*'), and
+    | 'ability' answers everywhere else, with its argument and its behavior unchanged.
+    |
+    | If you would rather not touch the config shape, the older one-line workaround still
+    | works. Declare an ability that asks the permission itself and point 'ability' at
+    | THAT; a closure declared as fn ($user) => … ignores an argument it does not accept,
+    | which makes the action name harmless:
     |
     |     Gate::define('webhooks.operate', fn ($user) => $user->can('manage webhooks'));
     |
@@ -968,6 +1012,8 @@ return [
 
     'admin' => [
         'ability' => null,
+
+        'abilities' => [],
     ],
 
 ];

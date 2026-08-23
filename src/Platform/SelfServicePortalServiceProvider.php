@@ -17,6 +17,7 @@ use Pushery\Webhooks\Platform\Livewire\PayloadTransformEditor;
 use Pushery\Webhooks\Platform\Livewire\SelfServicePortalPage;
 use Pushery\Webhooks\Support\MergesPackageConfig;
 use Pushery\Webhooks\Support\PlatformRequirement;
+use Pushery\Webhooks\Support\UiAssets;
 
 /**
  * Boots the self-service endpoint portal — the customer-facing Livewire/WireKit
@@ -72,6 +73,16 @@ final class SelfServicePortalServiceProvider extends ServiceProvider
         );
 
         $this->registerPanels();
+
+        // The one small script the secret panel's countdown rides on, served from the app's
+        // own origin so it runs under a strict `script-src 'self'` with no nonce and nothing
+        // for the host to publish.
+        //
+        // ⚠️ OUTSIDE the register_routes gate on purpose. That flag is about the portal's own
+        // PAGES: a host that mounts the panels inside its own guarded screens turns it off
+        // and still renders the secret panel. Putting the asset behind it would leave exactly
+        // that host with a countdown that never starts — the same silent dead surface, moved.
+        UiAssets::registerRoute();
 
         if ($this->shouldRegisterRoutes()) {
             $this->loadRoutesFrom(__DIR__.'/../../routes/self-service.php');

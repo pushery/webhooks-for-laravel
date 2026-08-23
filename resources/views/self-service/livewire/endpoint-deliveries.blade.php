@@ -18,6 +18,7 @@
             <label for="wh-deliveries-filter" class="sr-only">{{ __('webhooks::self-service.deliveries.filter_label') }}</label>
             <select
                 id="wh-deliveries-filter"
+                name="endpointId"
                 wire:model.live="endpointId"
                 class="wk-field h-[var(--size-wk-md)] rounded-[var(--radius-wk-md)] border border-[color:var(--color-wk-border)] bg-[var(--color-wk-bg)] px-[var(--padding-wk-x-md)] text-[length:var(--text-wk-md)] text-[color:var(--color-wk-text)]"
             >

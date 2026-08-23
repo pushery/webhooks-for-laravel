@@ -24,12 +24,16 @@ use Pushery\Webhooks\Models\WebhookSubscription;
  * tenant-facing surface.
  *
  * Its two mutating actions — redeliver() and ping() — additionally honor
- * webhooks.admin.ability (or an overridden authorizeAction()) when a host sets one, so the
- * whole console gates the same way rather than only half of it. Left unset, nothing changes.
+ * webhooks.admin.abilities and webhooks.admin.ability (or an overridden authorizeAction())
+ * when a host sets one, so the whole console gates the same way rather than only half of it.
+ * Left unset, nothing changes.
  *
  * ⚠️ Not `final`, and deliberately so: the override that sentence offers has to be reachable.
- * See {@see AuthorizesOperatorActions} — a spatie/laravel-permission name in the config key
- * denies every action silently, and the subclass is the documented way past it.
+ * See {@see AuthorizesOperatorActions} — a spatie/laravel-permission name in the SINGLE
+ * ability key denies every action silently, because the action name travels positionally and
+ * that package's Gate::before hook takes the first positional argument for a guard. The map
+ * passes no argument at all and is the direct way past it; the subclass remains the way past
+ * anything an ability cannot express.
  *
  * The tenant-facing surface is the observability dashboard
  * (`Pushery\Webhooks\Dashboard\Livewire\DeliveriesTable`), which is owner-scoped and

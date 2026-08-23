@@ -220,6 +220,50 @@ final class WebhookConfig
      */
     public function webhookId(SignatureHeaders $headers, string $rawBody = ''): ?string
     {
+        return $this->boundedWebhookId($this->resolvedWebhookId($headers, $rawBody));
+    }
+
+    /**
+     * Bound the dedupe key to the column that stores it — by HASHING, not by truncating.
+     *
+     * `webhook_id` is `varchar(255)` and has the same exposure `event_type` had: the row is
+     * written AFTER the signature verifies and BEFORE the 2xx goes back, so an over-long
+     * value fails the insert, the request answers 500, and the producer retries into the
+     * same failure until its budget runs out. The delivery was authentic, it was accepted,
+     * and then it was gone.
+     *
+     * ⚠️ THE FIX ITS TWIN GOT WOULD BE WORSE HERE THAN THE DEFECT. This column is the dedupe
+     * key: it sits in a partial unique index over (source, webhook_id). Truncating makes two
+     * different producer ids that share a 255-character prefix into ONE key — and a
+     * duplicate is dropped without a sound. That trades a loud 500 for a silent lost
+     * delivery, which is the wrong half of the trade. `event_type` can be cut because it is
+     * a ROUTING value: a truncated type matches no `process` map entry and lands on the
+     * catch-all, which is exactly where an over-long type was going anyway.
+     *
+     * Hashing keeps what the column is for. The same long id hashes to the same key, so the
+     * producer's retry still deduplicates; two different ids do not collide, prefix or not.
+     * The stored value is no longer the producer's own string — which is why it is PREFIXED:
+     * an operator holding this against a producer log sees `sha256:…` and knows to hash
+     * theirs rather than concluding the ids do not match.
+     *
+     * The prefix is also what keeps the substitution honest in the other direction. A key
+     * that is already short passes through untouched, so the only way a stored `sha256:…`
+     * can appear is this branch — unless a producer sends that literal shape itself, which
+     * would have to be the hash of one of its own over-long ids to collide with anything.
+     */
+    private function boundedWebhookId(?string $value): ?string
+    {
+        // Characters, not bytes, and the same 255 the twin uses: varchar(255) counts
+        // characters on PostgreSQL and on MySQL under utf8mb4 alike.
+        if ($value === null || mb_strlen($value) <= 255) {
+            return $value;
+        }
+
+        return 'sha256:'.hash('sha256', $value);
+    }
+
+    private function resolvedWebhookId(SignatureHeaders $headers, string $rawBody): ?string
+    {
         $spec = $this->dedupeId;
 
         if ($spec === null) {
@@ -290,8 +334,8 @@ final class WebhookConfig
      * ⚠️ THE DEDUPE KEY MUST NOT GET THIS TREATMENT, which is why the bound lives here and
      * not in nonEmpty() where both paths meet. `webhook_id` is the same width and has the
      * same exposure, but truncating it makes two different producer ids collide on their
-     * prefix — and a collision there drops a genuine delivery as a duplicate, silently.
-     * That one is filed rather than fixed the same way.
+     * prefix — and a collision there drops a genuine delivery as a duplicate, silently. It
+     * is bounded by HASHING instead; see {@see self::boundedWebhookId()}.
      */
     private function boundedEventType(?string $value): ?string
     {

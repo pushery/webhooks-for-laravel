@@ -16,8 +16,14 @@ use Pushery\Webhooks\Dashboard\Livewire\Concerns\InteractsWithDashboard;
  * The KPI ribbon: total sent, delivered, failed, pending and retry rate for the
  * selected window. Lazy with a skeleton placeholder and polls on its own cadence so
  * a count refresh never re-renders the heavier chart alongside it.
+ *
+ * `isolate: false` bundles this panel's lazy load with its siblings' into ONE request. Six
+ * isolated ones each morph the shared parent, and on a window switch four of them arrive
+ * while the components they name are being replaced — which is the `__lazyLoad not found`
+ * race. See {@see WebhooksDashboardPage} for the
+ * whole chain, including why taking the window out of the keys would be the worse answer.
  */
-#[Lazy]
+#[Lazy(isolate: false)]
 final class KpiCards extends Component
 {
     use InteractsWithDashboard;

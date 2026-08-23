@@ -6,14 +6,14 @@
     @endif
 
     <div class="flex flex-wrap gap-4">
-        <select wire:model.live="status" class="rounded border px-3 py-2" aria-label="{{ __('webhooks::management.filters.status') }}">
+        <select name="status" wire:model.live="status" class="rounded border px-3 py-2" aria-label="{{ __('webhooks::management.filters.status') }}">
             <option value="">{{ __('webhooks::management.filters.all_statuses') }}</option>
             <option value="pending">{{ __('webhooks::management.status_options.pending') }}</option>
             <option value="succeeded">{{ __('webhooks::management.status_options.succeeded') }}</option>
             <option value="failed">{{ __('webhooks::management.status_options.failed') }}</option>
             <option value="exhausted">{{ __('webhooks::management.status_options.exhausted') }}</option>
         </select>
-        <input type="text" wire:model.live.debounce.300ms="eventType" placeholder="{{ __('webhooks::management.filters.event_type_placeholder') }}" aria-label="{{ __('webhooks::management.filters.event_type') }}" class="rounded border px-3 py-2">
+        <input type="text" name="eventType" wire:model.live.debounce.300ms="eventType" placeholder="{{ __('webhooks::management.filters.event_type_placeholder') }}" aria-label="{{ __('webhooks::management.filters.event_type') }}" class="rounded border px-3 py-2">
     </div>
 
     <table class="w-full text-left text-sm">

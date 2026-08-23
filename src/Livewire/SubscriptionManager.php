@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\View as ViewFactory;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
+use Livewire\WithPagination;
 use Pushery\Webhooks\Core\Http\Exceptions\BlockedDestination;
 use Pushery\Webhooks\Core\Ssrf\SsrfGuard;
 use Pushery\Webhooks\Facades\Webhooks;
@@ -29,17 +30,19 @@ use Pushery\Webhooks\Support\Settings;
  * tenants.
  *
  * That gate stays yours and stays required. What each action adds is a check at the moment
- * it runs, which your page gate cannot give: set webhooks.admin.ability, or override
+ * it runs, which your page gate cannot give: name an ability per action in
+ * webhooks.admin.abilities, set a single webhooks.admin.ability, or override
  * authorizeAction() in a subclass. Left unset it does nothing, so this component behaves
- * exactly as it always has. See {@see AuthorizesOperatorActions} for why the two differ.
+ * exactly as it always has. See {@see AuthorizesOperatorActions} for why the three differ.
  *
- * ⚠️ THE SECOND WAY WAS BARRED UNTIL v2.0.1, AND THAT MATTERED MORE THAN IT LOOKS. This
- * class was `final`, so the subclass override the sentence above offers could not be
- * written — `cannot extend final class`. A host whose ability name comes from
- * spatie/laravel-permission has exactly one screw to turn, and the config one silently
- * denies every action there (the seam's docblock has the mechanism). Taking the only
- * documented way out and making it impossible is what turned a compatibility wrinkle into
- * a dead console.
+ * ⚠️ THE MAP IS THE ONE A PERMISSION-BASED HOST NEEDS, and it exists because the other two
+ * were both barred there for a while. The single-ability key passes the action name to the
+ * gate positionally, which spatie/laravel-permission's Gate::before hook takes for a guard
+ * name and shifts away — every action then denies every operator, silently. The documented
+ * escape was the subclass override, and until v2.0.1 this class was `final`, so it could
+ * not be written: `cannot extend final class`. A host had exactly one screw to turn and it
+ * was the broken one. An ability from the map is authorized with no argument at all, so
+ * there is nothing left for that hook to mistake.
  *
  * Two of the actions are here because their absence cost something the console exists for:
  *
@@ -58,6 +61,7 @@ use Pushery\Webhooks\Support\Settings;
 class SubscriptionManager extends Component
 {
     use AuthorizesOperatorActions;
+    use WithPagination;
 
     /**
      * The endpoint the form is editing, or null while it is registering a new one.
@@ -362,6 +366,18 @@ class SubscriptionManager extends Component
         return [];
     }
 
+    /**
+     * Page the list with the package's own pagination control rather than Livewire's
+     * built-in one, whose markup paints a raw color palette no design token reaches and
+     * whose landmark carries a hardcoded English accessible name. Publishing the views
+     * (webhooks-views) publishes this control alongside them, so a host on another design
+     * system restyles it in place. Same control, same reasoning as the delivery log beside it.
+     */
+    public function paginationView(): string
+    {
+        return 'webhooks::pagination';
+    }
+
     public function render(): View
     {
         return ViewFactory::make('webhooks::livewire.subscription-manager', [
@@ -371,6 +387,15 @@ class SubscriptionManager extends Component
             // simplePaginate asks for one page and one row beyond it — no count(*) over a
             // table whose size is the thing being complained about. Same reasoning, same
             // page size as the delivery log beside it.
+            //
+            // ⚠️ THE PAGINATOR IS ONLY HALF OF PAGING, AND THE MISSING HALF IS SILENT. Without
+            // WithPagination above, the control below still renders and still takes clicks —
+            // it just never moves. The paginator reads its page from the REQUEST via
+            // Paginator::resolveCurrentPage(), and a Livewire update request carries no `page`
+            // parameter, so every answer is page one. The failure has no error and no log line:
+            // the list simply looks like an installation with 25 endpoints in it, which on the
+            // one screen whose whole point is that the list outgrows a screen is the worst
+            // possible way to be wrong.
             'subscriptions' => WebhookSubscription::query()->latest()->simplePaginate(25),
             // The catalog, plus anything the OPENED ROW already holds that the catalog no
             // longer declares. Without the second half the stale value has no checkbox, so

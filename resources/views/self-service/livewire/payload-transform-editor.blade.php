@@ -53,6 +53,7 @@
                          now reads the shipped views and not only the styling guide, which is
                          why that went unnoticed. --}}
                     <x-wirekit::select
+                        name="payloadVersion"
                         :label="__('webhooks::self-service.transform.version_label')"
                         :hint="__('webhooks::self-service.transform.version_hint')"
                         wire:model.live="payloadVersion"
@@ -69,6 +70,7 @@
                                 <div class="flex items-center gap-[var(--gap-wk-sm)]" wire:key="include-{{ $i }}">
                                     <div class="flex-1">
                                         <x-wirekit::input
+                                            name="includeFields.{{ $i }}"
                                             wire:model.live.debounce.400ms="includeFields.{{ $i }}"
                                             :placeholder="__('webhooks::self-service.transform.field_name_placeholder')"
                                             :aria-label="__('webhooks::self-service.a11y.include_field', ['number' => $i + 1])"
@@ -99,6 +101,7 @@
                                 <div class="flex items-center gap-[var(--gap-wk-sm)]" wire:key="exclude-{{ $i }}">
                                     <div class="flex-1">
                                         <x-wirekit::input
+                                            name="excludeFields.{{ $i }}"
                                             wire:model.live.debounce.400ms="excludeFields.{{ $i }}"
                                             :placeholder="__('webhooks::self-service.transform.field_name_placeholder')"
                                             :aria-label="__('webhooks::self-service.a11y.exclude_field', ['number' => $i + 1])"
@@ -129,6 +132,7 @@
                                 <div class="flex items-center gap-[var(--gap-wk-sm)]" wire:key="rename-{{ $i }}">
                                     <div class="flex-1">
                                         <x-wirekit::input
+                                            name="renamePairs.{{ $i }}.from"
                                             wire:model.live.debounce.400ms="renamePairs.{{ $i }}.from"
                                             :placeholder="__('webhooks::self-service.transform.rename_from_placeholder')"
                                             :aria-label="__('webhooks::self-service.a11y.rename_source_field', ['number' => $i + 1])"
@@ -137,6 +141,7 @@
                                     <span class="text-[color:var(--color-wk-text-muted)]" aria-hidden="true">&rarr;</span>
                                     <div class="flex-1">
                                         <x-wirekit::input
+                                            name="renamePairs.{{ $i }}.to"
                                             wire:model.live.debounce.400ms="renamePairs.{{ $i }}.to"
                                             :placeholder="__('webhooks::self-service.transform.rename_to_placeholder')"
                                             :aria-label="__('webhooks::self-service.a11y.rename_target_field', ['number' => $i + 1])"
@@ -159,6 +164,7 @@
                     </x-wirekit::field>
 
                     <x-wirekit::input
+                        name="rewrapKey"
                         :label="__('webhooks::self-service.transform.rewrap_label')"
                         :hint="__('webhooks::self-service.transform.rewrap_hint')"
                         wire:model.live.debounce.400ms="rewrapKey"
@@ -181,6 +187,7 @@
                     {{-- Malformed JSON is named, never swallowed: without this the sample simply
                          previews as {} and the tenant reads it as "my rules broke the payload". --}}
                     <x-wirekit::textarea
+                        name="sampleJson"
                         :label="__('webhooks::self-service.transform.sample_label')"
                         :hint="__('webhooks::self-service.transform.sample_hint')"
                         wire:model.live.debounce.400ms="sampleJson"

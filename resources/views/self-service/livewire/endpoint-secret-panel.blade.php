@@ -4,53 +4,25 @@
      Rotation keeps the old secret as the verify-only rotation secret. Styled with
      WireKit tokens throughout.
 
-     THE TIMER IS A REGISTERED COMPONENT, NOT AN INLINE EXPRESSION. Under a
-     Content-Security-Policy without `unsafe-eval`, Alpine parses attribute expressions
-     against a small grammar rather than handing them to `new Function`, and an object
-     literal with methods does not parse there — the countdown would silently never start
-     and the secret would stay on screen past its window. Its inputs arrive through a data
-     attribute rather than as an argument, so the expression stays a bare factory call and
-     no `JSON.parse` appears in an Alpine expression, where `JSON` is not resolvable. --}}
+     THE TIMER IS A REGISTERED COMPONENT SERVED AS A FILE, NOT AN INLINE EXPRESSION AND NOT
+     AN INLINE SCRIPT — and both halves of that are load-bearing.
+
+     Registered rather than inline EXPRESSION: under a Content-Security-Policy without
+     `unsafe-eval`, Alpine parses attribute expressions against a small grammar rather than
+     handing them to `new Function`, and an object literal with methods does not parse there
+     — the countdown would silently never start and the secret would stay on screen past its
+     window. Its inputs arrive through a data attribute rather than as an argument, so the
+     expression stays a bare factory call and no `JSON.parse` appears in an Alpine
+     expression, where `JSON` is not resolvable.
+
+     A FILE rather than an inline SCRIPT: the registration used to ride in this block as an
+     inline `<script>` with an optional nonce, and under a strict NONCE-LESS policy
+     (`script-src 'self'`, which an application is entitled to choose) the browser simply
+     refused to run it. Nothing threw, nothing reached a log, and a CSP audit read the
+     expression as valid — the panel was dead and looked fine. Served from the app's own
+     origin it runs under every policy, with nothing for the host to configure. --}}
 @assets
-    <script{!! \Pushery\Webhooks\Support\UiTheme::nonceAttribute() !!}>
-        (function () {
-            var register = function () {
-                window.Alpine.data('webhooksSecretCountdown', function () {
-                    return {
-                        remaining: 0,
-                        announce: '',
-                        countdown: '',
-                        warning: '',
-                        tick: null,
-                        init() {
-                            const config = JSON.parse(this.$el.dataset.webhooksCountdown ?? '{}');
-                            this.remaining = config.remaining ?? 0;
-                            this.countdown = config.countdown ?? '';
-                            this.warning = config.warning ?? '';
-
-                            this.tick = setInterval(() => {
-                                this.remaining = Math.max(0, this.remaining - 1);
-                                if (this.remaining === 10) this.announce = this.warning;
-                                if (this.remaining <= 0) { this.stop(); this.$wire.hide(); }
-                            }, 1000);
-                        },
-                        stop() {
-                            if (this.tick !== null) { clearInterval(this.tick); this.tick = null; }
-                        },
-                        destroy() {
-                            this.stop();
-                        },
-                    };
-                });
-            };
-
-            if (window.Alpine) {
-                register();
-            } else {
-                document.addEventListener('alpine:init', register);
-            }
-        })();
-    </script>
+    <script src="{{ \Pushery\Webhooks\Support\UiAssets::url() }}" defer></script>
 @endassets
 @php($secret = $this->visibleCurrentSecret)
 @php($previous = $this->visiblePreviousSecret)

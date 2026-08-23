@@ -16,8 +16,14 @@ use Pushery\Webhooks\Models\WebhookSubscription;
  * The setup / endpoint-health summary: how many endpoints the acting tenant has
  * registered and how many are active. It doubles as the empty-onboarding hint when
  * a tenant has registered nothing yet.
+ *
+ * `isolate: false` bundles this panel's lazy load with its siblings' into ONE request. Six
+ * isolated ones each morph the shared parent, and on a window switch four of them arrive
+ * while the components they name are being replaced — which is the `__lazyLoad not found`
+ * race. See {@see WebhooksDashboardPage} for the
+ * whole chain, including why taking the window out of the keys would be the worse answer.
  */
-#[Lazy]
+#[Lazy(isolate: false)]
 final class SetupSummary extends Component
 {
     /**

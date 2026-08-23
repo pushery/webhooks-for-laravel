@@ -29,7 +29,7 @@ return [
     // Date patterns are translated, not just their month names: the ORDER differs by
     // locale (English leads with the month, French with the day).
     'formats' => [
-        'hour_bucket' => 'j M H:00',
+        'hour_bucket' => 'j M H:i',
         'absolute' => 'LLL z',
     ],
 

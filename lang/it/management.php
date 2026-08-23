@@ -30,6 +30,11 @@ return [
         // la chiave precedente resta valida finché la finestra di rotazione non si chiude. È
         // per questo che durante un incidente si può ruotare subito.
         'rotated_heading' => 'Nuova chiave di firma (mostrata una sola volta — salvala ora). La chiave precedente resta valida finché la finestra di rotazione non si chiude.',
+        // The one-time secret exists in a single response — this console has no reveal
+        // window to ask again with — so the copy control is what stands between the reader
+        // and a rotation nobody needed.
+        'copy' => 'Copia',
+        'copied' => 'Copiato!',
     ],
 
     'table' => [
