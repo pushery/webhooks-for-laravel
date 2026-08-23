@@ -68,8 +68,27 @@
         {{-- A rotation says something a registration does not: the OLD secret keeps verifying
              until the rotation window closes, which is what makes rotating during an incident
              safe to do immediately. --}}
+        {{-- ⚠️ THE COPY CONTROL IS NOT DECORATION HERE. dehydrate() clears newSecret on every
+             dehydrate, on purpose — so the plaintext exists in exactly ONE response, and this
+             console has no reveal window to ask again with. A reader who cannot get it out of
+             this one rendering has to ROTATE, which puts every consumer of the endpoint into a
+             migration window nobody needed. Selecting a 50-character token rendered `break-all`
+             across several lines with a mouse, without losing a character, is precisely where
+             that goes wrong. --}}
         <x-wirekit::alert variant="success" :title="$rotated ? __('webhooks::management.secret.rotated_heading') : __('webhooks::management.secret.heading')">
-            <x-wirekit::code class="wh-new-secret break-all">{{ $newSecret }}</x-wirekit::code>
+            <div class="flex flex-wrap items-center gap-[var(--gap-wk-sm)]">
+                <x-wirekit::code class="wh-new-secret break-all">{{ $newSecret }}</x-wirekit::code>
+                {{-- A LABELED button, not an icon-only one: its accessible name then comes from
+                     the visible text, so the name and the label cannot drift apart. The pair that
+                     has to hold together is the name and the VALUE — passing the secret as an
+                     undeclared attribute would leave the button unnamed and copy an empty string,
+                     and either half alone still looks right on screen. --}}
+                <x-wirekit::clipboard-button
+                    class="wh-new-secret-copy"
+                    :value="$newSecret"
+                    :copied-text="__('webhooks::management.secret.copied')"
+                >{{ __('webhooks::management.secret.copy') }}</x-wirekit::clipboard-button>
+            </div>
         </x-wirekit::alert>
     @endif
 
@@ -83,7 +102,13 @@
             :description="__('webhooks::management.empty.no_subscriptions.description')"
         />
     @else
+        {{-- id + tabindex="-1" so the delete dialog below has somewhere to put the focus back.
+             tabindex="-1" is the half that gets left off: without it a target cannot take focus
+             programmatically, and focus-return-to then points at an element that refuses it —
+             which behaves exactly like declaring nothing at all. --}}
         <x-wirekit::table
+            id="wh-subscriptions-table"
+            tabindex="-1"
             hoverable
             :aria-label="__('webhooks::management.a11y.subscriptions_table')"
             :table-label="__('webhooks::management.a11y.subscriptions_table')"
@@ -155,8 +180,26 @@
                             {{-- Deleting an endpoint is irreversible and stops a live production
                                  integration, so it is confirmed through the WireKit alert-dialog —
                                  never a bare one-click destroy, and never wire:confirm. This is the
-                                 pattern to copy when you restyle the stub. --}}
-                            <x-wirekit::alert-dialog :name="'delete-subscription-' . $subscription->id">
+                                 pattern to copy when you restyle the stub.
+
+                                 ⚠️ AND IT IS THE ONE DIALOG HERE THAT NEEDS focus-return-to. A
+                                 dialog normally hands focus back to its trigger; after a delete
+                                 the trigger is GONE with the row, so focus falls to <body> and a
+                                 keyboard or screen-reader user is returned to the top of the
+                                 document with no announcement that the irreversible thing they
+                                 just confirmed happened. The target is the table — it survives,
+                                 and it is where the removed row was. A selector pointing into the
+                                 host's surrounding chrome would break the moment the host changes
+                                 its markup, and break silently.
+
+                                 The rotate dialog beside it deliberately has NONE: its row
+                                 survives, so focus returns to the trigger by itself, and
+                                 declaring a target there would REPLACE that with a jump to the
+                                 table — worse than doing nothing. --}}
+                            <x-wirekit::alert-dialog
+                                :name="'delete-subscription-' . $subscription->id"
+                                focus-return-to="#wh-subscriptions-table"
+                            >
                                 <x-slot:trigger>
                                     <x-wirekit::button
                                         size="sm"

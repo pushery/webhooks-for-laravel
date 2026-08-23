@@ -32,8 +32,14 @@ return [
     // than a literal: a delivery timestamp is the one column an operator holds against
     // their own records, and an hour of unexplained offset there is not cosmetic. Without
     // the zone the reader cannot tell which clock they are being shown.
+    //
+    // ⚠️ 'hour_bucket' ends in `H:i` and NOT the literal `H:00` it used to. The buckets are
+    // whole hours, so the two render identically — until the dashboard's display zone has a
+    // sub-hour offset (India, Nepal, parts of Australia), where the value really is :30 or
+    // :45 and a hardcoded `00` prints a time that never existed. A literal that is true for
+    // most readers and silently false for some is worse than a format character.
     'formats' => [
-        'hour_bucket' => 'M j H:00',
+        'hour_bucket' => 'M j H:i',
         'absolute' => 'LLL z',
     ],
 

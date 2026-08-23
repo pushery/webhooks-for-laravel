@@ -29,6 +29,7 @@ use Pushery\Webhooks\Models\WebhookDelivery;
 use Pushery\Webhooks\Support\MergesPackageConfig;
 use Pushery\Webhooks\Support\PlatformRequirement;
 use Pushery\Webhooks\Support\ScheduleCadence;
+use Pushery\Webhooks\Support\UiAssets;
 
 /**
  * Boots the folded-in, customer-facing observability read model — the hourly
@@ -105,6 +106,13 @@ final class WebhooksDashboardServiceProvider extends ServiceProvider
         $this->registerAuthorization();
         $this->registerRedelivery();
         $this->registerPanels();
+
+        // The one small script the drawer's keyboard model rides on, served from the app's
+        // own origin so it runs under a strict `script-src 'self'` with no nonce and nothing
+        // for the host to publish. Registered here rather than centrally because a headless
+        // or send-only host mounts none of these screens and should carry no route for them.
+        UiAssets::registerRoute();
+
         $this->loadRoutesFrom(__DIR__.'/../../routes/dashboard.php');
 
         if ($this->app->runningInConsole()) {

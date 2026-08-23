@@ -6,9 +6,11 @@ namespace Pushery\Webhooks;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use Override;
 use Pushery\Webhooks\Console\AsyncApiCommand;
@@ -17,6 +19,7 @@ use Pushery\Webhooks\Console\PartitionMaintenanceCommand;
 use Pushery\Webhooks\Console\PruneOrphanedPayloadsCommand;
 use Pushery\Webhooks\Console\RefreshEndpointHealthCommand;
 use Pushery\Webhooks\Console\RevokeRotatedSecretsCommand;
+use Pushery\Webhooks\Database\OwnerKeyDeclaration;
 use Pushery\Webhooks\Listeners\WebhookServerEventSubscriber;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Platform\Delivery\SubscriptionDeliveryGate;
@@ -86,6 +89,7 @@ final class WebhooksServiceProvider extends ServiceProvider
         // is exactly the one who cannot publish the config that switches it back on.
         if ($this->app->runningInConsole()) {
             $this->registerPublishing();
+            $this->reportOwnerKeyDeclarationDriftAfterMigrating();
         }
 
         if (! $this->shouldBoot()) {
@@ -160,6 +164,44 @@ final class WebhooksServiceProvider extends ServiceProvider
                 RevokeRotatedSecretsCommand::class,
             ]);
         }
+    }
+
+    /**
+     * Say so when `webhooks.platform.owner_key_type` and the `owner_id` column it claims to
+     * describe disagree — at the end of the migration that could have caused it.
+     *
+     * ⚠️ THE HOOK IS THE MIGRATOR'S EVENT, NOT THIS PACKAGE'S MIGRATION FILES, AND THAT IS
+     * THE WHOLE POINT. The contradiction arises exactly when a host FORKS the two
+     * create-table migrations to partition differently or add its own indexes — an expected
+     * thing to do, not an abuse. In that installation this package's migration files are not
+     * in the tree at all, so a guard written inside them would never run on the one host that
+     * needs it. A listener on MigrationsEnded hears every migration run, forked or not.
+     *
+     * A LOG LINE RATHER THAN CONSOLE OUTPUT, and the reason is worth stating because the
+     * console would obviously read better. Illuminate\Console\Events\CommandFinished carries
+     * an output handle and would have been the natural hook — but the framework deliberately
+     * does not dispatch it under tests (Kernel::__construct skips rerouteSymfonyCommandEvents
+     * when runningUnitTests), so the branch could never be proven by an arm. The Migrator's
+     * own output handle has no public getter. An unprovable guard is one that rots silently,
+     * which is the same failure class this check exists to find. The place a reader is told
+     * on screen is `webhooks:preflight`, which fails outright.
+     *
+     * It reports and never fails: the migration's exit code is untouched, so a deploy is
+     * never broken by a diagnosis.
+     */
+    private function reportOwnerKeyDeclarationDriftAfterMigrating(): void
+    {
+        Event::listen(function (MigrationsEnded $event): void {
+            // 'down' rolls the schema back towards nothing; a contradiction found there is
+            // about a table on its way out and the reader can do nothing with it.
+            if ($event->method !== 'up') {
+                return;
+            }
+
+            foreach (OwnerKeyDeclaration::contradictions() as $message) {
+                Log::warning('[webhooks] '.$message.' Run `php artisan webhooks:preflight` for the full check.');
+            }
+        });
     }
 
     /**

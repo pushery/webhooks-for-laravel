@@ -6,7 +6,7 @@
      the control below the table is the package's own pagination view. --}}
 <div class="wh-dash-deliveries" wire:key="deliveries-table">
     <div class="mb-[var(--padding-wk-y-md)] flex flex-wrap items-end gap-[var(--padding-wk-x-md)]">
-        <x-wirekit::select wire:model.live="status" :label="__('webhooks::dashboard.filters.status')" hideLabel>
+        <x-wirekit::select name="status" wire:model.live="status" :label="__('webhooks::dashboard.filters.status')" hideLabel>
             <option value="">{{ __('webhooks::dashboard.filters.all_statuses') }}</option>
             <option value="pending">{{ __('webhooks::dashboard.status_options.pending') }}</option>
             <option value="succeeded">{{ __('webhooks::dashboard.status_options.succeeded') }}</option>
@@ -15,6 +15,7 @@
         </x-wirekit::select>
 
         <x-wirekit::input
+            name="eventType"
             wire:model.live.debounce.300ms="eventType"
             :label="__('webhooks::dashboard.filters.event_type')"
             hideLabel
@@ -55,7 +56,7 @@
                         'failed', 'exhausted' => 'danger',
                         default => 'warning',
                     })
-                    @php($when = $delivery->created_at->settings(['locale' => app()->getLocale()]))
+                    @php($when = \Pushery\Webhooks\Dashboard\DashboardTimezone::apply($delivery->created_at)->settings(['locale' => app()->getLocale()]))
                     <x-wirekit::table.row wire:key="dt-{{ $delivery->id }}">
                         <x-wirekit::table.th headerScope="row">
                             <button type="button" wire:click="viewDelivery('{{ $delivery->id }}')" class="cursor-pointer text-[color:var(--color-wk-accent)]" aria-label="{{ __('webhooks::dashboard.a11y.view_delivery', ['event' => $delivery->event_type]) }}">
@@ -70,7 +71,10 @@
                         <x-wirekit::table.td>{{ $delivery->duration_ms !== null ? $delivery->duration_ms . ' ms' : '—' }}</x-wirekit::table.td>
                         <x-wirekit::table.td>
                             {{-- Relative in the cell an operator scans, absolute on hover — both
-                                 in the reader's locale, never the raw stored timestamp. --}}
+                                 in the reader's locale and in the dashboard's display zone,
+                                 never the raw stored timestamp. The datetime attribute stays
+                                 ISO-8601 with its own offset, which is what a machine reads and
+                                 what a zone change must not reshape. --}}
                             <time datetime="{{ $delivery->created_at->toIso8601String() }}" title="{{ $when->isoFormat('LLL') }}">{{ $when->diffForHumans() }}</time>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td align="right">

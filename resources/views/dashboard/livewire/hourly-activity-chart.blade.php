@@ -42,7 +42,7 @@
                         @php($pending = (int) $row->pending)
                         @php($failed = (int) $row->failed)
                         @php($barHeight = (int) round($total / $peak * 100))
-                        @php($hour = \Illuminate\Support\Carbon::parse((string) $row->bucket)->settings(['locale' => app()->getLocale()])->translatedFormat(__('webhooks::dashboard.formats.hour_bucket')))
+                        @php($hour = \Pushery\Webhooks\Dashboard\DashboardTimezone::apply(\Illuminate\Support\Carbon::parse((string) $row->bucket))->settings(['locale' => app()->getLocale()])->translatedFormat(__('webhooks::dashboard.formats.hour_bucket')))
                         <div
                             class="wh-dash-activity-bar flex-1"
                             role="listitem"

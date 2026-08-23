@@ -16,7 +16,7 @@
              lands, either keep these two stubs on separate pages or swap this control for the
              native one. Left as the library component here on purpose: the trade-off is a
              reader's to make, and it is stated rather than hidden. --}}
-        <x-wirekit::select wire:model.live="status" :label="__('webhooks::management.filters.status')" hideLabel>
+        <x-wirekit::select name="status" wire:model.live="status" :label="__('webhooks::management.filters.status')" hideLabel>
             <option value="">{{ __('webhooks::management.filters.all_statuses') }}</option>
             <option value="pending">{{ __('webhooks::management.status_options.pending') }}</option>
             <option value="succeeded">{{ __('webhooks::management.status_options.succeeded') }}</option>
@@ -25,6 +25,7 @@
         </x-wirekit::select>
 
         <x-wirekit::input
+            name="eventType"
             wire:model.live.debounce.300ms="eventType"
             :label="__('webhooks::management.filters.event_type')"
             hideLabel

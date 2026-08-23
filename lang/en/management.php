@@ -30,6 +30,11 @@ return [
         // it: the previous secret keeps verifying until the rotation window closes. That is
         // what makes rotating during an incident safe to do immediately.
         'rotated_heading' => 'New signing secret (shown once — store it now). The previous secret keeps verifying until the rotation window closes.',
+        // The one-time secret exists in a single response — this console has no reveal
+        // window to ask again with — so the copy control is what stands between the reader
+        // and a rotation nobody needed.
+        'copy' => 'Copy',
+        'copied' => 'Copied!',
     ],
 
     'table' => [

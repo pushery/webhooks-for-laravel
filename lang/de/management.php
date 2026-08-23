@@ -30,6 +30,11 @@ return [
         // es erfahren: der bisherige Schlüssel bleibt gültig, bis das Rotationsfenster
         // schließt. Genau deshalb ist eine Rotation im Störfall sofort machbar.
         'rotated_heading' => 'Neuer Signaturschlüssel (wird nur einmal angezeigt — speichere ihn jetzt). Der bisherige Schlüssel bleibt gültig, bis das Rotationsfenster schließt.',
+        // The one-time secret exists in a single response — this console has no reveal
+        // window to ask again with — so the copy control is what stands between the reader
+        // and a rotation nobody needed.
+        'copy' => 'Kopieren',
+        'copied' => 'Kopiert!',
     ],
 
     'table' => [

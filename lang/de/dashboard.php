@@ -29,7 +29,7 @@ return [
     // Datumsmuster werden mitübersetzt, nicht nur die Monatsnamen: die REIHENFOLGE
     // unterscheidet sich je Sprache (Englisch führt mit dem Monat, Deutsch mit dem Tag).
     'formats' => [
-        'hour_bucket' => 'j. M H:00',
+        'hour_bucket' => 'j. M H:i',
         'absolute' => 'LLL z',
     ],
 

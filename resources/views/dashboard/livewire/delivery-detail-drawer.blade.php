@@ -16,59 +16,20 @@
      user cannot do without. A registered factory parses, and its body is ordinary
      JavaScript that never goes through that evaluator at all.
 
-     The registration rides in `@assets`: Livewire injects it once per page into the head
-     and de-duplicates it by compile key, so this needs no layout hook, no publish tag and
-     no new file type in `resources/` — and it travels with the view when a host publishes
-     it. It carries the same CSP nonce as the theme mirror in the layout. --}}
-@assets
-    <script{!! \Pushery\Webhooks\Support\UiTheme::nonceAttribute() !!}>
-        (function () {
-            var register = function () {
-                window.Alpine.data('webhooksFocusTrap', function () {
-                    return {
-                        trigger: null,
-                        focusables() {
-                            return Array.from(this.$refs.panel.querySelectorAll('a[href], button, input, select, textarea, [tabindex]')).filter((el) => ! el.disabled && el.tabIndex !== -1 && el.offsetParent !== null);
-                        },
-                        init() {
-                            this.trigger = document.activeElement;
-                            this.$nextTick(() => {
-                                const targets = this.focusables();
-                                (targets[0] ?? this.$refs.panel).focus();
-                            });
-                        },
-                        destroy() {
-                            if (this.trigger && typeof this.trigger.focus === 'function') {
-                                this.trigger.focus();
-                            }
-                        },
-                        trapTab(event) {
-                            const targets = this.focusables();
-                            if (targets.length === 0) {
-                                event.preventDefault();
-                                return;
-                            }
-                            const first = targets[0];
-                            const last = targets[targets.length - 1];
-                            if (event.shiftKey && document.activeElement === first) {
-                                event.preventDefault();
-                                last.focus();
-                            } else if (! event.shiftKey && document.activeElement === last) {
-                                event.preventDefault();
-                                first.focus();
-                            }
-                        },
-                    };
-                });
-            };
+     The registration rides in `@assets`: Livewire injects the tag once per page into the
+     head and de-duplicates it by compile key, so this needs no layout hook and no publish
+     step, and it travels with the view when a host publishes it.
 
-            if (window.Alpine) {
-                register();
-            } else {
-                document.addEventListener('alpine:init', register);
-            }
-        })();
-    </script>
+     ⚠️ IT IS A FILE FROM THE APP'S OWN ORIGIN, NOT AN INLINE SCRIPT, AND THAT REPLACED AN
+     EARLIER CHOICE MADE HERE. The registration used to be inline, carrying an OPTIONAL CSP
+     nonce. Under a strict NONCE-LESS policy — `script-src 'self'`, which an application is
+     entitled to choose and which this package must not ask it to loosen — the browser
+     refuses an inline script outright. Nothing throws, nothing reaches a log, and a CSP
+     audit reads the expression as valid: the drawer's keyboard model is simply gone, on the
+     one panel a keyboard or screen-reader user cannot do without. Served as a file it runs
+     under every policy, needs no nonce, and asks the host for nothing. --}}
+@assets
+    <script src="{{ \Pushery\Webhooks\Support\UiAssets::url() }}" defer></script>
 @endassets
 @php($delivery = $this->delivery)
 <div class="wh-dash-drawer" wire:key="delivery-drawer">
@@ -82,10 +43,18 @@
             aria-modal="true"
             aria-label="{{ __('webhooks::dashboard.a11y.delivery_details') }}"
         >
+            {{-- cursor-pointer, and it is load-bearing rather than cosmetic. Tailwind v4's
+                 preflight gives buttons `cursor: default`, so without it the overlay reads as
+                 dead space — and the pointer is the ONLY feedback an overlay can give: it has
+                 no border, no label and no focus ring. This is the drawer a reader clicks
+                 through many deliveries in, asking "how do I get out of here" each time; the
+                 other way out is Escape, which not everyone knows. An element that answers a
+                 click without offering one is the one combination that is wrong in both
+                 directions. --}}
             <button
                 type="button"
                 wire:click="close"
-                class="absolute inset-0 bg-[var(--color-wk-overlay)]"
+                class="absolute inset-0 cursor-pointer bg-[var(--color-wk-overlay)]"
                 aria-label="{{ __('webhooks::dashboard.a11y.close_details') }}"
             ></button>
 
@@ -115,14 +84,21 @@
                      detail panel, where an operator correlates the delivery against their own
                      records. A bare wall-clock time cannot be correlated — the reader has no
                      way to tell whether it is theirs, and an hour of offset here reads as a
-                     delivery that did not happen when it did. --}}
+                     delivery that did not happen when it did.
+
+                     And in the DISPLAY zone, which is not necessarily the application's:
+                     app.timezone is one process-wide setting, so in a multi-tenant back-office
+                     it is UTC for storage while the operator reading this sits somewhere else.
+                     Unset, DashboardTimezone hands the value straight back — see the seam for
+                     why the label alone was not enough. --}}
                 @php($locale = ['locale' => app()->getLocale()])
+                @php($zone = \Pushery\Webhooks\Dashboard\DashboardTimezone::apply(...))
                 <x-wirekit::timeline class="mb-[var(--padding-wk-y-md)]">
-                    <x-wirekit::timeline.item :time="$delivery->created_at->settings($locale)->isoFormat(__('webhooks::dashboard.formats.absolute'))" variant="default">
+                    <x-wirekit::timeline.item :time="$zone($delivery->created_at)->settings($locale)->isoFormat(__('webhooks::dashboard.formats.absolute'))" variant="default">
                         {{ __('webhooks::dashboard.drawer.queued') }}
                     </x-wirekit::timeline.item>
                     @if ($delivery->delivered_at !== null)
-                        <x-wirekit::timeline.item :time="$delivery->delivered_at->settings($locale)->isoFormat(__('webhooks::dashboard.formats.absolute'))" variant="success">
+                        <x-wirekit::timeline.item :time="$zone($delivery->delivered_at)->settings($locale)->isoFormat(__('webhooks::dashboard.formats.absolute'))" variant="success">
                             {{ __('webhooks::dashboard.drawer.delivered') }}
                         </x-wirekit::timeline.item>
                     @endif

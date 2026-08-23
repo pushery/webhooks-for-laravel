@@ -18,8 +18,14 @@ use Pushery\Webhooks\Dashboard\Livewire\Concerns\InteractsWithDashboard;
  * The full delivery table on the Webhooks tab: tenant-scoped, sortable, paginated
  * and filterable by status and event type, with an inline replay action and a
  * row-open into the detail drawer. An empty result renders the empty state.
+ *
+ * `isolate: false` bundles this panel's lazy load with its siblings' into ONE request. Six
+ * isolated ones each morph the shared parent, and on a window switch four of them arrive
+ * while the components they name are being replaced — which is the `__lazyLoad not found`
+ * race. See {@see WebhooksDashboardPage} for the
+ * whole chain, including why taking the window out of the keys would be the worse answer.
  */
-#[Lazy]
+#[Lazy(isolate: false)]
 final class DeliveriesTable extends Component
 {
     use InteractsWithDashboard;

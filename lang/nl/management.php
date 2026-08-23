@@ -30,6 +30,11 @@ return [
         // vorige sleutel blijft geldig tot het rotatievenster sluit. Precies daarom kun je
         // tijdens een incident meteen roteren.
         'rotated_heading' => 'Nieuwe ondertekeningssleutel (wordt maar één keer getoond — sla hem nu op). De vorige sleutel blijft geldig tot het rotatievenster sluit.',
+        // The one-time secret exists in a single response — this console has no reveal
+        // window to ask again with — so the copy control is what stands between the reader
+        // and a rotation nobody needed.
+        'copy' => 'Kopiëren',
+        'copied' => 'Gekopieerd!',
     ],
 
     'table' => [

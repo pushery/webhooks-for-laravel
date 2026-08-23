@@ -24,6 +24,20 @@ use Pushery\Webhooks\Dashboard\WindowResolver;
  * frozen into its placeholder and never leave it. The key carries the window instead,
  * because a key is read at render time and an event is not. See the comment in the
  * page view for the full chain.
+ *
+ * ⚠️ THE REMOUNT THE KEY CAUSES IS SAFE BECAUSE THE PANELS BUNDLE THEIR LAZY LOADS, and
+ * that pairing is the load-bearing part. Livewire isolates lazy loads by default: each
+ * `#[Lazy]` child fires its own `__lazyLoad` request and each response morphs this shared
+ * parent. Six of those race on first paint, and on a window switch four of them arrive while
+ * the components they name are being torn down and replaced — which surfaces as
+ * `Public method [__lazyLoad] not found`: a request landing on a snapshot a sibling's
+ * response has already re-rendered. Every panel therefore carries `#[Lazy(isolate: false)]`,
+ * so the whole set resolves in ONE request against one consistent set of snapshots.
+ *
+ * The obvious alternative — take the window out of the keys so nothing remounts — trades a
+ * loud, rare error for a quiet, permanent one: the panel resolves on the window frozen into
+ * its placeholder, the header reads 7d, the panel counts 24h, and nothing reports it. The
+ * race is worth removing; the remount is not.
  */
 #[Layout('webhooks::dashboard.layout')]
 final class WebhooksDashboardPage extends Component

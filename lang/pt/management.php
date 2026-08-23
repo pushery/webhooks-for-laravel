@@ -30,6 +30,11 @@ return [
         // anterior continua a validar até a janela de rotação fechar. É por isso que rodar
         // durante um incidente pode ser feito de imediato.
         'rotated_heading' => 'Nova chave de assinatura (mostrada uma única vez — guarda-a agora). A chave anterior continua a validar até a janela de rotação fechar.',
+        // The one-time secret exists in a single response — this console has no reveal
+        // window to ask again with — so the copy control is what stands between the reader
+        // and a rotation nobody needed.
+        'copy' => 'Copiar',
+        'copied' => 'Copiada!',
     ],
 
     'table' => [

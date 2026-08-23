@@ -30,6 +30,11 @@ return [
         // au lecteur : l'ancienne clé reste valide jusqu'à la fermeture de la fenêtre de
         // rotation. Voilà pourquoi une rotation en pleine incident peut se faire tout de suite.
         'rotated_heading' => 'Nouvelle clé de signature (affichée une seule fois — enregistre-la maintenant). L\'ancienne clé reste valide jusqu\'à la fermeture de la fenêtre de rotation.',
+        // The one-time secret exists in a single response — this console has no reveal
+        // window to ask again with — so the copy control is what stands between the reader
+        // and a rotation nobody needed.
+        'copy' => 'Copier',
+        'copied' => 'Copié !',
     ],
 
     'table' => [

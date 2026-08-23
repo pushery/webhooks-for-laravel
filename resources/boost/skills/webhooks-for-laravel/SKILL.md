@@ -223,6 +223,18 @@ The action name (`create`, `edit`, `toggle`, `rotate`, `delete`, `redeliver`, `p
 is passed to the gate. Default `null` means no per-action check. It is not tenant
 scoping.
 
+⚠️ **If the capabilities come from spatie/laravel-permission, use `admin.abilities`
+instead.** That package's `Gate::before` hook reads the first positional gate argument
+as a guard name and shifts it off, so the action name turns into a guard nobody
+defined and every action denies every operator — silently. An ability taken from the
+map is authorized with no argument at all:
+
+```php
+'admin' => ['abilities' => ['*' => 'manage webhooks']],
+```
+
+`'*'` is the catch-all; an exact action key wins over it.
+
 `rotate` is the one to reach for in an incident: it issues a new signing secret and
 shows it once, while the previous secret keeps verifying until the rotation window
 closes — so a leak is closed immediately without knocking the receiver offline.

@@ -4,6 +4,169 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-08-23
+
+### Added
+
+- **`admin.abilities` — a per-action ability map for the operator console, and the way past a
+  defect that denied every operator.** A host whose capabilities come from
+  spatie/laravel-permission could not use `admin.ability`: that package registers a
+  `Gate::before` hook which reads the first positional gate argument as a *guard* name and
+  shifts it off the list. The action name travels in exactly that position, so `'create'`
+  became the guard, the permission lookup asked for a guard nobody defined, and the check
+  fell through to an ability that does not exist — a deny.
+
+  Every action then refused every operator, **including the one the permission was granted
+  to**, and it refused silently: nothing threw, nothing was logged, the form just did nothing
+  when submitted. A surface that denies everything looks exactly like a surface that is well
+  guarded, which is why only a positive arm can tell them apart.
+
+  An ability taken from the new map is authorized **alone**, with no argument, so a
+  permission name works as itself:
+
+  ```php
+  'admin' => ['abilities' => ['*' => 'manage webhooks']],
+  ```
+
+  `'*'` is the catch-all and an exact action wins over it, so the console can sit at one
+  capability with only `delete` lifted to a stricter one. Both keys may be set: the map
+  answers where it names an action, `ability` answers everywhere else with its argument and
+  its behavior **unchanged**. An entry that is not a non-empty string is ignored rather than
+  denying — a half-written map must not become a console that refuses everyone.
+
+- **`webhooks:preflight` now holds the configuration against the schema, not just the driver.**
+  `platform.owner_key_type` has to be a declaration — it is read before the tables exist,
+  because it is what renders them — and nothing afterwards ever checked that it still
+  matched. Three run-time paths believe it over the database: `subscribe()` refuses every
+  owner it declares unfit (loud), the delivery model casts `owner_id` by it (silent — a UUID
+  declared `bigint` reads back as a small integer, and every UUIDv7 owner collapses onto the
+  same one), and the redelivery policy then compares that value against the tenant and
+  refuses every tenant its own deliveries (which reads like an authorization decision).
+
+  The contradiction is an **expected** state, not an abuse: a host that partitions
+  differently or needs its own indexes forks the two create-table migrations, and from then
+  on the column comes from the fork and the setting comes from the config. Preflight now
+  fails when they disagree and names both. A migration run that leaves them contradicting
+  also writes a warning to the log — the check hangs off the migrator's event rather than off
+  this package's migration files, which a forked installation does not have.
+
+- **`dashboard.timezone` — the zone the dashboard renders timestamps in.** Every value already
+  carried the application zone and said so, because the absolute format ends in `z`. What was
+  missing is a **seam**: `app.timezone` is one process-wide setting, so in a multi-tenant
+  back-office it is `UTC` for storage while the operator reading the delivery log sits
+  somewhere else, and there is no single value the application could set that is right for
+  every reader. Labelling the offset only told them to do the arithmetic themselves, on the one
+  surface where they compare against their own records.
+
+  Unset, **nothing changes**. Set a zone identifier for one operator or one tenant, or a class
+  implementing `DashboardTimezoneResolver` when the answer depends on who is reading — resolved
+  per render, the same shape as the payload seam. It reaches the delivery table, the detail
+  drawer and the hourly axis: two columns of one screen on two different clocks would be worse
+  than one clock that is not yours, because nothing would say it is happening.
+
+  A zone the runtime does not know falls back to the application zone rather than throwing —
+  a typo in a display setting must not take a dashboard down, and the `z` in the format means
+  the fallback names itself. A class that does not implement the resolver contract does throw.
+
+### Changed
+
+- **The hourly-activity axis ends in a minutes placeholder rather than a literal `00`.** The
+  buckets are whole hours, so the two render identically — until the display zone has a
+  sub-hour offset (India, Nepal, parts of Australia), where the value really is `:30` or `:45`
+  and a hardcoded `00` printed a time that never existed.
+
+- **The package's Alpine components now ship as a file served from your own origin, not as an
+  inline `<script>`.** The self-service secret panel's countdown and the dashboard drawer's
+  keyboard model were registered by an inline script carrying an *optional* CSP nonce. Under a
+  strict, **nonce-less** policy — `script-src 'self'`, which an application is entitled to
+  choose and which this package must not ask it to loosen — the browser refuses to run it.
+  Nothing throws, nothing reaches a server log, and a CSP audit reads the markup as perfectly
+  valid: the countdown never starts and the revealed secret stays on screen past its window;
+  the drawer loses the focus trap on the one panel a keyboard or screen-reader user cannot do
+  without.
+
+  That was the **third** distinct cause of the same dead surface, so the fix is the one with
+  no policy dependency left rather than a third correction inside the inline path. The file is
+  **served**, not published: a publishable asset works only for a host that remembers to run
+  `vendor:publish` — and to run it again after every upgrade — and forgetting is the same
+  silent dead panel.
+
+  **Nothing to do.** The route is registered by the dashboard and portal providers, carries no
+  middleware (it is a static file with no user data), and is cached immutably under a URL keyed
+  to the file's content hash. If you cache routes, rebuild the cache after upgrading. If you
+  published either view, re-publish it — your copy still carries the inline script.
+
+### Fixed
+
+- **The dashboard's panels resolve in one request instead of six racing ones.** Livewire
+  isolates lazy loads by default: every `#[Lazy]` panel fired its own request and every
+  response morphed the shared page. Six of those race on first paint — and switching the time
+  window sends four of them at components that are being torn down and replaced, because the
+  window is part of each panel's key. The result was an intermittent
+  `Public method [__lazyLoad] not found`: a request landing on a snapshot a sibling's response
+  had already re-rendered.
+
+  The panels now bundle, so the whole set resolves against one consistent set of snapshots —
+  which also costs the server five fewer Livewire boots per page load. **The window stays in
+  the keys**: taking it out would stop the remount, and trade a loud rare error for a quiet
+  permanent one, since a broadcast cannot reach a still-lazy panel and it would resolve on the
+  window frozen into its placeholder — header reading `7d`, panel counting `24h`, nothing
+  reporting it.
+
+- **Live-bound filters lost focus on every keystroke.** A `wire:model.live` control without a
+  `name` gives Livewire's morph nothing to recognise the old element by, so it replaces it —
+  and the field loses focus. On the debounced event-type filter that means typing one
+  character and finding the cursor gone. Every live-bound control in the shipped views now
+  carries one, and a guard holds the class rather than the two instances that were reported:
+  the same defect was in five other views.
+
+- **The operator console's delete dialog dropped focus to `<body>`.** A dialog normally hands
+  focus back to its trigger — but after a delete the trigger is gone with the row, so a
+  keyboard or screen-reader user confirmed an irreversible action, heard no announcement that
+  it happened, and was returned to the top of the document. It now returns focus to the
+  endpoints table, which survives and is where the removed row was. The rotate dialog beside
+  it deliberately has no such target: its row survives, so focus returns to the trigger by
+  itself, and declaring one would replace that with a jump to the table.
+
+- **The one-time secret in the WireKit console has a copy control.** `newSecret` is cleared on
+  every dehydrate, on purpose — the plaintext exists in exactly one response, and this console
+  has no reveal window to ask again with. A reader who could not get it out of that one
+  rendering had to **rotate**, putting every consumer of the endpoint into a migration window
+  nobody needed. Selecting a 50-character token rendered `break-all` across several lines, with
+  a mouse, without losing a character, is where that went wrong.
+
+- **The delivery drawer's overlay shows a pointer.** It closes the drawer on click, and the
+  pointer is the only feedback an overlay can give — it has no border, no label and no focus
+  ring. Tailwind v4's preflight gives buttons `cursor: default`, so the one visible way out of
+  that panel read as dead space.
+
+- **The operator console's pager rendered but never turned a page.** `SubscriptionManager`
+  has handed the view a paginator since 2.0.1, and the console stub renders its control — but
+  the component did not use Livewire's `WithPagination`, so the control took clicks and the
+  list did not move. A paginator resolves its page from the request, and a Livewire update
+  request carries no `page` parameter: every answer was page one.
+
+  That is the one list where it matters most. The console is unscoped by design, so its
+  length is the length of the installation — the exact reason it was paginated in the first
+  place. It now pages, and it uses the package's own pagination control, so a published view
+  restyles it in place like every other paged screen here.
+
+- **An over-long dedupe key could lose the delivery it identified.** `webhook_id` is the twin
+  of the `event_type` defect 2.0.1 closed: the same `varchar(255)` column, the same three
+  grammars a host can point at it, and the same failure — the row is written after the
+  signature verifies and before the 2xx goes back, so an over-long value fails the insert,
+  the request answers 500, and the producer retries into the same failure until its budget
+  runs out.
+
+  **It is bounded by hashing, not by truncating, and that difference is the whole point.**
+  This column sits in the partial unique index that deduplicates deliveries. Cutting it at
+  255 would collapse two different producer ids sharing a prefix into one key, and the second
+  delivery would be dropped as a duplicate — a loud 500 traded for a silent lost webhook. A
+  key longer than the column is stored as `sha256:<hex>` instead: the same id still hashes to
+  the same key, so a retry still deduplicates, and two different ids never collide. The
+  prefix is there so an operator comparing this against a producer's log can tell a hash from
+  a mismatch. **Nothing changes for a key that fits, which is every key a real producer sends.**
+
 ## [2.0.1] - 2026-08-21
 
 ### Fixed
@@ -1917,7 +2080,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v2.0.1...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.0.1...v2.1.0
 [2.0.1]: https://github.com/pushery/webhooks-for-laravel/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.12.0...v2.0.0
 [1.12.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.11.0...v1.12.0
