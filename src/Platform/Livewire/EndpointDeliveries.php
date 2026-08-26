@@ -7,10 +7,13 @@ namespace Pushery\Webhooks\Platform\Livewire;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Pushery\Webhooks\Facades\Webhooks;
 use Pushery\Webhooks\Models\WebhookDelivery;
 use Pushery\Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
 use Pushery\Webhooks\Platform\Support\SubscriptionScope;
@@ -41,10 +44,21 @@ use Pushery\Webhooks\Support\TenantIdentity;
  *   is no relation through which the scope could later be widened, and the whole PAIR is
  *   compared because two tenants can share an owner_id under different owner types. With
  *   no tenant resolved it constrains to nothing rather than falling back to everything.
- * - **It reads no body of any kind.** Not the outbound payload, which is gated behind its
- *   own ability on the operator dashboard, and not `error`, which carries an HTTP client's
- *   exception message and can quote back whatever the receiver wrote. A row here is time,
- *   outcome and status code, and nothing that needs a gate is fetched at all.
+ * - **It reads no payload, ever, and no error text unless the host asked for one.** The
+ *   outbound payload is gated behind its own ability on the operator dashboard and is never
+ *   fetched here at all. `error` carries an HTTP client's exception message and can quote
+ *   back whatever the receiver wrote — on the endpoint OWNER's own screen that text is the
+ *   answer they came for, on a portal where the reader does not run the receiver it is
+ *   someone else's server talking, and which of the two this is embedded on is the host's
+ *   knowledge. So it is a config key, the property may only ever decline it, and the column
+ *   is not even SELECTed while it is off: a promise kept by the view alone is a promise
+ *   about the markup rather than about what was read.
+ *
+ * - **It is bounded in time by default.** webhook_deliveries is range-partitioned by month,
+ *   and a read with no lower bound on created_at cannot be pruned, so it visits every
+ *   partition there is. Nothing goes red about that — the page loads, it just loads with the
+ *   whole history in the plan, and the cost arrives with the DATA rather than with the
+ *   change. A filter with no default is not a filter, it is an offer.
  */
 final class EndpointDeliveries extends Component
 {
@@ -61,9 +75,46 @@ final class EndpointDeliveries extends Component
     private const int PER_PAGE = 10;
 
     /**
+     * The shipped window ceiling, repeated here because an ABSENT key reads as null and a
+     * null ceiling would switch the bound off — the one direction that is expensive and
+     * silent. A host on a config cache built before this version is bounded in the meantime.
+     * ConfigDefaultsAreInSyncTest holds the two numbers together.
+     */
+    private const int WINDOW_DAYS = 30;
+
+    /**
+     * The window lengths offered, before the host's ceiling trims them.
+     */
+    private const array WINDOW_STEPS = [7, 30, 90, 365];
+
+    /**
      * Narrow the list to a single endpoint, or null for every endpoint the tenant owns.
      */
     public ?int $endpointId = null;
+
+    /**
+     * How many days back the list reads, or null to take the host's configured ceiling.
+     *
+     * This one IS public, unlike the page size above, because narrowing the window is a
+     * thing a reader legitimately does. What makes that safe is the clamp: the value can
+     * only ever move the window IN, never past `platform.deliveries.window_days`. A property
+     * that could widen it would be a way for the browser to ask for exactly the unbounded
+     * scan the default exists to prevent.
+     */
+    public ?int $windowDays = null;
+
+    /**
+     * Whether to render the stored error text, or null to follow the host's config.
+     *
+     * Also narrowing-only, and for a sharper reason than the window: `error` carries an HTTP
+     * client's exception message and can quote back whatever the receiver wrote. An
+     * embedding may switch it OFF where the host allows it; nothing sent from a browser may
+     * switch it ON.
+     */
+    public ?bool $showErrors = null;
+
+    /** A message for the reader — why a replay was refused. */
+    public string $message = '';
 
     /**
      * Its own page name, because the portal shows this panel and the endpoint list on one
@@ -106,6 +157,59 @@ final class EndpointDeliveries extends Component
         $this->resetPage($this->getPageName());
     }
 
+    /**
+     * Same reason as the endpoint filter: page 3 of ninety days is rarely page 3 of seven,
+     * and a narrowed list that opens on an empty page reads as "nothing was sent".
+     */
+    public function updatingWindowDays(): void
+    {
+        $this->resetPage($this->getPageName());
+    }
+
+    /**
+     * Replay one delivery to the endpoint it was sent to.
+     *
+     * This is the action the three delivery lists between them could not offer a tenant: the
+     * per-endpoint view is exactly the screen someone is standing on when they want to send
+     * it again.
+     *
+     * Four guards, in this order, and each answers a different question:
+     *
+     * 1. The delivery is loaded through the OWNER-SCOPED query, so a foreign id resolves to
+     *    nothing and fails not-found before anything else runs — the same shape the endpoint
+     *    lookup has, and the reason a probe cannot tell a foreign row from an absent one.
+     * 2. The endpoint is loaded through {@see findOwnedEndpoint()}, which scopes again.
+     * 3. The `redeliver` ability is the row-level, defense-in-depth check on the ACTION.
+     * 4. The per-tenant allowance, because this button makes the server send an HTTP request
+     *    to a URL the reader controls.
+     *
+     * A disabled endpoint is answered with a sentence rather than an exception: the engine
+     * refuses it regardless, so the only thing decided here is whether the reader is told.
+     */
+    public function redeliver(string $id): void
+    {
+        $this->message = '';
+
+        $delivery = $this->deliveryQuery()->select('*')->whereKey($id)->firstOrFail();
+        $endpoint = $this->findOwnedEndpoint($delivery->subscription_id);
+
+        $this->authorize('redeliver', $endpoint);
+
+        if (! $endpoint->is_active) {
+            $this->message = __('webhooks::self-service.deliveries.endpoint_disabled');
+
+            return;
+        }
+
+        if ($this->replayRateExceeded()) {
+            $this->message = __('webhooks::self-service.deliveries.replay_throttled');
+
+            return;
+        }
+
+        Webhooks::redeliver($delivery);
+    }
+
     public function paginationView(): string
     {
         return 'webhooks::pagination';
@@ -127,6 +231,8 @@ final class EndpointDeliveries extends Component
         return ViewFactory::make('webhooks::self-service.livewire.endpoint-deliveries', [
             'deliveries' => $deliveries,
             'endpoints' => $this->scopedQuery()->latest()->get(),
+            'windowChoices' => $this->windowChoices(),
+            'showsErrors' => $this->showsErrors(),
         ]);
     }
 
@@ -163,11 +269,22 @@ final class EndpointDeliveries extends Component
      */
     private function deliveryQuery(): Builder
     {
-        // Only the columns the panel renders. The class promises to read no body of any
-        // kind, and a bare query would fetch the jsonb payload and the stored error on every
-        // page — a promise kept by the view alone is a promise about the markup, not about
-        // what was read.
-        $query = WebhookDelivery::query()->select(['id', 'event_type', 'status', 'response_code', 'created_at']);
+        // Only the columns the panel renders, and `error` only when it is actually rendered.
+        // The class promises to read no BODY of any kind, and a bare query would fetch the
+        // jsonb payload on every page — a promise kept by the view alone is a promise about
+        // the markup, not about what was read.
+        //
+        // ⚠️ `subscription_id` was in this list with a comment saying the replay action needed
+        // it. It did not: redeliver() calls `->select('*')`, which REPLACES the column list
+        // rather than adding to it, so the row it works from was always complete. Measured by
+        // dropping the column with both panel suites running.
+        $columns = ['id', 'event_type', 'status', 'response_code', 'created_at'];
+
+        if ($this->showsErrors()) {
+            $columns[] = 'error';
+        }
+
+        $query = WebhookDelivery::query()->select($columns);
         $owner = SubscriptionScope::currentOwner();
 
         if (! $owner instanceof TenantIdentity) {
@@ -180,6 +297,75 @@ final class EndpointDeliveries extends Component
             $query->where('subscription_id', $this->findOwnedEndpoint($this->endpointId)->id);
         }
 
+        // The lower bound is what makes this query prunable. webhook_deliveries is range
+        // partitioned by month — the package's core storage decision, the one that makes
+        // retention a DROP PARTITION rather than a DELETE — and a read with no bound on
+        // created_at cannot be pruned, so it visits every partition there is. Nothing goes
+        // red about that: the page loads, it just loads with the whole history in the plan,
+        // and the cost arrives with the DATA rather than with the change.
+        //
+        // Bound through the package's own scope rather than a bare where(), because a naive
+        // literal is resolved by PostgreSQL against the database SESSION zone.
+        $days = $this->effectiveWindowDays();
+
+        if ($days !== null) {
+            $query->createdAfter(Date::now()->subDays($days)->startOfDay());
+        }
+
         return $query;
+    }
+
+    /**
+     * The window in days, or null when the host switched the bound off entirely.
+     *
+     * The configured value is a CEILING, not merely a default: `windowDays` may narrow
+     * beneath it and may not reach past it. A non-positive ceiling is the deliberate opt-out
+     * — a host that would rather pay the unbounded scan than ever hide a row.
+     */
+    private function effectiveWindowDays(): ?int
+    {
+        $ceiling = Config::integer('webhooks.platform.deliveries.window_days', self::WINDOW_DAYS);
+
+        if ($ceiling <= 0) {
+            return null;
+        }
+
+        return is_int($this->windowDays) && $this->windowDays > 0
+            ? min($this->windowDays, $ceiling)
+            : $ceiling;
+    }
+
+    /**
+     * The window lengths offered to the reader: the shipped steps that fit under the host's
+     * ceiling, plus the ceiling itself, so the widest choice is always reachable.
+     *
+     * @return list<int>
+     */
+    private function windowChoices(): array
+    {
+        $ceiling = $this->effectiveWindowDays();
+
+        if ($ceiling === null) {
+            return [];
+        }
+
+        $choices = array_values(array_filter(self::WINDOW_STEPS, fn (int $days): bool => $days < $ceiling));
+        $choices[] = $ceiling;
+
+        return $choices;
+    }
+
+    /**
+     * Whether the stored error text is rendered.
+     *
+     * The config decides IF it may be, the property may only decline. `error` carries an HTTP
+     * client's exception message and can quote back whatever the receiver wrote — on the
+     * endpoint owner's own surface that is the answer they came for, but which surface this
+     * is embedded on is the host's knowledge, not the browser's.
+     */
+    private function showsErrors(): bool
+    {
+        return Config::boolean('webhooks.platform.deliveries.show_errors', false)
+            && ($this->showErrors ?? true);
     }
 }

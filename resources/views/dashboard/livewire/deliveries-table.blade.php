@@ -59,6 +59,14 @@
                     @php($when = \Pushery\Webhooks\Dashboard\DashboardTimezone::apply($delivery->created_at)->settings(['locale' => app()->getLocale()]))
                     <x-wirekit::table.row wire:key="dt-{{ $delivery->id }}">
                         <x-wirekit::table.th headerScope="row">
+                            {{-- A native button rather than the library's, and this is the one
+                                 place in this view that leaves it. A table-cell trigger has to
+                                 read as the cell's own text — the event type — not as a control
+                                 sitting in a cell, so it takes the accent color and nothing
+                                 else. The library's button brings its own padding, height and
+                                 surface, and every row would then be a row of buttons.
+                                 Said out loud because a silent escape in a file that uses the
+                                 library twenty lines further down reads as an oversight. --}}
                             <button type="button" wire:click="viewDelivery('{{ $delivery->id }}')" class="cursor-pointer text-[color:var(--color-wk-accent)]" aria-label="{{ __('webhooks::dashboard.a11y.view_delivery', ['event' => $delivery->event_type]) }}">
                                 {{ $delivery->event_type }}
                             </button>

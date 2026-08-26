@@ -147,6 +147,10 @@ final readonly class JwksKeySet
                 continue;
             }
 
+            // The cast is EQUIVALENT and reported every run: PHP normalizes an integer-like array
+            // key back to an int, so `$keys[0]` and `$keys['0']` are the same slot. It stays
+            // because the array is declared `array<string, string>` and a bare int is the one
+            // value that would make that declaration false at runtime while every test passed.
             $kid = is_string($key['kid'] ?? null) && $key['kid'] !== '' ? $key['kid'] : (string) $index;
             $keys[$kid] = base64_encode($raw);
             $index++;

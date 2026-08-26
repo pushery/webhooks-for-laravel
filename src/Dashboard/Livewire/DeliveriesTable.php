@@ -6,6 +6,8 @@ namespace Pushery\Webhooks\Dashboard\Livewire;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
@@ -49,7 +51,30 @@ final class DeliveriesTable extends Component
 
     public int $perPage = 15;
 
+    /**
+     * How many days back the table reads, or null to take the host's configured ceiling.
+     *
+     * Clamped for the same reason `perPage` is: a public Livewire property is writable from
+     * the browser, so a value the reader picks is a cost the reader picks. It may narrow the
+     * window and can never reach past `dashboard.deliveries.window_days` — widening it would
+     * be a way to ask for exactly the unbounded, unprunable read the default prevents.
+     */
+    #[Url]
+    public ?int $windowDays = null;
+
+    /**
+     * The shipped ceiling, repeated here because an ABSENT key reads as null and a null
+     * ceiling would switch the bound off — the one direction that is expensive and silent.
+     * ConfigDefaultsAreInSyncTest holds the two numbers together.
+     */
+    private const int WINDOW_DAYS = 30;
+
     public function updatingStatus(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingWindowDays(): void
     {
         $this->resetPage();
     }
@@ -108,10 +133,35 @@ final class DeliveriesTable extends Component
 
         [$ownerSql, $ownerBindings] = DashboardScope::current()->condition();
 
-        $deliveries = $this->sourceModel()
+        $query = $this->sourceModel()
             ->newQuery()
-            ->whereRaw($ownerSql, $ownerBindings)
+            ->whereRaw($ownerSql, $ownerBindings);
+
+        // The lower bound is what makes this read prunable. webhook_deliveries is range
+        // partitioned by month — the decision that makes retention a DROP PARTITION rather
+        // than a DELETE — and a query with no bound on created_at visits every partition
+        // there is, on every render of a screen that stays open all day. Nothing goes red:
+        // the page loads, it just loads with the whole history in the plan, and the cost
+        // arrives with the DATA rather than with the change.
+        //
+        // Bound through the package's own timestamp scope rather than a bare where(): a
+        // naive literal is resolved by PostgreSQL against the database SESSION zone, which
+        // is a connection setting unrelated to app.timezone.
+        $days = $this->effectiveWindowDays();
+
+        if ($days !== null) {
+            $query->createdAfter(Date::now()->subDays($days)->startOfDay());
+        }
+
+        $deliveries = $query
             ->when($this->status !== '', fn (Builder $query): Builder => $query->where('status', $this->status))
+            // ⚠️ The `!== ''` test is unkillable, and reported as a survivor: with an empty
+            // filter the clause becomes LIKE '%%', which matches every row the panel would have
+            // returned anyway. Measured, suite green.
+            //
+            // It is NOT redundant for that reason alone — it is what keeps an unfiltered table
+            // from carrying a pointless LIKE into the query plan on a partitioned table. Kept
+            // for the plan, not for the result.
             ->when($this->eventType !== '', fn (Builder $query): Builder => $query->where('event_type', 'like', '%'.$this->eventType.'%'))
             ->orderBy($sortField, $sortDirection)
             // Clamped, because a public Livewire property is writable from the browser and
@@ -123,5 +173,24 @@ final class DeliveriesTable extends Component
         return ViewFactory::make('webhooks::dashboard.livewire.deliveries-table', [
             'deliveries' => $deliveries,
         ]);
+    }
+
+    /**
+     * The window in days, or null when the host switched the bound off entirely.
+     *
+     * The configured value is a CEILING rather than merely a default; a non-positive one is
+     * the deliberate opt-out, for an installation that would rather pay the scan.
+     */
+    private function effectiveWindowDays(): ?int
+    {
+        $ceiling = Config::integer('webhooks.dashboard.deliveries.window_days', self::WINDOW_DAYS);
+
+        if ($ceiling <= 0) {
+            return null;
+        }
+
+        return is_int($this->windowDays) && $this->windowDays > 0
+            ? min($this->windowDays, $ceiling)
+            : $ceiling;
     }
 }

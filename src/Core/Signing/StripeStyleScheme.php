@@ -36,6 +36,11 @@ readonly class StripeStyleScheme implements AcceptsSignatureHeaders, SignatureSc
 
         $signatures = array_map(
             fn (string $secret): string => 'v1='.$this->hmac($toSign, $secret),
+            // EQUIVALENT, and reported every run — the same shape as its twin in
+            // Ed25519Scheme. `all()` is keyed 'current'/'previous' and array_map preserves
+            // keys when it is handed exactly one array, but the result is only imploded and
+            // implode ignores keys. Kept because the order here is rotation order, not key
+            // order, and carrying the keys invites the opposite reading.
             array_values($secrets->all()),
         );
 
@@ -91,6 +96,9 @@ readonly class StripeStyleScheme implements AcceptsSignatureHeaders, SignatureSc
         $signatures = [];
 
         foreach (explode(',', $header) as $part) {
+            // Two integers, two different verdicts. The PAD LENGTH is equivalent — raising it
+            // appends an element the destructuring never reads. The EXPLODE LIMIT is not: a
+            // value containing '=' would be cut short, and the scheme tests hold that.
             [$key, $value] = array_pad(explode('=', trim($part), 2), 2, '');
 
             if ($key === 't' && preg_match('/^\d+$/', $value) === 1) {

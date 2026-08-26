@@ -138,6 +138,13 @@ return [
         // the heading above it, or a screen-reader user is offered three landmarks with
         // one name and has to guess which is the pager.
         'pagination_label' => 'Entregas recientes, páginas',
+        'window_label' => 'Periodo',
+        'window_days' => 'Últimos :days días',
+        'error' => 'Error',
+        'replay' => 'Enviar de nuevo',
+        'replay_sr' => 'Enviar :event de nuevo',
+        'endpoint_disabled' => 'Este endpoint está desactivado, así que no se le puede enviar nada.',
+        'replay_throttled' => 'Has reenviado mucho en poco tiempo. Espera un minuto e inténtalo otra vez.',
         'status' => [
             'pending' => 'En cola',
             'succeeded' => 'Entregado',
@@ -214,6 +221,7 @@ return [
             'blocked' => 'Esta URL no se puede usar como endpoint. Usa una URL https accesible públicamente.',
         ],
         'event_types' => [
+            'string' => 'Un tipo de evento debe ser un nombre, no un número ni una lista.',
             'required' => 'Selecciona al menos un tipo de evento.',
             'min' => 'Selecciona al menos un tipo de evento.',
             // A registration for a type the catalog does not declare. Only reachable

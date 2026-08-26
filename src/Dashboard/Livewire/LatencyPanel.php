@@ -56,6 +56,18 @@ final class LatencyPanel extends Component
     #[Computed]
     public function peakLatency(): float
     {
+        // ⚠️ BOTH FALLBACKS BELOW ARE UNKILLABLE, and mutation testing reports four mutants on
+        // them. The reason is the floor on the last line: `max(1.0, …)` absorbs anything at or
+        // below 1, and the mutators only move a literal by one — so 0 and 1 and -1 all come out
+        // of this method as 1.0. Measured: `?? 0` moved to `?? 1` and `return 0.0` to `1.0`, the
+        // dashboard suites green for both.
+        //
+        // The control is the same method: a row carrying a REAL p95 is still reported as itself
+        // (ChartPeakFallbackTest pins 250.5), so this is a statement about values under the
+        // floor rather than about an unmeasured peak.
+        //
+        // They stay because the floor is a rendering decision — every bar divides by this — and
+        // relying on it to also mean "no measurement" would put two jobs on one expression.
         $values = $this->trend()
             ->map(static function (stdClass $row): float {
                 $p95 = $row->p95 ?? 0;

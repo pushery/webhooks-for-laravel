@@ -32,6 +32,10 @@ final class RollupRefresh
         // unquoted, a uuid/ulid nil renders as a quoted char literal. It is a fixed package
         // constant, never user input, so splicing it into the SQL is safe.
         $sentinel = OwnerKeyType::fromConfig()->sentinelId();
+        // The cast is EQUIVALENT and reported every run — PHP renders an int identically when
+        // it is concatenated. It stays because this value is spliced into SQL and the method
+        // is declared `literal-string`: a bare int here is the one form that makes the two
+        // branches of this ternary disagree about their type while producing the same bytes.
         $sentinelSql = is_int($sentinel) ? (string) $sentinel : "'".$sentinel."'";
 
         $bucket = "CAST(DATE_FORMAT(created_at, '%Y-%m-%d %H:00:00') AS DATETIME)";

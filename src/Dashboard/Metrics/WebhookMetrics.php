@@ -91,6 +91,14 @@ final readonly class WebhookMetrics
         $counts = (array) $this->db()->table(self::HOURLY_VIEW)
             ->whereRaw($ownerSql, $ownerBindings)
             ->where('bucket', '>=', $this->since())
+            // ⚠️ The three mutants mutation testing reports on this list are ORDER swaps, and all
+            // three are equivalent: the row is read back by column NAME below, so a SELECT list
+            // in a different order returns the same KpiSet. There is no assertion that could
+            // tell them apart, and none should be invented.
+            //
+            // The surface itself is covered, which is the half worth checking before believing
+            // the paragraph above: DROP any one of these five aggregates and the metrics suite
+            // goes red (measured). Only the reordering is free.
             ->selectRaw(
                 'coalesce(sum(total), 0)     as total, '
                 .'coalesce(sum(delivered), 0) as delivered, '
@@ -100,6 +108,17 @@ final readonly class WebhookMetrics
             )
             ->first();
 
+        // ⚠️ The five `?? 0` defaults below are UNREACHABLE, and mutation testing reports all
+        // ten mutants on them. The SELECT above wraps every aggregate in coalesce(..., 0), so
+        // the row always carries the key and never carries null — and `??` fires on null.
+        // Measured: all five moved to `?? 1` at once, with the dashboard suites green.
+        //
+        // The control is the surface itself, one method up: DROP any one of those five
+        // aggregates from the SELECT and the suite goes red. This is a statement about the
+        // defaults, not about an unmeasured KpiSet.
+        //
+        // They stay because KpiSet's constructor takes ints and this is the boundary where
+        // that becomes true, rather than one call further in.
         return new KpiSet(
             total: $this->toInt($counts['total'] ?? 0),
             delivered: $this->toInt($counts['delivered'] ?? 0),

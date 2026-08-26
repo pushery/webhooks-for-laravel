@@ -68,6 +68,16 @@ final class PayloadTransformEditor extends Component
         // policy, exactly as every other panel does — otherwise a foreign-but-existing id 403s
         // while a non-existent one 404s, letting a tenant enumerate which ids exist. The policy
         // stays the second, defense-in-depth guard.
+        // ⚠️ Both lines are reported as survivors, for two different and already-known reasons.
+        //
+        // The (int) cast: $subscription->id is an int already, so it changes nothing at run time
+        // (measured). It stays because findOwnedEndpoint() is typed for an int and this is the
+        // boundary where that is made true.
+        //
+        // The authorize(): unreachable as the SOLE refusal, which InteractsWithEndpoints spells
+        // out in full — the boot gate reads the same ability, and findOwnedEndpoint() has already
+        // enforced the ownership the policy would add. That docblock ends "Do not 'kill' them by
+        // deleting them", and this is one of the five it means.
         $subscription = $this->findOwnedEndpoint((int) $subscription->id);
         $this->authorize('update', $subscription);
 
@@ -345,6 +355,14 @@ final class PayloadTransformEditor extends Component
     {
         $encoded = json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
+        // ⚠️ Unkillable, and reported as a survivor. `json_encode` returns string|false, so
+        // comparing against true never matches and the ternary simply yields the encoded value —
+        // identical behavior for every input that encodes. The two differ only when encoding
+        // FAILS, and what reaches here is an array this component itself validated as JSON.
+        // Measured: flipped to `=== true`, the editor suite stays green.
+        //
+        // It stays as a type net rather than a behavior: the method returns string, and without
+        // it a failed encode would return false from a string-typed method.
         return $encoded === false ? '{}' : $encoded;
     }
 
@@ -353,6 +371,10 @@ final class PayloadTransformEditor extends Component
         /** @var array<string, mixed> $versions */
         $versions = Config::array('webhooks.platform.payload_versioning.versions', []);
 
+        // ⚠️ The cast on the KEY below is unkillable — PHP normalizes a numeric string key to an
+        // int on the way in, so casting it changes nothing (measured). The cast on the VALUE is
+        // NOT in that position and an existing arm goes red without it; only one of the two is a
+        // survivor, which is what makes this a note about the key rather than about the line.
         $versionOptions = ['' => __('webhooks::self-service.transform.version_none')];
         foreach (array_keys($versions) as $version) {
             $versionOptions[(string) $version] = (string) $version;

@@ -8,7 +8,7 @@
         <x-wirekit::stack gap="sm">
             <x-wirekit::heading :level="1" size="lg">{{ __('webhooks::self-service.transform.heading') }}</x-wirekit::heading>
             @if ($this->endpointUrl !== null)
-                <x-wirekit::text variant="muted" class="break-all">{{ $this->endpointUrl }}</x-wirekit::text>
+                <x-wirekit::text intent="muted" class="break-all">{{ $this->endpointUrl }}</x-wirekit::text>
             @endif
         </x-wirekit::stack>
         {{-- Absent when this editor is embedded without the portal's own routes: there is
@@ -21,7 +21,7 @@
     </header>
 
     @unless ($versioningEnabled)
-        <x-wirekit::callout variant="warning">
+        <x-wirekit::callout intent="warning">
             {{ __('webhooks::self-service.transform.versioning_disabled') }}
         </x-wirekit::callout>
     @endunless

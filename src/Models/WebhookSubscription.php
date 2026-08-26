@@ -19,6 +19,7 @@ use Pushery\Webhooks\Database\Concerns\UsesWebhookConnection;
 use Pushery\Webhooks\Database\Factories\WebhookSubscriptionFactory;
 use Pushery\Webhooks\Livewire\SubscriptionManager;
 use Pushery\Webhooks\Platform\Livewire\EndpointForm;
+use Pushery\Webhooks\Support\EventTypeList;
 use Pushery\Webhooks\Support\Settings;
 
 /**
@@ -106,6 +107,26 @@ final class WebhookSubscription extends Model
     }
 
     /**
+     * The event types as the forms and the list screens declare them: a list of strings.
+     *
+     * The column is a JSON cast, so its shape is whatever was written into it. A row holding
+     * a JSON object, a number or a nested array reaches a reader unchanged — and every reader
+     * in this package treats it as a list of names. `implode()` on such a row emits an
+     * "Array to string conversion" warning and prints the literal `Array`; a form binds
+     * checkboxes against keys that are not indices and then refuses to save. Both screens go
+     * dead over a value the operator never chose and has no control to remove.
+     *
+     * Reading through here rather than through the raw property is what keeps the four
+     * readers agreeing. See {@see EventTypeList} for what is dropped and why.
+     *
+     * @return list<string>
+     */
+    public function eventTypeNames(): array
+    {
+        return EventTypeList::fromStorage($this->event_types);
+    }
+
+    /**
      * @return MorphTo<Model, $this>
      */
     public function owner(): MorphTo
@@ -119,6 +140,33 @@ final class WebhookSubscription extends Model
     public function deliveries(): HasMany
     {
         return $this->hasMany(WebhookDelivery::class, 'subscription_id');
+    }
+
+    /**
+     * Whether this endpoint was switched off by the circuit breaker rather than by a person.
+     *
+     * Both paths write the SAME two columns — `is_active = false` and a `disabled_at` stamp
+     * ({@see WebhookManager::disable()} and the breaker in WebhookServerEventSubscriber) — so
+     * the stamp cannot tell them apart. The failure STREAK can: the breaker only trips at or
+     * above its threshold and leaves the streak standing, while a person switching an endpoint
+     * off never touches it.
+     *
+     * ⚠️ The distinction changes what an operator should DO, which is why it is worth reading
+     * out. Seeing only "Disabled", they re-enable — and `enable()` clears the streak by design,
+     * so the endpoint gets a fresh failure budget, fails through it, and the breaker switches
+     * it off again. The screen says the same thing on every pass, so the loop never looks like
+     * one. When the breaker is what turned it off, the destination is what needs fixing.
+     *
+     * Answers false while the breaker is switched off entirely: a streak that no longer trips
+     * anything cannot have tripped this.
+     */
+    public function wasAutoDisabled(): bool
+    {
+        $settings = new Settings;
+
+        return ! $this->is_active
+            && $settings->circuitBreakerEnabled()
+            && $this->consecutive_failures >= $settings->circuitBreakerThreshold();
     }
 
     /**

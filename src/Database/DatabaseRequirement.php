@@ -133,6 +133,11 @@ final class DatabaseRequirement
         /** @var object{sql_mode?: string}|null $row */
         $row = $connection->selectOne('SELECT @@session.sql_mode AS sql_mode');
 
+        // EQUIVALENT, and reported every run: `SELECT @@session.sql_mode` always answers one
+        // row on a server that got this far, so the coalesce has no reachable input. It is the
+        // narrowing PHPStan needs from an optional property, and an empty mode is the safe
+        // reading — it satisfies no strictness check, so an unreadable mode is refused rather
+        // than waved through.
         return $row->sql_mode ?? '';
     }
 

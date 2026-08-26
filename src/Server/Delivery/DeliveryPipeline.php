@@ -56,9 +56,16 @@ final readonly class DeliveryPipeline
                 $headers,
                 $data->options->toTransportOptions(),
             );
+        } catch (NonRetryable $exception) {
+            // The one transport failure a retry cannot bridge: the endpoint answered, and
+            // what it answered contradicts itself about where the body ends. The next attempt
+            // reaches the same endpoint and gets the same bytes, so retrying spends the whole
+            // budget on identical refusals and feeds the circuit breaker twenty times over an
+            // endpoint whose actual defect nobody was told about. Failing final says it once.
+            return AttemptOutcome::finalFailure(null, $exception);
         } catch (Throwable $exception) {
-            // EVERY way the transport can fail is a retryable delivery failure — and the
-            // net has to be this wide. Laravel marshals only curl's five connect-phase
+            // EVERY OTHER way the transport can fail is a retryable delivery failure — and
+            // the net has to be this wide. Laravel marshals only curl's five connect-phase
             // errnos into a ConnectionException; an expired, self-signed or
             // hostname-mismatched certificate (the everyday CURLE_PEER_FAILED_VERIFICATION),
             // a connection reset mid-response, or a partial transfer all surface as a

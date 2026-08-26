@@ -408,9 +408,47 @@ return [
             // whatever this is set to.
             'refuse_with' => 403,
             'registrations_per_minute' => 10,
+
+            // How many deliveries one tenant may replay per minute, through the portal's
+            // "send again" action. Not decoration: replaying makes the SERVER issue an HTTP
+            // request to a URL the tenant registered, so with no brake one customer holding
+            // the button down is an amplifier pointed wherever they like. The SSRF guard
+            // decides WHERE a request may go; this decides how MANY. A non-positive value
+            // switches the brake off rather than refusing every replay.
+            'replays_per_minute' => 10,
             'secret_reveal_ttl' => 60,
             'allow_delete' => true,
             'max_endpoints_per_tenant' => null,
+        ],
+
+        // The tenant-facing delivery list in the self-service portal.
+        'deliveries' => [
+            // How many days back the list reads. This is a CEILING, not merely a default:
+            // the panel's windowDays property may narrow beneath it and can never reach
+            // past it, because every public Livewire property is writable from the browser
+            // and widening is the expensive direction.
+            //
+            // It exists because webhook_deliveries is range-partitioned by month — the
+            // decision that makes retention a DROP PARTITION rather than a DELETE — and a
+            // read with no lower bound on created_at cannot be pruned, so it visits every
+            // partition there is. Nothing goes red: the page loads, it just loads with the
+            // whole history in the plan, and the cost arrives with the DATA rather than with
+            // the change. A filter with no default is not a filter, it is an offer.
+            //
+            // Set 0 to switch the bound off entirely, for a host that would rather pay the
+            // scan than ever hide a row.
+            'window_days' => 30,
+
+            // Whether the list renders the stored error text of a failed delivery.
+            //
+            // Off by default, and that is a decision rather than an oversight: `error` holds
+            // an HTTP client's exception message and can quote back whatever the receiving
+            // server wrote. On the endpoint OWNER's own screen that text is the answer they
+            // came for; on a portal where the reader is not the party that runs the
+            // receiver, it is someone else's server talking. Which of the two this
+            // installation is, is the host's knowledge — so this is a config key, and the
+            // panel's showErrors property can only ever decline it, never grant it.
+            'show_errors' => false,
         ],
 
         // Endpoint health scoring. Each active endpoint earns a 0-100 health score
@@ -720,6 +758,18 @@ return [
         // per-tenant customer dashboard. It shows global rows to everyone the
         // view-webhook-dashboard gate admits, so gate that ability to operators.
         'operator' => (bool) env('WEBHOOKS_DASHBOARD_OPERATOR', false),
+
+        'deliveries' => [
+            // How many days back the delivery table reads. A CEILING, not merely a default:
+            // the panel's windowDays property may narrow beneath it and can never reach past
+            // it, because a public Livewire property is writable from the browser and
+            // widening is the expensive direction.
+            //
+            // webhook_deliveries is range-partitioned by month, and a read with no lower
+            // bound on created_at cannot be pruned — so it visits every partition, on every
+            // render of a screen that stays open all day. Set 0 to switch the bound off.
+            'window_days' => 30,
+        ],
         // Cross-tenant operator mode: read EVERY delivery, owner-less and tenant-owned alike.
         // This is the support/console view — "what did we send to THIS customer's endpoint?" —
         // and it is deliberately NOT part of 'operator' above: seeing the global endpoints and

@@ -105,6 +105,15 @@ enum OwnerKeyType: string
     public function accepts(int|string $key): bool
     {
         return match ($this) {
+            // ⚠️ The `$key !== ''` clause changes no answer, and mutation testing reports it as
+            // a survivor for exactly that reason. `ctype_digit('')` is false (measured, PHP 8),
+            // so the empty string is refused by the second clause alone, and the two clauses
+            // agree on every other input as well. It is an equivalent mutant.
+            //
+            // It stays, and it is NOT to be "killed" by deletion. Without it a reader has to
+            // know what ctype_digit does with an empty string to see that '' is refused — and
+            // an owner key that is the empty string reaching the subscribe guard is precisely
+            // the case this line is here to make obvious.
             self::Bigint => is_int($key) || ($key !== '' && ctype_digit($key)),
             self::Uuid => is_string($key) && Str::isUuid($key),
             self::Ulid => is_string($key) && Str::isUlid($key),

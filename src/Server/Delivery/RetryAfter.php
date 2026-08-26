@@ -26,6 +26,13 @@ final class RetryAfter
 
         $value = trim($header);
 
+        // EQUIVALENT, and reported every run. Measured: an empty value fails both patterns
+        // below (`preg_match` answers 0 for each), so the alphabetic check refuses it and the
+        // method returns null anyway.
+        //
+        // It stays because "the header was present but blank" is a distinct thing to have said
+        // out loud, and because it keeps the two regexes describing only the shapes they are
+        // about rather than doubling as an emptiness test.
         if ($value === '') {
             return null;
         }

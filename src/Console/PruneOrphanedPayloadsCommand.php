@@ -42,6 +42,10 @@ final class PruneOrphanedPayloadsCommand extends Command
             return self::SUCCESS;
         }
 
+        // The cast is EQUIVALENT and reported every run: `--dry-run` is declared with no
+        // value, so Symfony hands back a real bool and there is nothing to convert. It stays
+        // for the type checker — `option()` is `mixed`, and without the cast the flag reaches
+        // every branch below as an unnarrowed value.
         $dryRun = (bool) $this->option('dry-run');
         $totalOrphaned = 0;
         $totalDeleted = 0;

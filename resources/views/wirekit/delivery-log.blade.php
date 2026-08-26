@@ -4,6 +4,14 @@
      your own authorization. Publish the neutral variant
      instead with the webhooks-ui tag. --}}
 <x-wirekit::stack gap="md" class="wh-deliveries">
+    {{-- The component's two refusals — a redeliver against a switched-off endpoint, and a ping
+         past its allowance — reach the reader only through here. Rendered CONDITIONALLY rather
+         than as an always-present region: a permanently blank live region gets announced on
+         every update by some screen readers, which teaches the reader to ignore it. --}}
+    @if ($message !== '')
+        <x-wirekit::alert intent="warning" role="status">{{ $message }}</x-wirekit::alert>
+    @endif
+
     <x-wirekit::row gap="md" class="flex-wrap items-end">
         {{-- Both filters hide their label visually, so the label reaches sighted readers
              only through assistive technology — it is translated like any other. --}}
@@ -31,7 +39,42 @@
             hideLabel
             :placeholder="__('webhooks::management.filters.event_type_placeholder')"
         />
+
+        {{-- A LIST of the reader's endpoints, not a free-text id: the log is unscoped across
+             every tenant, and "what happened at THIS endpoint" is the first question after an
+             incident. A control that takes a number is one nobody can use without running a
+             query first. The warning above applies to this select as well. --}}
+        <x-wirekit::select name="subscriptionId" wire:model.live="subscriptionId" :label="__('webhooks::management.filters.endpoint')" hideLabel>
+            <option value="">{{ __('webhooks::management.filters.all_endpoints') }}</option>
+            @foreach ($endpoints as $endpoint)
+                <option value="{{ $endpoint->id }}">{{ $endpoint->name ?: $endpoint->url }}</option>
+            @endforeach
+        </x-wirekit::select>
+
+        {{-- Debounced like the event-type field: a date input reports every keystroke while a
+             reader types the year, and each one would be a round trip and a query. --}}
+        <x-wirekit::input
+            type="date"
+            name="from"
+            wire:model.live.debounce.500ms="from"
+            :label="__('webhooks::management.filters.from')"
+            hideLabel
+        />
+
+        <x-wirekit::input
+            type="date"
+            name="until"
+            wire:model.live.debounce.500ms="until"
+            :label="__('webhooks::management.filters.until')"
+            hideLabel
+        />
     </x-wirekit::row>
+
+    @if ($endpointsTruncated)
+        {{-- Said out loud rather than truncated in silence: a list that looks complete is how a
+             reader concludes an endpoint has no deliveries when it was simply never offered. --}}
+        <x-wirekit::text size="sm" intent="muted">{{ __('webhooks::management.filters.endpoints_truncated') }}</x-wirekit::text>
+    @endif
 
     @if ($deliveries->isEmpty())
         {{-- The zero-row case is the first thing every new install sees, so the stub ships

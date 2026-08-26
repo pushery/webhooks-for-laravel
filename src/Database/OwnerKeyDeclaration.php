@@ -85,6 +85,14 @@ final class OwnerKeyDeclaration
         }
 
         $name = $connection ?? Config::get('webhooks.database.connection');
+        // ⚠️ Both halves of this guard are reported as survivors, and both are equivalent.
+        // Turning `&&` into `||` reaches Schema::connection() with the same argument it would
+        // have had anyway — a non-string name is not a string, so the ternary still falls to
+        // null. Moving the empty-string test needs a connection literally named '', which no
+        // configuration produces. Measured, both, suite green.
+        //
+        // Kept: this line is what turns "unset or blank" into "the application default", and
+        // saying so here is cheaper than making a reader derive it from two coercions.
         $schema = Schema::connection(is_string($name) && $name !== '' ? $name : null);
 
         $found = [];
@@ -99,6 +107,14 @@ final class OwnerKeyDeclaration
             } catch (Throwable) {
                 // Reading a schema is not this check's job to guarantee. A connection that
                 // cannot answer is the caller's problem to report, not a contradiction.
+                //
+                // ⚠️ This is the ONE `continue` in this loop with no arm on it, and it is a
+                // deliberate gap rather than an oversight. The other four are each pinned by a
+                // "keeps checking after …" test, because turning any of them into a `break`
+                // would end the scan at a skipped table and report a forked schema as sound.
+                // Reaching THIS one needs a connection that answers for one table and throws
+                // for the next, which is a stub of the schema builder rather than a database
+                // state — a test whose subject would be the stub. Left as measured.
                 continue;
             }
 
@@ -156,6 +172,9 @@ final class OwnerKeyDeclaration
             // column of every table, and a schema that answered with a non-string type has no
             // separate outcome worth its own branch — it is the same "no answer" as a table
             // without the column, which is what the return below already says.
+            // The `!== ''` half is unkillable: a column the schema reports has a type, and an
+            // empty one is not a shape any driver returns (measured). Kept beside the
+            // is_string() so the pair reads as one statement about a usable type.
             if (($column['name'] ?? null) === 'owner_id' && is_string($type) && $type !== '') {
                 return $type;
             }

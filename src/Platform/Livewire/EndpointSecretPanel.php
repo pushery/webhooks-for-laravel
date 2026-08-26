@@ -140,6 +140,13 @@ final class EndpointSecretPanel extends Component
      */
     public function remainingSeconds(): int
     {
+        // ⚠️ Equivalent, and reported as a survivor. I expected removing it to be a TypeError;
+        // measured, PHP coerces the null to 0 and `max(0, 0 - timestamp)` answers 0 — the same
+        // number. So no test can tell the two apart.
+        //
+        // It stays because the guard states the CASE rather than relying on a coercion: "no
+        // window open" is a state this panel is in for most of its life, and reading it out of
+        // arithmetic on null is how a later edit turns it into a negative countdown.
         if ($this->expiresAt === null) {
             return 0;
         }

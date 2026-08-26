@@ -19,7 +19,7 @@
 
             @if ($trend->isNotEmpty())
                 <div class="wh-dash-latency-trend mt-[var(--padding-wk-y-md)]">
-                    <x-wirekit::text size="sm" variant="muted">{{ __('webhooks::dashboard.latency.p95_trend') }}</x-wirekit::text>
+                    <x-wirekit::text size="sm" intent="muted">{{ __('webhooks::dashboard.latency.p95_trend') }}</x-wirekit::text>
                     {{-- The sparkline height is a package custom property (defaulting to the
                          compact tier), so a host retunes both plots from one place. --}}
                     <div class="mt-[var(--padding-wk-y-sm)] flex h-[var(--wh-sparkline-height,4rem)] items-end gap-[var(--gap-wk-sm)]" role="img" aria-label="{{ __('webhooks::dashboard.a11y.latency_trend') }}">

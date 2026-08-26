@@ -9,6 +9,7 @@ use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Date;
+use Pushery\Webhooks\Core\Http\ErrorMessageRedactor;
 use Pushery\Webhooks\Enums\DeliveryStatus;
 use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 use Pushery\Webhooks\Server\Events\WebhookAttemptFailed;
@@ -155,8 +156,18 @@ final class PersistServerDelivery
             || (string) $exception->getCode() === '23505';
     }
 
+    /**
+     * The persisted text, with any credential in the failed URL taken out of it first.
+     *
+     * The redaction is this package's, not guzzle's, because guzzle's differs between the
+     * two psr7 majors the composer constraint allows — see {@see ErrorMessageRedactor}.
+     */
     private function errorFrom(?Throwable $exception): string
     {
-        return $exception?->getMessage() ?? self::DEFAULT_ERROR;
+        $message = $exception?->getMessage();
+
+        return $message === null || $message === ''
+            ? self::DEFAULT_ERROR
+            : ErrorMessageRedactor::redact($message);
     }
 }

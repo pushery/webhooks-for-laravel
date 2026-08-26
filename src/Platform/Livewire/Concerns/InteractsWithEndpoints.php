@@ -230,6 +230,78 @@ trait InteractsWithEndpoints
     private const int REGISTRATION_RATE_WINDOW = 60;
 
     /**
+     * How many deliveries one tenant may replay per minute, or null for no brake.
+     *
+     * This brake is not decoration, and it is the one thing the operator console's copy of
+     * the same action does not need. Replaying makes the SERVER issue an HTTP request to a
+     * URL the reader registered, on a SELF-SERVICE surface — so unbraked it is an amplifier
+     * one customer can point wherever they like simply by holding the button down. The SSRF
+     * guard decides WHERE a request may go; nothing else decides HOW MANY.
+     *
+     * A non-positive value reads as no brake rather than as "none allowed", the same way the
+     * registration brake does: a limit of zero would refuse every replay, which is a way to
+     * disable a feature by typo rather than a setting anyone wants. The shipped default is
+     * repeated here because an absent key reads as null and null switches the brake off, and
+     * a host on a config cache built before this version still has the old, trimmed layer —
+     * ConfigDefaultsAreInSyncTest holds the two numbers together.
+     */
+    protected function maxReplaysPerMinute(): ?int
+    {
+        $max = Config::get('webhooks.platform.self_service.replays_per_minute', 10);
+
+        // Two statements rather than one ternary, and that is a measured rule rather than a
+        // style: pcov credits the whole expression to every line it spans, so a one-line
+        // ternary counts as covered the first time EITHER arm runs — and the fallback can then
+        // go unexecuted for years under a green 100% floor. Its sibling above has the same
+        // shape for the same reason, and ConstantFallbackVisibilityTest holds both.
+        if (is_int($max) && $max > 0) {
+            return $max;
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether this tenant has spent its replay allowance for the current minute.
+     *
+     * Spent only by attempts that reach the send path: an unauthorized or not-found replay
+     * costs nothing against it, so a probe cannot burn a real tenant's allowance.
+     */
+    protected function replayRateExceeded(): bool
+    {
+        $max = $this->maxReplaysPerMinute();
+        $owner = SubscriptionScope::currentOwner();
+
+        if ($max === null || ! $owner instanceof TenantIdentity) {
+            return false;
+        }
+
+        $key = $this->replayRateKey($owner);
+
+        if (RateLimiter::tooManyAttempts($key, $max)) {
+            return true;
+        }
+
+        RateLimiter::hit($key, self::REGISTRATION_RATE_WINDOW);
+
+        return false;
+    }
+
+    /**
+     * The replay allowance's cache key for one tenant. A THIRD key beside the two below, and
+     * deliberately its own: sharing one with the registration allowance would make a tenant
+     * that registered an endpoint unable to replay a delivery, and neither reader would have
+     * any way to see why.
+     *
+     * Named rather than inlined, so all three keys are built the same way and can be held
+     * against each other by one test.
+     */
+    protected function replayRateKey(TenantIdentity $owner): string
+    {
+        return 'webhooks:delivery-replay-rate:'.str_replace('\\', '.', $owner->type).':'.$owner->id;
+    }
+
+    /**
      * The registration allowance's cache key for one tenant. Distinct from the
      * registration LOCK's key: one bounds how fast a tenant may register, the other keeps
      * a single registration atomic, and sharing a key would make each break the other.

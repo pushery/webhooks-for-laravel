@@ -4,6 +4,170 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-08-26
+
+### Changed
+- The secret panel's countdown owns the element its Alpine scope sits on, instead of sharing the WireKit card's root. Nothing renders differently: the card only sets an `x-data` of its own for a debug-time composition warning this panel does not trigger. But HTML keeps the first of two identical attributes, so sharing the element made the countdown's survival depend on a branch inside another component — and if it were ever taken, the countdown would stop with no error anywhere.
+- The self-service delivery panel still uses a native `<select>` for its two filters, and the comments saying why are now correct. They carry the date and the library version behind the measurement (the previous wording said "the current library release", which stops meaning anything the day after it is written), they name the condition under which the workaround retires, they say that there are TWO such controls on this screen rather than one, and they mark the window filter's reasoning as inherited from the endpoint filter rather than separately measured. Nothing about the rendered screen changes.
+- **The package installs under Guzzle 8 as well as Guzzle 7** — `guzzlehttp/guzzle: ^7.15.1|^8.0` and `guzzlehttp/psr7: ^2.7|^3.0`. Until now a host that had moved to Guzzle 8 could not install this package at all, and because `laravel/framework` already allows both, this package was the thing holding such an application back on Guzzle 7.
+
+  **No released version was affected by the casing defect this uncovered, and the entry is under Changed for that reason.** Guzzle 8 requires `guzzlehttp/psr7: ^3.1`, which the previous `^2.7` made unresolvable, so no consumer could reach it. What it means is this: the package canonicalizes every HTTP verb to lowercase on the way in, because that is the form it stores and displays, and psr7 2 quietly uppercased it again inside `Request::__construct`. psr7 3 stores the method verbatim, and RFC 9110 methods are case-sensitive — lowercase is not a spelling of the method, it is a different method — so under psr7 3 a delivery would have gone out as `post /hook HTTP/1.1`. The verb is now uppercased at the wire boundary, the single place both the delivery pipeline and the JWKS fetch pass through, which is also the only place that survives a job already sitting in the queue with a lowercase verb in its payload. Your configured `webhooks.verb` keeps working in either case.
+
+  Both majors are exercised rather than assumed: the suite is green under each. Note the asymmetry, because it decides how fast a break would be noticed — the gate resolves the highest allowed version, so Guzzle 8 is proven per integration, while Guzzle 7 is proven by the weekly `prefer-lowest` compatibility lane, which reports rather than gates.
+
+- **A delivery to an endpoint whose response contradicts itself about the body length now fails, and fails FINAL.** A response carrying both `Content-Length` and `Transfer-Encoding` is forbidden by RFC 9112 §6.1 — the two disagree about where the body ends. Guzzle 8 validates that framing before the response is ever visible and refuses the transfer; guzzle 7 has no such check and hands back an ordinary 200. Widening this package to accept both majors would have made the same wire event a delivered webhook on one and a failed delivery on the other, so the package makes the refusal itself and both majors now behave identically.
+
+  **Final rather than retryable, which is the part worth reading.** The next attempt reaches the same endpoint and gets the same bytes, so a retryable classification would spend the delivery's whole budget on identical refusals and feed the circuit breaker every one of them — eventually switching off an endpoint whose actual defect nobody was told about. The failure now says the true thing once, and `MalformedResponseFraming` names it.
+
+  If you host an endpoint behind a proxy or middlebox that adds a length header to a chunked response, this is the change you will notice: those deliveries used to arrive and now fail immediately. The fix is at the endpoint — a response can name its length or chunk it, not both.
+
+### Fixed
+- The neutral console stubs gained the four safety affordances only the WireKit variant had: an empty state on both tables (an empty log and a filter that matched nothing were the same picture), a disabled row action while its request is in flight (a second redeliver queued a second delivery, a second ping spent the allowance the component then throttles), an announced actions column instead of an empty `<th>`, and an accessible name on each table. The neutral variant is what `--tag=webhooks-ui` publishes, so a host on any other design system had the lesser screen.
+- The neutral stub's delete and rotate confirmations name the action, not only its consequence. `wire:confirm` carried the description alone, so an operator confirming an irreversible delete read the consequence without the sentence that frames it — while the title was already translated in all seven languages and reached only the styled variant.
+- The two WireKit-styled forms use `<x-wirekit::form>` rather than a native `<form>`. The library reads a form-level `announceErrors` from the container through `@aware`, so with a native element every field fell through to the global setting and a host could not give one form its own error-announcement policy. Nothing failed; the capability was simply unreachable.
+- The WireKit delivery log shows the component's two refusals — a redeliver against a switched-off endpoint, and a test ping past its allowance. It rendered neither: the operator clicked, the button flickered through its loading state, and nothing else happened. No row, no message, no error, nothing in the log — the same symptom as a swallowed click, which is the expensive thing to be wrong about on this screen.
+- The operator-console guide warns, at the point where you choose a view variant, that the two components must not share a page on the WireKit variant: a live-bound WireKit select on the page makes an alert-dialog's confirming action silently do nothing, so "delete endpoint" and "rotate secret" open a dialog that cannot be confirmed. The warning already existed in the stubs' Blade comments, which are compiled away and never reach the person deciding which variant to publish.
+- The WireKit delivery-log stub offers the same five filters as the neutral one. The endpoint and date-window filters reached the component and the neutral stub but not the styled screen — which is the one a host on that design system publishes, so the filters that shipped were the ones fewer people see. (The component itself always names the NEUTRAL view; the WireKit stub is reached by publishing it.) A parity arm now holds the two stubs against each other rather than checking either alone.
+- Operator console: an endpoint that is switched on but failing no longer renders as healthy. Both shipped stubs now show the health band beside the on/off state — `Failing` and `Degraded` alongside `Active` and `Disabled` — using the same bands, intents and wording as the self-service health matrix.
+
+- **The shipped views write WireKit's canonical `intent` prop rather than its back-compat
+  `variant` alias**, on the 26 places across ten files where the component in question declares
+  both and resolves `$intent ?? $variant`. Nothing rendered differently before or after — the
+  point is that an alias the library itself calls back-compat is a promise with an end date, and
+  when it goes it goes in every consuming application at once, inside views a consumer does not
+  own and cannot fix without publishing them.
+
+  The sweep is deliberately **not** global: on most WireKit components `variant` IS the canonical
+  prop, so a blanket rename would delete the property those components actually read. The
+  `variant="outline"` on every empty state and the `variant="ghost"` on the buttons are untouched
+  and correct.
+
+  A guard holds it, and it **derives** the alias set from WireKit rather than repeating it — a
+  hand-written list would rot in the expensive direction, missing a component that joins the set
+  later. It also carries the trap that let this slip past the reporting consumer's own guard: a
+  tag pattern of `[^>]*` is ended early by the `>` inside a bound attribute such as
+  `:time="$formats->dateTime($x)"`, which is exactly where two of these occurrences were hiding.
+
+- **An inbound endpoint whose config cannot verify anything now refuses the request instead of
+  answering `500`.** A client config with no `secret`, no `jwks` and no `verifier` threw while
+  it was being built — before the receiving pipeline existed — so the endpoint answered `500`
+  with an `InvalidArgumentException`. That is the one answer a producer reads as *try again*,
+  for a request that can never be made valid: GitHub does not re-send a release delivery at
+  all, so the event is simply lost, and Slack disables a subscription whose endpoint keeps
+  failing.
+
+  It is now refused with the config's `invalid_status` (`401` by default) — the same answer, in
+  the same shape, a rejected signature gets, because it is the same fact about the request. The
+  fault is logged as a **configuration** error naming the config, not filed among application
+  errors where the reader would go looking in code, and the log line carries nothing from the
+  body, which on this path is unauthenticated input.
+
+  Nothing is stored and nothing is dispatched, exactly as before. Hosts driving the pipeline
+  controller-less catch the new
+  `Pushery\Webhooks\Client\Exceptions\WebhookConfigCannotVerify`, which still **is** an
+  `InvalidArgumentException` — so an existing `catch` keeps working — and carries `configName`
+  and the `status` to answer with.
+
+- **A transport failure's stored error text no longer carries the credentials from the endpoint URL, on either psr7 major.** A webhook endpoint URL is a place hosts really do put a secret — `https://TOKEN@receiver.test/hook`, or a `?token=` query — and guzzle puts the failed URL into the exception message, which is written verbatim into `webhook_deliveries.error`. That table has no `url` column, so the message was the only place such a secret could come to rest there.
+
+  Guzzle already redacts. It redacts DIFFERENTLY depending on which psr7 major resolved, and both are inside this package's `^2.7|^3.0`: psr7 2 returns early unless the userinfo contains a colon, so a username-only token passed through untouched and the query string was kept, while psr7 3 masks every non-empty userinfo and empties the query. Whether a secret was stored in clear text was therefore decided by a dependency resolution, which is not a property anyone can reason about. The package now redacts the message itself, to one shape on both majors — `ErrorMessageRedactor`, the sibling of `HeaderRedactor`, using the same `[redacted]` marker so one grep finds every masked value.
+
+  The query string is dropped rather than masked, which is what psr7 3 chose upstream. It costs a little diagnostic detail and is the right trade: a query is exactly where a token hides, and the host already knows its own endpoint URL.
+
+  **This does not make a URL-embedded credential disappear from the database, and it is not meant to.** `webhook_subscriptions.url` and `webhook_server_deliveries.url` hold the endpoint URL as given, on both majors, because the package has to deliver to it. What changes is that the credential no longer also spreads into an error column a host may surface to operators.
+
+- **A read timeout that strikes after the response headers keeps its diagnosis, on both guzzle majors.** An endpoint that answers with a status line, promises a body and then stops is the one wire event the two majors classify differently: guzzle 7 has errno 28 in its connection-error list and raises a response-less exception, discarding the partial response, while guzzle 8 raises one that CARRIES it. Laravel then finds a response with a 4xx/5xx status and throws that instead — so the delivery row read `HTTP request returned status code 503` for a request that never completed, beside an `http_status` of NULL. The row contradicted itself, and the timeout was gone: `Response::toException()` builds a fresh exception with no `previous`, so nothing downstream could recover the errno.
+
+  Both majors now persist the same `cURL error 28: Operation timed out …` text. The normalization sits at the wire boundary, where the information still exists — the same place, and for the same reason, as the verb uppercasing and the error redaction.
+
+  It normalizes the timeout and nothing else. `ResponseTimeoutException` is a subclass of the exception guzzle 8 raises for a malformed response framing, and those want opposite treatment: a framing rejection concerns a response that arrived complete, a timeout one that did not. A check written one level up would turn an aborted transfer into a delivery carrying a truncated body, so a test guards that boundary directly.
+- **An endpoint whose stored event types are not a clean list of strings can be opened, listed and saved again.** `webhook_subscriptions.event_types` is a JSON cast, so its shape is whatever was written into it — and every reader treated it as a list of names. A row holding a JSON object, a number or a nested array therefore broke four screens, each differently: a list `implode()`d it and printed the literal `Array`, and a form bound its checkboxes against keys that are not indices and then refused to save. An operator who only wanted to correct the NAME was told about an event type they never chose — with no control to remove it by, because the form draws one checkbox per catalog entry and a stray value is in no catalog. The screen was dead for that row.
+
+  `WebhookSubscription::eventTypeNames()` is now the single reader, and both consoles and both list stubs go through it. Reported against the operator console; the tenant-facing form and list had the same exposure and less recourse, so they are fixed in the same change.
+
+  A value that cannot be a name at all — a nested array, an object — is dropped rather than stringified. `strval()` on one does not fail: it warns and yields the literal `Array`, which would then be saved back as though it were an event type. Nothing is rewritten by loading a row; it only changes if the operator saves it.
+
+### Added
+- A guard that measures the select/dialog pairing instead of describing it: no shipped view may carry a live-bound WireKit select together with a WireKit alert-dialog, and no page this package composes itself may carry both across the panels it mounts. The existing check asked whether a stub's source contained a warning — it never looked for a dialog and was satisfied by typing a comment. The two now sit side by side and say which is which.
+- Operator console: a disabled endpoint now says whether a person switched it off or the circuit breaker did, with the failure streak that tripped it. Both write the same two columns, and the two call for opposite actions — flip the switch back, or fix the destination. `WebhookSubscription::wasAutoDisabled()` is the public reading of it.
+
+- **Both delivery lists are bounded in time by default, and the portal panel can replay a
+  delivery.** `webhook_deliveries` is range-partitioned by month — the decision that makes
+  retention a `DROP PARTITION` rather than a `DELETE` — and a read with no lower bound on
+  `created_at` cannot be pruned, so it visited every partition there is. Nothing went red about
+  that: the page loaded, it just loaded with the whole history in the plan, and the cost arrives
+  with the data rather than with the change, at whichever consumer has been running longest.
+
+  `platform.deliveries.window_days` and `dashboard.deliveries.window_days` (both 30) are
+  **ceilings**, not merely defaults: the panels' new `windowDays` property may narrow the window
+  and can never widen past the configured value, because a public Livewire property is writable
+  from the browser and widening is the expensive direction. Set either to `0` to switch the bound
+  off. On the dashboard table the property is also `#[Url]`, so the window appears in the address
+  bar and a bookmarked view keeps it — the portal panel's is not.
+
+  The portal panel also gained a **send again** action, authorized by a new `redeliver` ability on
+  `WebhookSubscriptionPolicy` — its own ability rather than `update`, since causing an outbound
+  request to leave the installation is a different act from editing a row. It is braked per tenant
+  by `platform.self_service.replays_per_minute` (10): the destination is a URL the customer
+  registered, so an unbraked replay button is an amplifier one customer can point wherever they
+  like. A delivery belonging to another tenant fails not-found rather than forbidden, before the
+  policy and before the brake.
+
+  And `platform.deliveries.show_errors` (off) can put the stored error text on the portal list,
+  for an installation where the reader is the party that runs the receiving server. Off, the
+  column is not even selected — the panel's promise is about what it reads, not about what the
+  markup happens to print.
+
+- **The operator delivery log filters by endpoint and by date window, and returns to page one
+  when any filter changes.** Status and event type answered "what happened at this endpoint, in
+  this week" by paging, and on an installation with more than a handful of endpoints the row
+  being looked for is pages away. Reported from a consumer that had to keep its own copy of the
+  screen rather than adopt this one.
+
+  Both bounds are `Y-m-d` and inclusive: `until="2026-06-20"` includes everything that happened
+  on the 20th. A value that is not a date is ignored rather than raising — the bounds are bound
+  with `wire:model.live`, so they carry half-typed dates on the way to whole ones.
+
+  They compare `created_at` directly rather than through `whereDate()`, which is the difference
+  between a query PostgreSQL can prune to one partition and one that reads them all, and they
+  bind through the package's own timestamp scopes rather than a bare `where()` — a naive literal
+  is resolved against the **database session** zone, and was measured hiding a delivery stored at
+  23:59 UTC from a window that named that very day.
+
+  The endpoint list the filter offers is capped, because this console is unscoped and that list
+  is every subscription in the installation; when it truncates, the screen says so.
+
+- **`webhooks:preflight` now also checks that every inbound client config can verify a
+  delivery**, and `WebhookConfig::configurationFaults()` exposes the same check for a host's own
+  health check — one message per faulty entry, an empty array when there are none.
+
+  This is the half that makes the fault findable at all. Nothing about a config with no
+  verification material is visible from the application: every page renders, every check is
+  green, and the answer arrives once — as a refusal, from a producer that may never send that
+  event again. The check runs only while `client.enabled` is on, because with the layer off no
+  route is registered and failing over configuration nothing reads would teach a host to ignore
+  the command's verdict.
+
+  It does not restate the rules; it builds each entry through the same path a request takes, so
+  it inherits every check the builder has — a misspelled `dedupe` driver, a `verifier` that is
+  not an `InboundVerifier` — including ones written after it. Two faults it adds on top are
+  about the block rather than an entry: an entry with no `name`, which no route can ever
+  resolve, and a name defined twice, where only the first is ever used — the reason a secret
+  rotation can change nothing at all.
+- **A non-string event type was refused in English, whatever the reader's language, and the
+  refusal named a raw field path.** Both registration forms — the tenant-facing self-service one
+  and the operator console — rendered `The eventTypes.0 field must be a string.` The `string`
+  rule was the one rule of that `validate()` call with no message of its own, in a block whose
+  own comment promises that no refusal falls back to the framework's untranslated default.
+
+  It now carries a translated sentence in all seven shipped languages, in both catalogs. The
+  three attribute labels beside it could not have softened it: Laravel does not resolve an
+  indexed key such as `eventTypes.0` onto its parent's label, so the path appeared as written.
+
+  Nothing caught it because every arm asserted **that** an error existed on `eventTypes.0`
+  rather than **which sentence** appeared. The new arms read the sentence, in a non-English
+  locale.
+
 ## [2.1.0] - 2026-08-23
 
 ### Added
@@ -2080,7 +2244,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.0.1...v2.1.0
 [2.0.1]: https://github.com/pushery/webhooks-for-laravel/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/pushery/webhooks-for-laravel/compare/v1.12.0...v2.0.0

@@ -66,6 +66,11 @@ final class PayloadVisibility
     {
         $ability = Config::string('webhooks.dashboard.payload.ability', 'view-webhook-payload');
 
+        // The `!== ''` half is EQUIVALENT and reported every run, for the same reason as its
+        // twin in DashboardScope: `Gate::has('')` is false, so an empty ability already fails
+        // the conjunction. It is written out because this branch decides whether a PAYLOAD is
+        // shown, and a guard that reads as three independent conditions is the one that stays
+        // correct when someone reorders it.
         if ($ability !== '' && Gate::has($ability) && Gate::allows($ability)) {
             return self::MODE_FULL;
         }

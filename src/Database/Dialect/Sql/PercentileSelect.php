@@ -99,6 +99,12 @@ final class PercentileSelect
      */
     private static function fraction(float $percentile): string
     {
+        // Every arm of this match is an EQUIVALENT mutant and all of them are reported every
+        // run: move a KEY and the moved value falls through to `default`, which is the same
+        // '0.95' the 0.95 arm returns. The redundancy is deliberate and pinned in
+        // EndpointHealthTest — an unrecognized percentile must answer p95 rather than throw,
+        // because this string is spliced into SQL and a null there is a syntax error at
+        // runtime on a dashboard nobody was looking at.
         return match ($percentile) {
             0.5 => '0.50',
             0.9 => '0.90',

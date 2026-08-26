@@ -179,6 +179,9 @@ final readonly class WebhookManager
 
         $shown = match (true) {
             is_string($key) => "'".$key."'",
+            // EQUIVALENT, and reported every run: the value goes to a `%s` in sprintf, which
+            // renders an int identically. It is written out so all three arms of this match
+            // answer the same TYPE — the variable is a message fragment, not a key.
             is_int($key) => (string) $key,
             default => gettype($key),
         };
