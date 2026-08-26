@@ -6,6 +6,7 @@ namespace Pushery\Webhooks\Core\Http;
 
 use Illuminate\Support\Facades\Http;
 use Psr\Http\Message\StreamInterface;
+use Pushery\Webhooks\Core\Http\Exceptions\MalformedResponseFraming;
 use Pushery\Webhooks\Core\Ssrf\PinnedEndpoint;
 
 /**
@@ -35,13 +36,51 @@ final class HttpTransport
         $start = hrtime(true);
 
         $response = Http::withOptions($this->optionsFor($endpoint, $options))
+            // ⚠️ NORMALIZED HERE, BEFORE LARAVEL MARSHALS, because afterwards the information
+            // is destroyed: Response::toException() builds a fresh exception with no
+            // `previous`, so the errno cannot be recovered further down. See
+            // {@see TransportExceptionNormalizer} for what diverges and why only the timeout
+            // is touched. A no-op on guzzle 7, where the class it looks for does not exist.
+            ->withMiddleware(TransportExceptionNormalizer::wrap(...))
             ->withHeaders($headers)
             ->withBody($rawBody, $options->contentType)
-            ->send($options->verb, $endpoint->url);
+            // ⚠️ UPPERCASED HERE, AT THE WIRE, AND NOWHERE ELSE. The package canonicalizes
+            // every verb to lowercase on the way in — PendingWebhook::useHttpVerb(),
+            // Settings::httpVerb(), the config default — because that is the form it stores
+            // and displays. RFC 9110 methods are CASE-SENSITIVE, so lowercase is not a
+            // spelling of the method, it is a different method.
+            //
+            // Until now nothing here uppercased it, and nothing had to: guzzlehttp/psr7 2 did
+            // it silently inside Request::__construct (`$this->method = Utils::asciiToUpper()`).
+            // psr7 3 stores the method verbatim, so on that version every delivery this package
+            // makes would go out as `post /hook HTTP/1.1` — which a strict server is right to
+            // refuse, and PHP's built-in server refuses by closing the socket without a reply.
+            //
+            // The fix belongs at this one boundary rather than in the four places that
+            // lowercase: the stored form is deliberate and readers depend on it. Under psr7 2
+            // this is a no-op, so it holds for both majors.
+            ->send(strtoupper($options->verb), $endpoint->url);
 
         $durationMs = intdiv(hrtime(true) - $start, 1_000_000);
 
         $psr = $response->toPsrResponse();
+
+        // ⚠️ THE SAME REFUSAL GUZZLE 8 MAKES, MADE HERE, BECAUSE GUZZLE 7 DOES NOT MAKE IT.
+        // A response carrying both `Content-Length` and `Transfer-Encoding` contradicts itself
+        // about where its body ends; RFC 9112 §6.1 forbids it outright. Guzzle 8 validates the
+        // framing before the response is ever visible and rejects the transfer — measured —
+        // while guzzle 7 has no such check and hands back an ordinary 200 with both headers
+        // still on it. Without this, widening the constraint would have made the SAME wire
+        // event a delivered webhook on one major and a failed delivery on the other.
+        //
+        // Guzzle 8 never reaches this line for such a response: its rejection arrives as an
+        // exception that TransportExceptionNormalizer turns into the same class. Two routes,
+        // one outcome, and the one a host sees is the outcome.
+        if ($psr->hasHeader('Content-Length') && $psr->hasHeader('Transfer-Encoding')) {
+            throw new MalformedResponseFraming(
+                'A response must not contain both Content-Length and Transfer-Encoding',
+            );
+        }
 
         [$body, $truncated] = $this->captureBody($psr->getBody(), $options->responseCaptureBytes);
 

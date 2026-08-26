@@ -42,7 +42,21 @@
              setInterval. Clicking Hide tears this card out of the DOM, and an interval left
              behind would keep ticking against a dead scope — calling $wire.hide() on a
              component that no longer exists, once per second, for every reveal. --}}
-        <x-wirekit::card
+        {{-- ⚠️ THE SCOPE SITS ON OUR OWN ELEMENT, NOT ON THE CARD, and that is deliberate.
+             The card sets an `x-data` of its own when its slot carries visible text with no
+             card.body — a debug-only composition warning. This panel uses card.body, so that
+             branch is not taken today and both scopes coexist; measured, with app.debug on,
+             the card root carried exactly one x-data and it was ours.
+
+             But HTML keeps the FIRST of two identical attributes. If that branch is ever
+             taken — someone drops the card.body wrapper, or the component stops making the
+             warning conditional — one of the two scopes silently stops existing, and the
+             countdown that tells a reader how long the secret stays readable is the thing that
+             disappears. No error, no log line. That is the same dead surface this panel has
+             already had three times, from three different causes.
+
+             Owning the element costs a div and removes the dependency entirely. --}}
+        <div
             x-data="webhooksSecretCountdown()"
             data-webhooks-countdown="{{ json_encode([
                 'remaining' => $this->remainingSeconds(),
@@ -50,19 +64,20 @@
                 'warning' => __('webhooks::self-service.secret.countdown_warning'),
             ], JSON_THROW_ON_ERROR) }}"
         >
+        <x-wirekit::card>
             <x-wirekit::card.body>
                 <div class="flex flex-col gap-[var(--padding-wk-y-md)]" role="status" aria-live="polite">
                     <div class="flex flex-wrap items-start justify-between gap-[var(--padding-wk-x-md)]">
                         <x-wirekit::stack gap="none">
                             <x-wirekit::heading :level="3" size="sm">{{ __('webhooks::self-service.secret.heading') }}</x-wirekit::heading>
                             @if ($this->endpointUrl !== null)
-                                <x-wirekit::text size="sm" variant="muted" class="break-all">{{ $this->endpointUrl }}</x-wirekit::text>
+                                <x-wirekit::text size="sm" intent="muted" class="break-all">{{ $this->endpointUrl }}</x-wirekit::text>
                             @endif
                         </x-wirekit::stack>
                         <x-wirekit::button size="sm" surface="ghost" intent="neutral" wire:click="hide">{{ __('webhooks::self-service.secret.hide') }}</x-wirekit::button>
                     </div>
 
-                    <x-wirekit::text size="sm" variant="muted">
+                    <x-wirekit::text size="sm" intent="muted">
                         {{ __('webhooks::self-service.secret.notice') }}
                     </x-wirekit::text>
 
@@ -73,7 +88,7 @@
                          a locale's grammar puts them. --}}
                     <x-wirekit::text
                         size="sm"
-                        variant="muted"
+                        intent="muted"
                         class="tabular-nums"
                         aria-hidden="true"
                         x-text="countdown.replace(':seconds', remaining)"
@@ -107,5 +122,6 @@
                 </div>
             </x-wirekit::card.body>
         </x-wirekit::card>
+        </div>
     @endif
 </div>

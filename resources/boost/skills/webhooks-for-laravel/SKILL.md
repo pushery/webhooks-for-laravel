@@ -301,12 +301,21 @@ the tables and keep the sender.
   pipeline already reads JSON and declared form bodies; check
   `$this->message->format` first. Acknowledging a delivery nobody read is what
   stops the producer ever sending it again, and it leaves no error behind.
-- Do not bulk-register endpoints through the self-service portal. Two brakes ship
-  **on**: `platform.self_service.registrations_per_minute` (10) and
+- Do not bulk-register endpoints through the self-service portal. Three brakes ship
+  **on**: `platform.self_service.registrations_per_minute` (10),
+  `platform.self_service.replays_per_minute` (10) and
   `platform.test_ping.max_per_minute` (5, refused with
-  `Pushery\Webhooks\Exceptions\TestPingThrottled`). They bound what a *person* repeats.
-  An import belongs on `Webhooks::subscribe()`, which is not braked; `null` removes
-  either brake if the application genuinely needs it gone.
+  `Pushery\Webhooks\Exceptions\TestPingThrottled`). They bound what a *person* repeats,
+  and the replay one bounds how often a customer can make the server send a request to
+  a URL they chose. An import belongs on `Webhooks::subscribe()`, which is not braked;
+  `null` removes any of them if the application genuinely needs it gone.
+- Do not "fix" a delivery list that shows only the last 30 days by widening the
+  component property — it is clamped and cannot reach past the config. Both lists are
+  bounded on purpose (`platform.deliveries.window_days`,
+  `dashboard.deliveries.window_days`): the delivery log is partitioned by month, and a
+  read with no lower bound on `created_at` visits every partition there is. Raise the
+  config key if the application needs a longer window, or set it to `0` to remove the
+  bound entirely.
 - Do not document package internals here; keep this skill focused on adoption in
   Laravel applications, and link the deeper reference material instead.
 

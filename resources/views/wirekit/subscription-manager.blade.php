@@ -13,7 +13,7 @@
             {{-- One form for both jobs. The component decides which it is from whether an
                  endpoint is open for editing, so a save can never register a duplicate of
                  the row it meant to correct. --}}
-            <form wire:submit="save">
+            <x-wirekit::form wire:submit="save">
                 <x-wirekit::stack gap="md">
                     <x-wirekit::input
                         :label="__('webhooks::management.form.name_label')"
@@ -36,7 +36,7 @@
                             @empty
                                 {{-- The path travels through the sentence as a placeholder, so a locale
                                      can put it wherever its grammar wants it. --}}
-                                <x-wirekit::text size="sm" variant="muted">
+                                <x-wirekit::text size="sm" intent="muted">
                                     {{ __('webhooks::management.form.event_types_empty', ['file' => 'config/webhooks.php']) }}
                                 </x-wirekit::text>
                             @endforelse
@@ -60,7 +60,7 @@
                         @endif
                     </x-wirekit::row>
                 </x-wirekit::stack>
-            </form>
+            </x-wirekit::form>
         </x-wirekit::card.body>
     </x-wirekit::card>
 
@@ -75,7 +75,7 @@
              migration window nobody needed. Selecting a 50-character token rendered `break-all`
              across several lines with a mouse, without losing a character, is precisely where
              that goes wrong. --}}
-        <x-wirekit::alert variant="success" :title="$rotated ? __('webhooks::management.secret.rotated_heading') : __('webhooks::management.secret.heading')">
+        <x-wirekit::alert intent="success" :title="$rotated ? __('webhooks::management.secret.rotated_heading') : __('webhooks::management.secret.heading')">
             <div class="flex flex-wrap items-center gap-[var(--gap-wk-sm)]">
                 <x-wirekit::code class="wh-new-secret break-all">{{ $newSecret }}</x-wirekit::code>
                 {{-- A LABELED button, not an icon-only one: its accessible name then comes from
@@ -131,14 +131,48 @@
                         <x-wirekit::table.th headerScope="row">
                             <x-wirekit::stack gap="none">
                                 <x-wirekit::text weight="medium">{{ $subscription->name ?? '—' }}</x-wirekit::text>
-                                <x-wirekit::text size="sm" variant="muted">{{ $subscription->url }}</x-wirekit::text>
+                                <x-wirekit::text size="sm" intent="muted">{{ $subscription->url }}</x-wirekit::text>
                             </x-wirekit::stack>
                         </x-wirekit::table.th>
-                        <x-wirekit::table.td>{{ implode(', ', $subscription->event_types) }}</x-wirekit::table.td>
+                        <x-wirekit::table.td>{{ implode(', ', $subscription->eventTypeNames()) }}</x-wirekit::table.td>
+                        {{-- Switched OFF outranks every health band: an endpoint nobody is
+                             delivering to has no current health, and reporting a stale one as
+                             if it were live is the same confusion in the other direction.
+                             Everything below that mirrors the self-service health matrix —
+                             same bands, same intents, same words — so one endpoint does not
+                             read differently depending on which screen you opened. An unknown
+                             band (no recent history yet) stays Active: a freshly registered
+                             endpoint is not a problem, and coloring it as one trains the
+                             reader to ignore the color. --}}
+                        @php
+                            // ONE ladder producing both halves, not two ladders in step. Written
+                            // as two, the intent and the label can disagree — a red badge saying
+                            // "Disabled", or "Failing" in success green — and that is not
+                            // hypothetical: the first version here WAS two ladders, and the
+                            // mutant that dropped the off-arm from only one of them survived the
+                            // arm that was supposed to catch it.
+                            [$healthIntent, $healthLabel] = match (true) {
+                                ! $subscription->is_active => ['neutral', __('webhooks::management.subscription.disabled')],
+                                $subscription->health_status === 'failing' => ['danger', __('webhooks::management.subscription.failing')],
+                                $subscription->health_status === 'degraded' => ['warning', __('webhooks::management.subscription.degraded')],
+                                default => ['success', __('webhooks::management.subscription.active')],
+                            };
+                        @endphp
                         <x-wirekit::table.td>
-                            <x-wirekit::badge :intent="$subscription->is_active ? 'success' : 'neutral'">
-                                {{ $subscription->is_active ? __('webhooks::management.subscription.active') : __('webhooks::management.subscription.disabled') }}
-                            </x-wirekit::badge>
+                            <x-wirekit::stack gap="none">
+                                <x-wirekit::badge :intent="$healthIntent">
+                                    {{ $healthLabel }}
+                                </x-wirekit::badge>
+                                {{-- "Disabled" has two causes that look identical on screen, and
+                                     they call for opposite actions: flip the switch back, or go
+                                     fix the destination. Named here rather than left to be
+                                     guessed. --}}
+                                @if ($subscription->wasAutoDisabled())
+                                    <x-wirekit::text size="sm" intent="muted">
+                                        {{ __('webhooks::management.subscription.auto_disabled', ['count' => $subscription->consecutive_failures]) }}
+                                    </x-wirekit::text>
+                                @endif
+                            </x-wirekit::stack>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td align="right">
                             <x-wirekit::button

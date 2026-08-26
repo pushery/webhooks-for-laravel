@@ -62,13 +62,23 @@
         </div>
     @endif
 
-    <table class="w-full text-left text-sm">
+    @if ($subscriptions->isEmpty())
+        {{-- The zero-row case is the first thing every new install sees, so this stub ships the
+             empty state rather than a header row over nothing. --}}
+        <p class="wh-empty py-8 text-center text-sm">
+            <span class="block font-medium">{{ __('webhooks::management.empty.no_subscriptions.title') }}</span>
+            {{ __('webhooks::management.empty.no_subscriptions.description') }}
+        </p>
+    @else
+    <table class="w-full text-left text-sm" aria-label="{{ __('webhooks::management.a11y.subscriptions_table') }}">
         <thead>
             <tr>
                 <th class="py-2">{{ __('webhooks::management.table.endpoint') }}</th>
                 <th class="py-2">{{ __('webhooks::management.table.events') }}</th>
                 <th class="py-2">{{ __('webhooks::management.table.status') }}</th>
-                <th class="py-2"></th>
+                {{-- Not an empty <th>: an empty header announces nothing, so a screen-reader
+                     reader arriving in the last column is told only that it is the last one. --}}
+                <th class="py-2"><span class="sr-only">{{ __('webhooks::management.table.actions') }}</span></th>
             </tr>
         </thead>
         <tbody>
@@ -78,12 +88,25 @@
                         <span class="font-medium">{{ $subscription->name ?? '—' }}</span>
                         <span class="block text-gray-500">{{ $subscription->url }}</span>
                     </th>
-                    <td class="py-2">{{ implode(', ', $subscription->event_types) }}</td>
+                    <td class="py-2">{{ implode(', ', $subscription->eventTypeNames()) }}</td>
+                    {{-- The same three bands as the WireKit stub, in this stub's own plain
+                         classes. Both are kept in step deliberately: a host that starts on one
+                         and moves to the other must not lose a state on the way. --}}
                     <td class="py-2">
-                        @if ($subscription->is_active)
-                            <span class="text-green-700">{{ __('webhooks::management.subscription.active') }}</span>
-                        @else
+                        @if (! $subscription->is_active)
                             <span class="text-gray-500">{{ __('webhooks::management.subscription.disabled') }}</span>
+                        @elseif ($subscription->health_status === 'failing')
+                            <span class="text-red-700">{{ __('webhooks::management.subscription.failing') }}</span>
+                        @elseif ($subscription->health_status === 'degraded')
+                            <span class="text-amber-700">{{ __('webhooks::management.subscription.degraded') }}</span>
+                        @else
+                            <span class="text-green-700">{{ __('webhooks::management.subscription.active') }}</span>
+                        @endif
+
+                        {{-- Same reason as the WireKit stub: "Disabled" has two causes that read
+                             identically and call for opposite actions. --}}
+                        @if ($subscription->wasAutoDisabled())
+                            <span class="block text-gray-500">{{ __('webhooks::management.subscription.auto_disabled', ['count' => $subscription->consecutive_failures]) }}</span>
                         @endif
                     </td>
                     <td class="py-2 text-right">
@@ -102,7 +125,7 @@
                         <button
                             type="button"
                             wire:click="rotate({{ $subscription->id }})"
-                            wire:confirm="{{ __('webhooks::management.rotate_dialog.description') }}"
+                            wire:confirm="{{ __('webhooks::management.rotate_dialog.title') }}&#10;&#10;{{ __('webhooks::management.rotate_dialog.description') }}"
                             aria-label="{{ __('webhooks::management.a11y.rotate_subscription', ['url' => $subscription->url]) }}"
                             class="ml-3 text-indigo-600"
                         >{{ __('webhooks::management.subscription.rotate') }}</button>
@@ -115,7 +138,7 @@
                         <button
                             type="button"
                             wire:click="destroy({{ $subscription->id }})"
-                            wire:confirm="{{ __('webhooks::management.delete_dialog.description') }}"
+                            wire:confirm="{{ __('webhooks::management.delete_dialog.title') }}&#10;&#10;{{ __('webhooks::management.delete_dialog.description') }}"
                             aria-label="{{ __('webhooks::management.a11y.delete_subscription', ['url' => $subscription->url]) }}"
                             class="ml-3 text-red-600"
                         >{{ __('webhooks::management.subscription.delete') }}</button>
@@ -124,6 +147,7 @@
             @endforeach
         </tbody>
     </table>
+    @endif
 
     {{ $subscriptions->links() }}
 </div>

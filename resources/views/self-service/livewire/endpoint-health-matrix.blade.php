@@ -6,7 +6,7 @@
     <header class="flex flex-wrap items-start justify-between gap-[var(--padding-wk-x-md)]">
         <x-wirekit::stack gap="sm">
             <x-wirekit::heading :level="1" size="lg">{{ __('webhooks::self-service.health_page.heading') }}</x-wirekit::heading>
-            <x-wirekit::text variant="muted">{{ __('webhooks::self-service.health_page.intro') }}</x-wirekit::text>
+            <x-wirekit::text intent="muted">{{ __('webhooks::self-service.health_page.intro') }}</x-wirekit::text>
         </x-wirekit::stack>
         <div class="flex items-center gap-[var(--gap-wk-sm)]">
             {{-- Absent when this board is embedded without the portal's own routes: there
@@ -78,7 +78,7 @@
                                 @if ($endpoint->name !== null)
                                     <x-wirekit::text weight="medium">{{ $endpoint->name }}</x-wirekit::text>
                                 @endif
-                                <x-wirekit::text size="sm" variant="muted" class="break-all">{{ $endpoint->url }}</x-wirekit::text>
+                                <x-wirekit::text size="sm" intent="muted" class="break-all">{{ $endpoint->url }}</x-wirekit::text>
                             </x-wirekit::stack>
                         </x-wirekit::table.th>
                         <x-wirekit::table.td>
@@ -97,7 +97,7 @@
                             <x-wirekit::text size="sm">{{ $report !== null ? $report['sampleSize'] : '—' }}</x-wirekit::text>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td>
-                            <x-wirekit::text size="sm" variant="muted">{{ $endpoint->health_calculated_at?->settings(['locale' => app()->getLocale()])->diffForHumans() ?? __('webhooks::self-service.health_page.never') }}</x-wirekit::text>
+                            <x-wirekit::text size="sm" intent="muted">{{ $endpoint->health_calculated_at?->settings(['locale' => app()->getLocale()])->diffForHumans() ?? __('webhooks::self-service.health_page.never') }}</x-wirekit::text>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td align="right">
                             <x-wirekit::button

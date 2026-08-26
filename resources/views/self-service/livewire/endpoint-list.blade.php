@@ -7,7 +7,7 @@
         <x-wirekit::heading :level="2" size="md">{{ __('webhooks::self-service.list.heading') }}</x-wirekit::heading>
 
         @if ($this->capReached)
-            <x-wirekit::text size="sm" variant="muted">{{ __('webhooks::self-service.list.cap_reached') }}</x-wirekit::text>
+            <x-wirekit::text size="sm" intent="muted">{{ __('webhooks::self-service.list.cap_reached') }}</x-wirekit::text>
         @else
             <x-wirekit::button wire:click="newEndpoint" wire:loading.attr="disabled" wire:target="newEndpoint">
                 <x-slot:iconLeft><x-wirekit::icon name="plus" size="sm" /></x-slot:iconLeft>
@@ -57,7 +57,7 @@
                                 @if ($endpoint->name !== null)
                                     <x-wirekit::text weight="medium">{{ $endpoint->name }}</x-wirekit::text>
                                 @endif
-                                <x-wirekit::text size="sm" variant="muted" class="break-all">{{ $endpoint->url }}</x-wirekit::text>
+                                <x-wirekit::text size="sm" intent="muted" class="break-all">{{ $endpoint->url }}</x-wirekit::text>
                             </x-wirekit::stack>
                         </x-wirekit::table.th>
                         <x-wirekit::table.td>
@@ -66,7 +66,7 @@
                             </x-wirekit::badge>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td>
-                            <x-wirekit::text size="sm">{{ implode(', ', $endpoint->event_types) ?: '—' }}</x-wirekit::text>
+                            <x-wirekit::text size="sm">{{ implode(', ', $endpoint->eventTypeNames()) ?: '—' }}</x-wirekit::text>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td>
                             <x-wirekit::button

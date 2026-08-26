@@ -380,6 +380,9 @@ final readonly class WebhookProcessor
         $key = "webhooks:inbound:{$this->config->name}";
 
         if (RateLimiter::tooManyAttempts($key, $limit['max_attempts'])) {
+            // The cast is unkillable — PHP coerces the int into the header value either way,
+            // and mutation testing says so. It stays because the header array is declared as
+            // strings and the cast is where that becomes true, not because a test needs it.
             abort(429, headers: ['Retry-After' => (string) RateLimiter::availableIn($key)]);
         }
 
@@ -410,11 +413,22 @@ final readonly class WebhookProcessor
             return null;
         }
 
+        // The CONFIG side is lowered here and is load-bearing: a host writes 'X-Keep', and
+        // without this the comparison below never matches. Measured — removing it goes red.
         $only = is_array($store) ? array_map(strtolower(...), $store) : null;
 
         $kept = [];
 
         foreach ($this->flattenHeaders() as $name => $value) {
+            // ⚠️ The strtolower on the NAME is unkillable, and mutation testing reports it.
+            // Symfony's HeaderBag::all() already returns every key lowercased — measured, even
+            // for a header set as 'X-MiXeD-CaSe' — so no request can produce a name this would
+            // change. Its twin on the config side, six lines up, is NOT in that position and
+            // goes red when removed: that asymmetry is what makes this a claim about this call
+            // rather than about an untested filter.
+            //
+            // Kept: it says the comparison is case-insensitive at the point where a reader asks,
+            // rather than making them go and check what HeaderBag guarantees.
             if ($only !== null && ! in_array(strtolower($name), $only, true)) {
                 continue;
             }

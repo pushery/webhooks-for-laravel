@@ -111,6 +111,11 @@ class WebhookServerDelivery extends Model
             'http_status' => 'integer',
             'attempt' => 'integer',
             'duration_ms' => 'integer',
+            // EQUIVALENT, and reported every run: this model uses timestamps, so Eloquent's
+            // getDates() already lists created_at and date-casts it with or without this line.
+            // (Measured — the arm asserting a Carbon instance stays green without it.) It is
+            // written out because UPDATED_AT is null on this model, which makes the timestamp
+            // handling non-obvious enough that the reader should not have to infer this one.
             'created_at' => 'datetime',
             'delivered_at' => 'datetime',
         ];

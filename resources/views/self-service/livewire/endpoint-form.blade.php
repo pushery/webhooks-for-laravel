@@ -6,7 +6,7 @@
     @if ($open)
         <x-wirekit::card>
             <x-wirekit::card.body>
-                <form wire:submit="save">
+                <x-wirekit::form wire:submit="save">
                     <x-wirekit::stack gap="md">
                         <x-wirekit::heading :level="3" size="sm">
                             {{ $endpointId === null ? __('webhooks::self-service.form.new_heading') : __('webhooks::self-service.form.edit_heading') }}
@@ -33,7 +33,7 @@
                                 @forelse ($availableEventTypes as $type)
                                     <x-wirekit::checkbox wire:model="eventTypes" value="{{ $type }}" label="{{ $type }}" />
                                 @empty
-                                    <x-wirekit::text size="sm" variant="muted">
+                                    <x-wirekit::text size="sm" intent="muted">
                                         {{ __('webhooks::self-service.form.no_event_types') }}
                                     </x-wirekit::text>
                                 @endforelse
@@ -55,7 +55,7 @@
                             </x-wirekit::button>
                         </div>
                     </x-wirekit::stack>
-                </form>
+                </x-wirekit::form>
             </x-wirekit::card.body>
         </x-wirekit::card>
     @endif

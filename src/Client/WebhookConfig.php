@@ -7,6 +7,7 @@ namespace Pushery\Webhooks\Client;
 use Illuminate\Support\Facades\Config;
 use InvalidArgumentException;
 use Pushery\Webhooks\Client\Dedupe\DedupeKeyResolver;
+use Pushery\Webhooks\Client\Exceptions\WebhookConfigCannotVerify;
 use Pushery\Webhooks\Client\Http\BodyDecoder;
 use Pushery\Webhooks\Client\Jobs\ProcessWebhookJob;
 use Pushery\Webhooks\Client\Models\WebhookCall;
@@ -85,6 +86,71 @@ final class WebhookConfig
         }
 
         throw new InvalidArgumentException("No webhook client config named [{$name}] is defined in webhooks.client.configs.");
+    }
+
+    /**
+     * Every fault in webhooks.client.configs, one message each, empty when there are none.
+     *
+     * This is what turns a class of defect that is invisible until the first real delivery
+     * into one a deploy can see. A config with no verification material, a misspelled
+     * driver, a verifier that is not an InboundVerifier: none of it is reachable by a test
+     * of the host's own code, nothing renders differently, and the first symptom is a
+     * delivery that was refused or lost — weeks after the deployment that caused it.
+     *
+     * It does not restate the rules. It BUILDS each entry through the same path a request
+     * takes and collects what that refuses, so a rule added to the builder is covered here
+     * the day it lands, and a second copy of the rules can never drift from the first.
+     *
+     * Public because a host wiring its own health check is exactly the intended use, next
+     * to `webhooks:preflight`, which is this method with a console around it.
+     *
+     * @return list<string>
+     */
+    public static function configurationFaults(): array
+    {
+        $faults = [];
+        $seen = [];
+
+        foreach (Config::array('webhooks.client.configs', []) as $index => $entry) {
+            $at = "webhooks.client.configs.{$index}";
+
+            if (! is_array($entry)) {
+                $faults[] = "The webhook client config at [{$at}] is not an array.";
+
+                continue;
+            }
+
+            $name = $entry['name'] ?? null;
+
+            if (! is_string($name) || $name === '') {
+                // Unreachable rather than broken: forName() matches on 'name', so an entry
+                // without one is never selected and the route pointing at it answers "no
+                // config named [...]" — a message that sends the reader looking for a
+                // MISSING entry rather than at the one sitting right there.
+                $faults[] = "The webhook client config at [{$at}] has no non-empty 'name', so no route can ever resolve it.";
+
+                continue;
+            }
+
+            if (isset($seen[$name])) {
+                // forName() returns the first match and stops. The second entry is dead
+                // config that reads as live, which is worse than absent: a secret rotated
+                // in the wrong one of two identically named entries changes nothing at all.
+                $faults[] = "The webhook client config name [{$name}] is defined more than once; only the first is ever used.";
+
+                continue;
+            }
+
+            $seen[$name] = true;
+
+            try {
+                self::fromEntry($name, $entry);
+            } catch (InvalidArgumentException $fault) {
+                $faults[] = $fault->getMessage();
+            }
+        }
+
+        return $faults;
     }
 
     /**
@@ -470,8 +536,13 @@ final class WebhookConfig
         // A static secret is required unless a JWKS url supplies the public keys, or a
         // custom verifier authenticates by other means (an API callback, a cert chain)
         // and needs no shared secret at all.
+        //
+        // It carries the entry's invalid_status so the HTTP boundary can answer the same
+        // refusal a rejected signature gets. Read here rather than from the built config,
+        // because there is no built config to read it from — this is the one branch that
+        // never reaches the constructor.
         if ($jwks === null && $verifier === null && (! is_string($secret) || $secret === '')) {
-            throw new InvalidArgumentException("The webhook client config [{$name}] requires a non-empty 'secret', a 'jwks' url, or a 'verifier'.");
+            throw WebhookConfigCannotVerify::for($name, self::intOr($entry['invalid_status'] ?? null, 401));
         }
 
         $previous = $entry['previous_secret'] ?? null;

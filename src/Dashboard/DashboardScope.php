@@ -115,6 +115,10 @@ final class DashboardScope
     {
         $ability = Config::string('webhooks.dashboard.all_tenants_ability', 'view-all-tenant-webhooks');
 
+        // The `=== ''` half is EQUIVALENT and reported every run: `Gate::has('')` is false, so
+        // the second half refuses an empty ability on its own. Kept because it names the case —
+        // a host that blanked the config rather than a host that forgot to define the gate —
+        // and the two are fixed differently.
         if ($ability === '' || ! Gate::has($ability)) {
             throw new AuthorizationException(
                 'The webhook dashboard is in cross-tenant mode, which reads EVERY tenant\'s '

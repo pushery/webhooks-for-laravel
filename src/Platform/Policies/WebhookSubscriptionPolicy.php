@@ -58,6 +58,19 @@ final class WebhookSubscriptionPolicy
         return $this->ownsAndCan($user, $subscription);
     }
 
+    /**
+     * Replay a delivery that went to this endpoint.
+     *
+     * Deliberately its OWN ability rather than folding into `update`: replaying causes an
+     * outbound HTTP request to leave the installation, which is a different kind of act from
+     * editing a row, and a host tightening one has no reason to be forced to tighten the
+     * other. The same tenant-ownership floor applies either way.
+     */
+    public function redeliver(Authenticatable $user, WebhookSubscription $subscription): bool
+    {
+        return $this->ownsAndCan($user, $subscription);
+    }
+
     private function ownsAndCan(Authenticatable $user, WebhookSubscription $subscription): bool
     {
         return $this->ownedByCurrentTenant($subscription) && $this->hasManageAbility($user);

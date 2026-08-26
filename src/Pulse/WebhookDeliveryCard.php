@@ -35,6 +35,9 @@ final class WebhookDeliveryCard extends Card
 
         $events = $this->eventBreakdown();
 
+        // EQUIVALENT, and reported every run: the divisor is a nanoseconds-to-milliseconds
+        // conversion, and moving it by one changes the rendered figure by a millionth — below
+        // anything a card displays or a test could assert without pinning noise.
         $time = (hrtime(true) - $startedAt) / 1_000_000;
 
         return View::make('webhooks::pulse.webhook-deliveries', [

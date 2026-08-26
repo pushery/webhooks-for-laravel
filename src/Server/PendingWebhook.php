@@ -334,6 +334,13 @@ final class PendingWebhook
      */
     public function delayInSeconds(int $seconds): self
     {
+        // Lowering the floor is EQUIVALENT and reported every run: the dispatch reads
+        // `if ($this->delaySeconds > 0)`, so 0 and -1 both mean "queue it now". Raising it is
+        // not, and the arm on a negative hold covers that direction.
+        //
+        // The clamp stays because the PROPERTY should not carry a value the sender never
+        // meant. A negative hold stored as a negative number is one refactor away from being
+        // passed to a queue driver that reads it literally.
         return tap(clone $this, fn (self $call): int => $call->delaySeconds = max(0, $seconds));
     }
 

@@ -53,6 +53,13 @@ return [
     'subscription' => [
         'active' => 'Actif',
         'disabled' => 'Désactivé',
+        // Health bands, worded exactly as the self-service matrix words them: one
+        // package, one vocabulary for the same state.
+        'degraded' => 'Dégradé',
+        'failing' => 'Défaillant',
+        // Why an endpoint is off, not just that it is: the breaker and a person write
+        // the same two columns, and only the failure streak separates them.
+        'auto_disabled' => 'Désactivé automatiquement après :count échecs consécutifs',
         'enable' => 'Activer',
         'disable' => 'Désactiver',
         'edit' => 'Modifier',
@@ -106,6 +113,11 @@ return [
         'all_statuses' => 'Tous les statuts',
         'event_type' => 'Type d\'événement',
         'event_type_placeholder' => 'Filtrer par type d\'événement',
+        'endpoint' => 'Endpoint',
+        'all_endpoints' => 'Tous les endpoints',
+        'from' => 'Du',
+        'until' => 'Au',
+        'endpoints_truncated' => 'Seuls les premiers endpoints sont proposés ici. Si celui que tu cherches manque, filtre par type d\'événement ou adapte ce stub.',
     ],
 
     // Badge labels for the stored DeliveryStatus values. The key is the persisted
@@ -138,6 +150,7 @@ return [
 
     'validation' => [
         'event_types' => [
+            'string' => 'Un type d\'événement doit être un nom, pas un nombre ni une liste.',
             // An operator registers a GLOBAL endpoint here, so a type nothing publishes
             // costs every tenant's events for it rather than one tenant's.
             'in' => 'Ce type d\'événement n\'est pas publié par cette application.',

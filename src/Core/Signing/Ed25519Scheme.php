@@ -61,6 +61,13 @@ final readonly class Ed25519Scheme implements SignatureScheme
 
         $signatures = array_map(
             fn (string $secret): string => self::VERSION.','.base64_encode(sodium_crypto_sign_detached($toSign, $this->secretKey($secret))),
+            // EQUIVALENT, and reported every run. `all()` is keyed 'current'/'previous', so
+            // dropping this really does hand array_map a differently-keyed array — array_map
+            // preserves keys when it is given exactly one — but the result is only ever
+            // imploded, and implode does not look at keys.
+            //
+            // Kept because the keys are meaningless to the signer and carrying them makes the
+            // next reader ask whether the order is by key. It is not: it is rotation order.
             array_values($secrets->all()),
         );
 
@@ -179,10 +186,22 @@ final readonly class Ed25519Scheme implements SignatureScheme
         foreach (explode(' ', $header) as $entry) {
             $entry = trim($entry);
 
+            // EQUIVALENT, and reported every run. An empty entry — which a header with two
+            // spaces in it produces — falls through to `explode(',', '', 2)` = `['']`, pads to
+            // `['', '']`, and is then dropped by the version check below. Same outcome, one
+            // more round through the loop body.
+            //
+            // Kept because it states the case at the top rather than relying on the version
+            // check to absorb it, and because it is what makes the base64 decode below
+            // unreachable for empty input rather than merely unreached.
             if ($entry === '') {
                 continue;
             }
 
+            // The PAD LENGTH is an equivalent mutant (raising it appends a third element the
+            // destructuring never reads); the EXPLODE LIMIT is not, and is held by the arm
+            // below on a signature carrying a comma. Both are on this line, so a run reports
+            // them together.
             [$version, $signature] = array_pad(explode(',', $entry, 2), 2, '');
 
             if ($version === self::VERSION && $signature !== '') {

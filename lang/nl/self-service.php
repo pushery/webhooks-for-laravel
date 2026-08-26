@@ -138,6 +138,13 @@ return [
         // the heading above it, or a screen-reader user is offered three landmarks with
         // one name and has to guess which is the pager.
         'pagination_label' => 'Recente leveringen, pagina\'s',
+        'window_label' => 'Periode',
+        'window_days' => 'Laatste :days dagen',
+        'error' => 'Fout',
+        'replay' => 'Opnieuw versturen',
+        'replay_sr' => ':event opnieuw versturen',
+        'endpoint_disabled' => 'Dit endpoint staat uit, er kan dus niets naartoe worden gestuurd.',
+        'replay_throttled' => 'Je hebt zojuist veel opnieuw verstuurd. Wacht een minuut en probeer het nog eens.',
         'status' => [
             'pending' => 'In de wachtrij',
             'succeeded' => 'Afgeleverd',
@@ -214,6 +221,7 @@ return [
             'blocked' => 'Deze URL kan niet als endpoint worden gebruikt. Gebruik een openbaar bereikbare https-URL.',
         ],
         'event_types' => [
+            'string' => 'Een event-type moet een naam zijn, geen getal en geen lijst.',
             'required' => 'Selecteer minstens één event-type.',
             'min' => 'Selecteer minstens één event-type.',
             // A registration for a type the catalog does not declare. Only reachable

@@ -51,6 +51,11 @@ final class PayloadReclaimer
 
         // allFiles() is typed as a bare array; keep only the string keys it actually yields so
         // the path stays a string for the disk operations below.
+        //
+        // ⚠️ Unkillable, and reported as a survivor: the driver only ever yields strings, so at
+        // run time the filter removes nothing. Measured — unwrapped, the whole prune suite stays
+        // green. It stays because the guarantee it makes is a TYPE guarantee, and the operations
+        // below are typed for a string.
         foreach (array_filter($filesystem->allFiles(self::PREFIX), is_string(...)) as $path) {
             $scanned++;
 
@@ -83,6 +88,24 @@ final class PayloadReclaimer
         $schema = Schema::connection(WebhookConnection::name());
         $referenced = [];
 
+        // ⚠️ Five survivors live in this method and the loop above, and every one of them is
+        // equivalent. Measured, all three shapes at once, with the prune suite green:
+        //
+        //   `$referenced[$path] = true` moved to `false` — the read is isset(), and isset() is
+        //   true for a stored false. Only null would make it false, and null is not stored here.
+        //
+        //   both `array_filter(..., is_string(...))` calls unwrapped — pluck() yields null for a
+        //   row that offloaded nothing, and `$referenced[null]` lands under the key '' rather
+        //   than matching any real path.
+        //
+        // The controls are the suite's own arms rather than something added for this note: it
+        // deletes an object nothing references, keeps one a delivery row references, keeps one a
+        // call row references, and keeps scanning past a referenced object. A reference map that
+        // did not work would fail all four.
+        //
+        // They stay, and the second one earns its keep beyond the type: on PHP 8.4 a null array
+        // offset is DEPRECATED, so unwrapping it trades a silent no-op for a notice the day a
+        // row carries no path.
         if ($schema->hasTable('webhook_deliveries')) {
             $paths = WebhookDelivery::query()->where('payload_disk', $disk)->pluck('payload_path')->all();
 

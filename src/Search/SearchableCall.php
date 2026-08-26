@@ -75,6 +75,12 @@ trait SearchableCall
             return '';
         }
 
+        // The `?: ''` is EQUIVALENT and reported every run. json_encode only answers false on
+        // INF/NAN or invalid UTF-8, neither of which survives a jsonb column, and no successful
+        // encoding of an ARRAY is falsy — `[]` encodes to '[]'. So nothing reaches the fallback.
+        //
+        // It stays because Str::limit is typed for a string: the moment that assumption stops
+        // holding, the choice is an empty excerpt or a TypeError while indexing.
         return Str::limit(
             json_encode($this->payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '',
             new Settings()->searchPayloadExcerptChars(),

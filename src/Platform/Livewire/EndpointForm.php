@@ -70,12 +70,26 @@ final class EndpointForm extends Component
     public function openForEdit(int $id): void
     {
         $subscription = $this->findOwnedEndpoint($id);
+        // Reported as a survivor, and unreachable as the SOLE refusal: the boot gate reads the
+        // same ability, and findOwnedEndpoint() has already enforced the ownership this policy
+        // would add. InteractsWithEndpoints states that in full and ends "Do not 'kill' them by
+        // deleting them"; this is one of the five it means. The (int) cast beside it is
+        // unkillable for its own reason — the value is already an int, and the cast is the
+        // boundary that makes the argument one.
+        // Reported as a survivor, and unreachable as the SOLE refusal: the boot gate reads the
+        // same ability, and findOwnedEndpoint() has already enforced the ownership this policy
+        // would add. InteractsWithEndpoints states that in full and ends "Do not 'kill' them by
+        // deleting them"; this is one of the five it means. The (int) cast beside it is
+        // unkillable for its own reason — the value is already an int, and the cast is the
+        // boundary that makes the argument one.
         $this->authorize('update', $subscription);
 
         $this->endpointId = $subscription->id;
         $this->name = $subscription->name ?? '';
         $this->url = $subscription->url;
-        $this->eventTypes = $subscription->event_types;
+        // Normalized on the way IN — see EventTypeList. The tenant-facing form has the same
+        // exposure as the operator console, and a tenant has even less recourse.
+        $this->eventTypes = $subscription->eventTypeNames();
         $this->isActive = $subscription->is_active;
         $this->open = true;
     }
@@ -100,10 +114,34 @@ final class EndpointForm extends Component
         $accepted = new Settings()->acceptedEventTypes();
 
         if ($accepted !== null && $this->storedEventTypes() !== []) {
+            // ⚠️ Both calls on this line are UNKILLABLE, and mutation testing reports both.
+            // The result is only ever handed to Rule::in, which cares about neither duplicates
+            // nor keys — array_unique and array_values are tidiness, not behavior. Measured by
+            // removing each in turn, with the portal suite staying green both times.
+            //
+            // They stay because the value reads as a list everywhere it is passed on, and a
+            // duplicated or gap-keyed one would be a surprise waiting for whoever next uses it
+            // for something that does care.
             $accepted = array_values(array_unique([...$accepted, ...$this->storedEventTypes()]));
         }
 
         $this->validate(
+            // ⚠️ FOUR ITEMS IN THIS LIST CANNOT BE KILLED, measured one at a time by removing
+            // the item and running the portal suite:
+            //
+            //   'name' => 'nullable'      $name is a typed string property; never null
+            //   'name' => 'string'        same, the type already enforces it
+            //   'eventTypes' => 'array'   $eventTypes is a typed array property
+            //   'eventTypes' => 'min:1'   masked by 'required', which already rejects []
+            //
+            // Three restate what the TYPE system enforces one layer up, so no input reaches
+            // them; the fourth is redundant against its neighbour. They stay: this list is the
+            // form's written contract, and a subclass widening a property's type walks straight
+            // into the case the type stops covering.
+            //
+            // 'required', 'url', 'max:2048' and 'max:255' ARE reachable and every one of them
+            // goes red when removed — which is what makes the four above a statement about
+            // those four rather than about an untested validate() call.
             [
                 'name' => ['nullable', 'string', 'max:255'],
                 // Bound the URL length so it stores identically on every supported
@@ -135,8 +173,27 @@ final class EndpointForm extends Component
                 'eventTypes.min' => __('webhooks::self-service.validation.event_types.min'),
                 // Named explicitly, like every other message here, so a refused save does not
                 // fall back to the framework's untranslated ":attribute is invalid".
+                //
+                // ⚠️ THE LINE BELOW WAS THE ONE RULE OF THIS SET THAT HAD NO MESSAGE, and the
+                // paragraph above was false for exactly it. Measured: a non-string element
+                // rendered "The eventTypes.0 field must be a string." — English whatever the
+                // locale, and carrying a raw field path into a screen a CUSTOMER reads.
+                //
+                // The three attribute labels below could not soften it either: Laravel does
+                // not resolve an indexed key onto its parent's label, so the path appeared as
+                // written. See the note beside them.
+                'eventTypes.*.string' => __('webhooks::self-service.validation.event_types.string'),
                 'eventTypes.*.in' => __('webhooks::self-service.validation.event_types.in'),
             ],
+            // ⚠️ These three are INERT today, and that is worth knowing rather than trusting.
+            // Every message above is written without `:attribute`, so no label is ever
+            // interpolated; measured by removing each in turn, with the suite staying green.
+            //
+            // They are kept rather than deleted because the set of messages above is what
+            // makes them inert, and that set is edited: the moment a rule here loses its own
+            // message, the framework's default fires and asks for exactly these. What they
+            // cannot do is rescue an INDEXED key — `eventTypes.0` does not resolve onto the
+            // `eventTypes` label — which is why the rule above needed its own message instead.
             [
                 'name' => __('webhooks::self-service.form.name_label'),
                 'url' => __('webhooks::self-service.form.url_label'),
@@ -303,7 +360,12 @@ final class EndpointForm extends Component
             return [];
         }
 
-        return array_values($this->findOwnedEndpoint($this->endpointId)->event_types);
+        // ⚠️ Unkillable, and reported as a survivor: every caller either tests this for
+        // emptiness or spreads it into a list that is re-indexed again, so the keys never
+        // reach anything that reads them. Measured by removing it, with the suite green.
+        // Kept for the same reason as the pair above — it is what makes the return value a
+        // LIST, which is how its type is declared and how every reader will treat it.
+        return $this->findOwnedEndpoint($this->endpointId)->eventTypeNames();
     }
 
     public function render(): View
@@ -313,6 +375,9 @@ final class EndpointForm extends Component
             // longer declares. Without the second half the stale value has no checkbox, so a
             // tenant can neither keep it nor drop it — the value is in the component's state
             // and Livewire's checkbox binding only ever adds or removes its OWN value.
+            // The array_values here is unkillable — the view iterates and never reads a key
+            // (measured). Its neighbour array_unique is not in that position. Both stay: the
+            // value is handed on as a list, and a gap-keyed one would surprise the next reader.
             'availableEventTypes' => array_values(array_unique([
                 ...new Settings()->eventTypes(),
                 ...$this->storedEventTypes(),

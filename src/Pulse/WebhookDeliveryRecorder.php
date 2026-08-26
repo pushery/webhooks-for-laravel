@@ -71,6 +71,11 @@ final readonly class WebhookDeliveryRecorder
     {
         $type = $event->data->eventType ?? self::UNKNOWN_EVENT;
 
+        // EQUIVALENT, and reported every run: both arms read the same property, and a
+        // succeeded attempt always carries a response, so the nullsafe arm answers identically
+        // for it. The split exists for the TYPE CHECKER — on the succeeded event the response
+        // is non-nullable, and reading it nullsafe there would widen the result to null for a
+        // case that cannot happen.
         $durationMs = $event instanceof WebhookAttemptSucceeded
             ? $event->response->durationMs
             : $event->response?->durationMs;

@@ -184,15 +184,26 @@ final class WebhookMetricsController
     private function topEvents(WebhookMetrics $metrics): array
     {
         return $metrics->topEvents()
-            ->map(function (stdClass $row): array {
-                $columns = get_object_vars($row);
-
-                return [
-                    'event_type' => $this->toText($columns['event_type'] ?? null),
-                    'total' => $this->toInt($columns['total'] ?? 0),
-                ];
-            })
+            ->map(fn (stdClass $row): array => $this->topEventsRow(get_object_vars($row)))
             ->all();
+    }
+
+    /**
+     * One top-events row, with the raw database values coerced to stable JSON types.
+     *
+     * Named rather than inlined, so it has the same shape as {@see self::bucket()} — the two
+     * do the same job on the two row types this endpoint returns, and one of them being a
+     * closure inside a map() was the only difference between them.
+     *
+     * @param  array<array-key, mixed>  $columns
+     * @return array{event_type: string, total: int}
+     */
+    private function topEventsRow(array $columns): array
+    {
+        return [
+            'event_type' => $this->toText($columns['event_type'] ?? null),
+            'total' => $this->toInt($columns['total'] ?? 0),
+        ];
     }
 
     /**

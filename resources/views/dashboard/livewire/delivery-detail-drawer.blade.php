@@ -50,7 +50,12 @@
                  through many deliveries in, asking "how do I get out of here" each time; the
                  other way out is Escape, which not everyone knows. An element that answers a
                  click without offering one is the one combination that is wrong in both
-                 directions. --}}
+                 directions.
+
+                 Native rather than the library's button, and deliberately: a full-bleed
+                 invisible overlay is not a design-system control. It has no label, no surface
+                 and no focus ring by design, which is the opposite of what that component is
+                 for. --}}
             <button
                 type="button"
                 wire:click="close"
@@ -71,12 +76,12 @@
                 })
                 <div class="mb-[var(--padding-wk-y-md)] flex flex-wrap items-center gap-[var(--padding-wk-x-md)]">
                     <x-wirekit::badge :intent="$intent">{{ __('webhooks::dashboard.status.'.$delivery->status->value) }}</x-wirekit::badge>
-                    <x-wirekit::text size="sm" variant="muted">{{ __('webhooks::dashboard.drawer.attempt', ['number' => $delivery->attempt]) }}</x-wirekit::text>
+                    <x-wirekit::text size="sm" intent="muted">{{ __('webhooks::dashboard.drawer.attempt', ['number' => $delivery->attempt]) }}</x-wirekit::text>
                     @if ($delivery->response_code !== null)
-                        <x-wirekit::text size="sm" variant="muted">{{ __('webhooks::dashboard.drawer.http', ['code' => $delivery->response_code]) }}</x-wirekit::text>
+                        <x-wirekit::text size="sm" intent="muted">{{ __('webhooks::dashboard.drawer.http', ['code' => $delivery->response_code]) }}</x-wirekit::text>
                     @endif
                     @if ($delivery->duration_ms !== null)
-                        <x-wirekit::text size="sm" variant="muted">{{ $delivery->duration_ms }} ms</x-wirekit::text>
+                        <x-wirekit::text size="sm" intent="muted">{{ $delivery->duration_ms }} ms</x-wirekit::text>
                     @endif
                 </div>
 
@@ -94,11 +99,11 @@
                 @php($locale = ['locale' => app()->getLocale()])
                 @php($zone = \Pushery\Webhooks\Dashboard\DashboardTimezone::apply(...))
                 <x-wirekit::timeline class="mb-[var(--padding-wk-y-md)]">
-                    <x-wirekit::timeline.item :time="$zone($delivery->created_at)->settings($locale)->isoFormat(__('webhooks::dashboard.formats.absolute'))" variant="default">
+                    <x-wirekit::timeline.item :time="$zone($delivery->created_at)->settings($locale)->isoFormat(__('webhooks::dashboard.formats.absolute'))" intent="default">
                         {{ __('webhooks::dashboard.drawer.queued') }}
                     </x-wirekit::timeline.item>
                     @if ($delivery->delivered_at !== null)
-                        <x-wirekit::timeline.item :time="$zone($delivery->delivered_at)->settings($locale)->isoFormat(__('webhooks::dashboard.formats.absolute'))" variant="success">
+                        <x-wirekit::timeline.item :time="$zone($delivery->delivered_at)->settings($locale)->isoFormat(__('webhooks::dashboard.formats.absolute'))" intent="success">
                             {{ __('webhooks::dashboard.drawer.delivered') }}
                         </x-wirekit::timeline.item>
                     @endif
@@ -115,7 +120,7 @@
                          threshold the row holds only a stub, so the largest deliveries render as
                          the smallest ones — and under a redacted body the stub is
                          indistinguishable from "there was barely anything here". --}}
-                    <x-wirekit::text size="sm" variant="muted" class="mt-[var(--padding-wk-y-sm)] wh-dash-drawer-payload-offloaded">
+                    <x-wirekit::text size="sm" intent="muted" class="mt-[var(--padding-wk-y-sm)] wh-dash-drawer-payload-offloaded">
                         {{ $this->payloadOffloadNotice }}
                     </x-wirekit::text>
                 @endif
@@ -123,7 +128,7 @@
                 @if ($this->payloadNotice !== null)
                     {{-- Say WHY, always. A panel that just stops after its heading reads as a
                          defect, and the next person "fixes" it by deleting the guard. --}}
-                    <x-wirekit::text size="sm" variant="muted" class="mt-[var(--padding-wk-y-sm)] wh-dash-drawer-payload-notice">
+                    <x-wirekit::text size="sm" intent="muted" class="mt-[var(--padding-wk-y-sm)] wh-dash-drawer-payload-notice">
                         {{ $this->payloadNotice }}
                     </x-wirekit::text>
                 @endif

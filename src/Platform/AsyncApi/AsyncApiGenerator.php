@@ -93,6 +93,10 @@ final readonly class AsyncApiGenerator
         $encoded = json_encode($document) ?: '{}';
         $normalized = json_decode($encoded, true);
 
+        // Two integers, two verdicts. The INLINE LEVEL is equivalent in both directions and
+        // reported every run — this document nests nowhere near ten deep, so no value at or
+        // above its actual depth changes a byte. The INDENT is not, and the published-document
+        // arms hold it.
         return Yaml::dump(is_array($normalized) ? $normalized : [], 10, 2);
     }
 

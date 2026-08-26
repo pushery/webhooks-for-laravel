@@ -7,7 +7,7 @@
     <header class="flex flex-wrap items-start justify-between gap-[var(--padding-wk-x-md)]">
         <div class="flex flex-col gap-[var(--padding-wk-y-sm)]">
             <x-wirekit::heading :level="1" size="lg">{{ __('webhooks::self-service.page.heading') }}</x-wirekit::heading>
-            <x-wirekit::text variant="muted">{{ __('webhooks::self-service.page.intro') }}</x-wirekit::text>
+            <x-wirekit::text intent="muted">{{ __('webhooks::self-service.page.intro') }}</x-wirekit::text>
         </div>
         {{-- Absent when this shell is embedded without the portal's own routes. --}}
         @if ($healthBoardUrl !== null)

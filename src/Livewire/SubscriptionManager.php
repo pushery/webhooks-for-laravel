@@ -113,6 +113,12 @@ class SubscriptionManager extends Component
     public function dehydrate(): void
     {
         $this->newSecret = null;
+        // ⚠️ Equivalent, and reported as a survivor: the line above nulls the secret, and the
+        // panel this flag heads is only rendered when there IS one — so after dehydrate() the
+        // flag's value cannot reach a reader. Measured: set to true, every suite stays green.
+        // The same is true of its twin in edit(). Kept so the two fields that describe ONE
+        // revealed secret are always cleared together, rather than leaving a stale flag for
+        // whoever next sets newSecret without thinking about it.
         $this->rotated = false;
     }
 
@@ -145,11 +151,17 @@ class SubscriptionManager extends Component
         $this->editingId = $subscription->id;
         $this->name = $subscription->name ?? '';
         $this->url = $subscription->url;
-        $this->eventTypes = $subscription->event_types;
+        // Normalized on the way IN, the same way save() is careful on the way out — a row
+        // holding a JSON object or a number would otherwise open and never save again.
+        // See EventTypeList.
+        $this->eventTypes = $subscription->eventTypeNames();
         $this->isActive = $subscription->is_active;
 
         // A secret revealed for another endpoint has no business staying on screen over a
         // form that now describes a different one.
+        //
+        // The `rotated` line is equivalent for the same reason as the one in dehydrate(): the
+        // secret goes with it and the panel needs the secret. Kept for the same reason too.
         $this->newSecret = null;
         $this->rotated = false;
         $this->resetValidation();
@@ -181,9 +193,31 @@ class SubscriptionManager extends Component
         // writable from the browser, so an allowlist widened from one is an allowlist the
         // client widens.
         if ($accepted !== null && $this->storedEventTypes() !== []) {
+            // ⚠️ array_unique and array_values on this line are unkillable: the result only ever
+            // reaches Rule::in, which cares about neither duplicates nor keys. Measured, each
+            // removed in turn, suite green. The SPREAD is a different matter and IS pinned —
+            // drop the stored half and an edit is refused over a value the operator never
+            // touched, which is what makes this a note about the two helpers.
             $accepted = array_values(array_unique([...$accepted, ...$this->storedEventTypes()]));
         }
 
+        // ⚠️ FOUR OF THESE RULE ITEMS CANNOT BE KILLED BY ANY TEST, and mutation testing reports
+        // each of them as a survivor. Measured one at a time, by removing the item and running
+        // the whole Livewire suite:
+        //
+        //   'name' => 'nullable'      — $name is a typed string property; it is never null
+        //   'name' => 'string'        — same, the type already guarantees it
+        //   'eventTypes' => 'array'   — $eventTypes is a typed array property
+        //   'eventTypes' => 'min:1'   — masked by 'required', which already rejects []
+        //
+        // The first three are the validator restating what the TYPE system enforces one layer
+        // up, so no input can reach them; the fourth is redundant against its own neighbour.
+        // 'required' and 'max:255' ARE reachable and are pinned — removing either goes red.
+        //
+        // They stay, and they are not to be "killed" by deletion. This list is the written
+        // contract of the form, read by anyone changing it, and a subclass that widens a
+        // property's type (this class is not final, deliberately) walks straight into the case
+        // the type no longer covers.
         $this->validate([
             'name' => ['nullable', 'string', 'max:255'],
             // Cap the URL at the MySQL column width so it stores the same on every
@@ -195,6 +229,11 @@ class SubscriptionManager extends Component
             // here, so a typo costs every tenant's events for that type, not one tenant's.
             'eventTypes.*' => $accepted === null ? ['string'] : ['string', Rule::in($accepted)],
         ], [
+            // ⚠️ The 'string' rule had no message, so a non-string element rendered "The
+            // eventTypes.0 field must be a string." — the framework's English default, in a
+            // package that ships seven locales, carrying a raw field path. Measured on both
+            // this console and the portal form, which had the identical gap.
+            'eventTypes.*.string' => __('webhooks::management.validation.event_types.string'),
             'eventTypes.*.in' => __('webhooks::management.validation.event_types.in'),
         ]);
 
@@ -308,6 +347,9 @@ class SubscriptionManager extends Component
 
     private function update(): void
     {
+        // The (int) cast is unkillable — editingId is a typed ?int and the null case cannot
+        // reach here (update() is only called with one open). Kept as the boundary that makes
+        // the argument an int rather than a nullable one.
         $subscription = WebhookSubscription::query()->findOrFail((int) $this->editingId);
 
         try {
@@ -360,7 +402,11 @@ class SubscriptionManager extends Component
         $subscription = WebhookSubscription::query()->find($this->editingId);
 
         if ($subscription instanceof WebhookSubscription) {
-            return array_values($subscription->event_types);
+            // Through the accessor, not the raw column: what the row holds is spread into
+            // the validation allowlist, and a nested array there reaches Rule::in, which
+            // stringifies it — an "Array to string conversion" warning raised while
+            // validating, on a screen that exists to repair exactly such a row.
+            return $subscription->eventTypeNames();
         }
 
         return [];
@@ -401,6 +447,8 @@ class SubscriptionManager extends Component
             // longer declares. Without the second half the stale value has no checkbox, so
             // it can be neither kept nor dropped — Livewire's checkbox binding only ever
             // adds or removes its OWN value.
+            // The array_values here is unkillable (the view iterates, keys unread) while its
+            // neighbour array_unique is NOT — remove that one and an arm goes red. Both stay.
             'availableEventTypes' => array_values(array_unique([
                 ...new Settings()->eventTypes(),
                 ...$this->storedEventTypes(),

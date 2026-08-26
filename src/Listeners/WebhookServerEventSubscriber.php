@@ -6,6 +6,7 @@ namespace Pushery\Webhooks\Listeners;
 
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Facades\Event;
+use Pushery\Webhooks\Core\Http\ErrorMessageRedactor;
 use Pushery\Webhooks\Enums\DeliveryStatus;
 use Pushery\Webhooks\Events\WebhookDeliveryFailed;
 use Pushery\Webhooks\Events\WebhookDeliverySucceeded;
@@ -18,6 +19,7 @@ use Pushery\Webhooks\Server\Events\WebhookAttemptFailed;
 use Pushery\Webhooks\Server\Events\WebhookAttemptsExhausted;
 use Pushery\Webhooks\Server\Events\WebhookAttemptSucceeded;
 use Pushery\Webhooks\Support\Settings;
+use Throwable;
 
 /**
  * Translates the delivery engine's lifecycle events into delivery-log updates and
@@ -88,7 +90,7 @@ final readonly class WebhookServerEventSubscriber
             'attempt' => $event->attempt,
             'response_code' => $event->response?->status,
             'duration_ms' => $event->response?->durationMs,
-            'error' => $event->exception?->getMessage() ?? self::DEFAULT_ERROR,
+            'error' => $this->errorFrom($event->exception),
         ]);
     }
 
@@ -100,7 +102,7 @@ final readonly class WebhookServerEventSubscriber
             return;
         }
 
-        $reason = $event->exception?->getMessage() ?? self::DEFAULT_ERROR;
+        $reason = $this->errorFrom($event->exception);
 
         $this->persist($delivery, [
             'status' => DeliveryStatus::Exhausted,
@@ -160,6 +162,21 @@ final readonly class WebhookServerEventSubscriber
         if ($flipped === 1) {
             Event::dispatch(new WebhookEndpointAutoDisabled($subscription->refresh()));
         }
+    }
+
+    /**
+     * The persisted text, with any credential in the failed URL taken out of it first.
+     *
+     * The redaction is this package's, not guzzle's, because guzzle's differs between the
+     * two psr7 majors the composer constraint allows — see {@see ErrorMessageRedactor}.
+     */
+    private function errorFrom(?Throwable $exception): string
+    {
+        $message = $exception?->getMessage();
+
+        return $message === null || $message === ''
+            ? self::DEFAULT_ERROR
+            : ErrorMessageRedactor::redact($message);
     }
 
     private function isTerminal(WebhookDelivery $delivery): bool

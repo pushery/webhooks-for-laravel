@@ -58,6 +58,10 @@ final class HourlyActivityChart extends Component
                     return (int) $total;
                 }
 
+                // EQUIVALENT, and reported every run: the fallback is swallowed by the
+                // `max(1, ...)` below, so 0, 1 and -1 all produce the same peak. It stays 0
+                // because that is what a row with no readable total contributed — reporting a
+                // 1 would be inventing a delivery.
                 return 0;
             })
             ->all();

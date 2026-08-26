@@ -78,6 +78,10 @@ final class EndpointHealthMatrix extends Component
         // nothing and fails not-found before any action runs — the row-level policy below is the
         // second, defense-in-depth guard, not the only one.
         $subscription = $this->findOwnedEndpoint($id);
+        // Reported as a survivor, and unreachable as the SOLE refusal — InteractsWithEndpoints
+        // spells out why in full: the boot gate reads the same ability, and findOwnedEndpoint()
+        // has already enforced the ownership this policy would add. That docblock ends "Do not
+        // 'kill' them by deleting them", and this is one of the five it means.
         $this->authorize('update', $subscription);
 
         $this->refreshRow($subscription);
@@ -107,6 +111,9 @@ final class EndpointHealthMatrix extends Component
     {
         $report = Container::getInstance()->make(EndpointHealth::class)->refresh($subscription);
 
+        // The (int) cast is unkillable: the id is an int already, and PHP normalizes a numeric
+        // array key regardless (measured). Kept because the array is documented as keyed by the
+        // endpoint id, and the view looks a row up by exactly that.
         $this->reports[(int) $subscription->id] = [
             'successRate' => $report->successRate,
             'p95' => $report->p95,
@@ -146,6 +153,17 @@ final class EndpointHealthMatrix extends Component
             ->orderBy('id')
             ->get();
 
+        // ⚠️ Three of the entries below are REDUNDANT, and mutation testing reports one
+        // survivor each: `reports`, `sortField` and `sortDirection` are public properties of
+        // this component, and Livewire hands every public property to the view already. Removing
+        // them changes nothing — measured, one at a time, suite green.
+        //
+        // They stay because the view reads them by those names and this list is where a reader
+        // looks to see what it is given. `endpoints` and `portalUrl` are NOT redundant: neither
+        // is a property, and the view has no other source for them.
+        //
+        // What must NOT be concluded from this note is that the three properties are unused. It
+        // is the opposite: they are used, and by the view, which is why they are public.
         return ViewFactory::make('webhooks::self-service.livewire.endpoint-health-matrix', [
             'endpoints' => $endpoints,
             'reports' => $this->reports,

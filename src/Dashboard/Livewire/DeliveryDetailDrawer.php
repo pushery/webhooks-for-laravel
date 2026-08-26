@@ -170,6 +170,10 @@ final class DeliveryDetailDrawer extends Component
 
         $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
+        // EQUIVALENT, and reported every run. json_encode fails on INF/NAN or invalid UTF-8,
+        // and neither can come out of a jsonb column, so no input reaches the false branch.
+        // It stays because the alternative is returning `false` from a `?string` method — a
+        // TypeError rather than an empty drawer — the moment that assumption stops holding.
         return $json === false ? null : $json;
     }
 

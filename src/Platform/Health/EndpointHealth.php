@@ -88,12 +88,34 @@ final readonly class EndpointHealth
             'SELECT '
             .ConditionalCount::of("status IN ('succeeded', 'failed', 'exhausted')").' AS resolved, '
             .ConditionalCount::of("status = 'succeeded'").' AS succeeded, '
+            // ⚠️ The 0.95 here and its MySQL twin below are reported as survivors, and both are
+            // equivalent BY CONSTRUCTION rather than by accident: PercentileSelect::fraction()
+            // renders the fraction from a fixed set of literals so nothing interpolates into SQL,
+            // and its `default` arm collapses every unsupported value back to '0.95'. A mutator
+            // moving this constant therefore produces the identical SQL.
+            //
+            // That fallback is deliberate, has its own test, and is already written up in
+            // EndpointHealthTest beside the arm that would otherwise look like the one to blame.
+            // Pointed at rather than restated, so there is one place to change if it ever stops
+            // being true.
             .PercentileSelect::pgsqlExpression(0.95).' AS p95 '
             .'FROM webhook_deliveries '
             .'WHERE subscription_id = ? AND created_at >= ?',
             [$subscriptionId, $since],
         );
 
+        // ⚠️ The two COUNT defaults on the next line are UNKILLABLE, and mutation testing
+        // reports both. `??` fires on null, and a COUNT never returns null — it returns 0 for
+        // a window with nothing in it — so no query result can reach them. Measured: moved to
+        // `?? 1` one at a time, the suite stayed green for both.
+        //
+        // The p95 default beside them is a different matter and IS reachable: percentile_cont
+        // over no rows returns NULL, which is exactly the empty-window case. Moving THAT one
+        // goes red, and it is what makes the sentence above a claim about the two counts
+        // rather than about an untested method.
+        //
+        // All three stay: the tuple's declared type has no nulls in it, and the defaults are
+        // what make that true at the boundary rather than one call further in.
         return [$this->toInt($row['resolved'] ?? 0), $this->toInt($row['succeeded'] ?? 0), $this->toFloat($row['p95'] ?? 0)];
     }
 
@@ -121,6 +143,18 @@ final readonly class EndpointHealth
             [$subscriptionId, $since],
         );
 
+        // ⚠️ The two COUNT defaults on the next line are UNKILLABLE, and mutation testing
+        // reports both. `??` fires on null, and a COUNT never returns null — it returns 0 for
+        // a window with nothing in it — so no query result can reach them. Measured: moved to
+        // `?? 1` one at a time, the suite stayed green for both.
+        //
+        // The p95 default beside them is a different matter and IS reachable: percentile_cont
+        // over no rows returns NULL, which is exactly the empty-window case. Moving THAT one
+        // goes red, and it is what makes the sentence above a claim about the two counts
+        // rather than about an untested method.
+        //
+        // All three stay: the tuple's declared type has no nulls in it, and the defaults are
+        // what make that true at the boundary rather than one call further in.
         return [$this->toInt($counts['resolved'] ?? 0), $this->toInt($counts['succeeded'] ?? 0), $this->toFloat($p95['p95'] ?? 0)];
     }
 
@@ -181,6 +215,9 @@ final readonly class EndpointHealth
      */
     private function latencySignal(float $p95): float
     {
+        // The cast is unkillable — the getter already returns a number and the arithmetic
+        // below works either way (measured). It stays because this method's parameter and
+        // return are floats, and mixing an int budget into that reads as an oversight.
         $budget = (float) $this->config->healthLatencyBudgetMs();
 
         if ($budget <= 0.0) {
@@ -198,6 +235,13 @@ final readonly class EndpointHealth
     {
         $ceiling = $this->config->healthConsecutivePenaltyAt();
 
+        // ⚠️ `<= 0` moved to `<= 1` is equivalent, and reported as a survivor. At a ceiling of
+        // exactly 1 the two paths agree for every input: the shortcut answers 0.0 for any streak
+        // and 1.0 for none, and the linear form below computes clampUnit(1 - failures/1), which
+        // is the same two numbers. Measured, suite green.
+        //
+        // The shortcut stays for the ceiling it is actually there for — zero, where the division
+        // below would be by zero.
         if ($ceiling <= 0) {
             return $consecutiveFailures > 0 ? 0.0 : 1.0;
         }
