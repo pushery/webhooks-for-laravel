@@ -57,8 +57,37 @@
             {{-- A rotation says something a registration does not: the OLD secret keeps
                  verifying until the rotation window closes, which is what makes rotating
                  during an incident safe to do immediately. --}}
-            <p class="text-sm font-medium">{{ $rotated ? __('webhooks::management.secret.rotated_heading') : __('webhooks::management.secret.heading') }}:</p>
-            <code class="break-all">{{ $newSecret }}</code>
+            {{-- ⚠️ A READONLY INPUT, NOT A <code>, AND THAT IS ABOUT A ROTATION RATHER THAN ABOUT
+                 STYLING. `SubscriptionManager::dehydrate()` clears `newSecret` on EVERY
+                 serialization: the plaintext exists in exactly one response and this console has
+                 no reveal window to ask again with. A reader who loses one character while
+                 hand-selecting a long token that wraps over several lines has no second chance —
+                 the only recovery is a rotation, which sends every consumer of the endpoint into
+                 a migration window nobody needed.
+
+                 An input fixes the selection rather than the copying: focus it and Ctrl/Cmd-A
+                 selects the FIELD instead of the page, and the value comes back as one string
+                 with no wrap artefacts. It is also reachable by keyboard, which a <code> is not.
+
+                 ⚠️ AND IT CARRIES NO `onfocus="this.select()"`, WHICH IS THE OBVIOUS ADDITION AND
+                 THE ONE THIS PACKAGE MUST NOT MAKE. An inline handler is script under
+                 `script-src 'self'` without a nonce — a policy an application is entitled to
+                 choose — so the browser refuses to run it, nothing throws, and the affordance is
+                 simply dead. That failure has already happened three times on this surface;
+                 UiAssets states the third and why the answer had to be one with no policy
+                 dependency left. Auto-select would need a named factory in the served asset,
+                 which is a different change with a different cost.
+
+                 The heading is the input's LABEL rather than a paragraph beside it, so the field
+                 has an accessible name without inventing a lang key for one. --}}
+            <label for="wh-new-secret-value" class="block text-sm font-medium">{{ $rotated ? __('webhooks::management.secret.rotated_heading') : __('webhooks::management.secret.heading') }}</label>
+            <input
+                id="wh-new-secret-value"
+                class="wh-new-secret-value mt-2 w-full break-all font-mono text-sm"
+                type="text"
+                readonly
+                value="{{ $newSecret }}"
+            >
         </div>
     @endif
 

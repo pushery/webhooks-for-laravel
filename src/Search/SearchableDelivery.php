@@ -11,7 +11,7 @@ use Pushery\Webhooks\Support\Settings;
 
 /**
  * Makes an outbound delivery-log model searchable through Laravel Scout, indexing
- * only queryable, non-sensitive fields. Apply it to a WebhookDelivery model — the
+ * only queryable fields, and the body only where a host opts in. Apply it to a WebhookDelivery model — the
  * shipped {@see SearchableWebhookDelivery} already does — after installing
  * laravel/scout (a Composer suggestion) and pointing webhooks.dashboard.source_model
  * at the searchable model. Indexing stays gated by webhooks.search.enabled, so
@@ -23,7 +23,7 @@ trait SearchableDelivery
 
     /**
      * The queryable projection of a delivery for the search index. Only
-     * non-sensitive, filterable fields are indexed: the event type, the endpoint
+     * filterable fields are always indexed: the event type, the endpoint
      * URL, the status, the owner/tenant morph pair (owner_type + owner_id), the
      * timestamp, and a short payload excerpt — never the full logged payload. The
      * WHOLE morph pair is indexed so a tenant-scoped search can filter both columns:
@@ -85,6 +85,14 @@ trait SearchableDelivery
      */
     private function searchablePayloadExcerpt(): string
     {
+        // The body is only indexed where a host has said so. An index is shared across
+        // every reader and retained outside the application, so the per-request
+        // `view-webhook-payload` ability cannot govern it — see the note on
+        // `search.index_payload` in the shipped config.
+        if (! new Settings()->searchIndexPayload()) {
+            return '';
+        }
+
         if ($this->payload_disk !== null) {
             return '';
         }

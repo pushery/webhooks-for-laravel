@@ -15,15 +15,6 @@
     <x-wirekit::row gap="md" class="flex-wrap items-end">
         {{-- Both filters hide their label visually, so the label reaches sighted readers
              only through assistive technology — it is translated like any other. --}}
-        {{-- ⚠️ THIS FILTER AND THE SUBSCRIPTION-MANAGER STUB'S DELETE DIALOG ARE A KNOWN BAD PAIR.
-             On one page, a WireKit select bound with wire:model.live makes the confirm action
-             of an alert-dialog beside it unclickable: the dialog opens, the click never lands,
-             and nothing is logged. The package's own portal hits this and answers it with a
-             native <select> carrying the same tokens — see the comment in
-             self-service/livewire/endpoint-deliveries.blade.php. Reported upstream; until it
-             lands, either keep these two stubs on separate pages or swap this control for the
-             native one. Left as the library component here on purpose: the trade-off is a
-             reader's to make, and it is stated rather than hidden. --}}
         <x-wirekit::select name="status" wire:model.live="status" :label="__('webhooks::management.filters.status')" hideLabel>
             <option value="">{{ __('webhooks::management.filters.all_statuses') }}</option>
             <option value="pending">{{ __('webhooks::management.status_options.pending') }}</option>
@@ -43,7 +34,7 @@
         {{-- A LIST of the reader's endpoints, not a free-text id: the log is unscoped across
              every tenant, and "what happened at THIS endpoint" is the first question after an
              incident. A control that takes a number is one nobody can use without running a
-             query first. The warning above applies to this select as well. --}}
+             query first. --}}
         <x-wirekit::select name="subscriptionId" wire:model.live="subscriptionId" :label="__('webhooks::management.filters.endpoint')" hideLabel>
             <option value="">{{ __('webhooks::management.filters.all_endpoints') }}</option>
             @foreach ($endpoints as $endpoint)

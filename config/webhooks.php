@@ -905,6 +905,23 @@ return [
 
     'search' => [
         'enabled' => (bool) env('WEBHOOKS_SEARCH_ENABLED', false),
+
+        // Whether the delivery BODY is copied into the index. Off, and off is the only
+        // safe default, because an index is not a screen.
+        //
+        // The payload is governed on every screen by the `view-webhook-payload` ability:
+        // without it a reader sees the shape ([string], [int]) and not the customer's
+        // email. That decision is made per REQUEST, against the person looking. An index
+        // has no request and no person — it is one shared artifact, queried by everyone
+        // who can query it and retained by a system whose backups and access control
+        // nobody reviewed for this. So the ability cannot govern it, and pretending it
+        // could is how the redacted screen and the unredacted index ended up side by side.
+        //
+        // Turn it on only where the index is as protected as the database it mirrors, and
+        // read `security.md` first. With it off the index still carries everything a
+        // search actually needs: event type, url, status, the owner pair and the timestamp.
+        'index_payload' => (bool) env('WEBHOOKS_SEARCH_INDEX_PAYLOAD', false),
+
         'payload_excerpt_chars' => 500,
     ],
 

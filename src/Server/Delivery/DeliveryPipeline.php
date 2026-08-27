@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pushery\Webhooks\Server\Delivery;
 
 use Illuminate\Contracts\Container\Container;
+use Pushery\Webhooks\Core\Http\Exceptions\HostUnresolvable;
 use Pushery\Webhooks\Core\Http\Exceptions\NonRetryable;
 use Pushery\Webhooks\Core\Http\HttpTransport;
 use Pushery\Webhooks\Core\Signing\SecretSet;
@@ -45,6 +46,12 @@ final readonly class DeliveryPipeline
         try {
             $endpoint = $this->guard->resolveAndPin($data->url);
             $headers = $this->headersFor($data);
+        } catch (HostUnresolvable $exception) {
+            // Caught by its own type rather than by a wide net. A bare `catch (Throwable)`
+            // here would also swallow the signing faults raised a line below — an unknown
+            // scheme, a missing key — and turn a configuration error into a delivery that
+            // retries for hours instead of saying what is wrong.
+            return AttemptOutcome::retryable(null, $exception);
         } catch (NonRetryable $exception) {
             return AttemptOutcome::finalFailure(null, $exception);
         }

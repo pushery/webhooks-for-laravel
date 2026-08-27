@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pushery\Webhooks\Core\Ssrf;
 
 use Pushery\Webhooks\Core\Http\Exceptions\BlockedDestination;
+use Pushery\Webhooks\Core\Http\Exceptions\HostUnresolvable;
 
 /**
  * Vets an attacker-influenced webhook URL and returns a {@see PinnedEndpoint}
@@ -16,8 +17,16 @@ interface SsrfGuard
 {
     /**
      * @throws BlockedDestination when the URL is malformed, uses a disallowed
-     *                            scheme, is a blocked host, is unresolvable, or
-     *                            resolves to any private/reserved address
+     *                            scheme, is a blocked host, or resolves to any
+     *                            private/reserved address. All of those are
+     *                            {@see NonRetryable}: they are attacker influence
+     *                            or misconfiguration, and the next attempt gets
+     *                            the same answer.
+     * @throws HostUnresolvable when the host resolved to no address. NOT
+     *                          non-retryable, because PHP's resolver cannot say
+     *                          whether the name is gone or the lookup merely
+     *                          failed — see the exception for why the shipped
+     *                          guard refuses to guess.
      */
     public function resolveAndPin(string $url): PinnedEndpoint;
 }

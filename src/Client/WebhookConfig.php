@@ -545,6 +545,22 @@ final class WebhookConfig
             throw WebhookConfigCannotVerify::for($name, self::intOr($entry['invalid_status'] ?? null, 401));
         }
 
+        $scheme = self::resolveScheme($name, $entry['scheme'] ?? StandardWebhooksScheme::class);
+
+        // NON-EMPTY IS NOT THE SAME AS USABLE, and the branch above only knows the first.
+        // Standard Webhooks derives its key by base64-decoding the secret, so a value with no
+        // base64 characters in it -- the bare prefix `whsec_` above all, which is what an
+        // unset `WEBHOOKS_..._SECRET=whsec_${SECRET}` expands to -- passes the string test and
+        // then derives ZERO bytes. HMAC under an empty key is a pure function of bytes the
+        // sender already published, so this config would verify EVERY forged delivery while
+        // looking exactly like a configured one. Refused here, where preflight can see it,
+        // rather than at the first forged request, where nothing would say anything at all.
+        if ($jwks === null && $verifier === null && is_string($secret)
+            && is_a($scheme, StandardWebhooksScheme::class, true)
+            && ! StandardWebhooksScheme::derivesUsableKey($secret)) {
+            throw WebhookConfigCannotVerify::derivesNoKey($name, self::intOr($entry['invalid_status'] ?? null, 401));
+        }
+
         $previous = $entry['previous_secret'] ?? null;
 
         $headers = is_array($entry['signature_headers'] ?? null) ? $entry['signature_headers'] : [];
@@ -553,7 +569,7 @@ final class WebhookConfig
             name: $name,
             secret: is_string($secret) ? $secret : '',
             previousSecret: is_string($previous) && $previous !== '' ? $previous : null,
-            schemeClass: self::resolveScheme($name, $entry['scheme'] ?? StandardWebhooksScheme::class),
+            schemeClass: $scheme,
             verifierClass: $verifier,
             idHeader: self::headerName($headers, 'id', StandardWebhooksScheme::HEADER_ID),
             timestampHeader: self::headerName($headers, 'timestamp', StandardWebhooksScheme::HEADER_TIMESTAMP),

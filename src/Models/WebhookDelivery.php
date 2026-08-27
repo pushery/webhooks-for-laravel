@@ -173,9 +173,24 @@ class WebhookDelivery extends Model
     {
         $query->where($this->getKeyName(), '=', $this->getKeyForSaveQuery());
 
-        $createdAt = $this->fromDateTime($this->getRawOriginal('created_at'));
+        // ⚠️ BOUND VERBATIM, NEVER RE-DERIVED, and the difference is a whole engine.
+        //
+        // getRawOriginal() hands back the column's own literal — the exact bytes the row
+        // holds. Sending them back is an identity comparison and needs no timezone rule at
+        // all. Passing them through fromDateTime() looked equivalent and was not: that is
+        // the WRITE path, whose whole job is to read a value under the CALLER's rule, and
+        // its own docblock warns against exactly this confusion. On MySQL it resolved the
+        // naive column string against app.timezone, so on any host not running UTC the
+        // UPDATE asked for an instant offset by the zone and matched ZERO rows -- while
+        // save() still answered true and the in-memory model still looked written. Every
+        // delivery would have stayed at status=pending, attempt=0, for ever, with the
+        // dashboard, the health score and the circuit breaker all reading that as fact.
+        //
+        // PostgreSQL never showed it: the stored literal carries its offset, so both
+        // spellings name the same instant and timestamptz compares by instant.
+        $createdAt = $this->getRawOriginal('created_at');
 
-        if (is_string($createdAt)) {
+        if (is_string($createdAt) && $createdAt !== '') {
             $query->where('created_at', '=', $createdAt);
         }
 

@@ -163,7 +163,7 @@ final readonly class WebhookMetrics
             ->where('created_at', '>=', $this->since())
             ->groupBy('event_type')
             ->orderByDesc('total')
-            ->limit($limit)
+            ->limit($this->rowBudget($limit))
             ->selectRaw('event_type, count(*) as total')
             ->get();
     }
@@ -181,9 +181,31 @@ final readonly class WebhookMetrics
         return $this->sourceModel()
             ->newQuery()
             ->whereRaw($ownerSql, $ownerBindings)
+            // The window the caller already asked for. Every other query here carries it;
+            // this one did not, so a panel named "recent" would sort the owner's WHOLE
+            // history to find its newest rows — and on the range-partitioned delivery table
+            // that is a read the planner cannot prune, across every partition that exists.
+            ->where('created_at', '>=', $this->since())
             ->orderByDesc('created_at')
-            ->limit($limit)
+            ->limit($this->rowBudget($limit))
             ->get();
+    }
+
+    /**
+     * A row budget that is always a budget.
+     *
+     * Laravel's `limit()` DROPS a negative value in silence — `if ($value >= 0)` — and the
+     * statement then goes out with no LIMIT clause at all. That turns a bounded panel query
+     * into a full read of the owner's history, and both callers poll, so one open tab
+     * repeats it for as long as it is open.
+     *
+     * Clamped here, on the parameter, rather than at each call site: the call sites are the
+     * thing that will be added to, and a rule that has to be remembered at a new one is a
+     * rule that will be missed at a new one.
+     */
+    private function rowBudget(int $limit): int
+    {
+        return max(1, min($limit, 100));
     }
 
     /**

@@ -9,6 +9,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Lazy;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Pushery\Webhooks\Dashboard\Livewire\Concerns\InteractsWithDashboard;
 use stdClass;
@@ -30,6 +31,14 @@ final class TopEvents extends Component
 
     public string $window = '24h';
 
+    /**
+     * The row budget. LOCKED because it is a mount parameter and nothing else: no
+     * `wire:model` binds it, and a public Livewire property that nothing binds is still
+     * client input — Livewire applies an update for any public property declared on the
+     * subclass, and a reader who set it to -1 got a query with no LIMIT clause at all,
+     * repeated every poll interval by a tab left open.
+     */
+    #[Locked]
     public int $limit = 5;
 
     /**

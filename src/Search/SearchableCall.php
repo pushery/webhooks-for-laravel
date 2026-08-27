@@ -11,7 +11,7 @@ use Pushery\Webhooks\Support\Settings;
 
 /**
  * Makes an inbound call-log model searchable through Laravel Scout, indexing only
- * queryable, non-sensitive fields. Apply it to a WebhookCall model — the shipped
+ * queryable fields, and the body only where a host opts in. Apply it to a WebhookCall model — the shipped
  * {@see SearchableWebhookCall} already does — after installing laravel/scout (a
  * Composer suggestion) and pointing the client config's 'model' at the searchable
  * model. Indexing stays gated by webhooks.search.enabled, so nothing is written to
@@ -23,7 +23,7 @@ trait SearchableCall
 
     /**
      * The queryable projection of a stored call for the search index. Only
-     * non-sensitive, filterable fields are indexed: the source, the event type, the
+     * filterable fields are always indexed: the source, the event type, the
      * status, the timestamp, and a short payload excerpt — never the redacted
      * headers and never the full body. A body that was offloaded to a Storage disk
      * is not read back or indexed; its excerpt is empty, so a large body is never
@@ -71,6 +71,14 @@ trait SearchableCall
      */
     private function searchablePayloadExcerpt(): string
     {
+        // The body is only indexed where a host has said so. An index is shared across
+        // every reader and retained outside the application, so the per-request
+        // `view-webhook-payload` ability cannot govern it — see the note on
+        // `search.index_payload` in the shipped config.
+        if (! new Settings()->searchIndexPayload()) {
+            return '';
+        }
+
         if ($this->payload_disk !== null) {
             return '';
         }
