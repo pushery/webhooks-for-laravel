@@ -44,6 +44,27 @@ final class WebhookConfigCannotVerify extends InvalidArgumentException
     }
 
     /**
+     * The secret is present but derives NO key, which is worse than absent.
+     *
+     * Standard Webhooks base64-decodes the secret to get its HMAC key. A value carrying no
+     * base64 characters -- the bare `whsec_` prefix above all -- decodes to zero bytes, and
+     * HMAC under an empty key is computable by anyone who sees the request. Absent, the
+     * config refuses everything; like this, it would ACCEPT everything, while reading as
+     * configured. The same refusal and the same status, because it is the same fact about
+     * the request: it cannot be accepted as authentic.
+     */
+    public static function derivesNoKey(string $name, int $status): self
+    {
+        return new self(
+            $name,
+            $status,
+            "The webhook client config [{$name}] has a 'secret' that base64-decodes to nothing, so it "
+            .'would verify every forged delivery. Use the full secret, including the characters after '
+            ."the 'whsec_' prefix.",
+        );
+    }
+
+    /**
      * Report it as the configuration fault it is, and consider it reported.
      *
      * The default handler would file this under application errors, next to the failures

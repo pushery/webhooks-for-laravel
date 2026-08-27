@@ -4,6 +4,88 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-08-27
+
+### Security
+
+- **The search index no longer carries the delivery body unless a host asks for it — `search.index_payload`, off by default.** The payload is governed on every screen by the `view-webhook-payload` ability: without it a reader sees `[string]` and `[int]` rather than the customer's email, IBAN and address. The Scout path never consulted that ability. It wrote `payload_excerpt` — the first 500 characters of the raw payload — into Meilisearch or Algolia, where it was full-text searchable through `searchForOwner()` and came back as an attribute in every hit. A host running the shipped default (the ability undefined, so redaction on) saw the redacted shape on the dashboard and shipped the unredacted body to the index at the same moment.
+
+  **The switch is a switch rather than a redaction pass, and that is the substance.** An index is not a screen: it is one shared artifact, queried by everyone who can query it and retained by a service whose backups and access control this application does not own. A per-request permission cannot govern it, so the package stops pretending one can and asks the question once, in config, where a host can answer it knowing what it means. `security.md` now says what leaves the application boundary when search is on.
+
+  **If you have search on and want the body indexed, set `search.index_payload` to `true`.** Without it the index still carries everything a search needs — event type, url, status, the owner pair, the timestamp — and queries against those are unchanged. Queries whose term only ever matched inside a body will stop matching. An offloaded payload was never read back for indexing and still is not.
+
+  The docblock on both searchable traits claimed the opposite ("indexing only queryable, non-sensitive fields") and has been corrected.
+
+- **A secret that base64-decodes to nothing is refused instead of signing and verifying with an empty key.** Standard Webhooks derives its HMAC key by stripping an optional `whsec_` and base64-decoding the rest, so a value carrying no base64 characters derives **zero bytes** — and HMAC-SHA256 under an empty key is a pure function of `{id}.{timestamp}.{body}`, which is exactly what the request already publishes. A receiver configured that way accepted every forged delivery with a 200 and started the handler job; a sender configured that way put a signature on the wire that anyone who saw the request could reproduce. Nothing failed, nothing was logged, and the headers claimed the delivery was signed.
+
+  The realistic way to reach it is the bare prefix. `WEBHOOKS_..._SECRET=whsec_${SECRET}` with the variable unset expands to exactly `whsec_`, and both guards that existed checked the *string* — `WebhookConfig` required a non-empty one, `SecretSet` a non-empty token — while neither looked at the *key* derived from it.
+
+  The two sides answer differently, and deliberately. **Signing raises**, because the sending side is trusted and may fail loudly rather than emit a forgeable signature. **Verification skips** the unusable secret and falls through to `invalid`, because an unverifiable request must be refused rather than turned into a 500 — the same rule the Ed25519 dialect already stated for a malformed public key. A rotation carrying one usable secret and one broken one still verifies through the usable one.
+
+  `webhooks:preflight` names the fault too, so it is findable at deploy time rather than at the first forgery. The check is scoped to the dialects that actually derive a key: a Stripe- or GitHub-style config uses the raw bytes of its secret, where `whsec_` is an ordinary six-byte key and nothing is wrong.
+
+- **The guzzle floor moves past two advisories that affect the versions below it** — `guzzlehttp/guzzle: ^7.15.2|^8.0.1`, raised from `^7.15.1|^8.0`. 7.15.1 and 8.0.0 are affected by CVE-2026-69246 (high, *Noncanonical host can bypass host-based checks*) and CVE-2026-69245 (medium, *Noncanonical cookie domain keeps subdomain scope*). Composer refuses to install either under its own `block-insecure` default, so the old floor was simultaneously uninstallable and advertised as supported.
+
+  **The high one lands on this package's sharpest surface.** The SSRF guard *is* a host-based check — an allowlist, a classifier and an IP pin — so a host that bypasses host-based checks is the one class of upstream defect this package can least afford to admit in a constraint.
+
+  Nothing changes for an installation that resolved normally: the top of the range was already 8.1.0, and `composer audit` was green, because it reads what is INSTALLED rather than what the floor permits.
+
+### Changed
+
+- **The self-service delivery panel uses WireKit's own select again, and the warning that told you to keep two screens apart is gone.** From 2026-08-15 those two filters were native `<select>` elements: a WireKit select bound with `wire:model.live` made an `alert-dialog` on the same page impossible to confirm — the dialog opened, the click on "delete endpoint" never landed, and nothing was logged. On the WireKit variant that made the delivery log and the subscription manager a pair you could not put on one page, which the operator-console guide said in a danger admonition.
+
+  The upstream defect is fixed, and the condition for believing that was set by the workaround itself rather than by the upstream ticket. It had to pass for THIS composition — two separate Livewire components, a dialog per row, lazy panels — because a fixture on one page had already been green once while this arrangement was still broken. That is not hypothetical: the workaround was re-measured against v2.35.0 two days before it retired and was still failing then.
+
+  What goes with it: the browser arm that pinned the defect (it now goes red by proving the defect is gone, which is the whole design), the two static guards that forbade the composition, and the admonition. The end-to-end arm that drives a real Chromium through the delete dialog stays — it is the one that measures the behavior rather than the arrangement.
+
+- **The psr7 floor moves to where a resolution can actually land** — `guzzlehttp/psr7: ^2.13|^3.0`, raised from `^2.7|^3.0`. Every guzzle version this package admits requires psr7 `^2.13` or `^3.0` of its own accord, so no resolution could ever have put 2.7 in the tree: the number was a claim nobody could check, and it read as though it had been tested.
+
+  Both new floors are measured rather than inferred — the covering HTTP suites pass on guzzle 7.15.2 with psr7 2.13.0, and on guzzle 8.0.2 with psr7 3.0.0. The 3.0 half is deliberately not raised to 3.1: 3.0.0 is genuinely reachable through guzzle 8.0.1/8.0.2 and works, and narrowing a working combination for tidiness is not a fix.
+### Fixed
+
+- **The activity chart and the latency sparkline went blank on the 7-day and 30-day windows.** Both render one bar per hourly bucket as a flex child with `flex: 1 1 0%` in a row with a fixed gap — and a flex gap never shrinks. Once the gaps alone are wider than the plot, the free space is negative, and because the flex basis is 0 each bar's scaled shrink factor is 0 too: nothing shrinks, and every bar sits at 0px. The card around them is `overflow-hidden`, so not even a scrollbar appeared to say why. The measured threshold is about 90 buckets at 1280px and about 42 on a 390px phone, against up to 168 buckets on 7d and 720 on 30d.
+
+  **It failed exactly when there was something to see.** A quiet install produces few bucket rows and rendered correctly; a busy one produces a row per hour and rendered nothing. Screen-reader users kept the information the whole time — the per-bar `aria-label` was never affected — and sighted users lost it entirely.
+
+  Each bar now has a floor of 3px and the plot scrolls horizontally in its own region, which carries `tabindex="0"` and an accessible name so it can be reached by keyboard (WCAG 2.1.1) rather than only by a pointer.
+
+- **`webhooks:preflight` warns when the server layer resolves to the `sync` queue connection, and the docs say what that costs.** Sync has no worker: `SyncJob::release()` delegates to a parent whose entire body is `$this->released = true;`, and `SyncQueue::executeJob()` never reads that flag. So a delivery that fails in a retryable way gets one attempt rather than its configured `tries`, no further lifecycle event follows, and a row can keep a non-final state indefinitely — which is the one failure the delivery log itself cannot show you. Nothing said so anywhere: not `src/`, not the docs, not preflight.
+
+  It is a warning rather than a failure, because sync is a reasonable choice while developing and a preflight that failed over it would train a host to ignore its verdict. The sending guide now carries the caveat where `dispatchSync()` is introduced, and the reliability page has a section of its own.
+
+  **The behavior itself is unchanged in this release, deliberately.** Making such a delivery terminate at the attempt would be the honest state on `sync` — and it would also change what three integration arms observe about classification and `Retry-After` parsing, which they measure through the sync connection because that is how a test drives a queued job. That is worth doing carefully rather than beside a release.
+- **The bundled Boost skill no longer tells an adopting application that every service provider registers itself.** It said "the service providers are registered automatically through package discovery", which is true of four of the eight. The other four are opt-in and have to be named in `bootstrap/providers.php` — the self-service portal, the dashboard, the operator console and the Pulse card. Anyone following the skill switched a layer on, mounted the Livewire tag the skill gives it, and got `Unable to find component: [webhooks.…]` — a message that sends the reader to Livewire rather than to the one missing line. The portal docs said this loudly in three places; the skill, which is the document Boost surfaces inside consuming applications, said nothing.
+
+  The skill now lists all four with the layer each belongs to, marks them in its layer table, and puts the provider line *before* the config line in its self-service example. A new guard holds it — and derives its list by subtracting the auto-discovered providers from every `*ServiceProvider` under `src/`, so a fifth opt-in provider added later turns it red instead of being quietly left out. That derivation immediately found one the report itself had missed: the Pulse provider.
+
+- **A DNS hiccup no longer ends a delivery after one attempt, and no longer walks a healthy endpoint into the circuit breaker.** The SSRF guard refused a host that resolved to no address with `BlockedDestination`, which is `NonRetryable` — a final failure, on the reasoning that a blocked destination "can only be attacker influence or misconfiguration". That reasoning does not cover this case. PHP's resolver answers `false` for a name that does not exist, for SERVFAIL, for a resolver timeout and for a few seconds of lost network alike, and only the first of the four is permanent.
+
+  So one attempt was spent, the delivery was given up with its retry budget untouched, and the customer never got the webhook — while the log said `exhausted` with a message that reads like a misconfigured endpoint. Worse, every one of those counted as a consecutive final failure, so `platform.circuit_breaker.threshold` (10 by default) of them switched off an endpoint that was never broken, with no self-healing and no half-open probe.
+
+  Such a host now raises `Pushery\Webhooks\Core\Http\Exceptions\HostUnresolvable`, which is deliberately **not** `NonRetryable`, and the delivery gets its normal backoff. A genuinely dead host costs a handful of cheap lookups and then ends `exhausted` anyway — the asymmetry between that and losing a real delivery is not close. Every other SSRF refusal is unchanged and still final.
+
+  `BlockedDestination::unresolvable()` is kept rather than removed: a custom guard whose resolver reads a real NXDOMAIN may still refuse finally, and should. The shipped guard cannot make that distinction, so it no longer claims to.
+
+- **The two dashboard panels whose row budget came from the browser now clamp it, and the recent-queue read is bounded by its window.** `RecentQueue` and `TopEvents` held their budget in an unguarded `public int $limit` and handed it straight to `limit()`. Laravel drops a negative value there in silence — `if ($value >= 0)` — so the statement went out with no `LIMIT` clause at all. A signed-in reader setting `limit: -1` in a `/livewire/update` request got every delivery row the tenant owns in one response, and because both panels carry `wire:poll` the query then repeated itself every interval with no further help from the browser. Three sibling components already clamped exactly this and say why in their own comments; these two were the outliers.
+
+  Both properties are now `#[Locked]` — neither is bound by `wire:model`, both are mount parameters — and the budget is clamped on the *parameter* in `WebhookMetrics`, so a future call site inherits the rule instead of having to remember it.
+
+  **`recentQueue()` also gained the time bound every other metric query already had, and that one you may notice.** It was reading the owner's whole history to find its newest rows, which on the range-partitioned delivery table is a scan the planner cannot prune. It is now bounded by the window the caller already asked for, so a panel showing "recent" deliveries shows deliveries from the window rather than the newest rows of all time. A tenant with nothing in the last 24 hours now sees the panel's empty state instead of months-old rows.
+
+- **On MySQL, every write to the delivery log reached the row again when the application does not run on UTC.** It did not before, and nothing said so. `WebhookDelivery` adds `AND created_at = ?` to its own update so a write on the range-partitioned PostgreSQL table reaches one partition instead of all of them. The value it bound was re-derived from the raw column through `fromDateTime()` — the *write* path, whose job is to read a value under the *caller's* timezone rule, applied to bytes that came from the *column*. On MySQL that resolved the naive stored string against `app.timezone`, so under Europe/Berlin the UPDATE asked for an instant two hours away from the row and matched nothing at all.
+
+  **Nothing failed.** `save()` returned `true`, the in-memory model looked written, and there was no error and no log line. Every row in `webhook_deliveries` therefore stayed at `status = pending`, `attempt = 0`, with no `delivered_at`, `response_code`, `duration_ms` or `error` — for ever. The dashboard read that as 100% pending, endpoint health reported `Unknown` for every endpoint (it counts only `succeeded|failed|exhausted`), the circuit breaker could never trip, and the hourly rollup aggregated those wrong states.
+
+  The raw column value is now bound verbatim, which is an identity comparison and needs no timezone rule on either engine. PostgreSQL was never affected: its stored literal carries its offset, and `timestamptz` compares by instant.
+
+  It survived this long because the two spellings agree under UTC, and UTC is what a test environment runs on. A host that does not is the only one that ever saw it.
+
+- **The neutral operator console shows the one-time signing secret in a readonly input rather than a bare `<code>`.** The plaintext exists in exactly one response — `dehydrate()` clears it on every serialization and this console has no reveal window to ask again with — so a reader who loses one character while dragging across a long token that wraps over several lines has no second chance. The only recovery is a rotation, and a rotation sends every consumer of that endpoint into a migration window nobody needed.
+
+  The input fixes the selection rather than the copying: focus it and Ctrl/Cmd-A selects the field instead of the page, the value comes back as one string with no wrap artefacts, and it is reachable by keyboard. The heading is its `<label>`, so the field has an accessible name without a new translation key. The WireKit variant keeps its copy button; the neutral one is what `--tag=webhooks-ui` publishes, so this is the screen a host on any other design system actually gets.
+
+  **It deliberately carries no `onfocus="this.select()"`**, which is the obvious addition and the one this package must not make: an inline handler is script under `script-src 'self'` without a nonce, so the browser refuses it, nothing throws, and the affordance is silently dead — the fourth instance of a failure this surface has already had three times. Auto-select stays reachable through the asset the package already serves, as its own change. A test holds both stubs against each other and refuses an inline handler on either.
+
 ## [2.2.0] - 2026-08-26
 
 ### Changed
@@ -2244,7 +2326,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.0.1...v2.1.0
 [2.0.1]: https://github.com/pushery/webhooks-for-laravel/compare/v2.0.0...v2.0.1

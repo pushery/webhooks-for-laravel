@@ -102,6 +102,33 @@ final class PreflightCommand extends Command
             }
         }
 
+        // A WARNING rather than a failure: sync is a legitimate choice while developing, and
+        // failing a preflight over it would train a host to ignore this command's verdict.
+        // What it must not do is stay silent, because the consequence is invisible from
+        // inside the application — a released job on the sync connection is never picked up
+        // again (SyncQueue never reads the released flag), so every retryable delivery
+        // failure ends after ONE attempt and the retry schedule below it does nothing at all.
+        // ⚠️ READ NULL-SAFE, NOT THROUGH THE TYPED GETTER. `webhooks.server.connection` is
+        // `env('WEBHOOKS_SERVER_CONNECTION')` with no default, so on any host that has not set
+        // it the key is PRESENT and null — and Config::string() throws on a present null,
+        // because its default only covers a MISSING key. The typed getter would turn a
+        // preflight into a crash on precisely the default installation it exists to reassure.
+        $configured = Config::get('webhooks.server.connection');
+        $serverConnection = is_string($configured) && $configured !== ''
+            ? $configured
+            : (is_string($default = Config::get('queue.default')) ? $default : 'sync');
+
+        $driver = Config::get("queue.connections.{$serverConnection}.driver");
+
+        if ($serverConnection === 'sync' || $driver === 'sync') {
+            $this->components->warn(sprintf(
+                'The server layer resolves to the [sync] queue connection, which has no worker: a delivery that '
+                .'fails in a retryable way ends after one attempt instead of using its %d tries. Use a real queue '
+                .'connection (database, redis, sqs) wherever deliveries matter.',
+                is_int($tries = Config::get('webhooks.server.tries')) ? $tries : 3,
+            ));
+        }
+
         $this->components->info(sprintf(
             'Database preflight passed: the [%s] connection uses the [%s] driver, which is supported.',
             $connection->getName() ?? 'default',

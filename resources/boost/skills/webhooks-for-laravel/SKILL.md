@@ -31,7 +31,21 @@ the feature list suggests.
 composer require pushery/webhooks-for-laravel
 ```
 
-The service providers are registered automatically through package discovery.
+Four of the eight service providers are registered automatically through package
+discovery. **Four are not, and nothing tells you** — the opt-in ones, which are
+also the ones that put something on a page:
+
+```php
+// bootstrap/providers.php — add the ones whose layer you switch on
+Pushery\Webhooks\Platform\SelfServicePortalServiceProvider::class,   // self-service portal
+Pushery\Webhooks\Dashboard\WebhooksDashboardServiceProvider::class,  // observability dashboard
+Pushery\Webhooks\WebhooksUiServiceProvider::class,                    // operator console
+Pushery\Webhooks\Pulse\WebhookPulseServiceProvider::class,           // Laravel Pulse card
+```
+
+Without the matching line, the layer's config switch reads as on and the page
+fails at render with `Unable to find component: [webhooks.…]` — a message that
+sends you looking at Livewire rather than at a missing provider.
 
 ### 2. Decide which layers the application needs
 
@@ -41,9 +55,9 @@ Five layers sit on a shared crypto/transport core, each with one switch:
 | --- | --- | --- |
 | Core | Signing dialects, SSRF guard, HTTP transport | Always on |
 | Server | Outbound delivery — sign, queue, retry, back off | On |
-| Platform | Endpoint subscriptions, event fan-out, self-service portal | On |
+| Platform | Endpoint subscriptions, event fan-out, self-service portal | On · portal needs a manual provider |
 | Client | Inbound receiving — verify, de-duplicate, store, queue | Off |
-| Dashboard | Customer-facing observability UI over the delivery log | Off |
+| Dashboard | Customer-facing observability UI over the delivery log | Off · needs a manual provider |
 
 Two dependencies between the gates bite silently:
 
@@ -195,6 +209,11 @@ reaches it.
 **Embed a self-service panel in a screen the application already has.** Each panel
 has a stable alias, and a host that mounts its own page usually does not want the
 portal's URLs beside it:
+
+```php
+// bootstrap/providers.php — FIRST, or the alias below does not exist
+Pushery\Webhooks\Platform\SelfServicePortalServiceProvider::class,
+```
 
 ```php
 // config/webhooks.php

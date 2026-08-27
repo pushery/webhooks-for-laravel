@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace Pushery\Webhooks\Core\Ssrf;
 
 use Pushery\Webhooks\Core\Http\Exceptions\BlockedDestination;
+use Pushery\Webhooks\Core\Http\Exceptions\HostUnresolvable;
 
 /**
  * The default SSRF guard. Refuses non-HTTP(S) schemes, plaintext HTTP when HTTPS
- * is required, blocked hosts, unresolvable hosts, and any host resolving to a
+ * is required, blocked hosts, and any host resolving to a
  * private/reserved address (via {@see AddressClassifier}). Returns the vetted IPs
  * pinned so the transport connects only to exactly those addresses.
  *
@@ -63,7 +64,13 @@ final readonly class DefaultSsrfGuard implements SsrfGuard
         $ips = $this->resolver->resolve($host);
 
         if ($ips === []) {
-            throw BlockedDestination::unresolvable($host);
+            // RETRYABLE, not final. PHP's resolver answers `false` for a name that does not
+            // exist and for a lookup that merely failed — NXDOMAIN, SERVFAIL, a resolver
+            // timeout, a few seconds of lost network — and only the first is permanent. See
+            // HostUnresolvable for the arithmetic; the short version is that treating the
+            // transient three as final loses a delivery each AND feeds the circuit breaker,
+            // while treating the permanent one as transient costs a few cheap lookups.
+            throw HostUnresolvable::for($host);
         }
 
         foreach ($ips as $ip) {

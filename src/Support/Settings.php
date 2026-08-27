@@ -261,6 +261,18 @@ final class Settings
     }
 
     /**
+     * Whether the delivery body is copied into the search index.
+     *
+     * Defaults to FALSE, and the fallback repeats the shipped default on purpose: an
+     * absent key reads as null, and null must not mean "index the payload". A host on a
+     * stale config cache is the exact case this protects.
+     */
+    public function searchIndexPayload(): bool
+    {
+        return Config::boolean('webhooks.search.index_payload', false);
+    }
+
+    /**
      * Whether an over-threshold delivery-log payload is written to a Storage disk
      * instead of the payload column (off by default).
      */

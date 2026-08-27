@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pushery\Webhooks\Core\Signing;
 
 use Illuminate\Support\Facades\Date;
+use Pushery\Webhooks\Core\Signing\Exceptions\UnusableSigningSecret;
 
 /**
  * The default signature dialect: byte-compatible with the industry Standard
@@ -43,7 +44,18 @@ final readonly class StandardWebhooksScheme implements SignatureScheme
         $toSign = $this->signedContent($message->id, $message->timestamp, $message->rawBody);
 
         $signatures = array_map(
-            fn (string $secret): string => self::VERSION.','.$this->hmac($toSign, $secret),
+            function (string $secret) use ($toSign): string {
+                $key = self::key($secret);
+
+                if ($key === null) {
+                    // The send side is trusted and may fail loudly. Signing anyway would put a
+                    // signature on the wire that anyone who sees the request can reproduce,
+                    // while the headers claim the delivery is signed.
+                    throw UnusableSigningSecret::derivesNoKey(self::SECRET_PREFIX);
+                }
+
+                return self::VERSION.','.$this->hmac($toSign, $key);
+            },
             array_values($secrets->all()),
         );
 
@@ -80,7 +92,17 @@ final readonly class StandardWebhooksScheme implements SignatureScheme
         $toSign = $this->signedContent($id, $timestampValue, $rawBody);
 
         foreach ($secrets->all() as $keyId => $secret) {
-            $expected = $this->hmac($toSign, $secret);
+            $key = self::key($secret);
+
+            if ($key === null) {
+                // Skipped rather than raised, on the same rule Ed25519Scheme::publicKey()
+                // states: a secret that cannot verify anything must not turn an untrusted
+                // request into a 500. If every secret is unusable the loop falls through to
+                // invalid(), which is the honest answer.
+                continue;
+            }
+
+            $expected = $this->hmac($toSign, $key);
 
             foreach ($presented as $candidate) {
                 if (hash_equals($expected, $candidate)) {
@@ -97,18 +119,46 @@ final readonly class StandardWebhooksScheme implements SignatureScheme
         return $id.'.'.$timestamp.'.'.$rawBody;
     }
 
-    private function hmac(string $toSign, string $secret): string
+    /**
+     * @param  non-empty-string  $key  the DERIVED key, never the configured secret
+     */
+    private function hmac(string $toSign, string $key): string
     {
-        return base64_encode(hash_hmac('sha256', $toSign, $this->key($secret), true));
+        return base64_encode(hash_hmac('sha256', $toSign, $key, true));
     }
 
-    private function key(string $secret): string
+    /**
+     * Whether a configured secret derives an HMAC key at all.
+     *
+     * Public because the configuration checks need the SAME derivation the signing path
+     * uses. Re-deriving it in a second place is how the two come apart, and this one is
+     * not a place they may: a check that disagrees with the signer would pass exactly the
+     * secrets the signer cannot use.
+     */
+    public static function derivesUsableKey(string $secret): bool
+    {
+        return self::key($secret) !== null;
+    }
+
+    /**
+     * The raw HMAC key bytes, or null when the secret decodes to nothing.
+     *
+     * The derivation matches the reference SDKs exactly — strip an optional `whsec_`,
+     * then base64-decode. What the reference does NOT do is notice the empty result, and
+     * this package has a place to notice it, so it does. See {@see UnusableSigningSecret}
+     * for why an empty key is not a key.
+     *
+     * @return non-empty-string|null
+     */
+    private static function key(string $secret): ?string
     {
         if (str_starts_with($secret, self::SECRET_PREFIX)) {
             $secret = substr($secret, strlen(self::SECRET_PREFIX));
         }
 
-        return base64_decode($secret, false);
+        $key = base64_decode($secret, false);
+
+        return $key === '' ? null : $key;
     }
 
     /**

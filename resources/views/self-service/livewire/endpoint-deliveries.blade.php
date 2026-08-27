@@ -9,60 +9,41 @@
 
         <div class="flex flex-wrap items-center gap-[var(--padding-wk-x-md)]">
         @if ($windowChoices !== [])
-            {{-- Native, on the reasoning measured for the endpoint filter below — and BORROWED
-                 rather than re-measured for this control. Whether the window select alone would
-                 also take the delete confirmation down was never tested on its own; it shares
-                 the page and the binding style, so it shares the answer. Said plainly because
-                 an inherited result reads exactly like a measured one once it is a year old. --}}
-            <label for="wh-deliveries-window" class="sr-only">{{ __('webhooks::self-service.deliveries.window_label') }}</label>
-            <select
-                id="wh-deliveries-window"
+            {{-- Both filters are the library's own select again. They were native from
+                 2026-08-15 to today, because a WireKit select bound with wire:model.live made
+                 the endpoint list's delete confirmation unclickable on the same page — the
+                 dialog opened and the click on its destructive action never landed.
+
+                 RETIRED 2026-08-27 against WireKit v2.36.0, on the condition this file itself
+                 set: not on an upstream ticket closing, but on THIS composition — two separate
+                 Livewire components, a dialog per row, lazy panels — passing again. It was
+                 re-measured against v2.35.0 two days earlier and was still broken then, which
+                 is why the condition was written that way and why "upstream says fixed" was
+                 not enough on its own. --}}
+            <x-wirekit::select
                 name="windowDays"
                 wire:model.live="windowDays"
-                class="wk-field h-[var(--size-wk-md)] rounded-[var(--radius-wk-md)] border border-[color:var(--color-wk-border)] bg-[var(--color-wk-bg)] px-[var(--padding-wk-x-md)] text-[length:var(--text-wk-md)] text-[color:var(--color-wk-text)]"
+                :label="__('webhooks::self-service.deliveries.window_label')"
+                hideLabel
             >
                 @foreach ($windowChoices as $choice)
                     <option value="{{ $choice }}">{{ __('webhooks::self-service.deliveries.window_days', ['days' => $choice]) }}</option>
                 @endforeach
-            </select>
+            </x-wirekit::select>
         @endif
 
         @if ($endpoints->isNotEmpty())
-            {{-- A native select, deliberately. Together with the window select above, these are
-                 the TWO places these screens step outside the component library — and there are
-                 no others. Bound with wire:model.live inside the library's own select, this
-                 control makes the endpoint list's delete confirmation unclickable: the dialog
-                 opens, and the click on its destructive action never lands. Measured three ways
-                 on the same page — library select 15s timeout, native select 0.9s pass, no
-                 select at all 1.0s pass — so it is the control, not the live binding.
-
-                 RE-MEASURED 2026-08-25 against WireKit v2.35.0, on a machine with no other
-                 suites running, after the upstream report was closed as fixed: control 1.28s
-                 pass, library select 31s with the same 15s timeout, control again 1.04s pass.
-                 One variable, three runs, same page. It is NOT fixed for this page, whatever a
-                 fixture elsewhere shows.
-
-                 THE DATE AND THE VERSION ARE THE POINT, and the previous wording had neither —
-                 it said "the current library release", which stops meaning anything the day
-                 after it is written. This file ships; the run's own notes do not.
-
-                 RETIRED WHEN: the upstream defect is fixed for THIS composition — two separate
-                 Livewire components, a dialog per row, lazy panels — not merely for a
-                 single-page fixture. The proof is the browser arm "it deletes an endpoint only
-                 through the alert-dialog"; swap the control back, run it, and keep the swap
-                 only if it stays under two seconds. --}}
-            <label for="wh-deliveries-filter" class="sr-only">{{ __('webhooks::self-service.deliveries.filter_label') }}</label>
-            <select
-                id="wh-deliveries-filter"
+            <x-wirekit::select
                 name="endpointId"
                 wire:model.live="endpointId"
-                class="wk-field h-[var(--size-wk-md)] rounded-[var(--radius-wk-md)] border border-[color:var(--color-wk-border)] bg-[var(--color-wk-bg)] px-[var(--padding-wk-x-md)] text-[length:var(--text-wk-md)] text-[color:var(--color-wk-text)]"
+                :label="__('webhooks::self-service.deliveries.filter_label')"
+                hideLabel
             >
                 <option value="">{{ __('webhooks::self-service.deliveries.all_endpoints') }}</option>
                 @foreach ($endpoints as $endpoint)
                     <option value="{{ $endpoint->id }}">{{ $endpoint->name ?? $endpoint->url }}</option>
                 @endforeach
-            </select>
+            </x-wirekit::select>
         @endif
         </div>
     </div>
