@@ -10,6 +10,7 @@ use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Pushery\Webhooks\Client\Http\ForgeryProtectedRoutes;
+use Pushery\Webhooks\Client\Http\UnboundReceivingRoutes;
 use Pushery\Webhooks\Client\WebhookConfig;
 use Pushery\Webhooks\Database\CollationAudit;
 use Pushery\Webhooks\Database\DatabaseRequirement;
@@ -119,6 +120,25 @@ final class PreflightCommand extends Command
 
             if ($forgeryFaults !== []) {
                 foreach ($forgeryFaults as $message) {
+                    $this->components->error($message);
+                }
+
+                return self::FAILURE;
+            }
+
+            // The other way the same binding breaks, and it is checked from the ROUTE side
+            // because the config side cannot see it. A typo in the second argument of
+            // Route::webhooks() leaves a route that exists, resolves and refuses every delivery
+            // for ever -- and the config is not wrong, it simply has no entry of that name.
+            //
+            // A failure for the same reason the check above is one: the route cannot carry
+            // traffic. Together with webhooks.client.expected this covers both directions of a
+            // broken binding, and this half needs no setting, because mounting an endpoint is
+            // already the statement that a source of that name is expected.
+            $bindingFaults = UnboundReceivingRoutes::faults($router);
+
+            if ($bindingFaults !== []) {
+                foreach ($bindingFaults as $message) {
                     $this->components->error($message);
                 }
 

@@ -38,7 +38,7 @@ final class UiVariant
         // at resources/views/vendor/webhooks/livewire, so a host that published either of them —
         // including the WireKit one, before this config existed — has its copy under the neutral
         // name. Rendering the package's WireKit view by name would walk straight past it and
-        // silently discard their customisations, which is the same class of failure this class
+        // silently discard their customizations, which is the same class of failure this class
         // exists to end, aimed at the people who did the work.
         if (self::isPublished($component)) {
             return $neutral;

@@ -41,7 +41,7 @@ final readonly class StandardWebhooksScheme implements SignatureScheme
 
     public function sign(WebhookMessage $message, SecretSet $secrets): SignatureHeaders
     {
-        $toSign = $this->signedContent($message->id, $message->timestamp, $message->rawBody);
+        $toSign = $this->signedContent($message->id, (string) $message->timestamp, $message->rawBody);
 
         $signatures = array_map(
             function (string $secret) use ($toSign): string {
@@ -89,7 +89,9 @@ final readonly class StandardWebhooksScheme implements SignatureScheme
             return VerificationResult::malformed();
         }
 
-        $toSign = $this->signedContent($id, $timestampValue, $rawBody);
+        // The header as RECEIVED, not the integer it was normalized to for the window check
+        // above. {@see self::signedContent()} for what that changes and why.
+        $toSign = $this->signedContent($id, $timestamp, $rawBody);
 
         foreach ($secrets->all() as $keyId => $secret) {
             $key = self::key($secret);
@@ -114,7 +116,27 @@ final readonly class StandardWebhooksScheme implements SignatureScheme
         return VerificationResult::invalid();
     }
 
-    private function signedContent(string $id, int $timestamp, string $rawBody): string
+    /**
+     * The bytes the HMAC is taken over, per the spec: `{id}.{timestamp}.{body}`.
+     *
+     * The timestamp is a STRING here rather than an int, and that is the whole of a small
+     * correction. Verification used to normalize the header to an integer first and sign that,
+     * which had two consequences, both measured:
+     *
+     *   a producer that sends `0<ts>` and signs `{id}.0<ts>.{body}`, exactly as the spec says,
+     *   was REFUSED, because this side computed `{id}.<ts>.{body}` instead
+     *
+     *   a delivery signed canonically stayed valid after somebody rewrote its header to
+     *   `0<ts>`, because both spellings normalized to the same integer
+     *
+     * Neither buys an attacker anything -- the id and the body are still covered, and the
+     * tolerance reads the same instant either way -- but the second one is exactly the property
+     * the header was assumed to have and did not. Signing what was actually sent gives it.
+     *
+     * Nothing changes for a delivery this package signed: the signer has always written a plain
+     * decimal, and an int and its string are the same bytes here.
+     */
+    private function signedContent(string $id, string $timestamp, string $rawBody): string
     {
         return $id.'.'.$timestamp.'.'.$rawBody;
     }

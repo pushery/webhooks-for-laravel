@@ -4,6 +4,92 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-09-04
+
+### Added
+
+- **A consumer can pick the secondary button surface without publishing the view.** `ui.secondary_surface` (`ghost`, which is what the two operator screens have always drawn) is read where the value used to be written into the markup. A design system usually settles on one secondary style, and a borderless untinted button beside a tinted one reads as a third rank where there are two — so the only way to change it was to publish the view and carry the diff through every update, for a style question.
+
+  Scoped to the operator screens deliberately. The self-service views also use `ghost`, and several of those are icon-only controls inside a table row, where a third rank is exactly right; widening this without measuring which is which would restyle buttons nobody asked about.
+
+- **`webhooks:preflight` can be told which inbound clients this application requires.** `webhooks.client.expected` is a list of client names, empty by default, so nothing changes until you fill it in. Every other fault the preflight reports is found by reading the entries that exist, which leaves exactly one it could never see: an entry that should exist and does not. Only your application knows it expects a client called `github`; a package cannot infer an expectation nobody stated.
+
+### Changed
+
+- **A `dedupe_id` on a body-only dialect is described as what it is: retry dedupe, not replay protection.** The config file and the receiving page both called it "the only replay boundary the source can have", and that sentence had already been used as the reason to close a separate finding as covered. On a dialect that signs the body alone, the header the key is read from is not covered by the signature, so the sender chooses it: it separates a real producer's honest retries — worth having — and holds nothing against somebody replaying a delivery they captured, who can simply write a different id.
+
+  Nothing in configuration can turn it into a replay boundary; only a signed timestamp bounds a replay, and a dialect either has one or it does not. Both places say that now, and a test holds the corrected wording, because the claim mattered more than its phrasing did.
+
+- **The shipped config says where the receiving edge stops, instead of leaving it to be discovered.** Nothing in this package caps the size of an incoming body — `post_max_size` is what bounds it — and a large delivery is stored inline and carried a second time in the queued job. That was true before and written down nowhere. The config file and the receiving page now name it, along with the two levers that answer the two halves: `large_payload` for the storage cost, and a limit in front of the route for a refusal, because answering `413` to a producer is a policy about who may send you what.
+
+### Fixed
+
+- **Two comments in the shipped source spell their words the American way.** `customisations` in `UiVariant` and `optimisation` in `WebhookProcessor` had been sitting there across several releases. Nothing behaves differently — the package's house rule is US spelling across everything it publishes, and code comments ship with a library.
+
+  The check that holds that rule could not see either one, which is why they lasted. An `-ise` verb keeps its `e` in the forms that merely append and throws it away in the two that do not, so a pattern written against the verb reaches `optimised` and `optimises` but neither `optimising` nor `optimisation`. It reads the derived forms now.
+
+- **A cache outage no longer closes the receiver.** The fast-path dedupe read the cache unguarded, so an unreachable store propagated its connection error all the way out and every delivery was answered `500` — while the partial-unique index that actually guarantees uniqueness was working the whole time. The config file describes that cache as an accelerator in front of the index, and in this state it was a hard dependency.
+
+  All three cache touches now fall through instead. The read degrades to "not seen", which costs a database round trip per retry and cannot produce a duplicate; the marker write is skipped for a delivery that already succeeded; and the rollback's withdrawal no longer replaces the dispatch failure it is compensating for with a cache error — a store that cannot forget could not have been marked either.
+
+  Nothing is reported from these paths on purpose: a cache outage means every delivery takes them, so a line each would turn one incident into a second one made of log volume.
+
+- **A receiving route is bound to its client config, instead of merely defaulting to it.** `Route::webhooks()` pinned the name with `defaults()`, which is only what a route PARAMETER falls back to — so a URI written with a literal `{webhookConfigName}` segment let the caller choose the config. A route meant to be pinned to one source processed a delivery under another, and the stored row then disagreed with the route about where it came from.
+
+  The signature still had to match the chosen config, so nothing was forged; what was lost is the binding. And it is not far-fetched to reach: the parameter name is readable in any route listing, and a URI with placeholders is the obvious shape for a multi-tenant mount. The name lives in the route's action now, where nothing in the URI can reach it.
+
+- **The signature covers the timestamp exactly as the producer wrote it.** Verification normalized the header to an integer and signed that, which was wrong in both directions and measured in both. A producer sending `01700000000` and signing `{id}.01700000000.{body}` — which is what the specification says is signed — was refused, because this side computed the plain spelling instead. And a delivery signed canonically stayed valid after its header was rewritten to a different spelling of the same instant, because both normalize to the same integer.
+
+  Neither buys an attacker anything: the id and the body are covered either way, and the tolerance window reads the same instant. The first is an interop refusal, though, and fixing it also makes the header cover itself. Nothing changes for a delivery this package signed — the signer has always written a plain decimal.
+
+- **A verified delivery carrying a number no double can hold is stored, instead of failing for ever.** `json_decode` turns a literal past the double range — `1e400` — into `INF`, and `json_encode` has no literal to write it back with, so it threw. That happened after the signature was checked, in the storing path: the producer got `500`, retried, got `500` again, and the delivery was never stored. It takes the shared secret to reach, so this is not an attack — it is a currency or measurement source with a very large value in the payload.
+
+  The three floats JSON cannot write are now stored under their own names, `INF`, `-INF` and `NAN`, rather than as null: null cannot be told apart from a field that was absent. The exact received bytes survive alongside the cleaned view as they always have, so nothing is destroyed.
+
+- **A secret of nothing but whitespace is read as absent, instead of passing every check and then failing every delivery.** Two tests of the same value disagreed: the config builder asked whether the string was empty, while `SecretSet` — built once per request — rejects anything empty after trimming. So `secret => ' '` was configured as far as the builder was concerned, silent in `webhooks:preflight`, and threw on every incoming delivery. That is a `500`, which tells the producer to try again, so it does, and the installation reads as a transport problem rather than as a typo in a config file.
+
+  `previous_secret => ' '` is the half that broke a working install: it reached the rotation path and threw there, so a correctly signed delivery was answered `500` too. A rotation slot with nothing in it is now simply empty.
+
+  The value itself is not trimmed, only the question of whether it is empty. Silently rewriting a credential would be a worse habit than refusing an unusable one.
+
+- **`webhooks:preflight` names a receiving route bound to a client that is not configured.** A typo in the second argument of `Route::webhooks()` leaves a route that exists, resolves, and refuses every anonymous delivery for ever. The deployment is green and the configuration is not wrong — it simply has no entry of that name — so the first thing that reports the mistake is the producer's own dashboard.
+
+  It is the mirror of `webhooks.client.expected`, and the pair covers both directions a binding can break in. That setting is a host saying "a client of this name must exist"; this check needs no setting at all, because mounting an endpoint is already that statement.
+
+- **The operator delivery log opens on a window instead of on every partition.** Both of its date fields started empty, so the first render of a fresh instance issued a query with no lower bound on `created_at` — and `webhook_deliveries` is range-partitioned by month, so such a query cannot be pruned and reads every partition there is. Nothing about it looks wrong: the page loads, and on a young installation it is fast. The cost arrives with the data, months later, and reads as a database problem rather than as a default nobody set.
+
+  `ui.deliveries.default_window_days` (30) is a **default**, not a ceiling, and that is the difference between this screen and the two tenant-facing lists. Their properties are writable from the browser by whoever is looking, so `EndpointDeliveries` and the dashboard table may only ever narrow their window. This is the operator's own console: the date is preset in the From field where it can be seen, and clearing it reaches the unbounded query — deliberately. `0` restores the previous behavior.
+
+- **A provider whose JWKS cannot be reached is answered as a refusal, not a `500`.** Resolving the key material for a `jwks` source is an outbound HTTP call, and it sat inline as an argument to the verification. A provider that was down, serving a maintenance page or simply unreachable threw past the controller, and every anonymous `POST` came back `500` — the one answer a producer reads as "try again", on the path this package promises is never a `500`.
+
+  It made the outage worse in both directions. An unsuccessful fetch is deliberately not cached, so one bad minute at the provider does not reject every delivery for the rest of the hour — which means each request tried the fetch again, and an anonymous caller could point that amplifier at the provider in your name.
+
+  A key set that could not be resolved is what `undetermined` already meant here: the verification did not complete, and a retry could resolve it. It answers with `undetermined_status`, which falls back to `invalid_status`, so an installation that has not opted into a distinguishable answer sees no change. The failure is still reported, because a provider whose JWKS stopped resolving is a real fault and answering `401` in silence would hide it.
+
+  The receiving page gained a section on what this does **not** cover: nothing the package registers throttles a request before verification, `rate_limit` sits after it by design, and a host that wants a brake in front puts one in its own middleware stack. The page previously called `rate_limit` "the only brake on the receiving side", which read as a claim about the whole path.
+
+- **A stored header blob no longer carries the producer's Basic-auth password in clear text.** With `store_headers` set to `*`, `authorization` was masked and the very same password sat one key further down under `php-auth-pw`, unmasked — which is worse than not masking at all, because the redacted line beside it makes the blob read as safe. `proxy-authorization` was stored whole.
+
+  Those names are not headers a producer sends, which is why nobody had listed them: Symfony decodes an `Authorization: Basic` line and puts the two halves back as `PHP_AUTH_USER` and `PHP_AUTH_PW`. They are masked now, along with `PHP_AUTH_DIGEST` and `Proxy-Authorization`. The default is unaffected — `store_headers` stores nothing unless you ask it to — so this reaches the installations that turned it on and were relying on the redaction.
+
+  The same redactor serves the backfill import, so both paths are covered. The test drives a real request rather than a hand-built header map: the names it is about do not exist until Symfony creates them, so a map-based arm would have been green against the unfixed code.
+
+- **A replayed delivery no longer spends the producer's rate-limit bucket.** The check ran before the dedupe, so a repeat cost a token even though it caused no row, no offload and no job. The bucket is per source and not per sender, so anyone who captured one authentic delivery could replay it until the bucket was empty and leave the real producer answering `429` until the window rolled — and on a dialect that signs no timestamp, a captured delivery never expires, so the replay was not bounded by a tolerance window either.
+
+  The refusal still runs where it did, right after verification and before anything is stored. What moved is the counting: a delivery recognized as one already taken spends nothing. A delivery your own profile filters out still counts, deliberately — it is a distinct one the producer sent, and making it free would open an unlimited channel through the check.
+
+- **Every command the package schedules now runs on one server, not on all of them.** The Laravel scheduler fires on every application server by design, and each of these writes shared state — partitions, pruned rows, cached health scores, the dashboard rollup. Only `webhooks:partition-maintenance` carried `onOneServer()`; the other five did not, so on a cluster each one had as many concurrent writers as you have nodes. The two `model:prune` registrations also gained a bounded overlap guard, so a first prune over a long-retained log is not joined by the next day's.
+
+  **The guide's advice on this was wrong in a way worth naming, because following it would not have helped.** It said `onOneServer()` needs a store from a list — `redis`, `memcached`, `database`, `dynamodb` — as though the others could not take a lock. They can: `file` and `array` implement the same lock contract. They are also exactly the two that fail on a cluster, because a file lock lives on one server's disk and an array lock in one process, so every server takes its own and each one decides it is the chosen server. Nothing throws and nothing is logged. The criterion is that the store is **shared between your servers**, which is a different question from whether it can lock, and the page says that now.
+
+  The guard that holds this derives the command set from the source rather than listing it, so a command added later is covered the day it lands.
+
+- **A delivery to a client whose config entry is missing is refused with `401`, not answered `500`.** The route does not disappear with the entry — it hangs on the `Route::webhooks()` macro, and the macro on `webhooks.client.enabled`, never on whether a client of that name exists. So a lost entry does not take the endpoint down, it turns it into a server error: a bad merge, an unset variable in a fresh environment, a renamed client.
+
+  That matters because `5xx` is the one answer a producer reads as "try again", and not every producer retries at all. GitHub makes a single attempt at a release delivery, so a `500` there does not delay the event, it loses it — silently, because nothing ever arrived on the receiving side to be missed. The refusal is now the same one a rejected signature gets, deliberately: a producer must not be able to tell the two apart, and a host reading its own logs must not find two shapes for one event.
+
+  An entry that was *present* but carried no verification material was already handled this way. This is the other half of the same fault, one step further along, and it is the same exception class for the same reason.
+
 ## [2.4.0] - 2026-09-04
 
 ### Added
@@ -2805,7 +2891,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v2.4.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v2.5.0...HEAD
+[2.5.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.1.0...v2.2.0

@@ -203,7 +203,12 @@ final class WebhooksDashboardServiceProvider extends ServiceProvider
         // counts simply stop moving, with nothing red to explain it. Three times the default
         // five-minute cadence: past any real run, short enough that a stale lock costs a few
         // refreshes rather than the whole day.
-        $event = $schedule->command('webhooks:refresh-metrics')->withoutOverlapping(15);
+        // onOneServer() for the same reason the rest of the package's schedule carries it: the
+        // scheduler fires on every application server, and this one writes the rollup every
+        // dashboard reads. Two concurrent refreshes are not redundancy, they are two writers.
+        $event = $schedule->command('webhooks:refresh-metrics')
+            ->withoutOverlapping(15)
+            ->onOneServer();
 
         ScheduleCadence::apply(
             $event,

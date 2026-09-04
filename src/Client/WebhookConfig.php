@@ -131,7 +131,13 @@ final class WebhookConfig
             }
         }
 
-        throw new InvalidArgumentException("No webhook client config named [{$name}] is defined in webhooks.client.configs.");
+        // A bare InvalidArgumentException here escaped the controller, which catches only
+        // WebhookConfigCannotVerify, and the endpoint answered 500 -- the one answer a producer
+        // reads as "try again" for a request no retry can fix. It is the same fault as an entry
+        // with no verification material, one step further along, so it is the same exception and
+        // the same refusal. 401 is the package default; there is no entry here to read an
+        // 'invalid_status' from.
+        throw WebhookConfigCannotVerify::notConfigured($name, 401);
     }
 
     /**
@@ -196,6 +202,27 @@ final class WebhookConfig
             }
         }
 
+        // And the one fault that cannot be found by reading the entries: an entry that should
+        // be there and is not. Everything above walks what IS configured, so a client that
+        // vanished -- a bad merge, an unset variable in a fresh environment, a rename -- leaves
+        // nothing behind to walk. The endpoint stays up, because the route hangs on the macro
+        // and not on the entry, and refuses every delivery until somebody notices.
+        //
+        // Only the application knows it expects a client called 'github'; a package cannot infer
+        // an expectation nobody stated. So it is stated, in 'expected', and empty by default --
+        // nothing changes for a host that does not use it.
+        foreach (Config::array('webhooks.client.expected', []) as $index => $expected) {
+            if (! is_string($expected) || $expected === '') {
+                $faults[] = "The entry at [webhooks.client.expected.{$index}] is not a non-empty client name.";
+
+                continue;
+            }
+
+            if (! isset($seen[$expected])) {
+                $faults[] = "The webhook client config [{$expected}] is declared in 'webhooks.client.expected' but is not defined in webhooks.client.configs.";
+            }
+        }
+
         return $faults;
     }
 
@@ -205,6 +232,13 @@ final class WebhookConfig
      *
      * These are not faults. Every combination named here is a legal, working configuration; what
      * it lacks is a replay boundary, and neither half of the lack is visible from the config file.
+     *
+     * And a source that HAS a dedupe_id on such a dialect is not covered either, which is the
+     * distinction this file used to blur. The key comes from a header the signature does not
+     * cover, so the sender picks it: it separates a real producer's honest retries, and holds
+     * nothing against somebody replaying a delivery they captured. That is retry dedupe, not a
+     * replay boundary, and no setting here can turn it into one -- only a dialect that signs a
+     * timestamp can.
      * `tolerance_seconds` sits right there in the entry and reads like protection even for a
      * dialect that has no timestamp to check it against, and the dedupe default is a HEADER the
      * producer may simply not send — a key that stays null, and a null collides with nothing.
@@ -700,7 +734,16 @@ final class WebhookConfig
         // refusal a rejected signature gets. Read here rather than from the built config,
         // because there is no built config to read it from — this is the one branch that
         // never reaches the constructor.
-        if ($jwks === null && $verifier === null && (! is_string($secret) || $secret === '')) {
+        // `trim()`, and the difference is a whole failure mode. This test used to be `=== ''`
+        // while SecretSet -- built once per REQUEST -- rejects anything that is empty after
+        // trimming. A `secret => ' '` therefore passed here, passed the preflight, and threw on
+        // every delivery: 500, which tells the producer to try again, so it does, and the
+        // installation reads as a transport problem rather than as a typo in a config file.
+        //
+        // The VALUE is not trimmed, only the emptiness question. A secret with meaningful
+        // surrounding whitespace is unlikely, and silently rewriting somebody's credential is a
+        // worse habit than refusing an unusable one.
+        if ($jwks === null && $verifier === null && (! is_string($secret) || trim($secret) === '')) {
             throw WebhookConfigCannotVerify::for($name, self::intOr($entry['invalid_status'] ?? null, 401));
         }
 
@@ -727,7 +770,11 @@ final class WebhookConfig
         return new self(
             name: $name,
             secret: is_string($secret) ? $secret : '',
-            previousSecret: is_string($previous) && $previous !== '' ? $previous : null,
+            // Same trim, same reason, and this half is the one that breaks a WORKING install:
+            // a `previous_secret => ' '` reached SecretSet::rotating() and threw there, so a
+            // correctly signed delivery was answered 500 too. Absent is the honest reading of a
+            // rotation slot with nothing in it.
+            previousSecret: is_string($previous) && trim($previous) !== '' ? $previous : null,
             schemeClass: $scheme,
             verifierClass: $verifier,
             idHeader: self::headerName($headers, 'id', StandardWebhooksScheme::HEADER_ID),
