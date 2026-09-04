@@ -126,7 +126,21 @@ final class ServerServiceProvider extends ServiceProvider
                     return;
                 }
 
-                $schedule->command('model:prune', ['--model' => [WebhookServerDelivery::class]])->daily();
+                // Both guards, for the reasons the rest of the package's schedule carries them.
+                // onOneServer(): the scheduler fires on every application server, so without it
+                // N nodes delete from the same table at once -- not redundancy, just N times the
+                // delete load on a table deliveries are still being written to.
+                //
+                // withoutOverlapping(360): a first prune over a long-retained log runs for a
+                // while, and tomorrow's run starting on top of today's is the same hazard. Six
+                // hours is past any real run and well under the day between two of them, so a
+                // lock left by a hard kill costs one skipped prune rather than a permanent stop
+                // -- withoutOverlapping is a skip(), and a skipped run is not a failure, so
+                // nothing anywhere would turn red.
+                $schedule->command('model:prune', ['--model' => [WebhookServerDelivery::class]])
+                    ->daily()
+                    ->withoutOverlapping(360)
+                    ->onOneServer();
             });
         }
     }

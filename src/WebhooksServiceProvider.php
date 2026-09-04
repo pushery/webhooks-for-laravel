@@ -171,7 +171,16 @@ final class WebhooksServiceProvider extends ServiceProvider
             //
             // 55 minutes: comfortably past any real run of this command, and under the hour that
             // separates two of them, so a stale lock costs exactly one skipped run rather than a day.
-            $schedule->command('webhooks:revoke-rotated-secrets')->hourly()->withoutOverlapping(55);
+            //
+            // onOneServer() answers the other question. withoutOverlapping() serializes runs on
+            // one machine; the scheduler fires on every application server by design, so without
+            // this the revocation sweep runs N times at once on a cluster, N writers over the
+            // same rows. It needs a cache store with locks, which redis, file and array all
+            // provide, so no host loses anything by it.
+            $schedule->command('webhooks:revoke-rotated-secrets')
+                ->hourly()
+                ->withoutOverlapping(55)
+                ->onOneServer();
 
             // A finished delivery only refreshes ITS OWN endpoint's cached health, so an
             // endpoint whose traffic dries up would keep the last score a delivery left
@@ -183,7 +192,9 @@ final class WebhooksServiceProvider extends ServiceProvider
                 // 30 minutes, for the reason spelled out above the hourly command: twice the
                 // default fifteen-minute cadence, so a lock left by a hard kill costs one or two
                 // skipped sweeps instead of a day of frozen health scores.
-                $event = $schedule->command('webhooks:refresh-endpoint-health')->withoutOverlapping(30);
+                $event = $schedule->command('webhooks:refresh-endpoint-health')
+                    ->withoutOverlapping(30)
+                    ->onOneServer();
 
                 // An unknown cadence token falls back to fifteen minutes rather than
                 // silently never running.

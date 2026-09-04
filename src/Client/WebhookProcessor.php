@@ -22,6 +22,7 @@ use Pushery\Webhooks\Core\Http\HeaderRedactor;
 use Pushery\Webhooks\Core\Payload\PayloadSanitizer;
 use Pushery\Webhooks\Core\Payload\PayloadStore;
 use Pushery\Webhooks\Core\Signing\SignatureHeaders;
+use Pushery\Webhooks\Core\Signing\VerificationResult;
 use Pushery\Webhooks\Core\Signing\VerificationStatus;
 use Pushery\Webhooks\Database\Dialect\Dialect;
 use Pushery\Webhooks\Database\Dialect\Sql\DedupeInsert;
@@ -74,14 +75,53 @@ final readonly class WebhookProcessor
         // through to the pure-function scheme + shared secret.
         $verifier = $this->config->verifier();
 
-        $result = $verifier instanceof InboundVerifier
-            ? $verifier->verify($this->request, $this->config)
-            : $this->config->scheme()->verify(
+        // Resolving the key material is its own step, because for a `jwks` source it is an
+        // outbound HTTP call and it can fail. It used to sit inline as an argument to verify(),
+        // so a provider that was down, serving a maintenance page or simply unreachable threw
+        // straight past the controller -- which catches only WebhookConfigCannotVerify -- and
+        // every anonymous POST was answered 500.
+        //
+        // That is the one answer a producer reads as "try again", on the path three docblocks
+        // promise is never a 500, and it made the outage worse in both directions: an empty
+        // fetch is deliberately not cached (so a blip is not an hour-long outage), which means
+        // each request retried the fetch, and an anonymous caller could amplify against the
+        // provider in this installation's name.
+        //
+        // A key set that could not be resolved is exactly what "undetermined" already means
+        // here: the verification did not complete, and a retry could resolve it. The host still
+        // decides what that answers with -- undetermined_status falls back to invalid_status, so
+        // an installation that has not opted into a distinguishable answer sees no change.
+        $keyLookupFailed = false;
+
+        if (! $verifier instanceof InboundVerifier) {
+            try {
+                $secrets = $this->config->secrets();
+            } catch (Throwable $keyLookupFailure) {
+                $keyLookupFailed = true;
+
+                // Reported, not swallowed: a provider whose JWKS stopped resolving is a real
+                // operational fault, and answering 401 without saying so anywhere would turn a
+                // broken integration into silence. Guarded for the same reason as every other
+                // report on this path -- reporting can itself throw, and it must not become the
+                // 500 this whole change removes.
+                try {
+                    report($keyLookupFailure);
+                } catch (Throwable) {
+                    // Nothing above this can report, and the refusal below still answers.
+                }
+            }
+        }
+
+        $result = match (true) {
+            $verifier instanceof InboundVerifier => $verifier->verify($this->request, $this->config),
+            $keyLookupFailed => VerificationResult::undetermined(),
+            default => $this->config->scheme()->verify(
                 $rawBody,
                 $headers,
-                $this->config->secrets(),
+                $secrets ?? $this->config->secrets(),
                 $this->config->tolerance(),
-            );
+            ),
+        };
 
         if (! $result->isValid()) {
             // Guarded like the two announcements below, and this is the one with a recorded
@@ -141,10 +181,12 @@ final readonly class WebhookProcessor
             }
         }
 
-        // Throttle authentic requests per source. This runs after verification so a
-        // forged request can never exhaust a real producer's bucket, and before the
-        // store so a limited request is neither persisted nor dispatched.
-        $this->enforceRateLimit();
+        // Throttle authentic requests per source. The refusal runs after verification, so a
+        // forged request can never exhaust a real producer's bucket, and before the store, so a
+        // limited request is neither persisted nor dispatched. What SPENDS a token is separate
+        // and happens further down, once this delivery is known not to be a repeat of one
+        // already counted — see countAgainstRateLimit().
+        $this->refuseWhenRateLimited();
 
         $webhookId = $this->config->webhookId($headers, $rawBody);
         $fastPathDedupe = $webhookId !== null && $this->config->usesFastPathDedupe();
@@ -156,11 +198,16 @@ final readonly class WebhookProcessor
         // failure may leave a marker behind that would swallow the producer's retry with a bare
         // success, which is why the rollback clears it as well as deleting the row. The
         // authoritative partial-unique insert still guards a concurrent race.
-        if ($fastPathDedupe && Cache::has($this->cacheKey($webhookId))) {
+        if ($fastPathDedupe && $this->alreadySeen($webhookId)) {
             return $this->respond();
         }
 
         if (! $this->config->profile()->shouldProcess($this->request)) {
+            // Counted. The host chose to ignore this delivery, but the producer still sent a
+            // distinct one, and a filtered delivery that cost nothing would be an unlimited
+            // channel through the very check above.
+            $this->countAgainstRateLimit();
+
             return $this->respond();
         }
 
@@ -240,6 +287,12 @@ final readonly class WebhookProcessor
         // round-trip.
         $this->markSeen($fastPathDedupe, $webhookId);
 
+        // And spend the token here rather than at the check, for the same reason: this is the
+        // point at which the delivery is known to be new AND to have cost a row and a job. A
+        // dispatch that threw took the row with it above and never reaches this line, so a queue
+        // outage does not drain the producer's bucket on top of everything else.
+        $this->countAgainstRateLimit();
+
         // A body nothing could read is the one failure this pipeline cannot answer for the
         // host: the signature verified, so the delivery is authentic and has just been stored
         // and queued — but its meaning is still sitting unread in the bytes. Say so once, here,
@@ -282,6 +335,32 @@ final readonly class WebhookProcessor
     }
 
     /**
+     * Whether the fast path has this id marked, and false when the cache cannot say.
+     *
+     * The cache is an accelerator in front of the partial-unique index, not an authority: its
+     * whole job is to absorb a retry storm before it reaches the database. Read unguarded, an
+     * unreachable store turned that into a hard dependency -- with Redis down the receiver
+     * accepted NOTHING, answering 500 to every delivery, while the index that actually
+     * guarantees uniqueness was working the entire time.
+     *
+     * Falling through to the insert is the honest degradation: it costs a database round trip
+     * per retry, which is exactly what the cache exists to save and not something anyone is
+     * owed. It cannot produce a duplicate, because the index is what refuses one.
+     *
+     * Not reported, and that is a decision rather than an oversight: a cache outage means EVERY
+     * delivery takes this path, so reporting here would turn one incident into a second one made
+     * of log volume. The store's own health is the host's monitoring, not this request's.
+     */
+    private function alreadySeen(string $webhookId): bool
+    {
+        try {
+            return Cache::has($this->cacheKey($webhookId));
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /**
      * Arm the fast-path "seen" marker for a durably-stored id, held until the replay
      * tolerance elapses (plus a buffer). A no-op when the source has no fast-path
      * dedupe or the delivery carried no id.
@@ -289,7 +368,13 @@ final readonly class WebhookProcessor
     private function markSeen(bool $fastPathDedupe, ?string $webhookId): void
     {
         if ($fastPathDedupe && $webhookId !== null) {
-            Cache::put($this->cacheKey($webhookId), true, $this->config->tolerance() + self::SEEN_TTL_BUFFER);
+            try {
+                Cache::put($this->cacheKey($webhookId), true, $this->config->tolerance() + self::SEEN_TTL_BUFFER);
+            } catch (Throwable) {
+                // The row is stored and the job is queued; the marker is an optimization for the
+                // next retry. Losing it costs that retry one database round trip, and raising
+                // here would answer 500 for a delivery that fully succeeded.
+            }
         }
     }
 
@@ -305,7 +390,14 @@ final readonly class WebhookProcessor
     private function forgetSeen(bool $fastPathDedupe, ?string $webhookId): void
     {
         if ($fastPathDedupe && $webhookId !== null) {
-            Cache::forget($this->cacheKey($webhookId));
+            try {
+                Cache::forget($this->cacheKey($webhookId));
+            } catch (Throwable) {
+                // This runs inside the rollback that then re-raises, so an exception here would
+                // REPLACE the failure being reported with a cache error -- hiding the reason the
+                // rollback happened at all. And a store that cannot forget could not have been
+                // marked either, so there is nothing left behind to withdraw.
+            }
         }
     }
 
@@ -463,7 +555,7 @@ final readonly class WebhookProcessor
      * one token. The cache-backed limiter is atomic, so Redis makes this correct
      * across processes while the array store keeps it usable in tests.
      */
-    private function enforceRateLimit(): void
+    private function refuseWhenRateLimited(): void
     {
         $limit = $this->config->rateLimit();
 
@@ -471,7 +563,7 @@ final readonly class WebhookProcessor
             return;
         }
 
-        $key = "webhooks:inbound:{$this->config->name}";
+        $key = $this->rateLimitKey();
 
         if (RateLimiter::tooManyAttempts($key, $limit['max_attempts'])) {
             // The cast changes no outcome — PHP coerces the int into the header value either way.
@@ -479,8 +571,44 @@ final readonly class WebhookProcessor
             // becomes true, not because a test needs it.
             abort(429, headers: ['Retry-After' => (string) RateLimiter::availableIn($key)]);
         }
+    }
 
-        RateLimiter::hit($key, $limit['decay_seconds']);
+    /**
+     * Spend one token, for a delivery that was not a repeat of one already taken.
+     *
+     * Separated from the check above, and that separation is the fix. The two used to be one
+     * call placed before the dedupe, so a REPLAY spent a token: a captured authentic delivery
+     * verifies correctly, and replaying it enough times emptied the source's bucket and left the
+     * real producer answering 429 until the window rolled. The comment above the old call said
+     * the ordering meant "a forged request can never exhaust a real producer's bucket", which was
+     * true and was not the whole set — a replay is not forged.
+     *
+     * The bucket is per SOURCE rather than per sender, so there is no address to charge instead;
+     * what has to change is which requests count. A delivery the fast path or the authoritative
+     * insert recognized as one already taken does not, because it caused no work: no row, no
+     * offload, no job. Everything else does, including a delivery the host's own profile filters
+     * out — that is a distinct delivery the producer chose to send, and not counting it would
+     * hand back the unlimited channel this check exists to close.
+     *
+     * The check and the count are no longer atomic, so two requests can pass the check before
+     * either counts. The window is one request handler wide and the effect is bounded by the
+     * number of concurrent requests; the alternative is charging for repeats, which is the
+     * defect.
+     */
+    private function countAgainstRateLimit(): void
+    {
+        $limit = $this->config->rateLimit();
+
+        if ($limit === null) {
+            return;
+        }
+
+        RateLimiter::hit($this->rateLimitKey(), $limit['decay_seconds']);
+    }
+
+    private function rateLimitKey(): string
+    {
+        return "webhooks:inbound:{$this->config->name}";
     }
 
     private function dispatchProcessing(WebhookCall $call, InboundMessage $message): void
@@ -496,7 +624,7 @@ final readonly class WebhookProcessor
 
     /**
      * The redacted headers to persist, or null when store_headers is empty. Names in
-     * the redact list (plus Authorization and Cookie, always) are masked; a list of
+     * the redact list (plus everything in HeaderRedactor::ALWAYS) are masked; a list of
      * store_headers keeps only those names, '*' keeps them all.
      */
     private function redactedHeadersJson(): ?string

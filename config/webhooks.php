@@ -567,7 +567,11 @@ return [
     | Pushery\Webhooks\Client\Jobs\ProcessWebhookJob — it receives the stored call and the
     | parsed envelope) or a [event-type => job class] map for per-type routing.
     | 'store_headers' controls which request headers are persisted ('*' for all, a
-    | list of names, or [] for none); the names in 'redact' (plus Authorization and
+    | list of names, or [] for none); the names in 'redact' (plus Authorization,
+    | Cookie, Proxy-Authorization and the PHP_AUTH_* pair Symfony synthesizes from a
+    | Basic line, always) are masked. That last group is the one worth knowing about:
+    | they are not headers the producer sent, so masking Authorization alone used to
+    | leave the same password in clear text beside it. Formerly: Authorization and
     | Cookie always) are masked before storage. Stored calls are pruned after
     | 'delete_after_days' days by the scheduled model:prune command.
     |
@@ -602,6 +606,37 @@ return [
         // $message->format->readable() — because the two are otherwise indistinguishable, and
         // acknowledging an unread delivery is what stops the producer ever repeating it.
         'raw_body_capture' => true,
+
+        // There is deliberately NO body-size limit here, and the omission is a decision rather
+        // than an oversight. What bounds an incoming body is your PHP installation's
+        // post_max_size; this package adds nothing on top.
+        //
+        // The cost is worth knowing: a large delivery is stored inline in the row AND carried a
+        // second time in the job that goes on the queue, so on a Redis queue it is the Redis
+        // server's memory too. It takes your shared secret to send one, so this is not an
+        // anonymous flood -- the ordinary case is a producer attaching a document by mistake.
+        //
+        // Two levers, and they answer different halves. 'large_payload' below moves a big body
+        // onto a disk and keeps a pointer, which fixes the storage cost without refusing
+        // anything. A limit that REFUSES belongs in front of the route, in your own middleware,
+        // because answering 413 to a producer is a policy about who may send you what.
+        //
+        // A default here would be either too low for somebody or too high to be worth having.
+
+        // Client names this application REQUIRES to be configured. Empty by default, so this
+        // changes nothing until you fill it in.
+        //
+        // Everything else the preflight checks is found by reading the entries that exist, which
+        // means the one fault it could never see is an entry that SHOULD exist and does not. The
+        // route does not disappear with it -- routes hang on the macro, not on the entry -- so a
+        // client lost to a bad merge or an unset variable leaves an endpoint that refuses every
+        // delivery, and nothing says why until a producer complains.
+        //
+        // Only you know which clients you expect; name them here and `webhooks:preflight` will
+        // report a missing one as the fault it is.
+        //
+        //     'expected' => ['github', 'stripe'],
+        'expected' => [],
 
         'configs' => [
             // [
@@ -685,10 +720,17 @@ return [
             //     // GitHub again, and for the same reason: its delivery id is
             //     // X-GitHub-Delivery, not the 'webhook-id' header the default below reads.
             //     // It matters more here than the type does, because GitHubScheme signs no
-            //     // timestamp — 'tolerance_seconds' above is never consulted for it, so this
-            //     // line is the only replay boundary the source can have. Without it the key
-            //     // is null, a null collides with nothing, and an intercepted authentic
-            //     // delivery replays forever. 'webhooks:preflight' warns when it is missing.
+            //     // timestamp — 'tolerance_seconds' above is never consulted for it. Without
+            //     // this line the key is null, a null collides with nothing, and the producer's
+            //     // own retries each store a row. 'webhooks:preflight' warns when it is missing.
+            //     //
+            //     // Read what it is, not what it looks like: this is RETRY dedupe, not a replay
+            //     // boundary. The header is not covered by the signature on this dialect — the
+            //     // scheme signs the body alone — so the sender chooses the key. It separates
+            //     // the honest repeats of a real producer, and against somebody who captured an
+            //     // authentic delivery it holds nothing: change the header, get a second row.
+            //     // On a dialect with no signed timestamp there is nothing this package can do
+            //     // about that, which is exactly why the distinction is written down here.
             //     // 'dedupe_id' => 'header:X-GitHub-Delivery',
             //     // 'event_type' => 'body:data.kind',
             //     // A resolver is the form GitHub actually wants, because the useful type is
@@ -1035,6 +1077,41 @@ return [
         // service provider instead — UiTheme::resolveNonceUsing(fn () => Vite::cspNonce()) —
         // NOT a closure here: a closure in config makes `php artisan config:cache` throw.
         'csp_nonce' => null,
+
+        // The WireKit surface the two OPERATOR screens draw their SECONDARY actions with.
+        // 'ghost' is what they have always used, so leaving this alone changes nothing.
+        //
+        // It exists because a design system usually settles on one secondary style, and a
+        // borderless untinted button next to a tinted one reads as a THIRD rank where there are
+        // two. Until now the only way to change it was to publish the view and carry the diff
+        // through every package update -- for a style choice.
+        //
+        // Scoped to the two operator screens on purpose. The self-service views also use 'ghost',
+        // and not every one of those is a secondary action: several are icon-only controls inside
+        // a table row, where a third rank is exactly right. Widening this without measuring which
+        // is which would restyle buttons nobody asked about.
+        'secondary_surface' => 'ghost',
+
+        'deliveries' => [
+            // How far back the operator delivery log opens, in days. A DEFAULT, not a ceiling:
+            // the reader sees the date in the From field and can clear it, and on this screen
+            // that is the point — it is the operator's own console, and an operator sometimes
+            // has to look further back than a month.
+            //
+            // It matters because webhook_deliveries is range-partitioned by month, so a query
+            // with no lower bound on created_at cannot be pruned and reads every partition
+            // there is. Nothing goes red when that happens: the page loads, and on a young
+            // installation it is fast. The cost arrives with the DATA, months later, looking
+            // like a database problem rather than a missing default.
+            //
+            // The two tenant-facing lists work the other way round and keep their ceilings
+            // (platform.deliveries.window_days, dashboard.deliveries.window_days): their
+            // properties are writable from the browser by whoever is looking, so there the
+            // bound may only ever be narrowed. Here it may be opened, deliberately.
+            //
+            // 0 switches the default off and opens the log unbounded on first render.
+            'default_window_days' => 30,
+        ],
     ],
 
     /*

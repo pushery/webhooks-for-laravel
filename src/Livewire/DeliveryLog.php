@@ -7,6 +7,7 @@ namespace Pushery\Webhooks\Livewire;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -58,6 +59,12 @@ class DeliveryLog extends Component
      */
     private const int ENDPOINT_OPTIONS = 200;
 
+    /**
+     * The fallback for `ui.deliveries.default_window_days`, so a host that removed the key
+     * from a published config still opens on a window rather than on every partition.
+     */
+    private const int DEFAULT_WINDOW_DAYS = 30;
+
     public string $status = '';
 
     public string $eventType = '';
@@ -77,6 +84,33 @@ class DeliveryLog extends Component
     public string $from = '';
 
     public string $until = '';
+
+    /**
+     * Open on a window rather than on everything.
+     *
+     * `webhook_deliveries` is range-partitioned by month, so a query with no lower bound on
+     * `created_at` cannot be pruned and reads every partition there is. Both bounds started
+     * empty, so the FIRST render of a fresh instance did exactly that -- and nothing about it
+     * looks wrong: the page loads, and on a young installation it is fast. The cost arrives
+     * with the data, months later, and reads as a database problem rather than as a default
+     * nobody set.
+     *
+     * A DEFAULT and not a ceiling, which is the difference between this screen and the two
+     * tenant-facing lists. Their properties are writable from the browser by whoever is
+     * looking, so `EndpointDeliveries` and `DeliveriesTable` may only ever narrow the window.
+     * This is the operator's own console: the date is visible in the From field, and clearing
+     * it is a decision the reader takes rather than a state they arrive in.
+     *
+     * `0` opens the log unbounded, for a host that wants the old behavior back.
+     */
+    public function mount(): void
+    {
+        $days = Config::integer('webhooks.ui.deliveries.default_window_days', self::DEFAULT_WINDOW_DAYS);
+
+        if ($days > 0) {
+            $this->from = now()->subDays($days)->toDateString();
+        }
+    }
 
     /** A message for the reader — why an action was refused. */
     public string $message = '';

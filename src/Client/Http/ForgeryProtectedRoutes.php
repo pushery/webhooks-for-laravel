@@ -56,40 +56,22 @@ final class ForgeryProtectedRoutes
     {
         $faults = [];
 
-        // `getRoutes()` is typed as the collection INTERFACE, which is not iterable — the
-        // concrete RouteCollection is. Asking it for its array is one call and keeps the loop
-        // honestly typed rather than asserting around the declaration.
-        foreach ($router->getRoutes()->getRoutes() as $route) {
-            if (! self::isReceivingRoute($route) || ! self::isForgeryProtected($route)) {
+        foreach (ReceivingRoutes::all($router) as $route) {
+            if (! self::isForgeryProtected($route)) {
                 continue;
             }
 
             $faults[] = sprintf(
-                'The receiving route [%s %s] runs behind CSRF protection, so every delivery to it '
+                'The receiving route [%s] runs behind CSRF protection, so every delivery to it '
                 .'is answered 419 before the signature is ever verified. A producer has no session '
                 .'and no token, and most treat 4xx as permanent — the deliveries are not delayed, '
                 .'they are lost. Move the Route::webhooks() call out of routes/web.php (routes/api.php '
                 .'is the usual home), or exclude the forgery middleware for this route.',
-                // The verbs, filtered rather than cast: `methods()` is documented as a list of
-                // strings and the framework's own stub widens it, so a cast would be asserting
-                // around a declaration instead of reading it.
-                implode('|', array_filter($route->methods(), is_string(...))),
-                $route->uri(),
+                ReceivingRoutes::label($route),
             );
         }
 
         return $faults;
-    }
-
-    /**
-     * Whether this route is one the package's own macro registered.
-     *
-     * Asked of the CONTROLLER rather than of the route name, because a host may rename the route
-     * and the controller is what makes it a receiving route.
-     */
-    private static function isReceivingRoute(Route $route): bool
-    {
-        return $route->getActionName() === WebhookController::class;
     }
 
     private static function isForgeryProtected(Route $route): bool

@@ -80,7 +80,14 @@ final class WebhookClientServiceProvider extends ServiceProvider
                 return;
             }
 
-            $schedule->command('model:prune', ['--model' => [WebhookCall::class]])->daily();
+            // Both guards, for the reasons given at the server-side prune: the scheduler fires
+            // on every application server, so onOneServer() is what keeps one deleter instead of
+            // N, and the bounded overlap guard keeps a long first run over a large call log from
+            // being joined by the next day's.
+            $schedule->command('model:prune', ['--model' => [WebhookCall::class]])
+                ->daily()
+                ->withoutOverlapping(360)
+                ->onOneServer();
         });
     }
 
@@ -97,9 +104,22 @@ final class WebhookClientServiceProvider extends ServiceProvider
         Router::macro('webhooks', function (string $url, ?string $name = null, string $verb = 'post'): Route {
             $name ??= $url;
 
-            return RouteFacade::match([strtoupper($verb)], $url, WebhookController::class)
-                ->name("webhooks.{$name}")
-                ->defaults('webhookConfigName', $name);
+            // The name goes in the ACTION, not in defaults(), and the difference is whether
+            // the binding is a promise or a suggestion. A defaults() value is only what the
+            // parameter falls back to -- so a URI written with a literal {webhookConfigName}
+            // segment let the CALLER pick the config, and a route meant to be pinned to one
+            // source processed a delivery under another. The signature still had to match the
+            // chosen config, so nothing was forged; what was lost is the binding itself, and the
+            // stored row then disagreed with the route about where the delivery came from.
+            //
+            // Not far-fetched: the parameter name is readable in any route listing, and a URI
+            // with placeholders is the obvious shape for a multi-tenant mount.
+            //
+            // An action value has no such fallback semantics -- nothing in the URI can reach it.
+            return RouteFacade::match([strtoupper($verb)], $url, [
+                'uses' => WebhookController::class,
+                'webhookConfigName' => $name,
+            ])->name("webhooks.{$name}");
         });
     }
 }

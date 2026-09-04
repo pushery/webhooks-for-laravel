@@ -26,7 +26,9 @@ final class WebhookController
     public function __invoke(Request $request): Response
     {
         $route = $request->route();
-        $name = $route instanceof Route ? $route->parameter('webhookConfigName') : null;
+        // Read from the route's ACTION rather than from its parameters. A parameter can be
+        // supplied by the URI; an action cannot, which is what makes the binding a promise.
+        $name = $route instanceof Route ? $route->getAction('webhookConfigName') : null;
 
         if (! is_string($name)) {
             throw new RuntimeException('The webhooks route is missing its config name; register it with the Route::webhooks() macro.');
