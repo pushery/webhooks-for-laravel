@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\View as ViewFactory;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -109,6 +110,33 @@ final class EndpointDeliveries extends Component
     public ?int $endpointId = null;
 
     /**
+     * Whether an endpoint id that no longer resolves closes the list instead of dropping out
+     * of it.
+     *
+     * The default is the behavior every host has today: the filter is a NARROWING over rows
+     * the reader may see anyway, so losing it widens the list back to the tenant's own
+     * deliveries, which is a plausible reset and shows nothing that was hidden.
+     *
+     * On an owner's surface that reading is backwards, and that is what this switch is for.
+     * There the endpoint is not a filter over a permitted set — it is the definition of the
+     * permitted set. When it stops resolving, "nothing" is the correct answer and "everything
+     * the tenant owns" is the wrong one, so a reload after a deletion would show deliveries
+     * belonging to other destinations.
+     *
+     * And it is the failure direction that stays quiet: a filter that falls back to empty
+     * looks exactly like a filter somebody cleared. Nothing goes red, no test fails, and the
+     * rows are real -- they answer a different question than the one that was asked.
+     *
+     * #[Locked] because the dangerous direction here is turning it OFF. Every other narrowing
+     * property on this class may only ever narrow further, so a value from the browser can
+     * cost the reader information but never hand them any; this one is the opposite, and a
+     * plain public property would let the browser widen exactly what the host switched on to
+     * keep closed. The host sets it at mount and nothing from a request can move it.
+     */
+    #[Locked]
+    public bool $strictEndpoint = false;
+
+    /**
      * How many days back the list reads, or null to take the host's configured ceiling.
      *
      * This one IS public, unlike the page size above, because narrowing the window is a
@@ -184,7 +212,12 @@ final class EndpointDeliveries extends Component
     #[On('endpoint-deleted')]
     public function refreshDeliveries(): void
     {
-        if ($this->endpointId !== null && ! $this->scopedQuery()->whereKey($this->endpointId)->exists()) {
+        // Under $strictEndpoint the id deliberately STAYS, and dropping it here would defeat
+        // the switch before the query ever sees it: an id that is gone must close the list,
+        // and a null id is indistinguishable from "no filter was ever set". The 404 loop this
+        // reset exists to prevent cannot happen there either, because the strict path resolves
+        // the endpoint leniently rather than through the not-found lookup.
+        if (! $this->strictEndpoint && $this->endpointId !== null && ! $this->scopedQuery()->whereKey($this->endpointId)->exists()) {
             $this->endpointId = null;
         }
 
@@ -367,7 +400,29 @@ final class EndpointDeliveries extends Component
         $query->where('owner_type', $owner->type)->where('owner_id', $owner->id);
 
         if ($this->endpointId !== null) {
-            $query->where('subscription_id', $this->findOwnedEndpoint($this->endpointId)->id);
+            // The lenient lookup is the strict path's, and the pairing is the wrong way round
+            // only until you read what each mode is protecting.
+            //
+            // By default an id that does not resolve is a TAMPERED id -- the reset above has
+            // already removed the one legitimate way to hold a stale one -- so the not-found
+            // lookup is right: an empty table would look like an answer about an endpoint the
+            // reader does not own.
+            //
+            // Under $strictEndpoint a stale id is the ORDINARY case, because the reset no
+            // longer runs, and 404-ing the panel for the rest of the session over a deletion
+            // somebody performed on purpose is not an answer either. Both a deleted endpoint
+            // and a tampered one close the list, and the trade is stated rather than
+            // discovered: this mode gives up telling those two apart, in exchange for never
+            // widening. That is the direction a host chooses this switch for.
+            $endpoint = $this->strictEndpoint
+                ? $this->scopedQuery()->whereKey($this->endpointId)->first()
+                : $this->findOwnedEndpoint($this->endpointId);
+
+            if ($endpoint === null) {
+                return $query->whereRaw('1 = 0');
+            }
+
+            $query->where('subscription_id', $endpoint->id);
         }
 
         // The lower bound is what makes this query prunable. webhook_deliveries is range
