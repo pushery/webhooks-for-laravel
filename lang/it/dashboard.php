@@ -19,6 +19,7 @@ return [
     ],
 
     'kpis' => [
+        'title' => 'In sintesi',
         'total' => 'Totale webhook inviati',
         'successful' => 'Riusciti',
         'failed' => 'Falliti',
@@ -31,6 +32,11 @@ return [
     'formats' => [
         'hour_bucket' => 'j M H:i',
         'absolute' => 'LLL z',
+
+        // 'precise' is a second pattern because 'absolute' cannot separate two rows and the
+        // accessible names need it to. lang/en/dashboard.php states the case in full, including
+        // what it still does not cover.
+        'precise' => 'LL LTS z',
     ],
 
     'api' => [
@@ -87,11 +93,23 @@ return [
     // Badge labels for the stored DeliveryStatus values. The key is the persisted
     // value and is never translated; only the label a reader sees is. Lowercase, as
     // in the original design.
+    // Shown when the rollup the counts come from has fallen behind the rows it summarizes --
+    // twice the configured refresh cadence or more, so a run merely in progress never triggers it.
+    'rollup_stale' => 'I conteggi di consegna di questa pagina sono indietro di :minutes minuti. Vengono da un rollup che `webhooks:refresh-metrics` aggiorna; le latenze accanto sono in tempo reale, quindi i due valori divergono finché quel comando non gira di nuovo.',
+
+    // These agree with a noun that is not in the string, and four of the five used to get it wrong.
+    // They label one column of one table, and the thing they label is a delivery (la consegna),
+    // feminine in this language. Four were masculine and the fifth feminine, so the column read as
+    // machine translation on the most-read screen in the package.
+    //
+    // No guard can check this: agreement is a fact about a word that never appears beside them. The
+    // noun is written here so the next translator has it.
     'status' => [
         'pending' => 'in attesa',
         'succeeded' => 'riuscita',
         'failed' => 'fallita',
         'exhausted' => 'esaurita',
+        'refused' => 'rifiutata',
     ],
 
     // The same statuses as filter options, where the surrounding form wants them
@@ -101,6 +119,7 @@ return [
         'succeeded' => 'Riuscita',
         'failed' => 'Fallita',
         'exhausted' => 'Esaurita',
+        'refused' => 'Rifiutata',
     ],
 
     'drawer' => [
@@ -160,12 +179,22 @@ return [
         'sections' => 'Sezioni della dashboard',
         'retry_rate' => 'Tasso di nuovi tentativi',
         'deliveries_per_hour' => 'Consegne all\'ora',
-        'hour_summary' => ':hour: :total in totale, :delivered consegnate, :pending in attesa, :failed fallite',
+        'hour_summary' => [
+            // Four choice fragments rather than one sentence with four numbers in it: agreement is
+            // decided by the number, `trans_choice` takes one count per string, and there are four.
+            // lang/en/dashboard.php states the case in full, including why English, German and
+            // Dutch carry identical forms on both sides.
+            'total' => '{0} :count in totale|{1} :count in totale|[2,*] :count in totale',
+            'delivered' => '{0} :count consegnate|{1} :count consegnata|[2,*] :count consegnate',
+            'pending' => '{0} :count in attesa|{1} :count in attesa|[2,*] :count in attesa',
+            'failed' => '{0} :count fallite|{1} :count fallita|[2,*] :count fallite',
+        ],
         'latency_trend' => 'Andamento della latenza P95 per ora',
+        'latency_bar' => ':hour: :value ms',
         'recent_deliveries_table' => 'Consegne webhook recenti',
         'deliveries_table' => 'Consegne webhook',
-        'replay_delivery' => 'Reinvia la consegna :event',
-        'view_delivery' => 'Visualizza i dettagli della consegna :event',
+        'replay_delivery' => ':label — :event · :endpoint · :at',
+        'view_delivery' => 'Visualizza i dettagli della consegna :event a :endpoint del :at',
         'delivery_details' => 'Dettagli della consegna',
         'close_details' => 'Chiudi i dettagli',
         'loading_kpis' => 'Caricamento delle metriche principali',

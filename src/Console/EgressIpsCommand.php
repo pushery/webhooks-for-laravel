@@ -35,9 +35,47 @@ final class EgressIpsCommand extends Command
             return self::FAILURE;
         }
 
+        $this->warnAboutAnIgnoredProxy();
+
         $this->line(self::render($this->publishedIps(), $format));
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Say so when a proxy is configured and the gate that would use it is off.
+     *
+     * `core.egress.enabled` is checked before the proxy value is ever read, so while it is
+     * false a configured proxy is ignored and every delivery goes out direct. Nothing is
+     * logged and no configuration output changes — and this command is exactly where the
+     * mistake becomes expensive, because its output is what an operator hands a consumer to
+     * put on a firewall. If those addresses are the proxy's, the consumer allowlists hosts
+     * the traffic is not coming from.
+     *
+     * On stderr, and that is the whole point. The stdout of this command is the payload —
+     * `webhooks:egress-ips --format=json > ips.json` has to keep producing a parseable file.
+     * A warning printed beside it would corrupt the artifact it is warning about.
+     *
+     * Silent when no proxy is configured: there is nothing to be ignored then, and a gate
+     * that is off is the shipped default rather than a mistake.
+     */
+    private function warnAboutAnIgnoredProxy(): void
+    {
+        $proxy = Config::get('webhooks.core.egress.proxy');
+
+        if (! is_string($proxy) || trim($proxy) === '') {
+            return;
+        }
+
+        if (Config::boolean('webhooks.core.egress.enabled', false)) {
+            return;
+        }
+
+        $this->getOutput()->getErrorStyle()->warning(
+            'core.egress.proxy is set but core.egress.enabled is false, so the proxy is ignored '
+            .'and deliveries go out direct. These addresses are only the source of your traffic '
+            .'if they are the addresses it actually leaves from.'
+        );
     }
 
     /**

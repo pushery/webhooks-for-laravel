@@ -11,6 +11,7 @@ use Pushery\Webhooks\Client\WebhookConfig;
 use Pushery\Webhooks\Client\WebhookProcessor;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 /**
  * The single invokable endpoint every Route::webhooks() route points at. It reads
@@ -43,7 +44,18 @@ final class WebhookController
             //
             // Reported first, and only here: an uncaught one is reported by the framework
             // through the same report() on the exception, so neither path logs twice.
-            report($cannotVerify);
+            //
+            // And guarded, because report() is allowed to throw in three places of Laravel's
+            // own making — a reportable exception whose report() fails, a reportable() callback
+            // that throws, a logger that cannot be built. Unguarded it would defeat the promise
+            // the paragraph above states: the throw would travel over the abort() and answer a
+            // request that can never be made valid with the one status that invites a retry.
+            try {
+                report($cannotVerify);
+            } catch (Throwable) {
+                // Nothing here can report, and there is nothing to preserve: no row was written
+                // and no job was queued. The refusal below is what the caller is owed.
+            }
 
             abort($cannotVerify->status);
         }

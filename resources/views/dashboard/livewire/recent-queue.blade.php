@@ -4,7 +4,7 @@
 <div class="wh-dash-recent" wire:key="recent-queue" wire:poll.{{ config('webhooks.dashboard.poll_interval', '30s') }}>
     <x-wirekit::card>
         <x-wirekit::card.header>
-            <x-wirekit::heading :level="3" size="sm">{{ __('webhooks::dashboard.recent.title') }}</x-wirekit::heading>
+            <x-wirekit::heading :level="2" size="sm">{{ __('webhooks::dashboard.recent.title') }}</x-wirekit::heading>
         </x-wirekit::card.header>
         <x-wirekit::card.body>
             @if ($deliveries->isEmpty())
@@ -29,11 +29,12 @@
                     </x-wirekit::table.head>
                     <x-wirekit::table.body>
                         @foreach ($deliveries as $delivery)
-                            @php($intent = match ($delivery->status->value) {
-                                'succeeded' => 'success',
-                                'failed', 'exhausted' => 'danger',
-                                default => 'warning',
-                            })
+                            @php($intent = $delivery->status->intent())
+                            {{-- The row carries no visible timestamp, but its replay button needs one:
+                                 two queued deliveries of one event type would otherwise be two identically
+                                 named controls in a screen reader's element list. Same zone and same
+                                 absolute format as every other surface. --}}
+                            @php($when = \Pushery\Webhooks\Dashboard\DashboardTimezone::apply($delivery->created_at)->settings(['locale' => app()->getLocale()]))
                             <x-wirekit::table.row wire:key="rq-{{ $delivery->id }}">
                                 <x-wirekit::table.td>
                                     <x-wirekit::badge :intent="$intent">{{ __('webhooks::dashboard.status.'.$delivery->status->value) }}</x-wirekit::badge>
@@ -54,7 +55,7 @@
                                         wire:click="redeliver('{{ $delivery->id }}')"
                                         wire:loading.attr="disabled"
                                         wire:target="redeliver"
-                                        :aria-label="__('webhooks::dashboard.a11y.replay_delivery', ['event' => $delivery->event_type])"
+                                        :aria-label="__('webhooks::dashboard.a11y.replay_delivery', ['label' => __('webhooks::dashboard.table.replay'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat(__('webhooks::dashboard.formats.precise'))])"
                                     >{{ __('webhooks::dashboard.table.replay') }}</x-wirekit::button>
                                 </x-wirekit::table.td>
                             </x-wirekit::table.row>

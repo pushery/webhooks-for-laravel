@@ -13,7 +13,15 @@ return [
         // duration arrives as one placeholder so a locale never has to reassemble the
         // number and its unit.
         'timing' => 'Tiempo: :duration; Ejecutado a las: :at;',
-        'details' => 'últimos :period',
+        'details' => [
+            // The whole phrase per period, rather than a determiner plus an interpolated noun:
+            // agreement is decided by the noun and the noun arrives at run time, so a placeholder
+            // cannot fix it. lang/en/pulse.php states the case in full.
+            '6_hours' => 'últimas 6 horas',
+            '24_hours' => 'últimas 24 horas',
+            '7_days' => 'últimos 7 días',
+            'hour' => 'última hora',
+        ],
     ],
 
     'metrics' => [

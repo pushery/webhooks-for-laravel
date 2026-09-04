@@ -9,13 +9,18 @@ use Illuminate\Contracts\Foundation\CachesConfiguration;
 use Illuminate\Support\ServiceProvider;
 
 /**
- * Six providers merge the same shipped configuration, because a host may register any one
- * of them on its own — the Core, Server, Client, Platform, Dashboard and Pulse layers are
- * independently mountable. This is that merge, in one place, so the six call sites cannot
- * drift apart.
+ * Every provider in this package that has a register() merges the same shipped configuration,
+ * because a host may mount any one layer on its own. This is that merge, in one place, so the
+ * call sites cannot drift apart.
+ *
+ * The sentence above used to be a roster of six layer names, and it was wrong twice: it named
+ * the Server layer, which did not merge, and omitted the umbrella provider, which did. The count
+ * was right, which is what made it read as maintained. A roster in prose is a list nothing
+ * checks, so it is gone — the rule is stated instead, and ProviderConfigMergeTest holds every
+ * provider to it by reading the tree rather than a list.
  *
  * The path is resolved once here rather than six times at the call sites. `__DIR__` inside
- * a trait resolves to the directory of the TRAIT file, not of the class using it, so
+ * a trait resolves to the directory of the trait file, not of the class using it, so
  * `dirname(__DIR__, 2)` is the package root for every one of them — where the six call
  * sites previously carried two different relative depths between them.
  *

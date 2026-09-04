@@ -26,17 +26,17 @@ use Pushery\Webhooks\Core\Signing\VerificationResult;
  * {@see InboundVerifier} reported. It is null only when a
  * verifier authenticated the request without naming a key.
  *
- * ⚠️ IT FIRES ON EVERY VERIFIED DELIVERY, not only when the previous key matched, and that is the
+ * It fires on every verified delivery, not only when the previous key matched, and that is the
  * design rather than a default anyone can trim. Firing only on `previous` makes silence
  * ambiguous: no events means either the migration finished or no traffic arrived at all, and
  * those two call for opposite actions. It is the same distinction the refusal path draws between
  * a refusal and an absence. A listener that only wants the rare case filters on `matchedKeyId`;
  * a listener that wants the ratio needs both, and cannot reconstruct it from a filtered stream.
  *
- * It carries the config's NAME rather than the config, like its two siblings, because a
+ * It carries the config's name rather than the config, like its two siblings, because a
  * `Pushery\Webhooks\Client\WebhookConfig` holds the signing and rotation secrets in cleartext —
  * and a rotation listener is the single most likely one to be queued, since it is bookkeeping
- * rather than request work. `WebhookConfig::forName($event->source)` returns the whole config.
+ * and not request work. `WebhookConfig::forName($event->source)` returns the whole config.
  *
  * A listener that throws cannot cost the delivery: the dispatch is guarded and the failure is
  * reported as {@see InboundListenerFailed}. The delivery is

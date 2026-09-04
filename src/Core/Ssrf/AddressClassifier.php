@@ -141,9 +141,9 @@ final class AddressClassifier
         //
         // The two inet_pton checks cannot fire on this path: isBlocked() has already run the
         // address through FILTER_VALIDATE_IP, and the subnets come from the constant above.
-        // They stay because this method must not depend on its only caller's validation, and
-        // mutation testing reports them as survivors for exactly that reason — an unreachable
-        // guard has no observable behavior to assert. Do not "kill" them by removing them.
+        // They stay because this method must not depend on its only caller's validation. An
+        // unreachable guard has no observable behavior to assert, so no test can distinguish its
+        // presence from its absence — which is not a reason to remove it.
         if ($ipBin === false || $subnetBin === false || strlen($ipBin) !== strlen($subnetBin)) {
             return false;
         }
@@ -158,11 +158,11 @@ final class AddressClassifier
 
         // A whole-byte prefix is decided already, and this shortcut looks removable: for every
         // prefix in the list above, the mask path below reaches the same answer, because a
-        // zero remainder makes the mask 0 and the masked comparison trivially equal. Mutation
-        // testing says so too — three mutants on these two lines are unkillable.
+        // zero remainder makes the mask 0 and the masked comparison trivially equal. No test
+        // can tell the two versions apart.
         //
-        // It is NOT removable. The mask path indexes $ipBin[$wholeBytes], and a prefix that
-        // covers the WHOLE address (/32 on IPv4, /128 on IPv6) puts that index one past the
+        // It is not removable. The mask path indexes $ipBin[$wholeBytes], and a prefix that
+        // covers the whole address (/32 on IPv4, /128 on IPv6) puts that index one past the
         // end. The list happens to contain no such prefix that is reachable — ::/128 and
         // ::1/128 are in it, but unwrapMappedIp() turns :: and ::1 into IPv4 before they ever
         // get here — so today the crash cannot happen. Add one single-address CIDR and it can.

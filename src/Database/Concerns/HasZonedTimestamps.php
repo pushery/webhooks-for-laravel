@@ -45,10 +45,10 @@ trait HasZonedTimestamps
      * on PostgreSQL the offset-bearing format already carries the instant, so the parent
      * behavior is exact.
      *
-     * ⚠️ IT RESOLVES A STRING THROUGH THE PARENT, NOT THROUGH asDateTime() BELOW, and the two
+     * It resolves a string through the parent, not through asDateTime() below, and the two
      * are not interchangeable even though both turn a string into an instant. This is the
-     * WRITE path, so a string here came from the CALLER; asDateTime() is the READ path, where
-     * a string came from the COLUMN. A naive string is a wall clock, and only a timezone makes
+     * write path, so a string here came from the caller; asDateTime() is the read path, where
+     * a string came from the column. A naive string is a wall clock, and only a timezone makes
      * it an instant — the column's rule is "these bytes are UTC", the caller's is "this is my
      * application's local time". Applying the column's rule to a caller's value stored the
      * wrong instant: under Europe/Berlin, `'2026-07-12 14:30:00'` landed as 14:30Z instead of

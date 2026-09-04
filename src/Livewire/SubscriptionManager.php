@@ -17,6 +17,7 @@ use Pushery\Webhooks\Facades\Webhooks;
 use Pushery\Webhooks\Livewire\Concerns\AuthorizesOperatorActions;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Support\Settings;
+use Pushery\Webhooks\Support\UiVariant;
 
 /**
  * The OPERATOR console for webhook endpoints: register one, edit it, switch it on or off,
@@ -35,7 +36,7 @@ use Pushery\Webhooks\Support\Settings;
  * authorizeAction() in a subclass. Left unset it does nothing, so this component behaves
  * exactly as it always has. See {@see AuthorizesOperatorActions} for why the three differ.
  *
- * ⚠️ THE MAP IS THE ONE A PERMISSION-BASED HOST NEEDS, and it exists because the other two
+ * The map is the one a permission-based host needs, and it exists because the other two
  * were both barred there for a while. The single-ability key passes the action name to the
  * gate positionally, which spatie/laravel-permission's Gate::before hook takes for a guard
  * name and shifts away — every action then denies every operator, silently. The documented
@@ -113,12 +114,12 @@ class SubscriptionManager extends Component
     public function dehydrate(): void
     {
         $this->newSecret = null;
-        // ⚠️ Equivalent, and reported as a survivor: the line above nulls the secret, and the
-        // panel this flag heads is only rendered when there IS one — so after dehydrate() the
-        // flag's value cannot reach a reader. Measured: set to true, every suite stays green.
-        // The same is true of its twin in edit(). Kept so the two fields that describe ONE
-        // revealed secret are always cleared together, rather than leaving a stale flag for
-        // whoever next sets newSecret without thinking about it.
+        // This line cannot change what a reader sees: the line above nulls the secret, and the
+        // panel this flag heads is only rendered when there is one, so after dehydrate() the flag's
+        // value is unreachable. Set it to true and every suite stays green. The same is true of its
+        // twin in edit(). It is kept so the two fields that describe one revealed secret are always
+        // cleared together, rather than leaving a stale flag for whoever next sets newSecret
+        // without thinking about it.
         $this->rotated = false;
     }
 
@@ -193,25 +194,24 @@ class SubscriptionManager extends Component
         // writable from the browser, so an allowlist widened from one is an allowlist the
         // client widens.
         if ($accepted !== null && $this->storedEventTypes() !== []) {
-            // ⚠️ array_unique and array_values on this line are unkillable: the result only ever
-            // reaches Rule::in, which cares about neither duplicates nor keys. Measured, each
-            // removed in turn, suite green. The SPREAD is a different matter and IS pinned —
-            // drop the stored half and an edit is refused over a value the operator never
+            // array_unique and array_values on this line cannot change the outcome: the result only
+            // ever reaches Rule::in, which cares about neither duplicates nor keys. Each was
+            // removed in turn and the suite stayed green. The spread is a different matter and is
+            // pinned — drop the stored half and an edit is refused over a value the operator never
             // touched, which is what makes this a note about the two helpers.
             $accepted = array_values(array_unique([...$accepted, ...$this->storedEventTypes()]));
         }
 
-        // ⚠️ FOUR OF THESE RULE ITEMS CANNOT BE KILLED BY ANY TEST, and mutation testing reports
-        // each of them as a survivor. Measured one at a time, by removing the item and running
-        // the whole Livewire suite:
+        // Four of these rule items are redundant against the property declarations, and each is
+        // kept for the same reason. Removing one in turn leaves the whole Livewire suite green:
         //
-        //   'name' => 'nullable'      — $name is a typed string property; it is never null
-        //   'name' => 'string'        — same, the type already guarantees it
-        //   'eventTypes' => 'array'   — $eventTypes is a typed array property
-        //   'eventTypes' => 'min:1'   — masked by 'required', which already rejects []
+        // 'name' => 'nullable' — $name is a typed string property; it is never null 'name' =>
+        // 'string' — same, the type already guarantees it 'eventTypes' => 'array' — $eventTypes is
+        // a typed array property 'eventTypes' => 'min:1' — masked by 'required', which already
+        // rejects []
         //
         // The first three are the validator restating what the TYPE system enforces one layer
-        // up, so no input can reach them; the fourth is redundant against its own neighbour.
+        // up, so no input can reach them; the fourth is redundant against its own neighbor.
         // 'required' and 'max:255' ARE reachable and are pinned — removing either goes red.
         //
         // They stay, and they are not to be "killed" by deletion. This list is the written
@@ -222,17 +222,28 @@ class SubscriptionManager extends Component
             'name' => ['nullable', 'string', 'max:255'],
             // Cap the URL at the MySQL column width so it stores the same on every
             // supported engine (varchar(2048) there, unbounded text on Postgres).
-            'url' => ['required', 'url', 'max:2048'],
+            // `url:http,https`, not a bare `url`. Laravel's bare rule answers through Str::isUrl(),
+            // which checks a built-in list of over 200 schemes: ftp, file, data and chrome all pass
+            // it. The narrowing has been the supported spelling since 9.44.
+            //
+            // Without it a foreign scheme was refused only by the SSRF guard, which sits
+            // AFTER the registration rate limiter has already spent a token, the lock has
+            // been taken and the endpoint cap queried. So a typo cost the tenant part of
+            // their registration budget and returned the generic "cannot be used as an
+            // endpoint" instead of the field message that exists for exactly this. The
+            // guard stays the authority; the rule only takes from it the cases that never
+            // needed to reach it.
+            'url' => ['required', 'url:http,https', 'max:2048'],
             'eventTypes' => ['required', 'array', 'min:1'],
             // Constrained to the catalog when the host keeps one, and unconstrained when it
             // does not — the catalog ships empty. An operator registers a GLOBAL endpoint
             // here, so a typo costs every tenant's events for that type, not one tenant's.
             'eventTypes.*' => $accepted === null ? ['string'] : ['string', Rule::in($accepted)],
         ], [
-            // ⚠️ The 'string' rule had no message, so a non-string element rendered "The
-            // eventTypes.0 field must be a string." — the framework's English default, in a
-            // package that ships seven locales, carrying a raw field path. Measured on both
-            // this console and the portal form, which had the identical gap.
+            // The 'string' rule had no message, so a non-string element rendered "The eventTypes.0
+            // field must be a string.", the framework's English default, in a package that ships
+            // seven locales, carrying a raw field path. Measured on both this console and the
+            // portal form, which had the identical gap.
             'eventTypes.*.string' => __('webhooks::management.validation.event_types.string'),
             'eventTypes.*.in' => __('webhooks::management.validation.event_types.in'),
         ]);
@@ -347,9 +358,9 @@ class SubscriptionManager extends Component
 
     private function update(): void
     {
-        // The (int) cast is unkillable — editingId is a typed ?int and the null case cannot
-        // reach here (update() is only called with one open). Kept as the boundary that makes
-        // the argument an int rather than a nullable one.
+        // The (int) cast cannot fail: editingId is a typed ?int and the null case cannot reach
+        // here, because update() is only called with one open. It is kept as the boundary that
+        // makes the argument an int rather than a nullable one.
         $subscription = WebhookSubscription::query()->findOrFail((int) $this->editingId);
 
         try {
@@ -424,9 +435,24 @@ class SubscriptionManager extends Component
         return 'webhooks::pagination';
     }
 
+    /**
+     * And the same control for the SIMPLE paginator this component actually builds.
+     *
+     * Livewire resolves the two independently: paginationView() feeds
+     * Paginator::defaultView, paginationSimpleView() feeds Paginator::defaultSimpleView,
+     * and a simple paginator reads only the second. Overriding just the first left this
+     * screen on livewire::simple-tailwind -- Livewire's own markup, with a hardcoded
+     * English landmark and the raw palette the docblock above says is deliberately not
+     * used. The package view carries both types.
+     */
+    public function paginationSimpleView(): string
+    {
+        return 'webhooks::pagination';
+    }
+
     public function render(): View
     {
-        return ViewFactory::make('webhooks::livewire.subscription-manager', [
+        return ViewFactory::make(UiVariant::view('subscription-manager'), [
             // simplePaginate, not paginate, and not a bare get(): this stub is unscoped over
             // the whole installation, so the list grows with every endpoint anyone ever
             // registered. A bare get() hydrates all of them into memory to render one screen.
@@ -434,21 +460,27 @@ class SubscriptionManager extends Component
             // table whose size is the thing being complained about. Same reasoning, same
             // page size as the delivery log beside it.
             //
-            // ⚠️ THE PAGINATOR IS ONLY HALF OF PAGING, AND THE MISSING HALF IS SILENT. Without
-            // WithPagination above, the control below still renders and still takes clicks —
-            // it just never moves. The paginator reads its page from the REQUEST via
+            // The paginator is only half of paging, and the missing half is silent. Without
+            // WithPagination above, the control below still renders and still takes clicks, it just
+            // never moves. The paginator reads its page from the request via
             // Paginator::resolveCurrentPage(), and a Livewire update request carries no `page`
-            // parameter, so every answer is page one. The failure has no error and no log line:
-            // the list simply looks like an installation with 25 endpoints in it, which on the
-            // one screen whose whole point is that the list outgrows a screen is the worst
-            // possible way to be wrong.
-            'subscriptions' => WebhookSubscription::query()->latest()->simplePaginate(25),
+            // parameter, so every answer is page one. The failure has no error and no log line: the
+            // list simply looks like an installation with 25 endpoints in it, which on the one
+            // screen whose whole point is that the list outgrows a screen is the worst possible way
+            // to be wrong.
+            //
+            // `latest()` alone is not a total order. created_at has second resolution, and a
+            // paginated read is several queries: where two rows tie, the database may order them
+            // differently per query, so a reader sees one endpoint twice and another never, on the
+            // same screen whose whole point is that the list outgrows a page.
+            'subscriptions' => WebhookSubscription::query()->latest()->orderByDesc('id')->simplePaginate(25),
             // The catalog, plus anything the OPENED ROW already holds that the catalog no
             // longer declares. Without the second half the stale value has no checkbox, so
             // it can be neither kept nor dropped — Livewire's checkbox binding only ever
             // adds or removes its OWN value.
-            // The array_values here is unkillable (the view iterates, keys unread) while its
-            // neighbour array_unique is NOT — remove that one and an arm goes red. Both stay.
+            // The array_values here cannot change the outcome (the view iterates, keys unread)
+            // while its neighbor array_unique can — remove that one and an arm goes red. Both
+            // stay.
             'availableEventTypes' => array_values(array_unique([
                 ...new Settings()->eventTypes(),
                 ...$this->storedEventTypes(),

@@ -62,7 +62,7 @@ final class PercentileSelect
      * A MySQL query returning several interpolated percentiles of duration_ms over ONE window
      * (the whole set matched by $where) in a single pass — the window-level KPIs PostgreSQL gets
      * from percentile_cont(ARRAY[...]). Each named percentile is reconstructed by the same
-     * rank-and-interpolate as {@see mysqlQuery}; they share one scan of the ranked rows.
+     * rank-and-interpolate as {@see self::mysqlQuery()}; they share one scan of the ranked rows.
      *
      * @param  array<string, float>  $percentiles  alias => fraction, e.g. ['p50' => 0.5, 'p95' => 0.95]
      * @param  string  $table  a bare identifier the caller has validated (never request input)

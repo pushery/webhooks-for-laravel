@@ -211,7 +211,11 @@ final class EndpointList extends Component
         // Builder::limit() silently drops a non-positive value — a page size the reader
         // controls is one they can set to a value that pages nothing, and the component
         // would read every row it can see, in one request.
-        $endpoints = $this->scopedQuery()->latest()->paginate(max(1, min($this->perPage, 100)));
+        // `latest()` alone is not a total order. created_at has second resolution, and a
+        // paginated read is several queries: where two rows tie the database may order them
+        // differently per query, so a reader sees one row twice and another never, with every
+        // individual page correct. The primary key is unique and makes the order total.
+        $endpoints = $this->scopedQuery()->latest()->orderByDesc('id')->paginate(max(1, min($this->perPage, 100)));
 
         return ViewFactory::make('webhooks::self-service.livewire.endpoint-list', [
             'endpoints' => $endpoints,

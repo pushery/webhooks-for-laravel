@@ -68,9 +68,9 @@ final class ImportSpatieCallsCommand extends Command
         $fromTable = $this->stringOption('from-table') ?? 'webhook_calls';
         $fromConnection = $this->stringOption('from-connection');
         $chunk = max(1, (int) $this->option('chunk'));
-        // The cast is unkillable: a boolean console option is already a bool (measured). It
-        // stays because option() is declared as mixed, and the variable below is used as a
-        // condition in three places — the cast is where "mixed" stops.
+        // The cast changes no value: a boolean console option is already a bool. It stays because
+        // option() is declared as mixed, and the variable below is used as a condition in three
+        // places — the cast is where "mixed" stops.
         $dryRun = (bool) $this->option('dry-run');
 
         if (! Schema::connection($fromConnection)->hasTable($fromTable)) {
@@ -170,11 +170,10 @@ final class ImportSpatieCallsCommand extends Command
         // from a text-typed source column) throws and the caller records the row as unreadable.
         $payload = $row->payload ?? null;
         $json = is_string($payload) && $payload !== '' ? $payload : '{}';
-        // ⚠️ The depth argument is reported as a survivor at both call sites, and moving it by
-        // one is not something a test should chase: reaching the difference needs a payload
-        // nested 511 levels deep, and that fixture would be a test about json_decode rather
-        // than about this import. 512 is PHP's own default, written out only so the
-        // JSON_THROW_ON_ERROR beside it can be passed at all.
+        // Moving the depth argument by one changes nothing a test should chase: reaching the
+        // difference needs a payload nested 511 levels deep, and that fixture would be a test about
+        // json_decode rather than about this import. 512 is PHP's own default, written out only so
+        // the JSON_THROW_ON_ERROR beside it can be passed at all.
         $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
         $body = json_encode(PayloadSanitizer::scrub(is_array($decoded) ? $decoded : []), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
@@ -213,11 +212,9 @@ final class ImportSpatieCallsCommand extends Command
             return null;
         }
 
-        // ⚠️ The depth argument is reported as a survivor at both call sites, and moving it by
-        // one is not something a test should chase: reaching the difference needs a payload
-        // nested 511 levels deep, and that fixture would be a test about json_decode rather
-        // than about this import. 512 is PHP's own default, written out only so the
-        // JSON_THROW_ON_ERROR beside it can be passed at all.
+        // The depth argument is written out for the reason given at the first call site above: 512
+        // is PHP's own default, spelled out only so the JSON_THROW_ON_ERROR beside it can be passed
+        // at all.
         $decoded = json_decode($headers, true, 512, JSON_THROW_ON_ERROR);
 
         if (! is_array($decoded)) {
@@ -233,11 +230,11 @@ final class ImportSpatieCallsCommand extends Command
      */
     private function timestamp(mixed $value, Dialect $dialect): string
     {
-        // ⚠️ The `!== ''` clause changes no answer, and mutation testing reports it as a
-        // survivor. Carbon reads Date::parse('') as NOW — measured — which is exactly what the
-        // fallback beside it produces, so no input separates the two. The `is_string()` check
-        // does NOT share that property: without it an integer reaches Date::parse() and is
-        // turned into some instant, which is why that half is pinned by a test.
+        // The `!== ''` clause changes no answer: Carbon reads Date::parse('') as now, which is
+        // exactly what the fallback beside it produces, so no input separates the two. The
+        // `is_string()` check does not share that property — without it an integer reaches
+        // Date::parse() and is turned into some instant, which is why that half is pinned by a
+        // test.
         //
         // Kept rather than deleted: it states at the point of reading that an empty value has no
         // timestamp in it, instead of leaning on a convenience of the date library.

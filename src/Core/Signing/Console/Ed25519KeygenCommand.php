@@ -6,6 +6,7 @@ namespace Pushery\Webhooks\Core\Signing\Console;
 
 use Illuminate\Console\Command;
 use Pushery\Webhooks\Core\Signing\Ed25519Keys;
+use Pushery\Webhooks\Core\Signing\Ed25519Scheme;
 
 /**
  * Prints a fresh Ed25519 keypair for the asymmetric {@see Ed25519Scheme}.

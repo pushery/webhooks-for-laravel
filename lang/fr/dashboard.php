@@ -19,6 +19,7 @@ return [
     ],
 
     'kpis' => [
+        'title' => "En un coup d'œil",
         'total' => 'Total des webhooks envoyés',
         'successful' => 'Réussis',
         'failed' => 'Échoués',
@@ -31,6 +32,11 @@ return [
     'formats' => [
         'hour_bucket' => 'j M H:i',
         'absolute' => 'LLL z',
+
+        // 'precise' is a second pattern because 'absolute' cannot separate two rows and the
+        // accessible names need it to. lang/en/dashboard.php states the case in full, including
+        // what it still does not cover.
+        'precise' => 'LL LTS z',
     ],
 
     'api' => [
@@ -87,11 +93,23 @@ return [
     // Badge labels for the stored DeliveryStatus values. The key is the persisted
     // value and is never translated; only the label a reader sees is. Lowercase, as
     // in the original design.
+    // Shown when the rollup the counts come from has fallen behind the rows it summarizes --
+    // twice the configured refresh cadence or more, so a run merely in progress never triggers it.
+    'rollup_stale' => 'Les compteurs de livraison de cette page ont :minutes minutes de retard. Ils viennent d\'un rollup qu\'avance `webhooks:refresh-metrics` ; les latences à côté sont en direct, donc les deux divergent jusqu\'au prochain passage de cette commande.',
+
+    // These agree with a noun that is not in the string, and four of the five used to get it wrong.
+    // They label one column of one table, and the thing they label is a delivery (la livraison),
+    // feminine in this language. Four were masculine and the fifth feminine, so the column read as
+    // machine translation on the most-read screen in the package.
+    //
+    // No guard can check this: agreement is a fact about a word that never appears beside them. The
+    // noun is written here so the next translator has it.
     'status' => [
         'pending' => 'en attente',
-        'succeeded' => 'réussi',
-        'failed' => 'échoué',
-        'exhausted' => 'épuisé',
+        'succeeded' => 'réussie',
+        'failed' => 'échouée',
+        'exhausted' => 'épuisée',
+        'refused' => 'refusée',
     ],
 
     // The same statuses as filter options, where the surrounding form wants them
@@ -101,6 +119,7 @@ return [
         'succeeded' => 'Réussi',
         'failed' => 'Échoué',
         'exhausted' => 'Épuisé',
+        'refused' => 'Refusée',
     ],
 
     'drawer' => [
@@ -160,12 +179,22 @@ return [
         'sections' => 'Sections du tableau de bord',
         'retry_rate' => 'Taux de réessai',
         'deliveries_per_hour' => 'Livraisons par heure',
-        'hour_summary' => ':hour : :total au total, :delivered livrées, :pending en attente, :failed échouées',
+        'hour_summary' => [
+            // Four choice fragments rather than one sentence with four numbers in it: agreement is
+            // decided by the number, `trans_choice` takes one count per string, and there are four.
+            // lang/en/dashboard.php states the case in full, including why English, German and
+            // Dutch carry identical forms on both sides.
+            'total' => '{0} :count au total|{1} :count au total|[2,*] :count au total',
+            'delivered' => '{0} :count livrée|{1} :count livrée|[2,*] :count livrées',
+            'pending' => '{0} :count en attente|{1} :count en attente|[2,*] :count en attente',
+            'failed' => '{0} :count échouée|{1} :count échouée|[2,*] :count échouées',
+        ],
         'latency_trend' => 'Tendance de la latence P95 par heure',
+        'latency_bar' => ':hour : :value ms',
         'recent_deliveries_table' => 'Livraisons de webhooks récentes',
         'deliveries_table' => 'Livraisons de webhooks',
-        'replay_delivery' => 'Renvoyer la livraison :event',
-        'view_delivery' => 'Voir les détails de la livraison :event',
+        'replay_delivery' => ':label — :event · :endpoint · :at',
+        'view_delivery' => 'Voir les détails de la livraison :event vers :endpoint du :at',
         'delivery_details' => 'Détails de la livraison',
         'close_details' => 'Fermer les détails',
         'loading_kpis' => 'Chargement des indicateurs clés',

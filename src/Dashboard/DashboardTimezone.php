@@ -12,20 +12,20 @@ use Pushery\Webhooks\Support\UiTheme;
 use Throwable;
 
 /**
- * The zone the dashboard RENDERS its timestamps in — which is a different question from the
- * zone they are stored or read in, and until now the package only had an answer for the second.
+ * The zone the dashboard renders its timestamps in, which is a different question from the zone
+ * they are stored or read in — and until now the package only had an answer for the second.
  *
  * Every dashboard timestamp already carries the application zone: the delivery model uses
  * HasZonedTimestamps, which shifts a read into `app.timezone`, and the absolute format ends in
- * `z` so the reader can see which clock they are being shown. That is correct, and labelling it
+ * `z` so the reader can see which clock they are being shown. That is correct, and labeling it
  * was already an improvement over a bare wall-clock time.
  *
- * ⚠️ WHAT WAS MISSING IS A SEAM, NOT A ZONE. `app.timezone` is ONE process-wide setting. In a
- * multi-tenant back-office it is `UTC` — the right choice for storage and the wrong one for
- * display — while the operator reading the delivery log sits in Europe/Berlin and the next
- * tenant sits somewhere else. There is no single correct value an application could set, so
- * labelling the offset only tells the reader they have to do the arithmetic themselves, on the
- * one surface where they are comparing timestamps against their own records.
+ * What was missing is a seam rather than a zone. `app.timezone` is one process-wide setting. In a
+ * multi-tenant back-office it is `UTC`, the right choice for storage and the wrong one for display,
+ * while the operator reading the delivery log sits in Europe/Berlin and the next tenant sits
+ * somewhere else. There is no single correct value an application could set, so labeling the
+ * offset only tells the reader they have to do the arithmetic themselves, on the one surface where
+ * they are comparing timestamps against their own records.
  *
  * Unset, this changes nothing at all: the application zone, exactly as before.
  *
@@ -37,17 +37,16 @@ use Throwable;
  * The class form is the same mechanism as {@see PayloadVisibility}:
  * the host decides, the package asks. It must implement {@see DashboardTimezoneResolver}.
  *
- * A MISTYPED ZONE FALLS BACK RATHER THAN THROWING, and that follows the rule this package
- * already applies to presentation settings ({@see UiTheme}): a typo
- * in a display setting must never take a dashboard down. The fallback is also self-revealing
- * here in a way most fallbacks are not — the absolute format ends in `z`, so a reader who
- * expected their own zone sees the application's named beside the value rather than a plausible
- * wrong number.
+ * A mistyped zone falls back rather than throwing, which follows the rule this package already
+ * applies to presentation settings ({@see UiTheme}): a typo in a display setting must never take a
+ * dashboard down. The fallback is also self-revealing here in a way most fallbacks are not — the
+ * absolute format ends in `z`, so a reader who expected their own zone sees the application's named
+ * beside the value instead of a plausible wrong number.
  *
- * A RESOLVER CLASS THAT IS NOT ONE DOES throw, and the asymmetry is deliberate: a bad zone
- * string is data, and data is mistyped; a class that does not implement the contract is wiring,
- * and wiring is wrong rather than mistyped. It is the same split every other resolver seam in
- * this package makes.
+ * A resolver class that is not one does throw, and the asymmetry is deliberate: a bad zone string
+ * is data, and data is mistyped; a class that does not implement the contract is wiring, and wiring
+ * is wrong rather than mistyped. It is the same split every other resolver seam in this package
+ * makes.
  *
  * @internal
  */

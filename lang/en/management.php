@@ -8,6 +8,7 @@ declare(strict_types=1);
 // the wording of the other.
 return [
     'form' => [
+        'error_summary' => '{1} The form has one error.|[2,*] The form has :count errors.',
         'name_label' => 'Name',
         'url_label' => 'Endpoint URL',
         // An example URL, not prose, but it reaches the reader as a placeholder, so a
@@ -129,6 +130,7 @@ return [
         'succeeded' => 'succeeded',
         'failed' => 'failed',
         'exhausted' => 'exhausted',
+        'refused' => 'refused',
     ],
 
     // The same statuses as filter options, where the surrounding form wants them
@@ -138,6 +140,7 @@ return [
         'succeeded' => 'Succeeded',
         'failed' => 'Failed',
         'exhausted' => 'Exhausted',
+        'refused' => 'Refused',
     ],
 
     'messages' => [
@@ -158,6 +161,11 @@ return [
             'in' => 'This event type is not one this application publishes.',
         ],
         'url' => [
+            // The scheme narrowing on the rule ('url:http,https') is what produces this,
+            // and without a line here the operator console fell back to the framework's
+            // own English 'must be a valid URL' -- for a form whose every other message
+            // is translated.
+            'url' => 'Enter a valid endpoint URL. It must start with http:// or https://.',
             // What the reader gets when the SSRF guard refuses the destination. The
             // guard's own message stays untranslated: it is an operator diagnostic for
             // the log, and it would tell a stranger which hosts resolve where.
@@ -171,7 +179,14 @@ return [
         'subscriptions_table' => 'Your webhook endpoints',
         'delivery_log_table' => 'Delivery log',
         'edit_subscription' => 'Edit endpoint :url',
-        'rotate_subscription' => 'Rotate the signing secret of endpoint :url',
+        'rotate_subscription' => ':label — :url',
+        // Per ROW, because twenty buttons all reading "Redeliver" are twenty identical
+        // entries in a screen reader's element list, and picking the wrong one sends a
+        // real HTTP request to a customer's endpoint. Visible text first, so the name
+        // contains it (WCAG 2.5.3) -- see the a11y keys beside this one.
+        'redeliver_delivery' => ':label — :event · :endpoint · :at',
+        'toggle_subscription' => ':label — :url',
+        'ping_subscription' => ':label — :url',
         'delete_subscription' => 'Delete endpoint :url',
     ],
 ];

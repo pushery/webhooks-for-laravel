@@ -190,6 +190,13 @@ return [
         // the webhook when its window elapses, instead of the delivery being exhausted
         // half an hour earlier. Raise retry_after_cap on a queue that can hold longer
         // delays (Redis, database) to obey such a hint exactly.
+        //
+        // A cap of 0 switches the hint OFF rather than shortening it to nothing: the delay
+        // comes from the jittered schedule, exactly as if the endpoint had sent no header,
+        // and nothing is deferred. Read the other way it would answer 'Retry-After: 60'
+        // with an immediate retry against the endpoint that just asked for quiet — worse
+        // than not having the feature. To switch it off, either 0 or
+        // respect_retry_after => false will do; the second says so more plainly.
         'backoff' => [
             'base' => 10,
             'cap' => 900,
@@ -198,6 +205,13 @@ return [
             'retry_after_max_deferrals' => 6,
         ],
         'no_retry_on_4xx' => true,
+        // Which 4xx stay retryable while the switch above is on. Digit strings are read as
+        // the codes they obviously are, because the usual way this list grows a string is
+        // explode(',', env('...')) — and dropping those left an EMPTY list, which reads as
+        // the deliberate "no 4xx is retryable" and gave a host the exact opposite of what
+        // they configured. A value nothing can make sense of is still dropped, a list that
+        // survives as nothing falls back to these three, and 'webhooks:preflight' says so
+        // in every case rather than leaving the file looking right.
         'retryable_4xx' => [408, 425, 429],
 
         // How many bytes of an endpoint's response are kept on the delivery log for
@@ -258,7 +272,7 @@ return [
         'enabled' => (bool) env('WEBHOOKS_PLATFORM_ENABLED', true),
 
         // The primary-key type of the models that OWN webhook subscriptions: 'bigint'
-        // (default), 'uuid' or 'ulid'. It fixes the storage type of the denormalised
+        // (default), 'uuid' or 'ulid'. It fixes the storage type of the denormalized
         // owner_id column across the subscriptions table, the delivery log AND the
         // dashboard rollup — the three must match or the tenant join breaks — so set it
         // to match your owner models and migrate; changing it on a populated database is a
@@ -370,10 +384,10 @@ return [
         // so a rejected form costs nothing against it. Set to null to remove the brake.
         //
         // It is ON by default, and that is a deliberate behavior change: a host doing a bulk
-        // import THROUGH THE PORTAL will meet it. Bulk registration belongs on the manager
+        // import through the portal will meet it. Bulk registration belongs on the manager
         // (Webhooks::subscribe), which is not braked at all — this is the human surface.
         //
-        // 'register_routes' is for a host that wants the PANELS but not the portal's own
+        // 'register_routes' is for a host that wants the panels but not the portal's own
         // pages. Set it to false and the provider registers the Livewire components and
         // nothing else — no route, no prefix, no middleware stack of its own — so you can
         // embed <livewire:webhooks.self-service.endpoint-list /> in a screen you already
@@ -416,6 +430,15 @@ return [
             // decides WHERE a request may go; this decides how MANY. A non-positive value
             // switches the brake off rather than refusing every replay.
             'replays_per_minute' => 10,
+
+            // How many times one tenant may recompute the whole health matrix per minute.
+            // The portal's most expensive action by a wide margin: two queries per endpoint,
+            // synchronously, in the web request, multiplied by an endpoint count that
+            // max_endpoints_per_tenant leaves unbounded by default. Low on purpose — the
+            // scheduled refresh does the same work in the background, so pressing the button
+            // again buys nothing the next tick would not. A non-positive value switches the
+            // brake off rather than refusing every recompute.
+            'recomputes_per_minute' => 2,
             'secret_reveal_ttl' => 60,
             'allow_delete' => true,
             'max_endpoints_per_tenant' => null,
@@ -606,13 +629,12 @@ return [
             //     // 'cache_ttl' seconds. 'kid' pins one key exactly; without it the FIRST TWO
             //     // keys of the document are tried, in the order the document publishes them.
             //     //
-            //     // ⚠️ That is a statement about POSITION, not about age — a JWK carries no
+            //     // That is a statement about position rather than about age: a JWK carries no
             //     // reliable one, and RFC 7517 defines no ordering for 'keys'. With one or two
-            //     // keys it makes no difference (both are tried either way). With THREE or
-            //     // more, everything past the second is never tried, and a delivery signed
-            //     // with one of them is refused as unsigned: no error, no log, just a producer
-            //     // retrying until its budget is gone. Pin 'kid' when the producer publishes
-            //     // more than two.
+            //     // keys it makes no difference, since both are tried either way. With three or
+            //     // more, everything past the second is never tried, and a delivery signed with
+            //     // one of them is refused as unsigned: no error, no log, just a producer retrying
+            //     // until its budget is gone. Pin 'kid' when the producer publishes more than two.
             //     'scheme' => \Pushery\Webhooks\Core\Signing\Ed25519Scheme::class,
             //     'jwks' => ['url' => env('STRIPE_JWKS_URL'), 'cache_ttl' => 3600, 'kid' => null],
             //     // Authenticity that is NOT a signature over the bytes — a provider API
@@ -660,6 +682,14 @@ return [
             //     // with an EMPTY type and per-type routing falls to '*' every time. Same
             //     // grammar as 'dedupe_id' below.
             //     'event_type' => 'header:X-GitHub-Event',
+            //     // GitHub again, and for the same reason: its delivery id is
+            //     // X-GitHub-Delivery, not the 'webhook-id' header the default below reads.
+            //     // It matters more here than the type does, because GitHubScheme signs no
+            //     // timestamp — 'tolerance_seconds' above is never consulted for it, so this
+            //     // line is the only replay boundary the source can have. Without it the key
+            //     // is null, a null collides with nothing, and an intercepted authentic
+            //     // delivery replays forever. 'webhooks:preflight' warns when it is missing.
+            //     // 'dedupe_id' => 'header:X-GitHub-Delivery',
             //     // 'event_type' => 'body:data.kind',
             //     // A resolver is the form GitHub actually wants, because the useful type is
             //     // the header AND `action` together ('release.published'):
@@ -682,12 +712,12 @@ return [
             //     //                                           // in whichever format it arrived
             //     //   'dedupe_id' => \App\Webhooks\MyDedupeKey::class // a DedupeKeyResolver
             //     //
-            //     // ⚠️ It has to be the DELIVERY id, not the id of the thing the delivery is
-            //     // about. Stripe's 'data.object.id' is the invoice or the charge, so every
-            //     // event about that object carries the same value — keyed on it, an
-            //     // 'invoice.payment_failed' is a duplicate of the 'invoice.paid' before it
-            //     // and is acknowledged and dropped without a trace. Stripe's delivery id is
-            //     // the envelope's own 'id' (evt_…), which is what the line below reads.
+            //     // It has to be the delivery id, not the id of the thing the delivery is about.
+            //     // Stripe's 'data.object.id' is the invoice or the charge, so every event about
+            //     // that object carries the same value — keyed on it, an 'invoice.payment_failed'
+            //     // is a duplicate of the 'invoice.paid' before it and is acknowledged and dropped
+            //     // without a trace. Stripe's delivery id is the envelope's own 'id' (evt_…),
+            //     // which is what the line below reads.
             //     'dedupe_id' => 'body:id',
             //     'rate_limit' => ['max_attempts' => 60, 'decay_seconds' => 60],
             //     'large_payload' => ['enabled' => false, 'threshold' => 262144, 'disk' => 's3'],
@@ -711,7 +741,7 @@ return [
     | Composer suggestions), and a host on another UI kit publishes the views with
     | --tag=webhooks-dashboard-views and restyles them.
     |
-    | It READS THE PLATFORM LAYER'S delivery log (see 'source_model'), whose table is
+    | It reads the Platform layer's delivery log (see 'source_model'), whose table is
     | migrated only while platform.enabled is true — so the dashboard requires the
     | Platform layer. A host that points 'source_model' at its own log model owns that
     | table itself.
@@ -823,7 +853,7 @@ return [
         // Set it when app.timezone is not the right DISPLAY zone — which in a multi-tenant
         // back-office it usually is not: UTC is right for storage and wrong for the operator
         // reading the delivery log, and there is no single value the application could set
-        // that is correct for every reader. Labelling the offset only tells them to do the
+        // that is correct for every reader. Labeling the offset only tells them to do the
         // arithmetic themselves, on the one surface where they compare against their own
         // records.
         //
@@ -984,6 +1014,18 @@ return [
     'ui' => [
         'theme' => env('WEBHOOKS_UI_THEME', 'auto'),
 
+        // Which rendering of the two OPERATOR screens you get: 'auto', 'wirekit' or 'plain'.
+        //
+        // The package ships both — neutral Tailwind markup and pushery/wirekit markup — and
+        // 'auto' picks the WireKit one when WireKit is registered in your app. No publish, no
+        // copy to keep in step. There is no version setting because composer.json already
+        // refuses a WireKit below the tested floor, so a resolvable install is a tested one.
+        //
+        // A view you PUBLISHED always wins over this, whichever tag you published it with:
+        // both land at resources/views/vendor/webhooks/livewire, and that is still the way to
+        // make real changes rather than only to choose a style.
+        'variant' => env('WEBHOOKS_UI_VARIANT', 'auto'),
+
         // A Blade view rendered into the package layouts' <head> — your @vite tags (or any
         // <link>/<script>) so the shipped screens use your asset pipeline. Null renders nothing.
         'assets' => null,
@@ -1014,9 +1056,10 @@ return [
     | second place, it inherits THAT page's gate rather than the original one.
     |
     | Null is the default and means today's behavior exactly: no per-action check, the
-    | page gate is the only guard. Set it to an ability name and create(), toggle(),
-    | delete(), redeliver() and ping() authorize against it. The action name is passed
-    | to the gate as its argument, so one ability can answer differently per action:
+    | page gate is the only guard. Set it to an ability name and all seven gated actions
+    | authorize against it — create, edit, toggle, rotate, delete, redeliver, ping, the
+    | same list this block names again further down. The action name is passed to the
+    | gate as its argument, so one ability can answer differently per action:
     |
     |     Gate::define('webhooks.operate', fn ($user, string $action) => match ($action) {
     |         'delete' => $user->isAdmin(),
@@ -1028,9 +1071,9 @@ return [
     | non-final so that override is actually reachable; until v2.0.1 they were not, which
     | made this sentence describe something the language forbids.
     |
-    | ⚠️ THIS MUST NAME AN ABILITY YOU DECLARED WITH Gate::define() — NOT A
-    | spatie/laravel-permission PERMISSION. That package installs a Gate::before hook
-    | which reads the FIRST positional gate argument as a GUARD name and shifts it off:
+    | This must name an ability you declared with Gate::define(), not a spatie/laravel-permission
+    | permission. That package installs a Gate::before hook which reads the first positional gate
+    | argument as a guard name and shifts it off:
     |
     |     if (is_string($args[0] ?? null) && ! class_exists($args[0])) {
     |         $guard = array_shift($args);

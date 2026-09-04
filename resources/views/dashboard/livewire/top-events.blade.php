@@ -3,7 +3,7 @@
 <div class="wh-dash-top-events" wire:key="top-events" wire:poll.{{ config('webhooks.dashboard.poll_interval', '30s') }}>
     <x-wirekit::card>
         <x-wirekit::card.header>
-            <x-wirekit::heading :level="3" size="sm">{{ __('webhooks::dashboard.top_events.title') }}</x-wirekit::heading>
+            <x-wirekit::heading :level="2" size="sm">{{ __('webhooks::dashboard.top_events.title') }}</x-wirekit::heading>
         </x-wirekit::card.header>
         <x-wirekit::card.body>
             @if ($events->isEmpty())
@@ -20,7 +20,7 @@
                     @foreach ($events as $event)
                         <li class="flex items-center justify-between gap-[var(--padding-wk-x-md)]" wire:key="te-{{ $event->event_type }}">
                             <x-wirekit::text weight="medium" truncate>{{ $event->event_type }}</x-wirekit::text>
-                            <x-wirekit::badge intent="neutral">{{ number_format((int) $event->total) }}</x-wirekit::badge>
+                            <x-wirekit::badge intent="neutral">{{ \Pushery\Webhooks\Support\LocalizedNumber::format((int) $event->total) }}</x-wirekit::badge>
                         </li>
                     @endforeach
                 </ul>

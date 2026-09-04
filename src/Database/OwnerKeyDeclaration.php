@@ -27,12 +27,12 @@ use Throwable;
  *     against the tenant. FAIL-CLOSED: every tenant is refused its own deliveries, which
  *     reads like an authorization decision rather than a defect.
  *
- * ⚠️ THE CONTRADICTION IS AN EXPECTED STATE, NOT AN ABUSE. A host that partitions differently
- * or needs its own indexes FORKS the two create-table migrations — that is a normal thing to
- * do, and this package's own docs describe the shape. The moment it happens, the column comes
- * from the fork and the setting comes from the config, and nothing holds the two together.
- * The exception in the first bullet is well written and names the cure exactly; it simply
- * arrives at the first customer click, months after the mistake was made.
+ * The contradiction is an expected state, not an abuse. A host that partitions differently
+ * or needs its own indexes forks the two create-table migrations — a normal thing to do, and this
+ * package's own docs describe the shape. The moment it happens, the column comes from the fork and
+ * the setting comes from the config, and nothing holds the two together. The exception in the first
+ * bullet is well written and names the cure exactly; it simply arrives at the first customer click,
+ * months after the mistake was made.
  *
  * So the check reads the column rather than believing the setting, and it is deliberately
  * placed where a host is already looking: `webhooks:preflight` (onboarding) and right after
@@ -55,7 +55,7 @@ use Throwable;
 final class OwnerKeyDeclaration
 {
     /**
-     * The tables carrying the denormalised owner key. The rollup is MySQL-only (PostgreSQL's
+     * The tables carrying the denormalized owner key. The rollup is MySQL-only (PostgreSQL's
      * is a view over the delivery log), and every one of them is checked only if it exists —
      * a layer a host does not run leaves nothing to contradict.
      *
@@ -85,14 +85,14 @@ final class OwnerKeyDeclaration
         }
 
         $name = $connection ?? Config::get('webhooks.database.connection');
-        // ⚠️ Both halves of this guard are reported as survivors, and both are equivalent.
-        // Turning `&&` into `||` reaches Schema::connection() with the same argument it would
-        // have had anyway — a non-string name is not a string, so the ternary still falls to
-        // null. Moving the empty-string test needs a connection literally named '', which no
-        // configuration produces. Measured, both, suite green.
+        // Neither half of this guard can change the outcome. Turning `&&` into `||` reaches
+        // Schema::connection() with the same argument it would have had anyway, because a
+        // non-string name is not a string and the ternary still falls to null. Moving the
+        // empty-string test needs a connection literally named '', which no configuration produces.
         //
-        // Kept: this line is what turns "unset or blank" into "the application default", and
-        // saying so here is cheaper than making a reader derive it from two coercions.
+        // It is kept because this line is what turns "unset or blank" into "the application
+        // default", and saying so here is cheaper than making a reader derive it from two
+        // coercions.
         $schema = Schema::connection(is_string($name) && $name !== '' ? $name : null);
 
         $found = [];
@@ -108,13 +108,13 @@ final class OwnerKeyDeclaration
                 // Reading a schema is not this check's job to guarantee. A connection that
                 // cannot answer is the caller's problem to report, not a contradiction.
                 //
-                // ⚠️ This is the ONE `continue` in this loop with no arm on it, and it is a
-                // deliberate gap rather than an oversight. The other four are each pinned by a
-                // "keeps checking after …" test, because turning any of them into a `break`
-                // would end the scan at a skipped table and report a forked schema as sound.
-                // Reaching THIS one needs a connection that answers for one table and throws
-                // for the next, which is a stub of the schema builder rather than a database
-                // state — a test whose subject would be the stub. Left as measured.
+                // This is the one `continue` in this loop with no arm on it, and it is a deliberate
+                // gap rather than an oversight. The other four are each pinned by a "keeps checking
+                // after …" test, because turning any of them into a `break` would end the scan at a
+                // skipped table and report a forked schema as sound. Reaching this one needs a
+                // connection that answers for one table and throws for the next, which is a stub of
+                // the schema builder and not a database state — a test whose subject would be
+                // the stub. Left as measured.
                 continue;
             }
 
@@ -172,9 +172,9 @@ final class OwnerKeyDeclaration
             // column of every table, and a schema that answered with a non-string type has no
             // separate outcome worth its own branch — it is the same "no answer" as a table
             // without the column, which is what the return below already says.
-            // The `!== ''` half is unkillable: a column the schema reports has a type, and an
-            // empty one is not a shape any driver returns (measured). Kept beside the
-            // is_string() so the pair reads as one statement about a usable type.
+            // The `!== ''` half cannot fire: a column the schema reports has a type, and an empty
+            // one is not a shape any driver returns. It is kept beside the is_string() so the pair
+            // reads as one statement about a usable type.
             if (($column['name'] ?? null) === 'owner_id' && is_string($type) && $type !== '') {
                 return $type;
             }
@@ -191,11 +191,10 @@ final class OwnerKeyDeclaration
      * `bigint` / `uuid` / `character(26)`, MySQL answers `bigint unsigned` / `char(36)` /
      * `char(26)`, and a forked migration may have used any equivalent.
      *
-     * ⚠️ THE ORDER IS LOAD-BEARING AND THE WIDTHS ARE THE ONLY THING SEPARATING TWO OF THEM.
-     * MySQL stores a UUID as `char(36)` and a ULID as `char(26)` — the type name is identical
-     * and only the width tells them apart, so the character branches must test the width and
-     * must come after the two named types. Anything else answers null, and null is silence,
-     * not a finding.
+     * The order is load-bearing, and the widths are the only thing separating two of them. MySQL
+     * stores a UUID as `char(36)` and a ULID as `char(26)`: the type name is identical and only the
+     * width tells them apart, so the character branches must test the width and must come after the
+     * two named types. Anything else answers null, and null is silence rather than a finding.
      */
     private static function classify(string $type): ?OwnerKeyType
     {

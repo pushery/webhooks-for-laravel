@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Models;
 
+use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -19,6 +20,7 @@ use Pushery\Webhooks\Database\Concerns\UsesWebhookConnection;
 use Pushery\Webhooks\Database\Factories\WebhookDeliveryFactory;
 use Pushery\Webhooks\Database\OwnerKeyType;
 use Pushery\Webhooks\Enums\DeliveryStatus;
+use Pushery\Webhooks\Support\Settings;
 
 /**
  * A single delivery-log entry: one event sent to one subscription.
@@ -173,18 +175,18 @@ class WebhookDelivery extends Model
     {
         $query->where($this->getKeyName(), '=', $this->getKeyForSaveQuery());
 
-        // ⚠️ BOUND VERBATIM, NEVER RE-DERIVED, and the difference is a whole engine.
+        // Bound verbatim, never re-derived, and the difference is a whole engine.
         //
-        // getRawOriginal() hands back the column's own literal — the exact bytes the row
-        // holds. Sending them back is an identity comparison and needs no timezone rule at
-        // all. Passing them through fromDateTime() looked equivalent and was not: that is
-        // the WRITE path, whose whole job is to read a value under the CALLER's rule, and
-        // its own docblock warns against exactly this confusion. On MySQL it resolved the
-        // naive column string against app.timezone, so on any host not running UTC the
-        // UPDATE asked for an instant offset by the zone and matched ZERO rows -- while
-        // save() still answered true and the in-memory model still looked written. Every
-        // delivery would have stayed at status=pending, attempt=0, for ever, with the
-        // dashboard, the health score and the circuit breaker all reading that as fact.
+        // getRawOriginal() hands back the column's own literal — the exact bytes the row holds.
+        // Sending them back is an identity comparison and needs no timezone rule at all. Passing
+        // them through fromDateTime() looked equivalent and was not: that is the write path, whose
+        // whole job is to read a value under the caller's rule, and its own docblock warns against
+        // exactly this confusion. On MySQL it resolved the naive column string against
+        // app.timezone, so on any host not running UTC the UPDATE asked for an instant offset by
+        // the zone and matched zero rows — while save() still answered true and the in-memory model
+        // still looked written. Every delivery would have stayed at status=pending, attempt=0, for
+        // ever, with the dashboard, the health score and the circuit breaker all reading that as
+        // fact.
         //
         // PostgreSQL never showed it: the stored literal carries its offset, so both
         // spellings name the same instant and timestamptz compares by instant.
@@ -195,5 +197,31 @@ class WebhookDelivery extends Model
         }
 
         return $query;
+    }
+
+    /**
+     * Bound a lookup to the rows retention can still be holding, so the planner may prune.
+     *
+     * This is for a single-row lookup by id, and without it such a lookup reads every partition.
+     * `webhook_deliveries` is PARTITION BY RANGE (created_at) with PRIMARY KEY (id, created_at): an
+     * id alone does not say which partition, so PostgreSQL probes the primary index of all of them,
+     * and the count grows with every month the log survives. The package states that invariant in
+     * several places and three click paths in the operator surfaces did not hold it.
+     *
+     * It costs nothing in reachable rows. The bound is one month BELOW the retention floor —
+     * partitions are dropped whole and only once entirely older than it, so between two
+     * maintenance runs a partition just past the floor can still exist, and cutting exactly at
+     * the floor could hide a row that is genuinely still there.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeWithinRetention(Builder $query): Builder
+    {
+        $months = new Settings()->retentionMonths();
+
+        return $query->createdAfter(
+            CarbonImmutable::now('UTC')->startOfMonth()->subMonths($months + 1),
+        );
     }
 }

@@ -7,6 +7,7 @@ namespace Pushery\Webhooks\Console;
 use Illuminate\Console\Command;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Platform\Health\EndpointHealth;
+use Throwable;
 
 /**
  * Recomputes and caches the health score of every active endpoint from its recent
@@ -25,13 +26,37 @@ final class RefreshEndpointHealthCommand extends Command
     public function handle(EndpointHealth $health): int
     {
         $count = 0;
+        /** @var list<string> $failed */
+        $failed = [];
 
+        // Per row, for the reason spelled out in RevokeRotatedSecretsCommand: an unguarded sweep
+        // over a cursor ends at its first bad row, and the endpoints ordered after it keep the
+        // score the last delivery left them with -- which is precisely what this command exists
+        // to stop.
         foreach (WebhookSubscription::query()->active()->cursor() as $subscription) {
-            $health->refresh($subscription);
-            $count++;
+            try {
+                $health->refresh($subscription);
+                $count++;
+            } catch (Throwable $failure) {
+                $key = $subscription->getKey();
+
+                $failed[] = is_scalar($key) ? (string) $key : 'unknown';
+
+                report($failure);
+            }
         }
 
         $this->info(sprintf('Refreshed the health score of %d active endpoint(s).', $count));
+
+        if ($failed !== []) {
+            $this->error(sprintf(
+                '%d endpoint(s) could not be scored and keep whatever their last delivery left: %s.',
+                count($failed),
+                implode(', ', $failed),
+            ));
+
+            return self::FAILURE;
+        }
 
         return self::SUCCESS;
     }

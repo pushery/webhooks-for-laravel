@@ -6,7 +6,7 @@ namespace Pushery\Webhooks\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Number;
+use Pushery\Webhooks\Support\LocalizedNumber;
 use Pushery\Webhooks\Support\PayloadReclaimer;
 
 /**
@@ -21,6 +21,23 @@ use Pushery\Webhooks\Support\PayloadReclaimer;
  * you offload to a LOCAL disk, or when compliance requires app-controlled deletion. It is NOT
  * scheduled by default: run or schedule it yourself, off-peak (it assumes offload writes are
  * quiesced for the sweep).
+ *
+ * What it costs, stated rather than discovered. Two things scale with the installation and neither
+ * can be chunked away, so an operator should know the size before starting, not after a run
+ * dies:
+ *
+ *   - The DATABASE side is a full scan of both offload logs. `payload_disk` carries no index on
+ *     either engine, and no bound on `created_at` means no partition pruning either. That is a
+ *     deliberate trade: an index on that column would cost the delivery log's hot insert path
+ *     permanently, for a sweep that is manual and rare. The rows are streamed in chunks, so the
+ *     scan is slow rather than memory-hungry.
+ *   - The RESIDENT set is every still-referenced object key for the disk, held at once. It has to
+ *     be — an object is an orphan only when NO row references it, so the answer needs the whole
+ *     set. Roughly the key length times the number of offloaded rows.
+ *
+ * The disk listing is the third: it enumerates every object under the prefix. On object storage
+ * that is a full-bucket LIST, which is the cost a lifecycle policy exists to avoid, and the
+ * paragraph above is why this command is the second choice there.
  *
  * @internal
  */
@@ -66,7 +83,11 @@ final class PruneOrphanedPayloadsCommand extends Command
             ));
         }
 
-        $size = Number::fileSize($totalBytes);
+        // NOT Number::fileSize(): it reaches Illuminate\Support\Number::format(), which throws
+        // without ext-intl — an extension this package does not require. This command is
+        // SCHEDULED, and the call sits AFTER the deletion loop, so on such a host every run
+        // ended in a fatal error with the operator unable to tell whether the prune had run.
+        $size = LocalizedNumber::fileSize($totalBytes);
 
         $this->info($dryRun
             ? sprintf('Dry run: %d orphaned object(s) holding %s would be deleted.', $totalOrphaned, $size)
@@ -90,10 +111,38 @@ final class PruneOrphanedPayloadsCommand extends Command
             return [$override];
         }
 
+        $disks = [];
+
         if (Config::boolean('webhooks.server.large_payload.enabled', false)) {
-            return [Config::string('webhooks.server.large_payload.disk', 's3')];
+            $disks[] = Config::string('webhooks.server.large_payload.disk', 's3');
         }
 
-        return [];
+        // The client layer offloads too, and this only looked at the server. `PayloadReclaimer`
+        // sweeps both tables — its own docblock says so, and this command's description says "no
+        // delivery-log or call-log row still references" — but the disk list came from one layer.
+        // So a host with inbound offload on and outbound off was told "Offload is not enabled on
+        // any layer", the command returned success, and their orphaned call payloads accumulated on
+        // the disk for ever with a scheduled job reporting nothing wrong.
+        //
+        // Per SOURCE rather than one switch: `client.configs` is a list and each entry carries
+        // its own `large_payload` block, so two producers can offload to two different disks.
+        // Reading only the first would be the same defect one level down.
+        foreach (Config::array('webhooks.client.configs', []) as $entry) {
+            $block = is_array($entry) ? ($entry['large_payload'] ?? null) : null;
+
+            if (! is_array($block) || ($block['enabled'] ?? false) !== true) {
+                continue;
+            }
+
+            $disk = $block['disk'] ?? 's3';
+
+            if (is_string($disk) && $disk !== '') {
+                $disks[] = $disk;
+            }
+        }
+
+        // Deduplicated because both layers may point at one disk, and sweeping it twice would
+        // double a scan the reclaimer already documents as unindexed.
+        return array_values(array_unique($disks));
     }
 }

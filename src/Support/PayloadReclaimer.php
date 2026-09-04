@@ -34,6 +34,15 @@ final class PayloadReclaimer
     private const string PREFIX = 'webhooks';
 
     /**
+     * Rows per round trip while building the reference set.
+     *
+     * Big enough that a large log is not a million queries, small enough that one chunk is a
+     * rounding error next to the set it feeds. The set itself is unavoidable; the transient copy
+     * pluck()->all() made beside it was not.
+     */
+    private const int CHUNK = 1000;
+
+    /**
      * Sweep one disk. Returns the tally; when $dryRun is true nothing is deleted but the
      * orphans (and the bytes they hold) are still counted, so an operator can preview the run.
      *
@@ -52,10 +61,9 @@ final class PayloadReclaimer
         // allFiles() is typed as a bare array; keep only the string keys it actually yields so
         // the path stays a string for the disk operations below.
         //
-        // ⚠️ Unkillable, and reported as a survivor: the driver only ever yields strings, so at
-        // run time the filter removes nothing. Measured — unwrapped, the whole prune suite stays
-        // green. It stays because the guarantee it makes is a TYPE guarantee, and the operations
-        // below are typed for a string.
+        // The filter removes nothing at run time, because the driver only ever yields strings. It
+        // stays because the guarantee it makes is a type guarantee, and the operations below are
+        // typed for a string.
         foreach (array_filter($filesystem->allFiles(self::PREFIX), is_string(...)) as $path) {
             $scanned++;
 
@@ -88,38 +96,56 @@ final class PayloadReclaimer
         $schema = Schema::connection(WebhookConnection::name());
         $referenced = [];
 
-        // ⚠️ Five survivors live in this method and the loop above, and every one of them is
-        // equivalent. Measured, all three shapes at once, with the prune suite green:
+        // Three shapes in this method and the loop above cannot change the outcome, and all three
+        // were measured together with the prune suite green:
         //
-        //   `$referenced[$path] = true` moved to `false` — the read is isset(), and isset() is
-        //   true for a stored false. Only null would make it false, and null is not stored here.
+        // `$referenced[$path] = true` moved to `false` — the read is isset(), and isset() is true
+        // for a stored false. Only null would make it false, and null is not stored here.
         //
-        //   both `array_filter(..., is_string(...))` calls unwrapped — pluck() yields null for a
-        //   row that offloaded nothing, and `$referenced[null]` lands under the key '' rather
-        //   than matching any real path.
+        // both `array_filter(..., is_string(...))` calls unwrapped — pluck() yields null for a row
+        // that offloaded nothing, and `$referenced[null]` lands under the key '' rather than
+        // matching any real path.
         //
-        // The controls are the suite's own arms rather than something added for this note: it
+        // The controls are the suite's own arms, not something added for this note: it
         // deletes an object nothing references, keeps one a delivery row references, keeps one a
         // call row references, and keeps scanning past a referenced object. A reference map that
         // did not work would fail all four.
         //
         // They stay, and the second one earns its keep beyond the type: on PHP 8.4 a null array
-        // offset is DEPRECATED, so unwrapping it trades a silent no-op for a notice the day a
-        // row carries no path.
+        // offset is deprecated, so unwrapping it trades a silent no-op for a notice the day a row
+        // carries no path.
+        // Streamed rather than pluck()->all(), and the reason is the second copy. The set below has
+        // to hold every referenced key — that is what it is for, and no amount of chunking changes
+        // it. What pluck()->all() added on top was a full second array of the same paths, alive at
+        // the same time, for the duration of the copy. On a log with millions of offloaded rows
+        // that doubled the peak for no gain. lazyById() holds one chunk at a time instead.
+        //
+        // It cannot make the scan cheap: `payload_disk` carries no index on either engine, and
+        // adding one would cost the delivery log's hot insert path for a sweep that is manual,
+        // unscheduled and meant to run off-peak. That trade is named in the command's docblock
+        // instead of being made quietly here.
         if ($schema->hasTable('webhook_deliveries')) {
-            $paths = WebhookDelivery::query()->where('payload_disk', $disk)->pluck('payload_path')->all();
-
-            foreach (array_filter($paths, is_string(...)) as $path) {
-                $referenced[$path] = true;
-            }
+            WebhookDelivery::query()
+                ->where('payload_disk', $disk)
+                ->select(['id', 'payload_path'])
+                ->lazyById(self::CHUNK)
+                ->each(function (WebhookDelivery $row) use (&$referenced): void {
+                    if (is_string($row->payload_path)) {
+                        $referenced[$row->payload_path] = true;
+                    }
+                });
         }
 
         if ($schema->hasTable('webhook_calls')) {
-            $paths = WebhookCall::query()->where('payload_disk', $disk)->pluck('payload_path')->all();
-
-            foreach (array_filter($paths, is_string(...)) as $path) {
-                $referenced[$path] = true;
-            }
+            WebhookCall::query()
+                ->where('payload_disk', $disk)
+                ->select(['id', 'payload_path'])
+                ->lazyById(self::CHUNK)
+                ->each(function (WebhookCall $row) use (&$referenced): void {
+                    if (is_string($row->payload_path)) {
+                        $referenced[$row->payload_path] = true;
+                    }
+                });
         }
 
         return $referenced;

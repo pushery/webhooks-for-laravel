@@ -13,7 +13,25 @@ return [
         // duration arrives as one placeholder so a locale never has to reassemble the
         // number and its unit.
         'timing' => 'Time: :duration; Run at: :at;',
-        'details' => 'past :period',
+        'details' => [
+            // The whole phrase per period, rather than a determiner plus an interpolated noun. This
+            // key used to read `'past :period'` and take its noun from Pulse's `periodForHumans()`,
+            // which returns four hardcoded English strings — so the shipped card read "letzte 6
+            // hours", "derniers hour", "últimos hour": half-translated on every non-English
+            // installation, and the only such string in the package.
+            //
+            // The determiner was wrong too, in every locale at once. All seven chose a plural form,
+            // and one of the four periods is singular, so even with the noun translated "derniers
+            // heure" would still not agree. That is the shape a placeholder cannot fix: agreement
+            // is decided by the noun, and the noun arrives at run time.
+            //
+            // Four whole phrases is what a translator can actually write, and it removes the
+            // question rather than answering it per language.
+            '6_hours' => 'past 6 hours',
+            '24_hours' => 'past 24 hours',
+            '7_days' => 'past 7 days',
+            'hour' => 'past hour',
+        ],
     ],
 
     'metrics' => [

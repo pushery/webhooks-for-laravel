@@ -13,6 +13,7 @@ use Pushery\Webhooks\Dashboard\DashboardScope;
 use Pushery\Webhooks\Dashboard\Data\KpiSet;
 use Pushery\Webhooks\Dashboard\Metrics\WebhookMetrics;
 use Pushery\Webhooks\Dashboard\WindowResolver;
+use Pushery\Webhooks\Database\Concerns\HasZonedTimestamps;
 use Pushery\Webhooks\Database\Dialect\Dialect;
 use Pushery\Webhooks\Support\WebhookConnection;
 use stdClass;
@@ -210,7 +211,7 @@ final class WebhookMetricsController
      * A rollup bucket as a stable ISO-8601 timestamp. Both engines hand the bucket back as a
      * string; anything else is not a timestamp this view can produce.
      *
-     * THE ZONE HAS TO BE SUPPLIED ON MySQL, and leaving it out is not a formatting detail. Its
+     * The zone has to be supplied on MySQL, and leaving it out is not a formatting detail. Its
      * bucket is UTC-naive — `DATE_FORMAT` truncates a DATETIME that {@see HasZonedTimestamps}
      * stores in UTC — and a naive string parsed without a zone resolves against PHP's default,
      * which is app.timezone. A host in any non-UTC zone therefore had every bucket reported at

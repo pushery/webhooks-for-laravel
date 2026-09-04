@@ -45,9 +45,12 @@
                          shows the empty "inherit" entry for an endpoint that is pinned.
 
                          That is the version which introduced the behavior, and nothing more.
-                         The declared floor is 2.27, enforced through composer.json's
-                         `conflict`, and it sits higher for an unrelated reason — the seven
-                         shipped locales. An earlier version of this comment conflated the two
+                         The declared floor is 2.38, enforced through composer.json's
+                         `conflict`, and it sits higher for reasons that have nothing to do
+                         with this control — the seven shipped locales, the overlay geometry
+                         that keeps a destructive confirmation clickable without the host's
+                         Tailwind build, and an icon whose set is not registered degrading to
+                         a placeholder instead of taking the page down. An earlier version of this comment conflated the two
                          and pointed a reader at the lower number as the one to pin, which
                          reinstates exactly the defect described above. WirekitFloorContractTest
                          now reads the shipped views and not only the styling guide, which is

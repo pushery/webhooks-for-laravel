@@ -24,13 +24,13 @@ use Pushery\Webhooks\Core\Signing\VerificationStatus;
  * an undetermined verification, with undetermined_status when the host configured one.
  * Never a 500.
  *
- * ⚠️ IT CARRIES FIELDS, NOT THE REQUEST AND NOT THE CONFIG, and both omissions are
+ * It carries fields, not the request and not the config, and both omissions are
  * correctness requirements rather than preferences — the same rule
  * {@see UnreadableWebhookPayload} states for the same reasons.
  *
  * **No Request.** A listener may be queued, and Laravel serializes a job even on the `sync`
  * driver; an `Illuminate\Http\Request` holds the framework's user and route resolvers as
- * closures, which cannot be serialized. The throw landed INSIDE `dispatch()`, before the
+ * closures, which cannot be serialized. The throw landed inside `dispatch()`, before the
  * `abort()` that answers 401 — so every forged, unsigned or expired POST came back 500, from
  * an anonymous caller, on the default configuration, on the one path this docblock promises is
  * never a 500. The listener never ran either, so the rate-limiting it was queued for did not

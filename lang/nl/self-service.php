@@ -69,6 +69,8 @@ return [
     ],
 
     'secret' => [
+        'region_label' => 'Ondertekeningssleutel',
+        'shown_announcement' => 'Ondertekeningssleutel getoond. Hij verbergt zichzelf automatisch.',
         'heading' => 'Ondertekeningssleutel',
         'hide' => 'Verbergen',
         'hidden_announcement' => 'Ondertekeningssleutel verborgen.',
@@ -90,6 +92,8 @@ return [
         'recompute' => 'Opnieuw berekenen',
         'recompute_all' => 'Alles opnieuw berekenen',
         'never' => 'Nooit',
+        'recompute_throttled' => 'Je hebt zojuist veel herberekend. Wacht een minuut — tot dan houdt de geplande verversing de scores actueel.',
+        'endpoints_truncated' => 'Alleen de eerste endpoints worden hier getoond. De herberekening dekt precies de rijen op dit bord.',
     ],
 
     'transform' => [
@@ -101,10 +105,10 @@ return [
         'version_none' => 'Geen',
         'field_name_placeholder' => 'veldnaam',
         'include_label' => 'Velden opnemen',
-        'include_hint' => 'Alleen deze velden blijven behouden. Laat leeg om ze allemaal te behouden.',
+        'include_hint' => 'Alleen deze velden blijven over. Laat leeg om ze allemaal te behouden. Alleen namen op het hoogste niveau — een pad met punten is hier geen genest veld.',
         'add_include' => 'Op te nemen veld toevoegen',
         'exclude_label' => 'Velden uitsluiten',
-        'exclude_hint' => 'Deze velden worden uit de body verwijderd.',
+        'exclude_hint' => 'Deze velden worden uit de body verwijderd. Alleen namen op het hoogste niveau — een pad met punten is hier geen genest veld.',
         'add_exclude' => 'Uit te sluiten veld toevoegen',
         'rename_label' => 'Velden hernoemen',
         'rename_hint' => 'Een veld naar een nieuwe naam verplaatsen.',
@@ -126,10 +130,24 @@ return [
     // The tenant's own delivery log. The status labels are keyed by the STORED
     // DeliveryStatus value, which never changes, and read as outcomes rather than
     // states: a customer asking "did my order go out?" is not asking for an enum.
+    // The one date pattern this namespace needs, and it exists for the accessible names rather
+    // than for the screen. A replay writes a NEW delivery row — same event type, same endpoint —
+    // and `platform.self_service.replays_per_minute` allows ten a minute by default, so two rows
+    // that differ only in their second are the ORDINARY outcome of a tenant pressing Send again.
+    // `LLL` carries no seconds in any of the seven shipped locales (measured on two deliveries
+    // 37 seconds apart, identical in all seven), so the names agreed in every part.
+    //
+    // Translated rather than a literal for the reason the dashboard's own patterns are: the
+    // ORDER differs by locale, and `z` names the clock the reader is being shown.
+    'formats' => [
+        'precise' => 'LL LTS z',
+    ],
+
     'deliveries' => [
         'heading' => 'Recente leveringen',
         'filter_label' => 'Filter op endpoint',
         'all_endpoints' => 'Alle endpoints',
+        'endpoints_truncated' => 'Dit filter toont alleen de eerste endpoints. Ontbreekt degene die je zoekt, open die dan via je endpointlijst.',
         'event' => 'Event',
         'outcome' => 'Resultaat',
         'response_code' => 'Antwoord',
@@ -140,9 +158,13 @@ return [
         'pagination_label' => 'Recente leveringen, pagina\'s',
         'window_label' => 'Periode',
         'window_days' => 'Laatste :days dagen',
+        'status_label' => 'Filteren op resultaat',
+        'all_statuses' => 'Alle resultaten',
+        'from' => 'Van',
+        'until' => 'Tot en met',
         'error' => 'Fout',
         'replay' => 'Opnieuw versturen',
-        'replay_sr' => ':event opnieuw versturen',
+        'replay_sr' => ':label — :event · :at',
         'endpoint_disabled' => 'Dit endpoint staat uit, er kan dus niets naartoe worden gestuurd.',
         'replay_throttled' => 'Je hebt zojuist veel opnieuw verstuurd. Wacht een minuut en probeer het nog eens.',
         'status' => [
@@ -150,6 +172,7 @@ return [
             'succeeded' => 'Afgeleverd',
             'failed' => 'Mislukt, wordt opnieuw geprobeerd',
             'exhausted' => 'Opgegeven',
+            'refused' => 'Niet verzonden',
         ],
     ],
 
@@ -172,6 +195,10 @@ return [
             // about every endpoint the reader owns, and it is false while one is
             // selected — the others may be busy.
             'filtered' => 'Er is nog niets naar dit endpoint gestuurd. Leveringen ouder dan de bewaartermijn worden verwijderd, dus een oudere kan hier geweest en alweer weg zijn.',
+            // A third state, and each of the three has to be TRUE. The two above are
+            // claims about what was SENT; this one is a claim about the filters, which is
+            // the only honest thing to say when a reader narrowed by outcome or by date.
+            'no_match' => 'Geen enkele bezorging voldoet aan de ingestelde filters. Verwijder er een om meer te zien.',
         ],
     ],
 
@@ -208,6 +235,7 @@ return [
     // attribute names, so a refused save speaks the reader's language rather than the
     // framework's default English lines.
     'validation' => [
+        'nested_field' => 'Alleen veldnamen op het hoogste niveau — ":field" ziet eruit als een genest pad en zou niets vinden.',
         'name' => [
             'max' => 'De naam mag niet langer zijn dan :max tekens.',
         ],
@@ -238,11 +266,11 @@ return [
         'loading_endpoints' => 'Endpoints worden geladen',
         'endpoints_table' => 'Jouw webhook-endpoints',
         'health_table' => 'Endpoint-gezondheid',
-        'toggle_active' => 'Actief-status voor :url omschakelen',
+        'toggle_active' => ':state — actief-status voor :url omschakelen',
         'reveal_secret' => 'Ondertekeningssleutel voor :url tonen',
-        'ping_endpoint' => 'Een testgebeurtenis naar :url sturen',
+        'ping_endpoint' => ':label — een testgebeurtenis naar :url sturen',
         'edit_endpoint' => 'Endpoint :url bewerken',
-        'edit_transform' => 'Payload-transformatie voor :url bewerken',
+        'edit_transform' => ':label — payload-transformatie voor :url bewerken',
         'delete_endpoint' => 'Endpoint :url verwijderen',
         'recompute_health' => 'Gezondheid voor :url opnieuw berekenen',
         'include_field' => 'Op te nemen veld :number',

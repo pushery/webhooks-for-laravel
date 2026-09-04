@@ -22,7 +22,7 @@ use RuntimeException;
  * Failing final says the true thing once: this destination cannot be delivered to as it is
  * configured, and the message names why.
  *
- * ⚠️ A TIMEOUT IS NOT THIS, EVEN THOUGH GUZZLE FILES IT UNDER THE SAME PARENT.
+ * A timeout is not this, even though guzzle files it under the same parent.
  * `ResponseTimeoutException` is a subclass of the exception this is built from, and it means
  * the opposite thing: a response that never finished arriving, which the very next attempt
  * may well complete. {@see TransportExceptionNormalizer} keeps

@@ -19,6 +19,7 @@ return [
     ],
 
     'kpis' => [
+        'title' => 'Num relance',
         'total' => 'Total de webhooks enviados',
         'successful' => 'Com sucesso',
         'failed' => 'Falhados',
@@ -31,6 +32,11 @@ return [
     'formats' => [
         'hour_bucket' => 'j M H:i',
         'absolute' => 'LLL z',
+
+        // 'precise' is a second pattern because 'absolute' cannot separate two rows and the
+        // accessible names need it to. lang/en/dashboard.php states the case in full, including
+        // what it still does not cover.
+        'precise' => 'LL LTS z',
     ],
 
     'api' => [
@@ -87,11 +93,23 @@ return [
     // Badge labels for the stored DeliveryStatus values. The key is the persisted
     // value and is never translated; only the label a reader sees is. Lowercase, as
     // in the original design.
+    // Shown when the rollup the counts come from has fallen behind the rows it summarizes --
+    // twice the configured refresh cadence or more, so a run merely in progress never triggers it.
+    'rollup_stale' => 'As contagens de entrega desta página estão :minutes minutos atrasadas. Vêm de um rollup que o `webhooks:refresh-metrics` avança; as latências ao lado são em direto, por isso os dois divergem até esse comando correr de novo.',
+
+    // These agree with a noun that is not in the string, and four of the five used to get it wrong.
+    // They label one column of one table, and the thing they label is a delivery (a entrega),
+    // feminine in this language. Four were masculine and the fifth feminine, so the column read as
+    // machine translation on the most-read screen in the package.
+    //
+    // No guard can check this: agreement is a fact about a word that never appears beside them. The
+    // noun is written here so the next translator has it.
     'status' => [
         'pending' => 'pendente',
         'succeeded' => 'bem-sucedida',
         'failed' => 'falhada',
         'exhausted' => 'esgotada',
+        'refused' => 'recusada',
     ],
 
     // The same statuses as filter options, where the surrounding form wants them
@@ -101,6 +119,7 @@ return [
         'succeeded' => 'Bem-sucedida',
         'failed' => 'Falhada',
         'exhausted' => 'Esgotada',
+        'refused' => 'Recusada',
     ],
 
     'drawer' => [
@@ -160,12 +179,22 @@ return [
         'sections' => 'Secções do dashboard',
         'retry_rate' => 'Taxa de repetição',
         'deliveries_per_hour' => 'Entregas por hora',
-        'hour_summary' => ':hour: :total no total, :delivered entregues, :pending pendentes, :failed falhadas',
+        'hour_summary' => [
+            // Four choice fragments rather than one sentence with four numbers in it: agreement is
+            // decided by the number, `trans_choice` takes one count per string, and there are four.
+            // lang/en/dashboard.php states the case in full, including why English, German and
+            // Dutch carry identical forms on both sides.
+            'total' => '{0} :count no total|{1} :count no total|[2,*] :count no total',
+            'delivered' => '{0} :count entregues|{1} :count entregue|[2,*] :count entregues',
+            'pending' => '{0} :count pendentes|{1} :count pendente|[2,*] :count pendentes',
+            'failed' => '{0} :count falhadas|{1} :count falhada|[2,*] :count falhadas',
+        ],
         'latency_trend' => 'Tendência da latência P95 por hora',
+        'latency_bar' => ':hour: :value ms',
         'recent_deliveries_table' => 'Entregas de webhook recentes',
         'deliveries_table' => 'Entregas de webhook',
-        'replay_delivery' => 'Reenviar a entrega :event',
-        'view_delivery' => 'Ver os detalhes da entrega :event',
+        'replay_delivery' => ':label — :event · :endpoint · :at',
+        'view_delivery' => 'Ver os detalhes da entrega :event para :endpoint de :at',
         'delivery_details' => 'Detalhes da entrega',
         'close_details' => 'Fechar os detalhes',
         'loading_kpis' => 'A carregar as métricas principais',

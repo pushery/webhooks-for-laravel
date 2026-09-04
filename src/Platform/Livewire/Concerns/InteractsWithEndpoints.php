@@ -31,7 +31,7 @@ use Pushery\Webhooks\Support\TenantIdentity;
 trait InteractsWithEndpoints
 {
     /**
-     * Re-authorize the portal gate on EVERY request, not just the first one.
+     * Re-authorize the portal gate on every request, not just the first one.
      *
      * Livewire runs mount() only on the initial request; every later interaction is a
      * /livewire/update request that skips it. A gate authorized in mount() alone is therefore
@@ -40,27 +40,27 @@ trait InteractsWithEndpoints
      * middleware and Livewire re-applies `can:` on update (persistent middleware); the portal's
      * documented middleware is only ['web', 'auth'], so its panels assert the gate themselves.
      *
-     * boot() is the first hook on BOTH the mount and the hydrate path, so the ability is checked
+     * boot() is the first hook on both the mount and the hydrate path, so the ability is checked
      * before mount() loads anything and before any action runs. It refuses identically whichever
      * request hits it — through {@see PortalRefusal}, so a host that answers 404 everywhere gets
      * the same answer here as from its own screens, without the gate itself changing.
      * Row-level ownership stays a separate, second guard (a foreign id fails not-found first).
      *
-     * ⚠️ THAT SECOND GUARD IS UNREACHABLE AS THE *SOLE* REFUSAL, and knowing why saves the next
-     * reader a wasted afternoon. Mutation testing reports every `authorize('view'|'update'|
-     * 'rotateSecret', $subscription)` in these panels as a survivor — measured 2026-08-20:
+     * That second guard is unreachable as the sole refusal, and knowing why saves the next
+     * reader a wasted afternoon. Every `authorize('view'|'update'|'rotateSecret',
+     * $subscription)` in these panels is redundant with the one above it — measured 2026-08-20:
      * comment any of the five out and the whole 236-test portal suite stays green. They are not
-     * untested, they are unreachable: this boot gate reads the SAME `manage-webhook-endpoints`
+     * untested, they are unreachable: this boot gate reads the same `manage-webhook-endpoints`
      * ability the policy consults, and the only condition the policy adds on top is
      * `ownedByCurrentTenant()`, which findOwnedEndpoint() has already enforced —
      * scopeToCurrentOwner() answers `1 = 0` for a null tenant, so a row that loaded at all is a
-     * row the tenant owns. Do not "kill" them by deleting them: they are what still refuses if
-     * a future caller reaches an action without the scoped query.
+     * row the tenant owns. Do not delete them: they are what still refuses if a future caller
+     * reaches an action without the scoped query.
      *
-     * `create` is the ONE that is genuinely reachable, and it is reachable for a structural
+     * `create` is the one that is genuinely reachable, and it is reachable for a structural
      * reason: there is no row yet, so the scoping cannot speak, and the policy's
      * `currentOwner() instanceof TenantIdentity` is the only tenant check between an
-     * ability-holding reader with no tenant in scope and an OWNERLESS endpoint that receives
+     * ability-holding reader with no tenant in scope and an ownerless endpoint that receives
      * every tenant's payloads. All three call sites are pinned (EndpointForm's two arms, and
      * EndpointList::newEndpoint()).
      */
@@ -108,7 +108,7 @@ trait InteractsWithEndpoints
      * refused. An unset cap is always false.
      *
      * Read on its own this is only ever advisory — it is what decides whether a button is
-     * drawn. The decision that MUST hold is the one inside {@see withRegistrationLock()},
+     * drawn. The decision that MUST hold is the one inside {@see self::withRegistrationLock()},
      * which asks the same question with the answer pinned.
      */
     protected function endpointCapReached(): bool
@@ -285,6 +285,69 @@ trait InteractsWithEndpoints
         RateLimiter::hit($key, self::REGISTRATION_RATE_WINDOW);
 
         return false;
+    }
+
+    /**
+     * How many full health recomputes one tenant may run per minute, or null for no brake.
+     *
+     * The most expensive action the portal offers and, until 2026-08-27, the only one with no
+     * brake at all — while registration, replay and the test ping each had one. Every other
+     * tenant action costs a bounded amount of work; this one costs two queries per endpoint,
+     * synchronously, in the web request, and `max_endpoints_per_tenant` ships as null, so the
+     * multiplier has no ceiling either.
+     *
+     * The default is low on purpose. Registration and replay allow ten a minute because ten
+     * registrations is ten rows; two recomputes is 2·2·N queries, and the scheduled refresh
+     * already does the same work in the background — pressing the button repeatedly buys the
+     * reader nothing the next tick would not give them.
+     *
+     * A non-positive value reads as no brake rather than as "none allowed", the same way the
+     * two beside it do: a limit of zero would refuse every recompute, which is a way to
+     * disable a feature by typo rather than a setting anyone wants.
+     */
+    protected function maxRecomputesPerMinute(): ?int
+    {
+        $max = Config::get('webhooks.platform.self_service.recomputes_per_minute', 2);
+
+        // Two statements rather than a ternary, for the coverage reason its siblings state.
+        if (is_int($max) && $max > 0) {
+            return $max;
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether this tenant has spent its recompute allowance for the current minute.
+     */
+    protected function recomputeRateExceeded(): bool
+    {
+        $max = $this->maxRecomputesPerMinute();
+        $owner = SubscriptionScope::currentOwner();
+
+        if ($max === null || ! $owner instanceof TenantIdentity) {
+            return false;
+        }
+
+        $key = $this->recomputeRateKey($owner);
+
+        if (RateLimiter::tooManyAttempts($key, $max)) {
+            return true;
+        }
+
+        RateLimiter::hit($key, self::REGISTRATION_RATE_WINDOW);
+
+        return false;
+    }
+
+    /**
+     * The recompute allowance's cache key for one tenant. A FOURTH key beside the three
+     * below, and its own for the reason the third one is: sharing a bucket would make one
+     * action exhaust another, and neither reader would have any way to see why.
+     */
+    protected function recomputeRateKey(TenantIdentity $owner): string
+    {
+        return 'webhooks:endpoint-health-recompute-rate:'.str_replace('\\', '.', $owner->type).':'.$owner->id;
     }
 
     /**

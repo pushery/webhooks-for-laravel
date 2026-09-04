@@ -55,9 +55,16 @@ return new class extends Migration
         // history, and it is created WITH NO DATA: the schedule's
         // webhooks:refresh-metrics command populates it. Status filters map to the
         // real DeliveryStatus enum stored in webhook_deliveries.status: 'succeeded'
-        // is a delivered attempt, and 'failed'/'exhausted' are both failures (a
-        // subscription whose retries ran out). 'retried' counts attempts past the
-        // first (the column is attempt, not attempts).
+        // is a delivered attempt, and 'failed', 'exhausted' and 'refused' are all
+        // failures. 'retried' counts attempts past the first (the column is attempt,
+        // not attempts).
+        //
+        // 'refused' has to be in that list, and leaving it out is not a rounding error: the buckets
+        // are what the dashboard sums, so a status in none of them makes delivered + pending +
+        // failed stop adding up to total. An operator then reads a screen whose own numbers
+        // disagree, with nothing saying which one is short. A delivery refused because its endpoint
+        // was switched off did not arrive, which is what this rollup is asked about; the health
+        // score answers a different question about the endpoint and deliberately excludes it.
         //
         // A per-bucket latency_digest column is added only when the optional tdigest
         // extension is installed. It stores each hour's duration distribution as a
@@ -82,7 +89,7 @@ return new class extends Migration
                 count(*)                                                    AS total,
                 count(*) FILTER (WHERE status = 'succeeded')                AS delivered,
                 count(*) FILTER (WHERE status = 'pending')                  AS pending,
-                count(*) FILTER (WHERE status IN ('failed', 'exhausted'))   AS failed,
+                count(*) FILTER (WHERE status IN ('failed', 'exhausted', 'refused')) AS failed,
                 count(*) FILTER (WHERE attempt > 1)                         AS retried,
                 percentile_cont(0.50) WITHIN GROUP (ORDER BY duration_ms)   AS p50,
                 percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms)   AS p95{$digest}
@@ -116,8 +123,21 @@ return new class extends Migration
     {
         $ownerKeyType = OwnerKeyType::fromConfig();
 
-        Schema::create('webhook_delivery_hourly', function (Blueprint $table) use ($ownerKeyType): void {
-            $table->string('owner_type')->default('');
+        // The same collation the three other tables pin on their identity columns, and this one
+        // was the exception. A Blueprint column with no collation inherits the TABLE's, which for
+        // a Blueprint-created table comes from the CONNECTION config — and Laravel's shipped
+        // config/database.php names utf8mb4_unicode_ci there, which is case- and
+        // accent-insensitive. So the leading column of webhook_delivery_hourly_uidx compared
+        // more loosely than the raw rows it aggregates, on any host that had not changed it.
+        //
+        // The suite could not see it: the MySQL lane pins utf8mb4_0900_as_cs on the connection,
+        // so the column inherited the right thing here and the wrong thing everywhere else.
+        // `webhooks:preflight` reads it from the live schema now, which is the check that does
+        // not depend on how this file happens to be run.
+        $cs = 'utf8mb4_0900_as_cs';
+
+        Schema::create('webhook_delivery_hourly', function (Blueprint $table) use ($cs, $ownerKeyType): void {
+            $table->string('owner_type')->collation($cs)->default('');
             $ownerKeyType->blueprintColumn($table, 'owner_id')->default($ownerKeyType->sentinelId());
             $table->dateTime('bucket', 6);
             $table->unsignedBigInteger('total')->default(0);

@@ -24,7 +24,7 @@ use Pushery\Webhooks\Database\Dialect\Dialect;
  * (null on a duplicate); MySQL reports the outcome through the affected-row count (1 inserted,
  * 0 duplicate), which is why the command reads affectingStatement().
  *
- * NEVER INSERT IGNORE on MySQL: it downgrades every error — a truncation, a bad value, a
+ * Never `INSERT IGNORE` on MySQL: it downgrades every error — a truncation, a bad value, a
  * deadlock — into a silently skipped row, so a real failure would masquerade as a de-duplication
  * and a customer's history would import short with no sign anything went wrong. ON DUPLICATE KEY
  * UPDATE id = id is a genuine no-op that changes nothing on a duplicate and raises every real error.

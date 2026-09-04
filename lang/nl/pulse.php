@@ -13,7 +13,15 @@ return [
         // duration arrives as one placeholder so a locale never has to reassemble the
         // number and its unit.
         'timing' => 'Tijd: :duration; Uitgevoerd om: :at;',
-        'details' => 'afgelopen :period',
+        'details' => [
+            // The whole phrase per period, rather than a determiner plus an interpolated noun:
+            // agreement is decided by the noun and the noun arrives at run time, so a placeholder
+            // cannot fix it. lang/en/pulse.php states the case in full.
+            '6_hours' => 'afgelopen 6 uur',
+            '24_hours' => 'afgelopen 24 uur',
+            '7_days' => 'afgelopen 7 dagen',
+            'hour' => 'afgelopen uur',
+        ],
     ],
 
     'metrics' => [

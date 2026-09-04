@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Pushery\Webhooks\Core\Signing\Exceptions;
 
 use InvalidArgumentException;
+use Pushery\Webhooks\Core\Signing\VerificationResult;
+use Pushery\Webhooks\Core\Signing\WebhookMessage;
 
 /**
  * Thrown when a {@see WebhookMessage} is constructed with

@@ -6,28 +6,27 @@
      on open, Tab is trapped inside it, Escape closes it, and focus returns to the
      control that opened it on close. Styled with WireKit tokens throughout.
 
-     THE KEYBOARD MODEL IS A REGISTERED COMPONENT, NOT AN INLINE EXPRESSION, AND THAT IS
-     LOAD-BEARING. Under a Content-Security-Policy without `unsafe-eval` a host runs
-     Alpine's CSP evaluator, which parses attribute expressions against a small grammar
-     instead of handing them to `new Function`. An object literal with methods does not
-     parse there, so an inline trap would simply not run — in the browser, with nothing in
-     any server log. It would take out the focus trap specifically, on a panel that shows
-     delivery payloads, which is the one part of this screen a keyboard or screen-reader
-     user cannot do without. A registered factory parses, and its body is ordinary
-     JavaScript that never goes through that evaluator at all.
+     The keyboard model is a registered component rather than an inline expression, and that is
+     load-bearing. Under a Content-Security-Policy without `unsafe-eval` a host runs Alpine's CSP
+     evaluator, which parses attribute expressions against a small grammar instead of handing them
+     to `new Function`. An object literal with methods does not parse there, so an inline trap would
+     simply not run — in the browser, with nothing in any server log. It would take out the focus
+     trap specifically, on a panel that shows delivery payloads, which is the one part of this
+     screen a keyboard or screen-reader user cannot do without. A registered factory parses, and its
+     body is ordinary JavaScript that never goes through that evaluator at all.
 
      The registration rides in `@assets`: Livewire injects the tag once per page into the
      head and de-duplicates it by compile key, so this needs no layout hook and no publish
      step, and it travels with the view when a host publishes it.
 
-     ⚠️ IT IS A FILE FROM THE APP'S OWN ORIGIN, NOT AN INLINE SCRIPT, AND THAT REPLACED AN
-     EARLIER CHOICE MADE HERE. The registration used to be inline, carrying an OPTIONAL CSP
-     nonce. Under a strict NONCE-LESS policy — `script-src 'self'`, which an application is
-     entitled to choose and which this package must not ask it to loosen — the browser
-     refuses an inline script outright. Nothing throws, nothing reaches a log, and a CSP
-     audit reads the expression as valid: the drawer's keyboard model is simply gone, on the
-     one panel a keyboard or screen-reader user cannot do without. Served as a file it runs
-     under every policy, needs no nonce, and asks the host for nothing. --}}
+     It is a file from the app's own origin rather than an inline script, and that replaced an
+     earlier choice made here. The registration used to be inline, carrying an optional CSP nonce.
+     Under a strict nonce-less policy — `script-src 'self'`, which an application is entitled to
+     choose and which this package must not ask it to loosen — the browser refuses an inline script
+     outright. Nothing throws, nothing reaches a log, and a CSP audit reads the expression as valid:
+     the drawer's keyboard model is simply gone, on the one panel a keyboard or screen-reader user
+     cannot do without. Served as a file it runs under every policy, needs no nonce, and asks the
+     host for nothing. --}}
 @assets
     <script src="{{ \Pushery\Webhooks\Support\UiAssets::url() }}" defer></script>
 @endassets
@@ -69,11 +68,7 @@
                     <x-wirekit::button size="sm" surface="ghost" wire:click="close" :aria-label="__('webhooks::dashboard.a11y.close_details')">{{ __('webhooks::dashboard.drawer.close') }}</x-wirekit::button>
                 </div>
 
-                @php($intent = match ($delivery->status->value) {
-                    'succeeded' => 'success',
-                    'failed', 'exhausted' => 'danger',
-                    default => 'warning',
-                })
+@php($intent = $delivery->status->intent())
                 <div class="mb-[var(--padding-wk-y-md)] flex flex-wrap items-center gap-[var(--padding-wk-x-md)]">
                     <x-wirekit::badge :intent="$intent">{{ __('webhooks::dashboard.status.'.$delivery->status->value) }}</x-wirekit::badge>
                     <x-wirekit::text size="sm" intent="muted">{{ __('webhooks::dashboard.drawer.attempt', ['number' => $delivery->attempt]) }}</x-wirekit::text>
@@ -150,7 +145,7 @@
                         wire:click="redeliver('{{ $delivery->id }}')"
                         wire:loading.attr="disabled"
                         wire:target="redeliver"
-                        :aria-label="__('webhooks::dashboard.a11y.replay_delivery', ['event' => $delivery->event_type])"
+                        :aria-label="__('webhooks::dashboard.a11y.replay_delivery', ['label' => __('webhooks::dashboard.drawer.replay'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $zone($delivery->created_at)->settings($locale)->isoFormat(__('webhooks::dashboard.formats.precise'))])"
                     >{{ __('webhooks::dashboard.drawer.replay') }}</x-wirekit::button>
                 </div>
             </div>

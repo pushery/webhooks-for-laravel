@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Platform\Livewire;
 
+use Carbon\CarbonInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,10 +14,12 @@ use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Pushery\Webhooks\Enums\DeliveryStatus;
 use Pushery\Webhooks\Facades\Webhooks;
 use Pushery\Webhooks\Models\WebhookDelivery;
 use Pushery\Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
 use Pushery\Webhooks\Platform\Support\SubscriptionScope;
+use Pushery\Webhooks\Support\CalendarDay;
 use Pushery\Webhooks\Support\TenantIdentity;
 
 /**
@@ -75,6 +78,19 @@ final class EndpointDeliveries extends Component
     private const int PER_PAGE = 10;
 
     /**
+     * The most endpoints the filter offers, and the reason it offers a bounded number at all.
+     *
+     * This select was filled with every endpoint the tenant owns, every column, on EVERY
+     * render of the panel — a filter change, a page change, a sibling event. The operator
+     * console solved the identical problem carefully and says so in its own words; this is the
+     * tenant-facing copy of the same control, and it had neither the cap nor the select().
+     *
+     * When it truncates the view SAYS SO. A short list that looks complete is how a reader
+     * concludes an endpoint has no deliveries when it was simply never offered.
+     */
+    private const int ENDPOINT_OPTIONS = 200;
+
+    /**
      * The shipped window ceiling, repeated here because an ABSENT key reads as null and a
      * null ceiling would switch the bound off — the one direction that is expensive and
      * silent. A host on a config cache built before this version is bounded in the meantime.
@@ -112,6 +128,34 @@ final class EndpointDeliveries extends Component
      * switch it ON.
      */
     public ?bool $showErrors = null;
+
+    /**
+     * Narrow to one delivery outcome, or '' for every outcome.
+     *
+     * An unrecognized value is ignored rather than passed to the query. Passing it through
+     * would filter on a status nothing can have and render an empty table — which on this
+     * panel reads as "this endpoint received nothing", the one wrong answer a delivery log
+     * must never give. {@see DeliveryStatus} is the authority on what exists, so a status
+     * added later needs no second list here.
+     */
+    public string $status = '';
+
+    /**
+     * Inclusive lower and upper day bounds, `YYYY-MM-DD`, or '' for unbounded.
+     *
+     * These cannot widen the window, because they are added to it rather than used instead of it.
+     * The window's own lower bound stays on the query unconditionally, so a `from` older than the
+     * host's ceiling is ANDed with it and the older of the two simply loses. That is what keeps
+     * this pair safe on a panel where `windowDays` had to be clamped by hand: a reader may ask a
+     * narrower question, never a wider one.
+     *
+     * The trap is the plausible tidy-up — replacing the window bound with `from` when one is
+     * given, so the query carries a single lower bound. That reads cleaner and hands the
+     * browser the unbounded scan the window exists to prevent.
+     */
+    public string $from = '';
+
+    public string $until = '';
 
     /** A message for the reader — why a replay was refused. */
     public string $message = '';
@@ -166,6 +210,23 @@ final class EndpointDeliveries extends Component
         $this->resetPage($this->getPageName());
     }
 
+    /** Same reason again: page 3 of every outcome is rarely page 3 of the failures. */
+    public function updatingStatus(): void
+    {
+        $this->resetPage($this->getPageName());
+    }
+
+    /** And again for either day bound. */
+    public function updatingFrom(): void
+    {
+        $this->resetPage($this->getPageName());
+    }
+
+    public function updatingUntil(): void
+    {
+        $this->resetPage($this->getPageName());
+    }
+
     /**
      * Replay one delivery to the endpoint it was sent to.
      *
@@ -178,7 +239,7 @@ final class EndpointDeliveries extends Component
      * 1. The delivery is loaded through the OWNER-SCOPED query, so a foreign id resolves to
      *    nothing and fails not-found before anything else runs — the same shape the endpoint
      *    lookup has, and the reason a probe cannot tell a foreign row from an absent one.
-     * 2. The endpoint is loaded through {@see findOwnedEndpoint()}, which scopes again.
+     * 2. The endpoint is loaded through {@see self::findOwnedEndpoint()}, which scopes again.
      * 3. The `redeliver` ability is the row-level, defense-in-depth check on the ACTION.
      * 4. The per-tenant allowance, because this button makes the server send an HTTP request
      *    to a URL the reader controls.
@@ -228,10 +289,22 @@ final class EndpointDeliveries extends Component
             $deliveries = $this->page();
         }
 
+        // One row past the cap, so the truncation is DETECTABLE rather than assumed.
+        $endpoints = $this->scopedQuery()
+            ->select(['id', 'url', 'name'])
+            ->latest()
+            ->limit(self::ENDPOINT_OPTIONS + 1)
+            ->get();
+
+        $endpointsTruncated = $endpoints->count() > self::ENDPOINT_OPTIONS;
+
         return ViewFactory::make('webhooks::self-service.livewire.endpoint-deliveries', [
             'deliveries' => $deliveries,
-            'endpoints' => $this->scopedQuery()->latest()->get(),
+            'endpoints' => $endpoints->take(self::ENDPOINT_OPTIONS),
+            'endpointsTruncated' => $endpointsTruncated,
             'windowChoices' => $this->windowChoices(),
+            'statusChoices' => DeliveryStatus::cases(),
+            'emptyStateKey' => $this->emptyStateKey(),
             'showsErrors' => $this->showsErrors(),
         ]);
     }
@@ -249,7 +322,7 @@ final class EndpointDeliveries extends Component
      */
     private function page(): LengthAwarePaginator
     {
-        return $this->deliveryQuery()
+        return $this->filteredQuery()
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->paginate(self::PER_PAGE, pageName: $this->getPageName());
@@ -274,10 +347,10 @@ final class EndpointDeliveries extends Component
         // jsonb payload on every page — a promise kept by the view alone is a promise about
         // the markup, not about what was read.
         //
-        // ⚠️ `subscription_id` was in this list with a comment saying the replay action needed
-        // it. It did not: redeliver() calls `->select('*')`, which REPLACES the column list
-        // rather than adding to it, so the row it works from was always complete. Measured by
-        // dropping the column with both panel suites running.
+        // `subscription_id` was in this list with a comment saying the replay action needed it. It
+        // did not: redeliver() calls `->select('*')`, which replaces the column list rather than
+        // adding to it, so the row it works from was always complete. Measured by dropping the
+        // column with both panel suites running.
         $columns = ['id', 'event_type', 'status', 'response_code', 'created_at'];
 
         if ($this->showsErrors()) {
@@ -313,6 +386,106 @@ final class EndpointDeliveries extends Component
         }
 
         return $query;
+    }
+
+    /**
+     * Which of the three empty-state sentences is TRUE for the current filters.
+     *
+     * Three rather than two, and the missing one is the wrong answer a delivery log must never
+     * give. The view chose between two on the endpoint filter alone, which was complete until the
+     * outcome and day-range filters existed. After them a customer who filters to "failed" and has
+     * none was told "nothing has been sent to your endpoints yet", in the exact moment they are
+     * looking for a failure somebody told them about. The endpoint wording ("nothing has been sent
+     * to this endpoint") is just as untrue there.
+     *
+     * Decided here rather than in the view, so a filter added later is one line from being
+     * counted rather than a sentence that quietly goes stale.
+     */
+    private function emptyStateKey(): string
+    {
+        // Narrowed by outcome or by date: the only honest sentence is about the FILTERS. Both
+        // others are claims about what was sent, and both are false here.
+        if (DeliveryStatus::tryFrom($this->status) instanceof DeliveryStatus
+            || CalendarDay::start($this->from) instanceof CarbonInterface
+            || CalendarDay::endExclusive($this->until) instanceof CarbonInterface
+            || $this->windowNarrowed()) {
+            return 'no_match';
+        }
+
+        // One endpoint selected: "your endpoints" would be a claim about the others too.
+        if ($this->endpointId !== null) {
+            return 'filtered';
+        }
+
+        return 'description';
+    }
+
+    /**
+     * The tenant's deliveries as the READER has narrowed them.
+     *
+     * Separate from {@see self::deliveryQuery()} on purpose, and the separation is the fix for a defect
+     * these filters introduced. The replay action loads its row through the owner-scoped query, and
+     * while these three sat inside that query it inherited them: a tenant who filtered to "failed",
+     * saw a row and clicked replay got a 404 on their own delivery whenever a worker had moved it
+     * to `exhausted` in between, which is exactly the kind of row somebody replays. What may narrow
+     * a lookup is ownership; what the reader chose narrows a list.
+     *
+     * The dates are added to the window bound rather than used in its place, so a reader's
+     * dates can only ever narrow what the window already allows — and they go through the
+     * package's own timestamp scopes for the two reasons the operator log states at its own
+     * bounds: whereDate() wraps the column in a function and stops the planner pruning
+     * partitions, and a bare where() binds a naive literal that PostgreSQL resolves against
+     * the database SESSION zone.
+     *
+     * @return Builder<WebhookDelivery>
+     */
+    private function filteredQuery(): Builder
+    {
+        $query = $this->deliveryQuery();
+
+        $from = CalendarDay::start($this->from);
+
+        if ($from instanceof CarbonInterface) {
+            $query->createdAfter($from);
+        }
+
+        $until = CalendarDay::endExclusive($this->until);
+
+        if ($until instanceof CarbonInterface) {
+            $query->createdBefore($until);
+        }
+
+        if (DeliveryStatus::tryFrom($this->status) instanceof DeliveryStatus) {
+            $query->where('status', $this->status);
+        }
+
+        return $query;
+    }
+
+    /**
+     * Whether the reader pulled the time window in below the host's ceiling.
+     *
+     * The fourth filter, and the three-way empty state was written without it. `windowDays` is
+     * reader-controlled like the other three: narrowed to seven days over an endpoint whose
+     * deliveries are twenty days old, the list is empty because of a choice the reader made.
+     *
+     * That makes the unfiltered sentence worse than merely wrong there. It hedges about the
+     * retention window — "an older one may have been here and gone" — so it attributes the reader's
+     * own narrowing to the package having deleted their data.
+     *
+     * Compared against the ceiling rather than against null: the value equal to the ceiling is
+     * the default in a different spelling, and calling that a filter would put the wrong
+     * sentence in front of a reader who changed nothing.
+     */
+    private function windowNarrowed(): bool
+    {
+        if (! is_int($this->windowDays) || $this->windowDays <= 0) {
+            return false;
+        }
+
+        $ceiling = Config::integer('webhooks.platform.deliveries.window_days', self::WINDOW_DAYS);
+
+        return $ceiling > 0 && $this->windowDays < $ceiling;
     }
 
     /**

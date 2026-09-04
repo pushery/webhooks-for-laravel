@@ -8,6 +8,7 @@ use Illuminate\Container\Container;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\View as ViewFactory;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Pushery\Webhooks\Models\WebhookSubscription;
@@ -41,13 +42,27 @@ final class PayloadTransformEditor extends Component
 
     public string $payloadVersion = '';
 
-    /** @var array<int, string> */
+    /**
+     * The three rule lists, typed as what a public Livewire property CAN hold.
+     *
+     * These read `array<int, string>` and `array<int, array{from: string, to: string}>` until
+     * 2026-08-27, and the narrower type was not a description but a wish. Livewire enforces the
+     * array type of a public array property and nothing whatever about its elements, so the browser
+     * decides what is in here. Under the narrow annotation static analysis then called the element
+     * checks in buildRules() redundant, which is how a property the client writes came to look like
+     * a property the type system guarded.
+     *
+     * EndpointForm::storedEventTypes() states the same fact for its own case, in the same words: a
+     * public property "may hold anything at all, including a nested array".
+     *
+     * @var array<array-key, mixed>
+     */
     public array $includeFields = [];
 
-    /** @var array<int, string> */
+    /** @var array<array-key, mixed> */
     public array $excludeFields = [];
 
-    /** @var array<int, array{from: string, to: string}> */
+    /** @var array<array-key, mixed> */
     public array $renamePairs = [];
 
     public string $rewrapKey = '';
@@ -68,14 +83,15 @@ final class PayloadTransformEditor extends Component
         // policy, exactly as every other panel does — otherwise a foreign-but-existing id 403s
         // while a non-existent one 404s, letting a tenant enumerate which ids exist. The policy
         // stays the second, defense-in-depth guard.
-        // ⚠️ Both lines are reported as survivors, for two different and already-known reasons.
+        // Neither line below can be the thing that refuses, for two different and already-known
+        // reasons.
         //
-        // The (int) cast: $subscription->id is an int already, so it changes nothing at run time
-        // (measured). It stays because findOwnedEndpoint() is typed for an int and this is the
-        // boundary where that is made true.
+        // The (int) cast: $subscription->id is an int already, so it changes nothing at run time.
+        // It stays because findOwnedEndpoint() is typed for an int and this is the boundary where
+        // that is made true.
         //
-        // The authorize(): unreachable as the SOLE refusal, which InteractsWithEndpoints spells
-        // out in full — the boot gate reads the same ability, and findOwnedEndpoint() has already
+        // The authorize(): it cannot be the sole refusal, which InteractsWithEndpoints spells out
+        // in full — the boot gate reads the same ability, and findOwnedEndpoint() has already
         // enforced the ownership the policy would add. That docblock ends "Do not 'kill' them by
         // deleting them", and this is one of the five it means.
         $subscription = $this->findOwnedEndpoint((int) $subscription->id);
@@ -142,6 +158,34 @@ final class PayloadTransformEditor extends Component
         // fails not-found before the save runs — the row-level policy below is the second guard.
         $subscription = $this->findOwnedEndpoint((int) $this->endpointId);
         $this->authorize('update', $subscription);
+
+        // The only write in this component, and the only one in the package that had no
+        // validate() at all. Two things got through without it. `payloadVersion` is a public
+        // property, so the browser writes it straight onto a `varchar(20)` column — the same
+        // hazard the URL field in the endpoint form caps at 2048, with a comment about MySQL's
+        // 1406 error. Past 20 characters this is a 500 (Postgres 22001, MySQL 1406) where the
+        // reader should be getting a field message. And a rule list is a public ARRAY: Livewire
+        // enforces the array, never its elements, so an entry that is not a string reached
+        // trim() under strict_types and raised there.
+        //
+        // Deliberately NOT Rule::in over the declared versions. PayloadVersionRegistry says in
+        // its own words that an unknown version is a supported state — "a version may exist
+        // purely to stamp its id with no field changes" — so constraining the field to the
+        // configured set would narrow documented behavior to fix a column width. The width is
+        // what is wrong here, so the width is what is bounded.
+        $this->validate([
+            'payloadVersion' => ['string', 'max:20'],
+            'includeFields' => ['array'],
+            'includeFields.*' => ['string', 'max:255'],
+            'excludeFields' => ['array'],
+            'excludeFields.*' => ['string', 'max:255'],
+            'renamePairs' => ['array'],
+            'renamePairs.*.from' => ['string', 'max:255'],
+            'renamePairs.*.to' => ['string', 'max:255'],
+            'rewrapKey' => ['string', 'max:255'],
+        ]);
+
+        $this->rejectNestedPaths();
 
         $rules = $this->buildRules();
 
@@ -242,6 +286,12 @@ final class PayloadTransformEditor extends Component
 
         $rename = [];
         foreach ($this->renamePairs as $pair) {
+            // Same read-path reasoning as cleanList(), plus the keys: a pair the browser sends
+            // without a `from` raised "Undefined array key" before it ever reached trim().
+            if (! is_array($pair) || ! is_string($pair['from'] ?? null) || ! is_string($pair['to'] ?? null)) {
+                continue;
+            }
+
             $from = trim($pair['from']);
             $to = trim($pair['to']);
             if ($from !== '' && $to !== '') {
@@ -258,6 +308,48 @@ final class PayloadTransformEditor extends Component
         }
 
         return $rules;
+    }
+
+    /**
+     * Refuse a field name that looks like a nested path.
+     *
+     * The rule engine matches against the payload's TOP-LEVEL keys only, so `customer.email`
+     * matches nothing and is a no-op -- an exact no-op, with no message, no log line and no
+     * visible difference in the preview beside it. On the one screen where a tenant configures
+     * which customer data leaves the building, silence is the wrong answer: the reader believes
+     * the email is being dropped while it is being delivered.
+     *
+     * Refused rather than supported, which is a decision about the rule model rather than about
+     * effort. Making a dotted path work would give `include` and `exclude` a semantics that
+     * `rename` and `rewrap` do not have, and a rule set where two of four rules understand
+     * nesting is harder to reason about than one where none of them do. What was missing is
+     * that the model says so.
+     */
+    private function rejectNestedPaths(): void
+    {
+        $nested = [];
+
+        foreach (['includeFields', 'excludeFields'] as $property) {
+            foreach ($this->{$property} as $index => $value) {
+                if (is_string($value) && str_contains($value, '.')) {
+                    $nested[$property.'.'.$index] = trans('webhooks::self-service.validation.nested_field', ['field' => $value]);
+                }
+            }
+        }
+
+        foreach ($this->renamePairs as $index => $pair) {
+            foreach (['from', 'to'] as $side) {
+                $value = is_array($pair) ? ($pair[$side] ?? null) : null;
+
+                if (is_string($value) && str_contains($value, '.')) {
+                    $nested['renamePairs.'.$index.'.'.$side] = trans('webhooks::self-service.validation.nested_field', ['field' => $value]);
+                }
+            }
+        }
+
+        if ($nested !== []) {
+            throw ValidationException::withMessages($nested);
+        }
     }
 
     /**
@@ -298,7 +390,7 @@ final class PayloadTransformEditor extends Component
     /**
      * Trim and drop blank entries from a list of field names, keeping it a clean list.
      *
-     * @param  array<int, string>  $values
+     * @param  array<array-key, mixed>  $values
      * @return list<string>
      */
     private function cleanList(array $values): array
@@ -306,6 +398,14 @@ final class PayloadTransformEditor extends Component
         $clean = [];
 
         foreach ($values as $value) {
+            // is_string, because this runs on the READ path too. render() calls preview() which
+            // calls buildRules(), so a non-string element does not wait for a save to raise — it
+            // takes the editor down on load and keeps it down until the state is reset. The
+            // validation in save() protects the write; only this protects the render.
+            if (! is_string($value)) {
+                continue;
+            }
+
             $trimmed = trim($value);
             if ($trimmed !== '') {
                 $clean[] = $trimmed;
@@ -355,13 +455,12 @@ final class PayloadTransformEditor extends Component
     {
         $encoded = json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
-        // ⚠️ Unkillable, and reported as a survivor. `json_encode` returns string|false, so
-        // comparing against true never matches and the ternary simply yields the encoded value —
-        // identical behavior for every input that encodes. The two differ only when encoding
-        // FAILS, and what reaches here is an array this component itself validated as JSON.
-        // Measured: flipped to `=== true`, the editor suite stays green.
+        // This comparison cannot fail. `json_encode` returns string|false, so comparing against
+        // true never matches and the ternary simply yields the encoded value, which is identical
+        // behavior for every input that encodes. The two differ only when encoding fails, and what
+        // reaches here is an array this component itself validated as JSON.
         //
-        // It stays as a type net rather than a behavior: the method returns string, and without
+        // It stays as a type net rather than as behavior: the method returns string, and without
         // it a failed encode would return false from a string-typed method.
         return $encoded === false ? '{}' : $encoded;
     }
@@ -371,10 +470,9 @@ final class PayloadTransformEditor extends Component
         /** @var array<string, mixed> $versions */
         $versions = Config::array('webhooks.platform.payload_versioning.versions', []);
 
-        // ⚠️ The cast on the KEY below is unkillable — PHP normalizes a numeric string key to an
-        // int on the way in, so casting it changes nothing (measured). The cast on the VALUE is
-        // NOT in that position and an existing arm goes red without it; only one of the two is a
-        // survivor, which is what makes this a note about the key rather than about the line.
+        // The cast on the key below changes nothing: PHP normalizes a numeric string key to an int
+        // on the way in. The cast on the value is not in that position and an existing arm goes red
+        // without it, which is what makes this a note about the key rather than about the line.
         $versionOptions = ['' => __('webhooks::self-service.transform.version_none')];
         foreach (array_keys($versions) as $version) {
             $versionOptions[(string) $version] = (string) $version;

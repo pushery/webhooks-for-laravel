@@ -14,9 +14,23 @@ namespace Pushery\Webhooks\Support;
  * The package needs it in exactly one place: the spatie import command derives a stable
  * primary key from (source, spatie-row-id) so a second run of the same import re-derives
  * the same ids and skips what it already wrote, rather than duplicating history. A random
- * UUID could not do that. It is deliberately hand-rolled rather than pulled from a UUID
- * library so the package's `require` list stays as lean as it is (illuminate, guzzle,
- * opis) for one small, well-understood function.
+ * UUID could not do that.
+ *
+ * The stated reason for hand-rolling it used to be false, and it is worth replacing rather
+ * than deleting. It read: hand-rolled "so the package's `require` list stays as lean as it is
+ * (illuminate, guzzle, opis)". Both halves fail on the first check. `ramsey/uuid ^4.7` is a hard
+ * require of `laravel/framework`, so the library is already in every install of this package and
+ * using it would add nothing to the tree. And `require` names no `illuminate/*` at all — that is
+ * a deliberate decision this repo documents at length, so the parenthetical contradicted it while
+ * omitting two of the five packages actually listed.
+ *
+ * The real reason it stays: using the library would mean declaring `ramsey/uuid` in `require`,
+ * because a package declares what it uses directly rather than borrowing a transitive. That is a
+ * second constraint to carry across the next framework major, for one twenty-line function whose
+ * output is fixed by RFC 4122 and cannot drift. The trade is worth making the other way, and it
+ * is only defensible because the equivalence is checked: the test pins this against
+ * `Ramsey\Uuid\Uuid::uuid5()` as well as against the canonical python.org vector, so the day the
+ * two disagree is the day the suite says so.
  *
  * @internal
  */

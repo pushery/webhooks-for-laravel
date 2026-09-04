@@ -9,7 +9,7 @@ use RuntimeException;
 /**
  * The webhook host resolved to no address, and this package cannot tell you why.
  *
- * ⚠️ IT IS DELIBERATELY *NOT* {@see NonRetryable}, and that is the whole reason it exists
+ * It is deliberately *not* {@see NonRetryable}, and that is the whole reason it exists
  * beside {@see BlockedDestination}.
  *
  * PHP's resolver does not distinguish a name that does not exist from a lookup that failed:

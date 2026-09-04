@@ -21,6 +21,7 @@ use Pushery\Webhooks\Livewire\SubscriptionManager;
 use Pushery\Webhooks\Platform\Livewire\EndpointForm;
 use Pushery\Webhooks\Support\EventTypeList;
 use Pushery\Webhooks\Support\Settings;
+use Pushery\Webhooks\WebhookManager;
 
 /**
  * A registered webhook endpoint and the event types it listens for.
@@ -87,6 +88,26 @@ final class WebhookSubscription extends Model
     protected $fillable = ['name', 'url', 'event_types'];
 
     /**
+     * Kept out of every array and JSON form of this model.
+     *
+     * The `encrypted` cast is what makes this necessary rather than what makes it redundant.
+     * Eloquent's attributesToArray() runs each cast attribute through castAttribute(), which for an
+     * encrypted cast decrypts first — so `toArray()`, `toJson()` and `(string) $model` all emitted
+     * the plaintext `whsec_…`. The cast protects the row at rest; it does nothing for the way out.
+     *
+     * That surface is entirely the host's: this package never serializes a subscription. But
+     * the docs hand the model to a host and tell it to read `$subscription->secret`, and
+     * WebhookEndpointRegistered ships the model to any listener that writes an audit trail —
+     * which is exactly the code that would call toArray() on it.
+     *
+     * The two panels that show a secret are unaffected: `$hidden` governs serialization, not
+     * property access, and both read `$subscription->secret` directly.
+     *
+     * @var list<string>
+     */
+    protected $hidden = ['secret', 'previous_secret'];
+
+    /**
      * @return array<string, string>
      */
     #[Override]
@@ -151,11 +172,11 @@ final class WebhookSubscription extends Model
      * above its threshold and leaves the streak standing, while a person switching an endpoint
      * off never touches it.
      *
-     * ⚠️ The distinction changes what an operator should DO, which is why it is worth reading
-     * out. Seeing only "Disabled", they re-enable — and `enable()` clears the streak by design,
-     * so the endpoint gets a fresh failure budget, fails through it, and the breaker switches
-     * it off again. The screen says the same thing on every pass, so the loop never looks like
-     * one. When the breaker is what turned it off, the destination is what needs fixing.
+     * The distinction changes what an operator should do, which is why it is worth reading out.
+     * Seeing only "Disabled", they re-enable — and `enable()` clears the streak by design, so the
+     * endpoint gets a fresh failure budget, fails through it, and the breaker switches it off
+     * again. The screen says the same thing on every pass, so the loop never looks like one. When
+     * the breaker is what turned it off, the destination is what needs fixing.
      *
      * Answers false while the breaker is switched off entirely: a streak that no longer trips
      * anything cannot have tripped this.
@@ -186,17 +207,17 @@ final class WebhookSubscription extends Model
      * one prefix per dot boundary. Each arm is still a `whereJsonContains`, so the GIN /
      * multi-valued index serves the lookup as before.
      *
-     * ⚠️ EVERY LOOKUP HERE DEPENDS ON `event_types` BEING A JSON *LIST*, and that is an
-     * invariant the writers hold, not one the column enforces. `whereJsonContains` looks for a
-     * member of an array; against an OBJECT it matches nothing — measured: a row stored as
-     * `{"5":"invoice.paid"}` is invisible to `listeningFor('invoice.paid')` while looking
-     * perfectly configured in both consoles, with no error, no empty state and no log line.
+     * Every lookup here depends on `event_types` being a JSON list, and that is an invariant the
+     * writers hold rather than one the column enforces. `whereJsonContains` looks for a member of
+     * an array; against an object it matches nothing — measured, a row stored as
+     * `{"5":"invoice.paid"}` is invisible to `listeningFor('invoice.paid')` while looking perfectly
+     * configured in both consoles, with no error, no empty state and no log line.
      *
-     * The shape is reachable because both management components bind `$eventTypes` to a PUBLIC
-     * Livewire property, so a payload decides its keys. All three writers therefore re-index:
-     * {@see WebhookManager::subscribe()}, {@see EndpointForm} and
-     * {@see SubscriptionManager}, each with its own arm. A fourth writer
-     * needs one too — including anything a host reaches through `$fillable`.
+     * The shape is reachable because both management components bind `$eventTypes` to a public
+     * Livewire property, so a payload decides its keys. All three writers therefore re-index: {@see
+     * WebhookManager::subscribe()}, {@see EndpointForm} and {@see SubscriptionManager}, each with
+     * its own arm. A fourth writer needs one too, including anything a host reaches through
+     * `$fillable`.
      *
      * @param  Builder<WebhookSubscription>  $query
      * @return Builder<WebhookSubscription>

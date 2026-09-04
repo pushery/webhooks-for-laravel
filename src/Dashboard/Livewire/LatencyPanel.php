@@ -9,6 +9,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Lazy;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Pushery\Webhooks\Dashboard\Data\KpiSet;
 use Pushery\Webhooks\Dashboard\Livewire\Concerns\InteractsWithDashboard;
@@ -30,6 +31,17 @@ final class LatencyPanel extends Component
 {
     use InteractsWithDashboard;
 
+    /**
+     * The window this panel counts over. LOCKED because it is a mount parameter and nothing else — no `wire:model` binds it, and a public
+     * Livewire property that nothing binds is still client input. The page decides the
+     * window, screens it against the configured set, and remounts every panel on it through
+     * the wire:key; a panel that also accepted the value from the browser re-opened the hole
+     * the page had just closed, one component deeper, where nothing screens it at all.
+     *
+     * The failure is not silent: WindowResolver throws on a token it does not know, so an
+     * unscreened value is a 500 where the panel should be.
+     */
+    #[Locked]
     public string $window = '24h';
 
     #[Computed]
@@ -56,13 +68,12 @@ final class LatencyPanel extends Component
     #[Computed]
     public function peakLatency(): float
     {
-        // ⚠️ BOTH FALLBACKS BELOW ARE UNKILLABLE, and mutation testing reports four mutants on
-        // them. The reason is the floor on the last line: `max(1.0, …)` absorbs anything at or
-        // below 1, and the mutators only move a literal by one — so 0 and 1 and -1 all come out
-        // of this method as 1.0. Measured: `?? 0` moved to `?? 1` and `return 0.0` to `1.0`, the
-        // dashboard suites green for both.
+        // Both fallbacks below are absorbed by the floor on the last line: `max(1.0, …)` takes
+        // anything at or below 1, so 0 and 1 and -1 all come out of this method as 1.0.
+        // Measured: `?? 0` changed to `?? 1` and `return 0.0` to `1.0`, the dashboard suites
+        // green for both.
         //
-        // The control is the same method: a row carrying a REAL p95 is still reported as itself
+        // The control is the same method: a row carrying a real p95 is still reported as itself
         // (ChartPeakFallbackTest pins 250.5), so this is a statement about values under the
         // floor rather than about an unmeasured peak.
         //

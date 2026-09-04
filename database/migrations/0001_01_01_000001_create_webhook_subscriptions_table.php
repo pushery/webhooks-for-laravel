@@ -48,7 +48,7 @@ return new class extends Migration
         Schema::create('webhook_subscriptions', function (Blueprint $table) use ($ownerKeyType): void {
             $table->id();
 
-            // owner_id is denormalised across the delivery log and the dashboard rollup, so its
+            // owner_id is denormalized across the delivery log and the dashboard rollup, so its
             // type is not nullableMorphs() but the configured owner_key_type (bigint by default,
             // uuid/ulid on demand), rendered identically here and on those tables. WebhookManager
             // rejects an owner whose key does not match the configured type up front.

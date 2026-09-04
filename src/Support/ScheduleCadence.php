@@ -40,6 +40,29 @@ final class ScheduleCadence
     ];
 
     /**
+     * The cadence token in minutes — what "how often does this run" means as a number.
+     *
+     * Exposed so a reader of the DATA can ask the same question the scheduler answers: a rollup
+     * one cadence behind is a rollup between two runs, and only a multiple of it means something
+     * broke. An unsupported token falls back to five minutes rather than to zero, because zero
+     * would make every comparison against it read as "always late".
+     */
+    public static function minutesFor(string $cadence): int
+    {
+        return match (self::supports($cadence) ? $cadence : 'everyFiveMinutes') {
+            'everyMinute' => 1,
+            'everyTwoMinutes' => 2,
+            'everyThreeMinutes' => 3,
+            'everyFourMinutes' => 4,
+            'everyTenMinutes' => 10,
+            'everyFifteenMinutes' => 15,
+            'everyThirtyMinutes' => 30,
+            'hourly' => 60,
+            default => 5,
+        };
+    }
+
+    /**
      * Apply the configured cadence to a scheduled event, falling back to the given
      * default token when the configured one is not supported.
      *

@@ -1,22 +1,20 @@
 /*
- * The Alpine components the package's own screens mount, served as a FILE from the
- * application's own origin.
+ * The Alpine components the package's own screens mount, served as a file from the application's
+ * own origin.
  *
- * WHY A FILE AND NOT AN INLINE SCRIPT. These factories used to be registered by an inline
- * <script> inside each view's @assets block, carrying an optional CSP nonce. Under a strict,
- * NONCE-LESS policy — `script-src 'self'`, which an application is entitled to choose — the
- * browser refuses to run it. Nothing throws, nothing reaches a server log, and a CSP audit
- * sees an expression that is grammatically perfect: the surface is simply dead. That was the
- * third distinct cause of the same dead panel, so the fix is the one that has no policy
- * dependency left. A file from 'self' runs under every policy, with no nonce, no
- * 'unsafe-inline', and nothing for the host to configure.
+ * A file rather than an inline script. These factories used to be registered by an inline <script>
+ * inside each view's @assets block, carrying an optional CSP nonce. Under a strict, nonce-less
+ * policy — `script-src 'self'`, which an application is entitled to choose — the browser refuses to
+ * run it. Nothing throws, nothing reaches a server log, and a CSP audit sees an expression that is
+ * grammatically perfect: the surface is simply dead. That was the third distinct cause of the same
+ * dead panel, so the fix is the one that has no policy dependency left. A file from 'self' runs
+ * under every policy, with no nonce, no 'unsafe-inline', and nothing for the host to configure.
  *
- * WHY REGISTERED FACTORIES AND NOT INLINE EXPRESSIONS. Under a policy without 'unsafe-eval'
- * Alpine runs its CSP evaluator, which parses attribute expressions against a small grammar
- * rather than handing them to `new Function`. An object literal with methods does not parse
- * there, so an inline `x-data="{ … }"` would silently never run. A registered factory keeps
- * the attribute a bare call, and the body below is ordinary JavaScript that never meets that
- * evaluator at all.
+ * Registered factories rather than inline expressions. Under a policy without 'unsafe-eval' Alpine
+ * runs its CSP evaluator, which parses attribute expressions against a small grammar instead of
+ * handing them to `new Function`. An object literal with methods does not parse there, so an inline
+ * `x-data="{ … }"` would silently never run. A registered factory keeps the attribute a bare call,
+ * and the body below is ordinary JavaScript that never meets that evaluator at all.
  */
 (function () {
     var register = function () {
@@ -99,6 +97,42 @@
                     } else if (! event.shiftKey && document.activeElement === last) {
                         event.preventDefault();
                         first.focus();
+                    }
+                },
+            };
+        });
+
+        /*
+         * Focus and announcement for a panel Livewire opens IN PLACE.
+         *
+         * The endpoint form is not a dialog -- it appears inline, and in the page's markup it
+         * sits BEFORE the list, so the new content is inserted above the button that asked for
+         * it. Nothing moves, nothing scrolls and nothing is announced: a sighted reader looks
+         * at the list where the button was; a screen-reader user is still after the trigger,
+         * which is now after the whole form; a keyboard user tabs FORWARD out of the list
+         * rather than into the thing they just opened.
+         *
+         * Deliberately NOT the focus trap above. This is not modal -- the list behind it stays
+         * live and reachable, and trapping Tab in a panel a reader is meant to leave would be
+         * worse than leaving it alone. What is needed is the move in, and the way back out on
+         * close.
+         */
+        window.Alpine.data('webhooksOpenedPanel', function () {
+            return {
+                trigger: null,
+                init() {
+                    this.trigger = document.activeElement;
+                    this.$nextTick(() => {
+                        const first = this.$el.querySelector('input, select, textarea, button');
+                        (first ?? this.$el).focus();
+                    });
+                },
+                destroy() {
+                    // Back to the control that opened it, when it is still there. After a save
+                    // the list re-renders and the trigger may be gone; focus then stays where
+                    // the browser left it rather than jumping to the top of the document.
+                    if (this.trigger && this.trigger.isConnected && typeof this.trigger.focus === 'function') {
+                        this.trigger.focus();
                     }
                 },
             };

@@ -8,6 +8,7 @@ declare(strict_types=1);
 // the wording of the other.
 return [
     'form' => [
+        'error_summary' => '{1} Het formulier bevat één fout.|[2,*] Het formulier bevat :count fouten.',
         'name_label' => 'Naam',
         'url_label' => 'Endpoint-URL',
         // An example URL, not prose, but it reaches the reader as a placeholder, so a
@@ -128,6 +129,7 @@ return [
         'succeeded' => 'geslaagd',
         'failed' => 'mislukt',
         'exhausted' => 'uitgeput',
+        'refused' => 'geweigerd',
     ],
 
     // The same statuses as filter options, where the surrounding form wants them
@@ -137,6 +139,7 @@ return [
         'succeeded' => 'Geslaagd',
         'failed' => 'Mislukt',
         'exhausted' => 'Uitgeput',
+        'refused' => 'Geweigerd',
     ],
 
     'messages' => [
@@ -156,6 +159,11 @@ return [
             'in' => 'Dit event-type publiceert deze applicatie niet.',
         ],
         'url' => [
+            // The scheme narrowing on the rule ('url:http,https') is what produces this,
+            // and without a line here the operator console fell back to the framework's
+            // own English 'must be a valid URL' -- for a form whose every other message
+            // is translated.
+            'url' => 'Voer een geldige endpoint-URL in. Die moet met http:// of https:// beginnen.',
             // What the reader gets when the SSRF guard refuses the destination. The
             // guard's own message stays untranslated: it is an operator diagnostic for
             // the log, and it would tell a stranger which hosts resolve where.
@@ -169,7 +177,10 @@ return [
         'subscriptions_table' => 'Je webhook-endpoints',
         'delivery_log_table' => 'Afleverlogboek',
         'edit_subscription' => 'Endpoint :url bewerken',
-        'rotate_subscription' => 'De ondertekeningssleutel van endpoint :url roteren',
+        'rotate_subscription' => ':label — :url',
+        'redeliver_delivery' => ':label — :event · :endpoint · :at',
+        'toggle_subscription' => ':label — :url',
+        'ping_subscription' => ':label — :url',
         'delete_subscription' => 'Endpoint :url verwijderen',
     ],
 ];

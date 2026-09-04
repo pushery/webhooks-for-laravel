@@ -127,7 +127,12 @@ final class PendingWebhook
         $call->verifySsl = $config->verifySsl();
         $call->canonicalize = $config->canonicalizeJson();
         $call->respectRetryAfter = $config->respectRetryAfter();
-        $call->retryAfterCap = $config->retryAfterCap();
+        // Clamped here the way the builder clamps it, and for a reason the builder does not
+        // have: this value reaches $job->delay() on the deferral path, and a negative delay is
+        // not a shorter wait but an invalid argument to the queue. Config is the path a host
+        // reaches by typing a number into a file; the builder is the path a host reaches by
+        // calling a method, and only one of the two was holding the line.
+        $call->retryAfterCap = max(0, $config->retryAfterCap());
         $call->retryAfterMaxDeferrals = $config->retryAfterMaxDeferrals();
         $call->responseCaptureBytes = $config->responseCaptureBytes();
         $call->backoff = $config->backoffStrategy();

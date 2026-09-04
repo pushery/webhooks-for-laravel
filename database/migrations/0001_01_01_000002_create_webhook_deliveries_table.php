@@ -9,6 +9,7 @@ use Pushery\Webhooks\Database\DatabaseRequirement;
 use Pushery\Webhooks\Database\Dialect\Dialect;
 use Pushery\Webhooks\Database\OwnerKeyType;
 use Pushery\Webhooks\Database\PartitionManager;
+use Pushery\Webhooks\Support\Settings;
 use Pushery\Webhooks\Support\WebhookConnection;
 
 return new class extends Migration
@@ -111,13 +112,27 @@ return new class extends Migration
 
         $partitions = new PartitionManager;
         $partitions->ensureDefaultPartition();
-        // Cover the previous month through three months ahead so inserts always land
-        // in a real partition; the maintenance command keeps the window rolling. The
-        // partition key is a timestamptz, so the months are UTC months — anchoring them
-        // to a local calendar would shift every bound by the local offset and, since
-        // that offset moves twice a year, leave a gap or an overlap between two
-        // adjacent partitions.
-        $partitions->ensureWindow(CarbonImmutable::now('UTC')->startOfMonth()->subMonth(), 4);
+        // Cover the previous month through partition_months_ahead months ahead, so inserts
+        // always land in a real partition; the maintenance command keeps the window rolling.
+        //
+        // The count is derived rather than written out, and it used to be a literal 4 under a
+        // comment promising three months ahead. ensureWindow($from, $months) creates exactly
+        // $months consecutive months starting at $from, so from the previous month a 4 reaches +2
+        // and not +3 — one month less runway than both the comment and the setting said. The
+        // maintenance command next to it did the arithmetic correctly (`$monthsAhead + 1` from the
+        // current month), so a fresh install and steady state disagreed about the same configured
+        // value.
+        //
+        // Reading the setting is what keeps them from disagreeing again: +2 is prev and current
+        // on top of the months ahead, and it moves with the config instead of beside it.
+        //
+        // The partition key is a timestamptz, so the months are UTC months — anchoring them to a
+        // local calendar would shift every bound by the local offset and, since that offset
+        // moves twice a year, leave a gap or an overlap between two adjacent partitions.
+        $partitions->ensureWindow(
+            CarbonImmutable::now('UTC')->startOfMonth()->subMonth(),
+            new Settings()->partitionMonthsAhead() + 2,
+        );
     }
 
     /**

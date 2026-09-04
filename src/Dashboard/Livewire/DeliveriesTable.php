@@ -135,6 +135,11 @@ final class DeliveriesTable extends Component
 
         $query = $this->sourceModel()
             ->newQuery()
+            // The endpoint is read by every row's accessible name, and without this it is read
+            // one query at a time. Named columns rather than the whole row: a subscription
+            // carries its signing secret, and a table that needs a label has no business
+            // hydrating it fifteen times per render.
+            ->with(['subscription:id,name,url'])
             ->whereRaw($ownerSql, $ownerBindings);
 
         // The lower bound is what makes this read prunable. webhook_deliveries is range
@@ -155,15 +160,23 @@ final class DeliveriesTable extends Component
 
         $deliveries = $query
             ->when($this->status !== '', fn (Builder $query): Builder => $query->where('status', $this->status))
-            // ⚠️ The `!== ''` test is unkillable, and reported as a survivor: with an empty
-            // filter the clause becomes LIKE '%%', which matches every row the panel would have
-            // returned anyway. Measured, suite green.
+            // The `!== ''` test changes no result: with an empty filter the clause becomes LIKE
+            // '%%', which matches every row the panel would have returned anyway.
             //
             // It is NOT redundant for that reason alone — it is what keeps an unfiltered table
             // from carrying a pointless LIKE into the query plan on a partitioned table. Kept
             // for the plan, not for the result.
             ->when($this->eventType !== '', fn (Builder $query): Builder => $query->where('event_type', 'like', '%'.$this->eventType.'%'))
             ->orderBy($sortField, $sortDirection)
+            // A tiebreaker rather than a second sort preference. The column above is chosen by the
+            // reader, and every one of them ties: sorting by status puts every row of a status
+            // level with every other, and `created_at` has second resolution against a fan-out that
+            // writes a burst inside one second. A paginated read is several queries. Where the
+            // order is not total the database may return tied rows differently per query, so a
+            // reader paging through a burst sees rows twice and never sees others, with every
+            // individual page correct. The primary key is unique, which is what makes the order
+            // total.
+            ->orderBy('id', $sortDirection)
             // Clamped, because a public Livewire property is writable from the browser and
             // Builder::limit() silently drops a non-positive value — a page size the reader
             // controls is one they can set to a value that pages nothing, and the component

@@ -18,11 +18,15 @@ use Pushery\Webhooks\Client\Responses\RespondsToWebhook;
 use Pushery\Webhooks\Client\Verification\InboundVerifier;
 use Pushery\Webhooks\Core\Signing\AcceptsSignatureHeaders;
 use Pushery\Webhooks\Core\Signing\Ed25519Scheme;
+use Pushery\Webhooks\Core\Signing\GitHubScheme;
 use Pushery\Webhooks\Core\Signing\Jwks\JwksKeySet;
+use Pushery\Webhooks\Core\Signing\PlainHmacScheme;
 use Pushery\Webhooks\Core\Signing\SecretSet;
 use Pushery\Webhooks\Core\Signing\SignatureHeaders;
 use Pushery\Webhooks\Core\Signing\SignatureScheme;
 use Pushery\Webhooks\Core\Signing\StandardWebhooksScheme;
+use Pushery\Webhooks\Core\Signing\StripeScheme;
+use Pushery\Webhooks\Core\Signing\StripeStyleScheme;
 
 /**
  * A typed, resolved view of a single webhooks.client.configs entry, selected by
@@ -33,6 +37,48 @@ use Pushery\Webhooks\Core\Signing\StandardWebhooksScheme;
  */
 final class WebhookConfig
 {
+    /**
+     * The built-in dialects whose wire format carries no timestamp, so a verification through
+     * them can never return expired and `tolerance_seconds` is inert.
+     *
+     * A hand-written list, and therefore held by a test that derives the same answer from
+     * BEHAVIOR rather than from this line: every built-in scheme signs a message and verifies
+     * it back with a tolerance of -1, which makes even a fresh signature expired for anything
+     * that checks a window. The ones that still return valid are exactly these two, and the
+     * test fails if a new scheme joins them or one of these grows a window.
+     *
+     * A host's own scheme cannot be classified from here, so it is left alone rather than
+     * guessed at: a warning that names someone's correct code is worse than none.
+     *
+     * @var list<class-string<SignatureScheme>>
+     */
+    private const array SCHEMES_WITHOUT_A_REPLAY_WINDOW = [
+        GitHubScheme::class,
+        PlainHmacScheme::class,
+    ];
+
+    /**
+     * The built-in dialects that send no delivery-id header, so with `dedupe_id` unset the
+     * idempotency key is null — and a null collides with nothing, in the partial unique index
+     * and in the cache fast path alike.
+     *
+     * A superset of the list above and a different question. A dialect can carry a timestamp
+     * and no id (Stripe: the `evt_…` is in the body), which bounds a replay in TIME without
+     * making it idempotent — inside the tolerance window the same delivery is processed as
+     * often as it arrives.
+     *
+     * Derived by the same test and the same way: every built-in scheme signs a message, and
+     * the ones whose headers come back without the configured id header are exactly these.
+     *
+     * @var list<class-string<SignatureScheme>>
+     */
+    private const array SCHEMES_WITHOUT_A_DELIVERY_ID_HEADER = [
+        GitHubScheme::class,
+        PlainHmacScheme::class,
+        StripeStyleScheme::class,
+        StripeScheme::class,
+    ];
+
     /**
      * @param  class-string<SignatureScheme>  $schemeClass
      * @param  array{id?: string, timestamp?: string, signature?: string}  $explicitHeaders
@@ -151,6 +197,119 @@ final class WebhookConfig
         }
 
         return $faults;
+    }
+
+    /**
+     * Sources whose authentic deliveries nothing makes idempotent — one advisory line each, in
+     * the shape {@see self::configurationFaults()} uses, so the preflight can print them the same way.
+     *
+     * These are not faults. Every combination named here is a legal, working configuration; what
+     * it lacks is a replay boundary, and neither half of the lack is visible from the config file.
+     * `tolerance_seconds` sits right there in the entry and reads like protection even for a
+     * dialect that has no timestamp to check it against, and the dedupe default is a HEADER the
+     * producer may simply not send — a key that stays null, and a null collides with nothing.
+     *
+     * @return list<string>
+     */
+    public static function replayBoundaryAdvisories(): array
+    {
+        $advisories = [];
+        $seen = [];
+
+        foreach (Config::array('webhooks.client.configs', []) as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+
+            $name = $entry['name'] ?? null;
+
+            // Both are already reported by configurationFaults(), which the preflight runs
+            // first and fails on. Repeating them here would say the same thing twice in two
+            // registers, and an advisory next to an error reads as a second, lesser error.
+            if (! is_string($name) || $name === '' || isset($seen[$name])) {
+                continue;
+            }
+
+            $seen[$name] = true;
+
+            try {
+                $config = self::fromEntry($name, $entry);
+            } catch (InvalidArgumentException) {
+                continue;
+            }
+
+            $scheme = $config->schemeWithoutDeliveryIdHeader();
+
+            if ($scheme === null) {
+                continue;
+            }
+
+            // Two facts, one message. The id half is why we are here at all, so it leads; the
+            // window half only sharpens it. Split across two advisories, a GitHub source would
+            // draw both and a reader would fix one and think the source was covered.
+            $advisories[] = sprintf(
+                'Webhook source [%s] verifies with %s, a dialect that sends no delivery-id '
+                .'header: with no dedupe_id set the key is read from [%s], which this producer '
+                .'does not send, so it stays null — and a null collides with nothing. Both '
+                .'dedupe tiers are inert for this source, and every retry the producer makes '
+                .'stores another row and runs the handler again.%s Set dedupe_id to the id the '
+                .'producer does send (GitHub: header:X-GitHub-Delivery; Stripe: body:id — the '
+                .'envelope, not data.object.id).',
+                $name,
+                class_basename($scheme),
+                $config->idHeader,
+                $config->schemeWithoutReplayWindow() === null
+                    ? ''
+                    : sprintf(
+                        ' This dialect also signs no timestamp, so its tolerance_seconds (%d) is '
+                        .'never consulted and nothing bounds a replay in time either.',
+                        $config->tolerance,
+                    ),
+            );
+        }
+
+        return $advisories;
+    }
+
+    /**
+     * The scheme class when this source's dialect sends no delivery-id header and nothing else
+     * supplies the key, null otherwise.
+     *
+     * `idHeader` defaults to the Standard Webhooks name whatever the scheme is, so an unset
+     * `dedupe_id` looks for a header four of the six built-in dialects never send. A configured
+     * `dedupe_id` answers it, and a 'verifier' puts the whole question out of scope.
+     */
+    public function schemeWithoutDeliveryIdHeader(): ?string
+    {
+        if ($this->verifierClass !== null || $this->dedupeId !== null) {
+            return null;
+        }
+
+        return in_array($this->schemeClass, self::SCHEMES_WITHOUT_A_DELIVERY_ID_HEADER, true)
+            ? $this->schemeClass
+            : null;
+    }
+
+    /**
+     * The scheme class when this source has no replay boundary at all, null when it has one.
+     *
+     * A dialect with a signed timestamp bounds a replay with `tolerance_seconds`; the two that
+     * carry none say so in their own docblocks, and a verification through them never returns
+     * expired. A configured `dedupe_id` is the other boundary, and it is enough on its own — so
+     * this asks for the absence of BOTH.
+     *
+     * A 'verifier' takes precedence over the scheme entirely and reaches its verdict however it
+     * likes, so the question does not apply to one and no advice is offered about it.
+     */
+    public function schemeWithoutReplayWindow(): ?string
+    {
+        if ($this->verifierClass !== null || $this->dedupeId !== null) {
+            return null;
+        }
+
+        return in_array($this->schemeClass, self::SCHEMES_WITHOUT_A_REPLAY_WINDOW, true)
+            ? $this->schemeClass
+            : null;
     }
 
     /**
@@ -298,13 +457,13 @@ final class WebhookConfig
      * same failure until its budget runs out. The delivery was authentic, it was accepted,
      * and then it was gone.
      *
-     * ⚠️ THE FIX ITS TWIN GOT WOULD BE WORSE HERE THAN THE DEFECT. This column is the dedupe
-     * key: it sits in a partial unique index over (source, webhook_id). Truncating makes two
-     * different producer ids that share a 255-character prefix into ONE key — and a
-     * duplicate is dropped without a sound. That trades a loud 500 for a silent lost
-     * delivery, which is the wrong half of the trade. `event_type` can be cut because it is
-     * a ROUTING value: a truncated type matches no `process` map entry and lands on the
-     * catch-all, which is exactly where an over-long type was going anyway.
+     * The fix its twin got would be worse here than the defect. This column is the dedupe key: it
+     * sits in a partial unique index over (source, webhook_id). Truncating makes two different
+     * producer ids that share a 255-character prefix into one key, and a duplicate is dropped
+     * without a sound. That trades a loud 500 for a silent lost delivery, which is the wrong half
+     * of the trade. `event_type` can be cut because it is a routing value: a truncated type matches
+     * no `process` map entry and lands on the catch-all, which is exactly where an over-long type
+     * was going anyway.
      *
      * Hashing keeps what the column is for. The same long id hashes to the same key, so the
      * producer's retry still deduplicates; two different ids do not collide, prefix or not.
@@ -397,11 +556,11 @@ final class WebhookConfig
      * the delivery survives, the exact bytes stay in the raw body, and a value this long
      * routes to the catch-all either way — no 'process' map key is 255 characters long.
      *
-     * ⚠️ THE DEDUPE KEY MUST NOT GET THIS TREATMENT, which is why the bound lives here and
-     * not in nonEmpty() where both paths meet. `webhook_id` is the same width and has the
-     * same exposure, but truncating it makes two different producer ids collide on their
-     * prefix — and a collision there drops a genuine delivery as a duplicate, silently. It
-     * is bounded by HASHING instead; see {@see self::boundedWebhookId()}.
+     * The dedupe key must not get this treatment, which is why the bound lives here and not in
+     * nonEmpty() where both paths meet. `webhook_id` is the same width and has the same exposure,
+     * but truncating it makes two different producer ids collide on their prefix — and a collision
+     * there drops a genuine delivery as a duplicate, silently. It is bounded by hashing instead;
+     * see {@see self::boundedWebhookId()}.
      */
     private function boundedEventType(?string $value): ?string
     {
@@ -547,14 +706,14 @@ final class WebhookConfig
 
         $scheme = self::resolveScheme($name, $entry['scheme'] ?? StandardWebhooksScheme::class);
 
-        // NON-EMPTY IS NOT THE SAME AS USABLE, and the branch above only knows the first.
-        // Standard Webhooks derives its key by base64-decoding the secret, so a value with no
-        // base64 characters in it -- the bare prefix `whsec_` above all, which is what an
-        // unset `WEBHOOKS_..._SECRET=whsec_${SECRET}` expands to -- passes the string test and
-        // then derives ZERO bytes. HMAC under an empty key is a pure function of bytes the
-        // sender already published, so this config would verify EVERY forged delivery while
-        // looking exactly like a configured one. Refused here, where preflight can see it,
-        // rather than at the first forged request, where nothing would say anything at all.
+        // Non-empty is not the same as usable, and the branch above only knows the first. Standard
+        // Webhooks derives its key by base64-decoding the secret, so a value with no base64
+        // characters in it — the bare prefix `whsec_` above all, which is what an unset
+        // `WEBHOOKS_..._SECRET=whsec_${SECRET}` expands to — passes the string test and then
+        // derives zero bytes. HMAC under an empty key is a pure function of bytes the sender
+        // already published, so this config would verify every forged delivery while looking
+        // exactly like a configured one. Refused here, where preflight can see it, rather than at
+        // the first forged request, where nothing would say anything at all.
         if ($jwks === null && $verifier === null && is_string($secret)
             && is_a($scheme, StandardWebhooksScheme::class, true)
             && ! StandardWebhooksScheme::derivesUsableKey($secret)) {

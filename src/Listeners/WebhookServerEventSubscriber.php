@@ -18,6 +18,7 @@ use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 use Pushery\Webhooks\Server\Events\WebhookAttemptFailed;
 use Pushery\Webhooks\Server\Events\WebhookAttemptsExhausted;
 use Pushery\Webhooks\Server\Events\WebhookAttemptSucceeded;
+use Pushery\Webhooks\Server\Exceptions\DeliveryRefused;
 use Pushery\Webhooks\Support\Settings;
 use Throwable;
 
@@ -104,8 +105,13 @@ final readonly class WebhookServerEventSubscriber
 
         $reason = $this->errorFrom($event->exception);
 
+        // A refusal is not an exhaustion, and the difference is the whole reason the guard
+        // below exists. Written as Exhausted it was indistinguishable afterwards, so the health
+        // score counted against the endpoint what the breaker three lines down refuses to.
         $this->persist($delivery, [
-            'status' => DeliveryStatus::Exhausted,
+            'status' => $event->exception instanceof DeliveryRefused
+                ? DeliveryStatus::Refused
+                : DeliveryStatus::Exhausted,
             'attempt' => $event->attempt,
             'response_code' => $event->response?->status,
             'duration_ms' => $event->response?->durationMs,
@@ -181,7 +187,7 @@ final readonly class WebhookServerEventSubscriber
 
     private function isTerminal(WebhookDelivery $delivery): bool
     {
-        return in_array($delivery->status, [DeliveryStatus::Succeeded, DeliveryStatus::Exhausted], true);
+        return in_array($delivery->status, [DeliveryStatus::Succeeded, DeliveryStatus::Exhausted, DeliveryStatus::Refused], true);
     }
 
     private function resolveDelivery(WebhookDeliveryData $data): ?WebhookDelivery

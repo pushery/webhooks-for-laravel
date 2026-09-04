@@ -19,6 +19,7 @@ return [
     ],
 
     'kpis' => [
+        'title' => 'Auf einen Blick',
         'total' => 'Gesendete Webhooks gesamt',
         'successful' => 'Erfolgreich',
         'failed' => 'Fehlgeschlagen',
@@ -31,6 +32,11 @@ return [
     'formats' => [
         'hour_bucket' => 'j. M H:i',
         'absolute' => 'LLL z',
+
+        // 'precise' is a second pattern because 'absolute' cannot separate two rows and the
+        // accessible names need it to. lang/en/dashboard.php states the case in full, including
+        // what it still does not cover.
+        'precise' => 'LL LTS z',
     ],
 
     'api' => [
@@ -86,11 +92,16 @@ return [
 
     // Der Schlüssel ist der gespeicherte Statuswert und bleibt unverändert;
     // übersetzt wird nur die Beschriftung. Kleinschreibung wie im Original-Design.
+    // Shown when the rollup the counts come from has fallen behind the rows it summarizes --
+    // twice the configured refresh cadence or more, so a run merely in progress never triggers it.
+    'rollup_stale' => 'Die Zustellzahlen auf dieser Seite sind :minutes Minuten alt. Sie kommen aus einem Rollup, das `webhooks:refresh-metrics` fortschreibt; die Latenzwerte daneben sind live, die beiden widersprechen sich also, bis das Kommando wieder läuft.',
+
     'status' => [
         'pending' => 'ausstehend',
         'succeeded' => 'erfolgreich',
         'failed' => 'fehlgeschlagen',
         'exhausted' => 'aufgegeben',
+        'refused' => 'abgelehnt',
     ],
 
     'status_options' => [
@@ -98,6 +109,7 @@ return [
         'succeeded' => 'Erfolgreich',
         'failed' => 'Fehlgeschlagen',
         'exhausted' => 'Aufgegeben',
+        'refused' => 'Abgelehnt',
     ],
 
     'drawer' => [
@@ -156,12 +168,22 @@ return [
         'sections' => 'Dashboard-Bereiche',
         'retry_rate' => 'Wiederholungsrate',
         'deliveries_per_hour' => 'Zustellungen pro Stunde',
-        'hour_summary' => ':hour: :total gesamt, :delivered zugestellt, :pending ausstehend, :failed fehlgeschlagen',
+        'hour_summary' => [
+            // Four choice fragments rather than one sentence with four numbers in it: agreement is
+            // decided by the number, `trans_choice` takes one count per string, and there are four.
+            // lang/en/dashboard.php states the case in full, including why English, German and
+            // Dutch carry identical forms on both sides.
+            'total' => '{0} :count gesamt|{1} :count gesamt|[2,*] :count gesamt',
+            'delivered' => '{0} :count zugestellt|{1} :count zugestellt|[2,*] :count zugestellt',
+            'pending' => '{0} :count ausstehend|{1} :count ausstehend|[2,*] :count ausstehend',
+            'failed' => '{0} :count fehlgeschlagen|{1} :count fehlgeschlagen|[2,*] :count fehlgeschlagen',
+        ],
         'latency_trend' => 'P95-Latenzverlauf pro Stunde',
+        'latency_bar' => ':hour: :value ms',
         'recent_deliveries_table' => 'Aktuelle Webhook-Zustellungen',
         'deliveries_table' => 'Webhook-Zustellungen',
-        'replay_delivery' => 'Zustellung :event erneut senden',
-        'view_delivery' => 'Details der Zustellung :event ansehen',
+        'replay_delivery' => ':label — :event · :endpoint · :at',
+        'view_delivery' => 'Details der Zustellung :event an :endpoint vom :at ansehen',
         'delivery_details' => 'Zustellungsdetails',
         'close_details' => 'Details schließen',
         'loading_kpis' => 'Kennzahlen werden geladen',

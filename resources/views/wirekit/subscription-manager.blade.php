@@ -3,10 +3,10 @@
      at https://docs.pushery.com/webhooks-for-laravel/guides/styling-the-ui); place behind
      your own authorization. Publish the neutral variant
      instead with the webhooks-ui tag. --}}
-{{-- ⚠️ Pairs badly with the wirekit.delivery-log stub on the SAME page: its filter is a
-     WireKit select bound with wire:model.live, and that combination makes the confirm action
-     of the delete dialogs below unclickable. The dialog opens, the click never lands, nothing
-     is logged. Reported upstream; the comment in that stub carries the detail. --}}
+{{-- Pairs badly with the wirekit.delivery-log stub on the same page: its filter is a WireKit select
+     bound with wire:model.live, and that combination makes the confirm action of the delete dialogs
+     below unclickable. The dialog opens, the click never lands, nothing is logged. Reported
+     upstream; the comment in that stub carries the detail. --}}
 <x-wirekit::stack gap="lg" class="wh-subscriptions">
     <x-wirekit::card>
         <x-wirekit::card.body>
@@ -68,13 +68,13 @@
         {{-- A rotation says something a registration does not: the OLD secret keeps verifying
              until the rotation window closes, which is what makes rotating during an incident
              safe to do immediately. --}}
-        {{-- ⚠️ THE COPY CONTROL IS NOT DECORATION HERE. dehydrate() clears newSecret on every
-             dehydrate, on purpose — so the plaintext exists in exactly ONE response, and this
-             console has no reveal window to ask again with. A reader who cannot get it out of
-             this one rendering has to ROTATE, which puts every consumer of the endpoint into a
-             migration window nobody needed. Selecting a 50-character token rendered `break-all`
-             across several lines with a mouse, without losing a character, is precisely where
-             that goes wrong. --}}
+        {{-- The copy control is not decoration here. dehydrate() clears newSecret on every
+             dehydrate, on purpose, so the plaintext exists in exactly one response and this console
+             has no reveal window to ask again with. A reader who cannot get it out of this one
+             rendering has to rotate, which puts every consumer of the endpoint into a migration
+             window nobody needed. Selecting a 50-character token rendered `break-all` across
+             several lines with a mouse, without losing a character, is precisely where that goes
+             wrong. --}}
         <x-wirekit::alert intent="success" :title="$rotated ? __('webhooks::management.secret.rotated_heading') : __('webhooks::management.secret.heading')">
             <div class="flex flex-wrap items-center gap-[var(--gap-wk-sm)]">
                 <x-wirekit::code class="wh-new-secret break-all">{{ $newSecret }}</x-wirekit::code>
@@ -182,8 +182,12 @@
                                 :aria-label="__('webhooks::management.a11y.edit_subscription', ['url' => $subscription->url])"
                             >{{ __('webhooks::management.subscription.edit') }}</x-wirekit::button>
 
-                            <x-wirekit::button size="sm" surface="ghost" wire:click="toggle({{ $subscription->id }})" wire:loading.attr="disabled" wire:target="toggle">
-                                {{ $subscription->is_active ? __('webhooks::management.subscription.disable') : __('webhooks::management.subscription.enable') }}
+                            {{-- Named per row like its neighbors. The visible word switches with
+                                 the row's state, so it is interpolated rather than described --
+                                 the name then contains whichever word is on the button. --}}
+                            @php($toggleLabel = $subscription->is_active ? __('webhooks::management.subscription.disable') : __('webhooks::management.subscription.enable'))
+                            <x-wirekit::button size="sm" surface="ghost" wire:click="toggle({{ $subscription->id }})" wire:loading.attr="disabled" wire:target="toggle" :aria-label="__('webhooks::management.a11y.toggle_subscription', ['label' => $toggleLabel, 'url' => $subscription->url])">
+                                {{ $toggleLabel }}
                             </x-wirekit::button>
 
                             {{-- Rotating starts a clock on the old secret rather than invalidating
@@ -195,7 +199,7 @@
                                     <x-wirekit::button
                                         size="sm"
                                         surface="ghost"
-                                        :aria-label="__('webhooks::management.a11y.rotate_subscription', ['url' => $subscription->url])"
+                                        :aria-label="__('webhooks::management.a11y.rotate_subscription', ['label' => __('webhooks::management.subscription.rotate'), 'url' => $subscription->url])"
                                     >{{ __('webhooks::management.subscription.rotate') }}</x-wirekit::button>
                                 </x-slot:trigger>
 
@@ -216,15 +220,15 @@
                                  never a bare one-click destroy, and never wire:confirm. This is the
                                  pattern to copy when you restyle the stub.
 
-                                 ⚠️ AND IT IS THE ONE DIALOG HERE THAT NEEDS focus-return-to. A
-                                 dialog normally hands focus back to its trigger; after a delete
-                                 the trigger is GONE with the row, so focus falls to <body> and a
+                                 And it is the one dialog here that needs focus-return-to. A dialog
+                                 normally hands focus back to its trigger; after a delete the
+                                 trigger is gone with the row, so focus falls to <body> and a
                                  keyboard or screen-reader user is returned to the top of the
-                                 document with no announcement that the irreversible thing they
-                                 just confirmed happened. The target is the table — it survives,
-                                 and it is where the removed row was. A selector pointing into the
-                                 host's surrounding chrome would break the moment the host changes
-                                 its markup, and break silently.
+                                 document with no announcement that the irreversible thing they just
+                                 confirmed happened. The target is the table — it survives, and it
+                                 is where the removed row was. A selector pointing into the host's
+                                 surrounding chrome would break the moment the host changes its
+                                 markup, and break silently.
 
                                  The rotate dialog beside it deliberately has NONE: its row
                                  survives, so focus returns to the trigger by itself, and
@@ -265,7 +269,11 @@
                 @endforeach
             </x-wirekit::table.body>
         </x-wirekit::table>
-
-        {{ $subscriptions->links() }}
     @endif
+    {{-- OUTSIDE the @if, matching the neutral stub beside this one. A simplePaginate list
+         does not know how many pages there are, so a page past the end renders an empty
+         table — and with the control inside the @else the only way back was to edit the
+         URL. The package's pagination view renders nothing while there is a single page,
+         so putting it here costs nothing in the ordinary case. --}}
+    {{ $subscriptions->links() }}
 </x-wirekit::stack>

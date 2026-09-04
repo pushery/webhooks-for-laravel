@@ -30,7 +30,7 @@ use Pushery\Webhooks\Client\Models\WebhookCall;
  * with a message-size limit, keep such a listener synchronous, or read what is needed here and
  * dispatch a job carrying only the call's id.
  *
- * ⚠️ IT CARRIES THE CONFIG'S NAME, NOT THE CONFIG, for a reason the paragraph above missed while
+ * It carries the config's name, not the config, for a reason the paragraph above missed while
  * it was busy with the request. A WebhookConfig holds the signing secret and the rotation secret
  * in cleartext, and this row travels into a queued listener's job payload — so the config went
  * with it, into the queue store, and into the log of any listener that recorded the event. That

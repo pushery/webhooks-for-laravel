@@ -69,6 +69,8 @@ return [
     ],
 
     'secret' => [
+        'region_label' => 'Signing secret',
+        'shown_announcement' => 'Signing secret shown. It hides automatically.',
         'heading' => 'Signing secret',
         'hide' => 'Hide',
         'hidden_announcement' => 'Signing secret hidden.',
@@ -90,6 +92,9 @@ return [
         'recompute' => 'Recompute',
         'recompute_all' => 'Recompute all',
         'never' => 'Never',
+        // Two lines the board says out loud rather than doing in silence.
+        'recompute_throttled' => 'You have recomputed a lot just now. Give it a minute and try again — the scheduled refresh keeps the scores current in the meantime.',
+        'endpoints_truncated' => 'Only the first endpoints are shown here. Recompute covers exactly the rows on this board.',
     ],
 
     'transform' => [
@@ -101,10 +106,10 @@ return [
         'version_none' => 'None',
         'field_name_placeholder' => 'field name',
         'include_label' => 'Include fields',
-        'include_hint' => 'Only these fields survive. Leave empty to keep them all.',
+        'include_hint' => 'Only these fields survive. Leave empty to keep them all. Top-level names only — a dotted path is not a nested field here.',
         'add_include' => 'Add include field',
         'exclude_label' => 'Exclude fields',
-        'exclude_hint' => 'These fields are dropped from the body.',
+        'exclude_hint' => 'These fields are dropped from the body. Top-level names only — a dotted path is not a nested field here.',
         'add_exclude' => 'Add exclude field',
         'rename_label' => 'Rename fields',
         'rename_hint' => 'Move a field to a new name.',
@@ -126,10 +131,24 @@ return [
     // The tenant's own delivery log. The status labels are keyed by the STORED
     // DeliveryStatus value, which never changes, and read as outcomes rather than
     // states: a customer asking "did my order go out?" is not asking for an enum.
+    // The one date pattern this namespace needs, and it exists for the accessible names rather
+    // than for the screen. A replay writes a NEW delivery row — same event type, same endpoint —
+    // and `platform.self_service.replays_per_minute` allows ten a minute by default, so two rows
+    // that differ only in their second are the ORDINARY outcome of a tenant pressing Send again.
+    // `LLL` carries no seconds in any of the seven shipped locales (measured on two deliveries
+    // 37 seconds apart, identical in all seven), so the names agreed in every part.
+    //
+    // Translated rather than a literal for the reason the dashboard's own patterns are: the
+    // ORDER differs by locale, and `z` names the clock the reader is being shown.
+    'formats' => [
+        'precise' => 'LL LTS z',
+    ],
+
     'deliveries' => [
         'heading' => 'Recent deliveries',
         'filter_label' => 'Filter by endpoint',
         'all_endpoints' => 'All endpoints',
+        'endpoints_truncated' => 'Only the first endpoints are offered in this filter. If the one you want is missing, open it from your endpoint list.',
         'event' => 'Event',
         'outcome' => 'Outcome',
         'response_code' => 'Response',
@@ -140,9 +159,13 @@ return [
         'pagination_label' => 'Recent deliveries, pages',
         'window_label' => 'Time window',
         'window_days' => 'Last :days days',
+        'status_label' => 'Filter by outcome',
+        'all_statuses' => 'All outcomes',
+        'from' => 'From',
+        'until' => 'Until',
         'error' => 'Error',
         'replay' => 'Send again',
-        'replay_sr' => 'Send :event again',
+        'replay_sr' => ':label — :event · :at',
         'endpoint_disabled' => 'This endpoint is switched off, so nothing can be sent to it.',
         'replay_throttled' => 'You have sent a lot of replays just now. Give it a minute and try again.',
         'status' => [
@@ -150,6 +173,7 @@ return [
             'succeeded' => 'Delivered',
             'failed' => 'Failed, retrying',
             'exhausted' => 'Gave up',
+            'refused' => 'Not sent',
         ],
     ],
 
@@ -172,6 +196,10 @@ return [
             // about every endpoint the reader owns, and it is false while one is
             // selected — the others may be busy.
             'filtered' => 'Nothing has been sent to this endpoint yet. Deliveries older than the retention window are removed, so an older one may have been here and gone.',
+            // A third state, and each of the three has to be TRUE. The two above are
+            // claims about what was SENT; this one is a claim about the filters, which is
+            // the only honest thing to say when a reader narrowed by outcome or by date.
+            'no_match' => 'No delivery matches the filters you set. Clear one to see more.',
         ],
     ],
 
@@ -209,6 +237,7 @@ return [
     // attribute names, so a refused save speaks the reader's language rather than the
     // framework's default English lines.
     'validation' => [
+        'nested_field' => 'Top-level field names only — ":field" looks like a nested path, and it would match nothing.',
         'name' => [
             'max' => 'The name may not be longer than :max characters.',
         ],
@@ -239,11 +268,11 @@ return [
         'loading_endpoints' => 'Loading endpoints',
         'endpoints_table' => 'Your webhook endpoints',
         'health_table' => 'Endpoint health',
-        'toggle_active' => 'Toggle active state for :url',
+        'toggle_active' => ':state — toggle active state for :url',
         'reveal_secret' => 'Reveal signing secret for :url',
-        'ping_endpoint' => 'Send a test event to :url',
+        'ping_endpoint' => ':label — send a test event to :url',
         'edit_endpoint' => 'Edit endpoint :url',
-        'edit_transform' => 'Edit payload transform for :url',
+        'edit_transform' => ':label — edit payload transform for :url',
         'delete_endpoint' => 'Delete endpoint :url',
         'recompute_health' => 'Recompute health for :url',
         'include_field' => 'Include field :number',

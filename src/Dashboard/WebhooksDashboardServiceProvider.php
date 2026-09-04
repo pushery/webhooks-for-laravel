@@ -198,7 +198,12 @@ final class WebhooksDashboardServiceProvider extends ServiceProvider
      */
     private function scheduleRefresh(Schedule $schedule): void
     {
-        $event = $schedule->command('webhooks:refresh-metrics')->withoutOverlapping();
+        // 15 minutes rather than Laravel's 1440. The default leaves a hard-killed run holding the
+        // mutex for a day, and withoutOverlapping is implemented as skip() -- so the dashboard's
+        // counts simply stop moving, with nothing red to explain it. Three times the default
+        // five-minute cadence: past any real run, short enough that a stale lock costs a few
+        // refreshes rather than the whole day.
+        $event = $schedule->command('webhooks:refresh-metrics')->withoutOverlapping(15);
 
         ScheduleCadence::apply(
             $event,

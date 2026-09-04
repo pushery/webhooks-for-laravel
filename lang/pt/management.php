@@ -8,6 +8,7 @@ declare(strict_types=1);
 // the wording of the other.
 return [
     'form' => [
+        'error_summary' => '{1} O formulário tem um erro.|[2,*] O formulário tem :count erros.',
         'name_label' => 'Nome',
         'url_label' => 'URL do endpoint',
         // An example URL, not prose, but it reaches the reader as a placeholder, so a
@@ -128,6 +129,7 @@ return [
         'succeeded' => 'bem-sucedida',
         'failed' => 'falhada',
         'exhausted' => 'esgotada',
+        'refused' => 'recusada',
     ],
 
     // The same statuses as filter options, where the surrounding form wants them
@@ -137,6 +139,7 @@ return [
         'succeeded' => 'Bem-sucedida',
         'failed' => 'Falhada',
         'exhausted' => 'Esgotada',
+        'refused' => 'Recusada',
     ],
 
     'messages' => [
@@ -156,6 +159,11 @@ return [
             'in' => 'Este tipo de evento não é publicado por esta aplicação.',
         ],
         'url' => [
+            // The scheme narrowing on the rule ('url:http,https') is what produces this,
+            // and without a line here the operator console fell back to the framework's
+            // own English 'must be a valid URL' -- for a form whose every other message
+            // is translated.
+            'url' => 'Introduz um URL de endpoint válido. Tem de começar por http:// ou https://.',
             // What the reader gets when the SSRF guard refuses the destination. The
             // guard's own message stays untranslated: it is an operator diagnostic for
             // the log, and it would tell a stranger which hosts resolve where.
@@ -169,7 +177,10 @@ return [
         'subscriptions_table' => 'Os teus endpoints de webhook',
         'delivery_log_table' => 'Registo de entregas',
         'edit_subscription' => 'Editar o endpoint :url',
-        'rotate_subscription' => 'Rodar a chave de assinatura do endpoint :url',
+        'rotate_subscription' => ':label — :url',
+        'redeliver_delivery' => ':label — :event · :endpoint · :at',
+        'toggle_subscription' => ':label — :url',
+        'ping_subscription' => ':label — :url',
         'delete_subscription' => 'Eliminar o endpoint :url',
     ],
 ];

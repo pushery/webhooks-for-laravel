@@ -36,19 +36,19 @@ final class HttpTransport
         $start = hrtime(true);
 
         $response = Http::withOptions($this->optionsFor($endpoint, $options))
-            // ⚠️ NORMALIZED HERE, BEFORE LARAVEL MARSHALS, because afterwards the information
-            // is destroyed: Response::toException() builds a fresh exception with no
-            // `previous`, so the errno cannot be recovered further down. See
-            // {@see TransportExceptionNormalizer} for what diverges and why only the timeout
-            // is touched. A no-op on guzzle 7, where the class it looks for does not exist.
+            // Normalized here, before Laravel marshals, because afterwards the information is
+            // destroyed: Response::toException() builds a fresh exception with no `previous`, so
+            // the errno cannot be recovered further down. See {@see TransportExceptionNormalizer}
+            // for what diverges and why only the timeout is touched. A no-op on guzzle 7, where the
+            // class it looks for does not exist.
             ->withMiddleware(TransportExceptionNormalizer::wrap(...))
             ->withHeaders($headers)
             ->withBody($rawBody, $options->contentType)
-            // ⚠️ UPPERCASED HERE, AT THE WIRE, AND NOWHERE ELSE. The package canonicalizes
-            // every verb to lowercase on the way in — PendingWebhook::useHttpVerb(),
-            // Settings::httpVerb(), the config default — because that is the form it stores
-            // and displays. RFC 9110 methods are CASE-SENSITIVE, so lowercase is not a
-            // spelling of the method, it is a different method.
+            // Uppercased here, at the wire, and nowhere else. The package canonicalises every verb
+            // to lowercase on the way in — PendingWebhook::useHttpVerb(), Settings::httpVerb(), the
+            // config default — because that is the form it stores and displays. RFC 9110 methods
+            // are case-sensitive, so lowercase is not a spelling of the method, it is a different
+            // method.
             //
             // Until now nothing here uppercased it, and nothing had to: guzzlehttp/psr7 2 did
             // it silently inside Request::__construct (`$this->method = Utils::asciiToUpper()`).
@@ -65,13 +65,13 @@ final class HttpTransport
 
         $psr = $response->toPsrResponse();
 
-        // ⚠️ THE SAME REFUSAL GUZZLE 8 MAKES, MADE HERE, BECAUSE GUZZLE 7 DOES NOT MAKE IT.
-        // A response carrying both `Content-Length` and `Transfer-Encoding` contradicts itself
-        // about where its body ends; RFC 9112 §6.1 forbids it outright. Guzzle 8 validates the
-        // framing before the response is ever visible and rejects the transfer — measured —
-        // while guzzle 7 has no such check and hands back an ordinary 200 with both headers
-        // still on it. Without this, widening the constraint would have made the SAME wire
-        // event a delivered webhook on one major and a failed delivery on the other.
+        // The same refusal guzzle 8 makes, made here, because guzzle 7 does not make it. A response
+        // carrying both `Content-Length` and `Transfer-Encoding` contradicts itself about where its
+        // body ends; RFC 9112 §6.1 forbids it outright. Guzzle 8 validates the framing before the
+        // response is ever visible and rejects the transfer — measured — while guzzle 7 has no such
+        // check and hands back an ordinary 200 with both headers still on it. Without this,
+        // widening the constraint would have made the same wire event a delivered webhook on one
+        // major and a failed delivery on the other.
         //
         // Guzzle 8 never reaches this line for such a response: its rejection arrives as an
         // exception that TransportExceptionNormalizer turns into the same class. Two routes,

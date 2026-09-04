@@ -24,6 +24,19 @@
         </div>
     </header>
 
+    @if ($message !== '')
+        {{-- Why an action was refused, said where the reader is looking rather than only in a
+             toast that may already have gone. --}}
+        <x-wirekit::alert intent="warning" role="status">{{ $message }}</x-wirekit::alert>
+    @endif
+
+    @if ($endpointsTruncated)
+        {{-- Said out loud rather than truncated in silence: a board that looks complete is how
+             a reader concludes an endpoint is gone. It also states what Recompute covers, since
+             the pass is bounded to exactly these rows. --}}
+        <x-wirekit::text size="sm" intent="muted">{{ __('webhooks::self-service.health_page.endpoints_truncated') }}</x-wirekit::text>
+    @endif
+
     @if ($endpoints->isEmpty())
         <x-wirekit::empty-state
             icon="globe"
@@ -88,10 +101,10 @@
                             <x-wirekit::text weight="medium">{{ $endpoint->health_score ?? '—' }}</x-wirekit::text>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td align="right">
-                            <x-wirekit::text size="sm">{{ $report !== null ? number_format($report['successRate'] * 100, 1).'%' : '—' }}</x-wirekit::text>
+                            <x-wirekit::text size="sm">{{ $report !== null ? \Pushery\Webhooks\Support\LocalizedNumber::format($report['successRate'] * 100, 1).'%' : '—' }}</x-wirekit::text>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td align="right">
-                            <x-wirekit::text size="sm">{{ $report !== null ? number_format($report['p95']).' ms' : '—' }}</x-wirekit::text>
+                            <x-wirekit::text size="sm">{{ $report !== null ? \Pushery\Webhooks\Support\LocalizedNumber::format($report['p95']).' ms' : '—' }}</x-wirekit::text>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td align="right">
                             <x-wirekit::text size="sm">{{ $report !== null ? $report['sampleSize'] : '—' }}</x-wirekit::text>

@@ -50,7 +50,12 @@ final class RollupRefresh
             .'COUNT(*) AS total, '
             ."COUNT(CASE WHEN status = 'succeeded' THEN 1 END) AS delivered, "
             ."COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending, "
-            ."COUNT(CASE WHEN status IN ('failed', 'exhausted') THEN 1 END) AS failed, "
+            // 'refused' belongs here and NOT in the health score, and the split is deliberate. This
+            // rollup answers "what happened to my deliveries" for an operator, and a delivery
+            // refused because its endpoint was off did not arrive; leaving it out of every bucket
+            // would make the buckets stop summing to the total. The health score answers "how is
+            // this ENDPOINT behaving", which a delivery it never received says nothing about.
+            ."COUNT(CASE WHEN status IN ('failed', 'exhausted', 'refused') THEN 1 END) AS failed, "
             .'COUNT(CASE WHEN attempt > 1 THEN 1 END) AS retried '
             .'FROM webhook_deliveries WHERE created_at >= ? '
             .'GROUP BY ot, oid, bkt'

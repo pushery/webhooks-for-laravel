@@ -8,6 +8,7 @@ use Illuminate\Contracts\Cache\Repository as Cache;
 use InvalidArgumentException;
 use Pushery\Webhooks\Core\Http\HttpTransport;
 use Pushery\Webhooks\Core\Http\TransportOptions;
+use Pushery\Webhooks\Core\Signing\Ed25519Scheme;
 use Pushery\Webhooks\Core\Signing\SecretSet;
 use Pushery\Webhooks\Core\Ssrf\SsrfGuard;
 

@@ -69,6 +69,8 @@ return [
     ],
 
     'secret' => [
+        'region_label' => 'Clave de firma',
+        'shown_announcement' => 'Clave de firma mostrada. Se oculta automáticamente.',
         'heading' => 'Clave de firma',
         'hide' => 'Ocultar',
         'hidden_announcement' => 'Clave de firma oculta.',
@@ -90,6 +92,8 @@ return [
         'recompute' => 'Recalcular',
         'recompute_all' => 'Recalcular todo',
         'never' => 'Nunca',
+        'recompute_throttled' => 'Has recalculado mucho hace un momento. Espera un minuto — mientras tanto, la actualización programada mantiene las puntuaciones al día.',
+        'endpoints_truncated' => 'Solo se muestran los primeros endpoints. El recálculo cubre exactamente las filas de este panel.',
     ],
 
     'transform' => [
@@ -101,10 +105,10 @@ return [
         'version_none' => 'Ninguna',
         'field_name_placeholder' => 'nombre del campo',
         'include_label' => 'Incluir campos',
-        'include_hint' => 'Solo se conservan estos campos. Déjalo vacío para mantenerlos todos.',
+        'include_hint' => 'Solo estos campos sobreviven. Déjalo vacío para conservarlos todos. Solo nombres de primer nivel: una ruta con puntos no es un campo anidado aquí.',
         'add_include' => 'Añadir campo a incluir',
         'exclude_label' => 'Excluir campos',
-        'exclude_hint' => 'Estos campos se eliminan del cuerpo.',
+        'exclude_hint' => 'Estos campos se eliminan del cuerpo. Solo nombres de primer nivel: una ruta con puntos no es un campo anidado aquí.',
         'add_exclude' => 'Añadir campo a excluir',
         'rename_label' => 'Renombrar campos',
         'rename_hint' => 'Mover un campo a un nombre nuevo.',
@@ -126,10 +130,24 @@ return [
     // The tenant's own delivery log. The status labels are keyed by the STORED
     // DeliveryStatus value, which never changes, and read as outcomes rather than
     // states: a customer asking "did my order go out?" is not asking for an enum.
+    // The one date pattern this namespace needs, and it exists for the accessible names rather
+    // than for the screen. A replay writes a NEW delivery row — same event type, same endpoint —
+    // and `platform.self_service.replays_per_minute` allows ten a minute by default, so two rows
+    // that differ only in their second are the ORDINARY outcome of a tenant pressing Send again.
+    // `LLL` carries no seconds in any of the seven shipped locales (measured on two deliveries
+    // 37 seconds apart, identical in all seven), so the names agreed in every part.
+    //
+    // Translated rather than a literal for the reason the dashboard's own patterns are: the
+    // ORDER differs by locale, and `z` names the clock the reader is being shown.
+    'formats' => [
+        'precise' => 'LL LTS z',
+    ],
+
     'deliveries' => [
         'heading' => 'Entregas recientes',
         'filter_label' => 'Filtrar por endpoint',
         'all_endpoints' => 'Todos los endpoints',
+        'endpoints_truncated' => 'Este filtro solo ofrece los primeros endpoints. Si falta el que buscas, ábrelo desde tu lista de endpoints.',
         'event' => 'Evento',
         'outcome' => 'Resultado',
         'response_code' => 'Respuesta',
@@ -140,16 +158,21 @@ return [
         'pagination_label' => 'Entregas recientes, páginas',
         'window_label' => 'Periodo',
         'window_days' => 'Últimos :days días',
+        'status_label' => 'Filtrar por resultado',
+        'all_statuses' => 'Todos los resultados',
+        'from' => 'Desde',
+        'until' => 'Hasta',
         'error' => 'Error',
         'replay' => 'Enviar de nuevo',
-        'replay_sr' => 'Enviar :event de nuevo',
+        'replay_sr' => ':label — :event · :at',
         'endpoint_disabled' => 'Este endpoint está desactivado, así que no se le puede enviar nada.',
         'replay_throttled' => 'Has reenviado mucho en poco tiempo. Espera un minuto e inténtalo otra vez.',
         'status' => [
             'pending' => 'En cola',
-            'succeeded' => 'Entregado',
-            'failed' => 'Fallido, reintentando',
-            'exhausted' => 'Abandonado',
+            'succeeded' => 'Entregada',
+            'failed' => 'Fallida, reintentando',
+            'exhausted' => 'Abandonada',
+            'refused' => 'No enviada',
         ],
     ],
 
@@ -172,6 +195,10 @@ return [
             // about every endpoint the reader owns, and it is false while one is
             // selected — the others may be busy.
             'filtered' => 'Todavía no se ha enviado nada a este endpoint. Las entregas más antiguas que el periodo de retención se eliminan, así que una anterior pudo estar aquí y ya no estar.',
+            // A third state, and each of the three has to be TRUE. The two above are
+            // claims about what was SENT; this one is a claim about the filters, which is
+            // the only honest thing to say when a reader narrowed by outcome or by date.
+            'no_match' => 'Ninguna entrega coincide con los filtros aplicados. Quita uno para ver más.',
         ],
     ],
 
@@ -208,6 +235,7 @@ return [
     // attribute names, so a refused save speaks the reader's language rather than the
     // framework's default English lines.
     'validation' => [
+        'nested_field' => 'Solo nombres de campo de primer nivel: ":field" parece una ruta anidada y no coincidiría con nada.',
         'name' => [
             'max' => 'El nombre no puede tener más de :max caracteres.',
         ],
@@ -238,11 +266,11 @@ return [
         'loading_endpoints' => 'Cargando endpoints',
         'endpoints_table' => 'Tus endpoints de webhook',
         'health_table' => 'Salud de los endpoints',
-        'toggle_active' => 'Cambiar el estado activo de :url',
+        'toggle_active' => ':state — cambiar el estado activo de :url',
         'reveal_secret' => 'Mostrar la clave de firma de :url',
-        'ping_endpoint' => 'Enviar un evento de prueba a :url',
+        'ping_endpoint' => ':label — enviar un evento de prueba a :url',
         'edit_endpoint' => 'Editar el endpoint :url',
-        'edit_transform' => 'Editar la transformación de payload de :url',
+        'edit_transform' => ':label — editar la transformación de payload de :url',
         'delete_endpoint' => 'Eliminar el endpoint :url',
         'recompute_health' => 'Recalcular la salud de :url',
         'include_field' => 'Campo a incluir :number',
