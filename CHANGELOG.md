@@ -4,6 +4,18 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-09-05
+
+### Added
+
+- **An operator surface can make the endpoint filter binding instead of merely narrowing.** `EndpointDeliveries` gained `strictEndpoint`, off by default, so nothing changes for anyone who does not set it. With it on, an endpoint id that stops resolving closes the list rather than dropping out of it.
+
+  The default is right where the filter narrows a set the reader may see anyway: losing it widens back to the tenant's own deliveries, which is a plausible reset and reveals nothing that was hidden. It is backwards where the endpoint *is* the definition of what may be seen — there "nothing" is the correct answer to a destination that no longer exists, and a reload after a deletion would otherwise list deliveries belonging to other destinations.
+
+  It is also the failure direction that stays quiet: a filter that falls back to empty looks exactly like a filter somebody cleared. The property is `#[Locked]`, because unlike every other public property on that component this one's dangerous direction is being switched **off** — the others can only ever cost a reader information, and a value from a browser must not be able to widen what the host switched on to keep closed.
+
+  The trade is stated rather than discovered: this mode keeps stale ids on purpose, so it cannot tell a deleted endpoint from one that was never the tenant's, and answers both the same closed way. The default still answers a cross-tenant id with a not-found.
+
 ## [2.5.0] - 2026-09-04
 
 ### Added
@@ -2891,7 +2903,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v2.5.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v2.6.0...HEAD
+[2.6.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.2.0...v2.3.0
