@@ -18,6 +18,7 @@ use Pushery\Webhooks\Server\Events\WebhookAttemptsExhausted;
 use Pushery\Webhooks\Server\Events\WebhookAttemptStarting;
 use Pushery\Webhooks\Server\Events\WebhookAttemptSucceeded;
 use Pushery\Webhooks\Server\Events\WebhookDeliveryDispatching;
+use Pushery\Webhooks\Server\Exceptions\DeliveryRefused;
 use Pushery\Webhooks\Server\Models\WebhookServerDelivery;
 use Pushery\Webhooks\Support\WebhookConnection;
 use Throwable;
@@ -90,12 +91,16 @@ final class PersistServerDelivery
 
     public function onFailedFinally(WebhookAttemptsExhausted $event): void
     {
-        $this->record($event->data, DeliveryStatus::Exhausted, [
-            'attempt' => $event->attempt,
-            'http_status' => $event->response?->status,
-            'duration_ms' => $event->response?->durationMs,
-            'error' => $this->errorFrom($event->exception),
-        ]);
+        // The standalone log makes the same distinction the Platform log does: a delivery the
+        // gate refused was never sent, so nothing about the endpoint can be read from it.
+        $this->record($event->data, $event->exception instanceof DeliveryRefused
+            ? DeliveryStatus::Refused
+            : DeliveryStatus::Exhausted, [
+                'attempt' => $event->attempt,
+                'http_status' => $event->response?->status,
+                'duration_ms' => $event->response?->durationMs,
+                'error' => $this->errorFrom($event->exception),
+            ]);
     }
 
     /**
@@ -108,7 +113,7 @@ final class PersistServerDelivery
     {
         $delivery = WebhookServerDelivery::query()->firstOrNew(['message_id' => $data->messageId]);
 
-        if ($delivery->exists && in_array($delivery->status, [DeliveryStatus::Succeeded, DeliveryStatus::Exhausted], true)) {
+        if ($delivery->exists && in_array($delivery->status, [DeliveryStatus::Succeeded, DeliveryStatus::Exhausted, DeliveryStatus::Refused], true)) {
             return;
         }
 

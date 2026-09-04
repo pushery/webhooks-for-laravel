@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Server\Delivery;
 
+use Pushery\Webhooks\Core\Http\Exceptions\NonRetryable;
 use Pushery\Webhooks\Core\Http\TransportResponse;
 
 /**

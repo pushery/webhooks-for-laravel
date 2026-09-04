@@ -4,12 +4,25 @@
      your own authorization. Publish the neutral variant
      instead with the webhooks-ui tag. --}}
 <x-wirekit::stack gap="md" class="wh-deliveries">
+
+    {{-- Permanently in the DOM, so a filter change has something to speak THROUGH: a region
+         inserted together with its own text is not announced by most screen readers. The
+         wire:key carries the count, so Livewire's morph sees a changed node rather than an
+         identical one it can leave alone -- the same detail the transform editor's preview
+         region already depends on.
+
+         A live-bound filter swaps the table underneath and says nothing on its own. The count
+         is in the document, in the pagination summary, but as a plain paragraph outside any
+         live region: a reader has to travel back down and read to learn whether the change
+         produced three rows, two hundred, or none. And the empty state REPLACES the table, so a
+         virtual cursor that was standing in it loses its position silently (WCAG 4.1.3). --}}
+    <x-wirekit::visually-hidden role="status" aria-live="polite" wire:key="wh-filtered-{{ $deliveries->count() }}">{{ trans_choice('webhooks::pagination.filtered_of_unknown_total', $deliveries->count()) }}</x-wirekit::visually-hidden>
     {{-- The component's two refusals — a redeliver against a switched-off endpoint, and a ping
          past its allowance — reach the reader only through here. Rendered CONDITIONALLY rather
          than as an always-present region: a permanently blank live region gets announced on
          every update by some screen readers, which teaches the reader to ignore it. --}}
     @if ($message !== '')
-        <x-wirekit::alert intent="warning" role="status">{{ $message }}</x-wirekit::alert>
+        <x-wirekit::alert intent="warning" role="status" data-wh-region="refusal">{{ $message }}</x-wirekit::alert>
     @endif
 
     <x-wirekit::row gap="md" class="flex-wrap items-end">
@@ -21,6 +34,7 @@
             <option value="succeeded">{{ __('webhooks::management.status_options.succeeded') }}</option>
             <option value="failed">{{ __('webhooks::management.status_options.failed') }}</option>
             <option value="exhausted">{{ __('webhooks::management.status_options.exhausted') }}</option>
+            <option value="refused">{{ __('webhooks::management.status_options.refused') }}</option>
         </x-wirekit::select>
 
         <x-wirekit::input
@@ -99,12 +113,11 @@
             <x-wirekit::table.body>
                 @foreach ($deliveries as $delivery)
                     @php
-                        $intent = match ($delivery->status->value) {
-                            'succeeded' => 'success',
-                            'failed' => 'danger',
-                            'exhausted' => 'warning',
-                            default => 'neutral',
-                        };
+                        // From the enum, not from a ladder here. This stub had its own, and it
+                        // disagreed with the other three views: exhausted was `warning` -- the
+                        // same amber it uses for pending -- so the worst outcome a delivery has
+                        // read one step too harmless on precisely the view a host copies.
+                        $intent = $delivery->status->intent();
                         $when = $delivery->created_at->settings(['locale' => app()->getLocale()]);
                     @endphp
                     <x-wirekit::table.row wire:key="del-{{ $delivery->id }}">
@@ -121,14 +134,31 @@
                             <time datetime="{{ $delivery->created_at->toIso8601String() }}" title="{{ $when->isoFormat('LLL') }}">{{ $when->diffForHumans() }}</time>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td align="right">
-                            <x-wirekit::button size="sm" surface="ghost" wire:click="redeliver('{{ $delivery->id }}')" wire:loading.attr="disabled" wire:target="redeliver">{{ __('webhooks::management.deliveries.redeliver') }}</x-wirekit::button>
-                            <x-wirekit::button size="sm" surface="ghost" wire:click="ping({{ $delivery->subscription_id }})" wire:loading.attr="disabled" wire:target="ping">{{ __('webhooks::management.deliveries.ping') }}</x-wirekit::button>
+                            {{-- Named per ROW. Twenty buttons all reading "Redeliver" are twenty
+                                 identical entries in a screen reader's element list, and reading
+                                 order -- where the row header supplies the event -- is exactly
+                                 what an element list does not have. Picking the wrong one sends
+                                 a real HTTP request to a customer's endpoint.
+
+                                 The visible word is interpolated rather than described, so the
+                                 name CONTAINS it in all seven languages (WCAG 2.5.3). --}}
+                            {{-- `LLL` without a zone, unlike the dashboard's names: this console renders no
+                             zone anywhere — its own <time title> is a bare LLL — and a name that carried
+                             one would be the only place on the screen that did. The dashboard has a
+                             translatable `formats.absolute` for exactly that reason; this namespace has
+                             none, and inventing one here would be a wider change than a label needs. --}}
+                        <x-wirekit::button size="sm" surface="ghost" wire:click="redeliver('{{ $delivery->id }}')" wire:loading.attr="disabled" wire:target="redeliver" :aria-label="__('webhooks::management.a11y.redeliver_delivery', ['label' => __('webhooks::management.deliveries.redeliver'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat('LLL')])">{{ __('webhooks::management.deliveries.redeliver') }}</x-wirekit::button>
+                            <x-wirekit::button size="sm" surface="ghost" wire:click="ping({{ $delivery->subscription_id }})" wire:loading.attr="disabled" wire:target="ping" :aria-label="__('webhooks::management.a11y.ping_subscription', ['label' => __('webhooks::management.deliveries.ping'), 'url' => $delivery->subscription?->url ?? $delivery->subscription_id])">{{ __('webhooks::management.deliveries.ping') }}</x-wirekit::button>
                         </x-wirekit::table.td>
                     </x-wirekit::table.row>
                 @endforeach
             </x-wirekit::table.body>
         </x-wirekit::table>
-
-        {{ $deliveries->links() }}
     @endif
+    {{-- OUTSIDE the @if, matching the neutral stub beside this one. A simplePaginate list
+         does not know how many pages there are, so a page past the end renders an empty
+         table — and with the control inside the @else the only way back was to edit the
+         URL. The package's pagination view renders nothing while there is a single page,
+         so putting it here costs nothing in the ordinary case. --}}
+    {{ $deliveries->links() }}
 </x-wirekit::stack>

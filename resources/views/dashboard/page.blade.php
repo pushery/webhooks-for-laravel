@@ -6,22 +6,37 @@
     <header class="flex flex-wrap items-center justify-between gap-[var(--padding-wk-x-md)]">
         <x-wirekit::heading :level="1" size="lg">{{ __('webhooks::dashboard.heading') }}</x-wirekit::heading>
 
-        {{-- A hand-rolled toggle group rather than WireKit's segmented-control: the
-             control has to write straight back to a live Livewire property, and the
-             component forwards only a bare `wire:model` to its hidden input — a
-             `wire:model.live` never reaches it, so the window switch would not take
-             effect until the next unrelated round trip. --}}
-        <div class="wh-dash-windows inline-flex items-center gap-[var(--gap-wk-sm)]" role="group" aria-label="{{ __('webhooks::dashboard.a11y.time_window') }}">
-            @foreach ($windows as $option)
-                <x-wirekit::button
-                    size="sm"
-                    :surface="$window === $option ? 'filled' : 'ghost'"
-                    :intent="$window === $option ? 'primary' : 'neutral'"
-                    wire:click="selectWindow('{{ $option }}')"
-                    :aria-pressed="$window === $option ? 'true' : 'false'"
-                >{{ $option }}</x-wirekit::button>
-            @endforeach
-        </div>
+        {{-- WireKit's segmented-control, driven optimistically through selectWindow()
+             rather than by a wire:model.
+
+             A hand-rolled button group stood here, and its stated reason — "the component
+             forwards only a bare `wire:model` to its hidden input" — was fixed upstream in
+             WireKit v2.12.0 and is unreachable below the 2.38 floor this package enforces.
+             It was a rebuild of a component we ship.
+
+             No `optimistic` prop, and that is measured rather than chosen. The optimistic layer
+             lives in a separate WireKit bundle (dist/wirekit-optimistic.js) that these screens do
+             not load; with the prop set, a real browser reports `wirekitOptimistic is not defined`
+             and four more before the page finishes. Using it would make a second asset a
+             requirement for every consumer, to move a three-option control a round trip sooner.
+
+             The binding needs `updatedWindow()`, and without it this would be a regression.
+             `$window` carries `#[Url]`, so it is client input; mount() screens it against the
+             configured set, and mount() runs once. The hand-rolled group this replaced went through
+             the allowlisted `selectWindow()` on every click. A binding writes the property directly
+             instead, so the same screening now sits in the update hook — see the component. --}}
+        <x-wirekit::segmented-control
+            class="wh-dash-windows"
+            {{-- Named because it is live-bound: the hidden input a wire:model writes through is
+                 what a form would submit, and LiveBoundFieldsAreNamedTest holds every shipped
+                 control to that. --}}
+            name="window"
+            size="sm"
+            :label="__('webhooks::dashboard.a11y.time_window')"
+            :options="array_combine($windows, $windows)"
+            :value="$window"
+            wire:model.live="window"
+        />
     </header>
 
     <nav class="wh-dash-tabs flex flex-wrap gap-[var(--padding-wk-x-md)] border-b-[length:var(--border-wk-width)] border-[color:var(--color-wk-border)]" aria-label="{{ __('webhooks::dashboard.a11y.sections') }}">
@@ -39,23 +54,36 @@
         @endforeach
     </nav>
 
-    {{-- ⚠️ THE WINDOW IS PART OF THE KEY ON EVERY PANEL THAT TAKES ONE, AND IT HAS TO BE.
-         A broadcast cannot reach a panel that is still lazy: Livewire's client drops the
-         event outright for an unresolved lazy component. That panel then resolves through
-         its own `__lazyLoad`, which RESURRECTS the mount parameters encoded into the
-         placeholder when the page first rendered — so it comes up on the OLD window and
-         stays there. The header reads 7d, the panel counts 24h, and nothing reports it.
-         The re-render does not fix it either: a child whose key is unchanged is replaced
-         by an empty stub rather than mounted again, so the encoded parameters never move.
+    {{-- The window is part of the key on every panel that takes one, and it has to be. A broadcast
+         cannot reach a panel that is still lazy: Livewire's client drops the event outright for an
+         unresolved lazy component. That panel then resolves through its own `__lazyLoad`, which
+         resurrects the mount parameters encoded into the placeholder when the page first rendered —
+         so it comes up on the old window and stays there. The header reads 7d, the panel counts
+         24h, and nothing reports it. The re-render does not fix it either: a child whose key is
+         unchanged is replaced by an empty stub rather than mounted again, so the encoded parameters
+         never move.
 
-         Putting the window in the key means the child is a different child on every
-         window, so it is mounted fresh — with the new window, and a placeholder that
-         encodes the new window. The panels below that take no window keep a stable key.
+         Putting the window in the key means the child is a different child on every window, so it
+         is mounted fresh — with the new window, and a placeholder that encodes the new window. The
+         panels below that take no window keep a stable key.
 
-         The cost is deliberate: switching the window remounts these four, so their
-         skeleton shows for one round trip instead of the old numbers being patched in
-         place. That is the honest picture — during that round trip the old numbers are
-         not the new window's, which is exactly the confusion this fixes. --}}
+         The cost is deliberate: switching the window remounts these four, so their skeleton shows
+         for one round trip instead of the old numbers being patched in place. That is the honest
+         picture — during that round trip the old numbers are not the new window's, which is exactly
+         the confusion this fixes. --}}
+    {{-- The counts below are summed from a materialized rollup that only webhooks:refresh-metrics
+         advances; the latency percentiles beside them are computed live. With the refresh
+         stopped, frozen counts sit next to current percentiles that make them look plausible,
+         and nothing said which was which.
+         The lag is measured against the newest DELIVERY, not against the clock, so an endpoint
+         with no traffic never reports one -- and it only shows past twice the configured
+         cadence, because one cadence behind is simply between two runs. --}}
+    @if ($this->rollupLagMinutes() !== null)
+        <x-wirekit::alert intent="warning" role="status">
+            {{ __('webhooks::dashboard.rollup_stale', ['minutes' => $this->rollupLagMinutes()]) }}
+        </x-wirekit::alert>
+    @endif
+
     <div class="wh-dash-body">
         @if ($tab === 'overview')
             <div class="flex flex-col gap-[var(--padding-wk-y-lg)]">

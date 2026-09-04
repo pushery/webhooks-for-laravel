@@ -14,9 +14,9 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Gives a transport timeout ONE shape across the two guzzle majors this package supports,
- * at the wire boundary and nowhere else — the same doctrine as the verb uppercasing in
- * {@see HttpTransport} and the redaction in {@see ErrorMessageRedactor}.
+ * Gives a transport timeout one shape across the two guzzle majors this package supports, at the
+ * wire boundary and nowhere else — the same doctrine as the verb uppercasing in {@see
+ * HttpTransport} and the redaction in {@see ErrorMessageRedactor}.
  *
  * The divergence, measured on both sides. A read timeout that strikes AFTER the response
  * headers have arrived is, on guzzle 7, unconditionally a response-less `ConnectException`:
@@ -33,17 +33,16 @@ use Throwable;
  * beside an `http_status` of NULL, because no response reaches the pipeline either way. The
  * row then contradicts itself, and the timeout diagnosis is gone.
  *
- * ⚠️ IT IS GONE FOR GOOD, WHICH IS WHY THIS SITS AT THE BOUNDARY AND NOT IN `errorFrom()`.
- * `Response::toException()` builds a FRESH exception with no `previous`, so by the time the
- * listener writes the row there is nothing left to recover the errno from. Normalizing has
- * to happen before Laravel marshals, and the one hook for that is guzzle middleware.
+ * It is gone for good, which is why this sits at the boundary rather than in `errorFrom()`.
+ * `Response::toException()` builds a fresh exception with no `previous`, so by the time the
+ * listener writes the row there is nothing left to recover the errno from. Normalizing has to
+ * happen before Laravel marshals, and the one hook for that is guzzle middleware.
  *
- * ⚠️ AND IT NORMALIZES ONLY THE TIMEOUT, NEVER ITS PARENT. `ResponseTimeoutException` is a
- * subclass of `ResponseTransferException`, which guzzle 8 also raises for a response whose
- * framing is malformed. Those are different events and want opposite treatment: a framing
- * rejection concerns a response that arrived complete, a timeout concerns one that did not.
- * A check written one level up would quietly turn an aborted transfer into a delivery
- * carrying a truncated body.
+ * It also normalizes only the timeout, never its parent. `ResponseTimeoutException` is a subclass
+ * of `ResponseTransferException`, which guzzle 8 also raises for a response whose framing is
+ * malformed. Those are different events and want opposite treatment: a framing rejection concerns a
+ * response that arrived complete, a timeout concerns one that did not. A check written one level up
+ * would quietly turn an aborted transfer into a delivery carrying a truncated body.
  *
  * On guzzle 7 the whole class is a no-op by construction: `ResponseTimeoutException` does not
  * exist there, and `instanceof` against a missing class is `false` without autoloading or
@@ -82,10 +81,10 @@ final class TransportExceptionNormalizer
 
     public static function normalize(Throwable $exception): Throwable
     {
-        // ⚠️ ORDER IS LOAD-BEARING, because guzzle files the two under one parent:
-        // ResponseTimeoutException EXTENDS ResponseTransferException. Asked the other way
-        // round, every timeout would be answered as a framing defect — a delivery that could
-        // have succeeded on the next attempt failed final instead, and the errno went with it.
+        // Order is load-bearing, because guzzle files the two under one parent:
+        // ResponseTimeoutException extends ResponseTransferException. Asked the other way round,
+        // every timeout would be answered as a framing defect — a delivery that could have
+        // succeeded on the next attempt failed final instead, and the errno went with it.
         if ($exception instanceof ResponseTimeoutException) {
             return self::withoutCarriedResponse($exception);
         }
@@ -93,11 +92,53 @@ final class TransportExceptionNormalizer
         // A response that arrived COMPLETE and contradicts itself about where its body ends.
         // Guzzle 8 refuses it, guzzle 7 hands it back as an ordinary 200 — so the majors
         // disagree, and the shape this package gives it settles the disagreement in one place.
-        if ($exception instanceof ResponseTransferException) {
+        //
+        // Only that one event, and the narrowing is the point of the condition. This arm used to
+        // answer every `ResponseTransferException`, and guzzle 8 files far more than a framing
+        // contradiction under that class: `isResponseTransferError()` is true for its whole
+        // connection-error and network-error tables plus errnos 18 and 61, whenever response
+        // headers had already arrived. So a receiver that reset the connection or sent a short body
+        // — errno 56, errno 18, both transient — was answered NonRetryable, and the delivery failed
+        // final on the first attempt with its retry budget untouched. Measured end to end against a
+        // socket, with a well-formed response as the control.
+        //
+        // That is the expensive direction. A framing contradiction retried costs a handful of extra
+        // requests to a receiver that is broken anyway; a reset treated as final loses the webhook,
+        // and feeds the endpoint's failure streak with events no successful delivery can
+        // interleave. So the default here is Retryable, reached by falling through untouched, and
+        // NonRetryable is claimed only where the permanent event is positively identified.
+        if ($exception instanceof ResponseTransferException && self::isFramingContradiction($exception)) {
             return new MalformedResponseFraming($exception->getMessage(), 0, $exception);
         }
 
         return $exception;
+    }
+
+    /**
+     * Whether this is the response that refuted itself, rather than the transfer that broke.
+     *
+     * Guzzle builds the two at different sites, and only one of them carries a cause:
+     *
+     *   EasyHandle::createResponse()  — the framing check. Constructs the exception with the
+     *                                   RuntimeException psr7 raised as its `previous`.
+     *   CurlFactory::createRejection() — the errno path. Passes its own `$previous`, which is
+     *                                   null for an ordinary curl failure.
+     *
+     * Measured on both, through a real socket rather than read off the source:
+     *
+     *   framing    previous=RuntimeException  carriedResponse=200  bodyLen=0
+     *   truncated  previous=NULL              carriedResponse=200  bodyLen=10
+     *
+     * The body length is the same fact from the other side and is the reason to trust the
+     * discriminator rather than merely observe it: a framing rejection happens while the
+     * HEADERS are parsed, so no body was ever admitted; a transfer break happens after the
+     * bytes started arriving. `TransportFramingShapeTest` drives both events over a socket, so
+     * a guzzle release that moves either construction turns this red instead of silently
+     * reclassifying a whole class of transient failures.
+     */
+    private static function isFramingContradiction(ResponseTransferException $exception): bool
+    {
+        return $exception->getPrevious() instanceof Throwable;
     }
 
     /**

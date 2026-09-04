@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks;
 
+use DateTimeInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -113,14 +114,11 @@ final readonly class WebhookManager
      */
     public function enable(WebhookSubscription $subscription): WebhookSubscription
     {
-        // The lifecycle columns are guarded (engine-owned, never mass-assignable), so
-        // they are written by direct assignment.
-        $subscription->is_active = true;
-        $subscription->disabled_at = null;
-        $subscription->consecutive_failures = 0;
-        $subscription->save();
-
-        return $subscription;
+        return $this->writeLifecycle($subscription, [
+            'is_active' => true,
+            'disabled_at' => null,
+            'consecutive_failures' => 0,
+        ]);
     }
 
     /**
@@ -132,9 +130,91 @@ final readonly class WebhookManager
      */
     public function disable(WebhookSubscription $subscription): WebhookSubscription
     {
-        $subscription->is_active = false;
-        $subscription->disabled_at = now();
-        $subscription->save();
+        return $this->writeLifecycle($subscription, [
+            'is_active' => false,
+            'disabled_at' => now(),
+        ]);
+    }
+
+    /**
+     * Write the lifecycle columns of one subscription, through the query builder.
+     *
+     * Not `$subscription->save()`, and the reason is the circuit breaker. The breaker switches an
+     * endpoint off with a conditional UPDATE through the query builder — it has to, because gating
+     * on `is_active = true` is what makes only one of several concurrent workers fire the
+     * auto-disabled event. A query-builder write does not touch an instance already in memory, so
+     * any model loaded before the trip goes on reading `is_active = true, disabled_at = null` while
+     * the row says the opposite.
+     *
+     * Assigning those same values to such a model leaves Eloquent with nothing dirty, and
+     * `save()` then issues no UPDATE at all — while still returning normally, so the caller
+     * sees a subscription handed back and reads it as a confirmation. The endpoint stays as
+     * it was. Both directions fail this way, and the quieter one is `disable()`: a failed
+     * enable is noticed the moment somebody waits for a webhook, a failed disable is noticed
+     * only by whoever keeps receiving the traffic that was meant to stop.
+     *
+     * Writing through the builder makes the update unconditional on what the instance
+     * happens to hold, which is the same reason the breaker writes that way. The instance is
+     * then synced to what was just written — by assignment rather than by `refresh()`, which
+     * would cost a second query and would throw on a row that has since been deleted, where
+     * both this method and its predecessor are a silent no-op.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function writeLifecycle(WebhookSubscription $subscription, array $attributes): WebhookSubscription
+    {
+        // The timestamp is passed rather than left to the builder, which would add its own:
+        // the instance has to end up carrying the SAME value the row got, and the only way to
+        // be sure of that is to choose it here. Without it the object handed back reports a
+        // change time from before the change — on the one call whose whole shape says "here
+        // is your subscription, it is done".
+        $attributes['updated_at'] = $subscription->freshTimestamp();
+
+        // Every timestamp goes through the model's own conversion, and leaving it out is the reason
+        // this method needed a second read. A query-builder update binds a DateTimeInterface
+        // through the query grammar and never reaches {@see \Pushery\Webhooks\Database\Concerns\HasZonedTimestamps::fromDateTime()},
+        // the one place this package normalizes a timestamp per engine. `save()` went through it;
+        // this does not, so writing `now()` straight through stores an instant an offset away from
+        // the one meant. Nothing complains: both values are real timestamps.
+        //
+        // Measured at an hour off on this machine, and disabled_at is what the active() scope
+        // filters on — an endpoint switched off an hour in the future is one the scope still
+        // treats as live.
+        // Into a second array rather than over the first, and that is not tidiness. The stored form
+        // goes to the builder; the instance below gets the original values, because forceFill()
+        // routes everything through setAttribute(), which runs fromDateTime() again on any date
+        // attribute. On PostgreSQL that second pass is idempotent — the string carries its offset
+        // and parses back — but on MySQL the stored form is UTC-naive, so the re-parse resolves it
+        // against the PHP default zone and shifts it a second time. The row would be right and the
+        // returned instance an app-timezone offset away from it, with syncOriginalAttributes
+        // pinning the wrong value as original so nothing reports itself dirty. Converting once,
+        // exactly as save() did, is the point.
+        $stored = $attributes;
+
+        foreach ($stored as $column => $value) {
+            if ($value instanceof DateTimeInterface) {
+                $stored[$column] = $subscription->fromDateTime($value);
+            }
+        }
+
+        // Through the BASE builder, and the reason is that by this point there is nothing left
+        // for the Eloquent layer to contribute: the values are already in their stored form,
+        // `updated_at` is supplied above rather than added, the model declares no global scope,
+        // and nothing listens for its model events. It is also the same kind of statement the
+        // circuit breaker writes — which is the symmetry this whole method exists to restore.
+        $subscription->newQuery()->toBase()
+            ->where($subscription->getKeyName(), $subscription->getKey())
+            ->update($stored);
+
+        // forceFill because the lifecycle columns are guarded — engine-owned, never
+        // mass-assignable — and this IS the engine.
+        //
+        // syncOriginalAttributes rather than syncOriginal, and the difference is silent data loss
+        // in the caller. syncOriginal() marks every attribute clean, including a change the caller
+        // made and has not saved yet, which this method did not write. Their own save() afterwards
+        // then finds nothing dirty and writes nothing, and the edit is gone with no error anywhere.
+        // Only the columns actually written may be marked clean.
+        $subscription->forceFill($attributes)->syncOriginalAttributes(array_keys($attributes));
 
         return $subscription;
     }
@@ -162,7 +242,7 @@ final readonly class WebhookManager
 
     /**
      * Fail fast, with a clear message, when an owner's primary key cannot be stored as the
-     * configured owner_key_type. The package denormalises owner_id across the subscriptions
+     * configured owner_key_type. The package denormalizes owner_id across the subscriptions
      * table, the delivery log and the dashboard rollup; the three must share one type, so an
      * owner whose key does not match the configured one (a UUID owner under the bigint default,
      * say) is rejected here rather than surfacing as an opaque insert error on the first
@@ -286,10 +366,24 @@ final readonly class WebhookManager
             ->exists();
 
         if (! $eligible) {
+            // The reason is re-read rather than taken off the model. The eligibility above is
+            // decided by the fan-out's own scopes against the database, for the reason this
+            // method's docblock gives: a second opinion drifts. Reading `is_active` off the
+            // instance here to explain the refusal was that second opinion, and it drifts in
+            // exactly the case that matters — right after the circuit breaker has switched the
+            // endpoint off through the query builder, the row is disabled and a model loaded before
+            // the trip is not. The operator was then told the endpoint "does not subscribe to that
+            // event type" about an endpoint subscribed to it, and sent to change event types that
+            // were already right.
+            $live = WebhookSubscription::query()
+                ->whereKey($subscription->getKey())
+                ->active()
+                ->exists();
+
             throw new SubscriptionNotListening(
                 $subscription,
                 $eventType,
-                $subscription->is_active && $subscription->disabled_at === null
+                $live
                     ? 'it does not subscribe to that event type'
                     : 'it is not active',
             );

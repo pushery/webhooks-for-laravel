@@ -26,9 +26,9 @@ use Illuminate\Support\Facades\Config;
  * config keys left at their defaults this method does nothing at all, which is exactly the
  * behavior the console shipped with — a host that wants none of this notices nothing.
  *
- * ⚠️ THE ABILITY MUST BE ONE `Gate::define()` DECLARED — NOT A spatie/laravel-permission
- * PERMISSION NAME. That package installs a `Gate::before` hook which reads the FIRST
- * positional gate argument as a GUARD name and shifts it off the argument list:
+ * The ability must be one `Gate::define()` declared, not a spatie/laravel-permission permission
+ * name. That package installs a `Gate::before` hook which reads the first positional gate argument
+ * as a guard name and shifts it off the argument list:
  *
  *     if (is_string($args[0] ?? null) && ! class_exists($args[0])) {
  *         $guard = array_shift($args);
@@ -46,9 +46,9 @@ use Illuminate\Support\Facades\Config;
  * a POSITIVE arm — one asserting that a permitted operator really CAN act — can tell the
  * two apart, and that is the arm people rarely write.
  *
- * THE WAY OUT IS webhooks.admin.abilities, AND IT EXISTS BECAUSE OF THIS. An ability taken
- * from that map is authorized with NO positional argument at all, so nothing travels in the
- * slot the hook reads as a guard and a permission name works as itself:
+ * The way out is webhooks.admin.abilities, and it exists because of this. An ability taken from
+ * that map is authorized with no positional argument at all, so nothing travels in the slot the
+ * hook reads as a guard and a permission name works as itself:
  *
  *     'abilities' => ['*' => 'manage webhooks'],            // one permission, every action
  *     'abilities' => ['delete' => 'delete webhooks', …],    // or one per action

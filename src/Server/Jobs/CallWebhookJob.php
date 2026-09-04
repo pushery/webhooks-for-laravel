@@ -6,6 +6,9 @@ namespace Pushery\Webhooks\Server\Jobs;
 
 use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\Jobs\SyncJob;
+use Illuminate\Queue\QueueManager;
+use Illuminate\Queue\SyncQueue;
 use Pushery\Webhooks\Core\Http\TransportResponse;
 use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 use Pushery\Webhooks\Server\Delivery\DeliveryGate;
@@ -19,6 +22,7 @@ use Pushery\Webhooks\Server\Events\WebhookAttemptsExhausted;
 use Pushery\Webhooks\Server\Events\WebhookAttemptStarting;
 use Pushery\Webhooks\Server\Events\WebhookAttemptSucceeded;
 use Pushery\Webhooks\Server\Exceptions\DeliveryRefused;
+use Pushery\Webhooks\Server\Exceptions\QueueCannotRetry;
 use Throwable;
 
 /**
@@ -47,9 +51,17 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
      * Headroom over the HTTP budget: connect + response timeout, plus the time the
      * signing, DNS resolution and event handling around them can take.
      */
-    private const int TIMEOUT_HEADROOM = 10;
+    public const int TIMEOUT_HEADROOM = 10;
 
-    private const int MINIMUM_TIMEOUT = 30;
+    /**
+     * The floor under the derived timeout.
+     *
+     * Public alongside the headroom, so {@see JobTimeoutBudget} applies this arithmetic rather than
+     * a copy of it. The check it performs is whether this timeout can reach the queue's
+     * `retry_after` — a number written twice would make it quietly wrong in the direction that
+     * reports nothing.
+     */
+    public const int MINIMUM_TIMEOUT = 30;
 
     public int $tries;
 
@@ -114,13 +126,19 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
         // while it is still rate-limiting us, and the delivery is exhausted long before
         // its window elapses. Wait the cap, and do not charge it — bounded, so a
         // permanently rate-limiting endpoint still terminates.
-        if ($hint !== null && $hint > $this->data->options->retryAfterCap && $this->canDefer()) {
+        // The zero cap is excluded here for the same reason the schedule excludes it: it means
+        // the hint is switched off, so there is no wait to defer INTO. Without that test every
+        // hint exceeds a cap of zero, and each deferral re-dispatches the job with a delay of
+        // the cap — zero — so the delivery fires retryAfterMaxDeferrals immediate requests at
+        // the endpoint that asked for quiet, on top of its ordinary retry budget.
+        if ($hint !== null && $this->data->options->retryAfterCap > 0
+            && $hint > $this->data->options->retryAfterCap && $this->canDefer()) {
             $this->defer($attempt, $hint);
 
             return;
         }
 
-        if ($this->budgetRemaining($attempt)) {
+        if ($this->budgetRemaining($attempt) && $this->canRelease()) {
             $delay = $this->data->backoff->delayAfterAttempt($attempt, $hint);
             event(new WebhookAttemptRetrying($this->data, $attempt, $delay));
             $this->release($delay);
@@ -128,7 +146,17 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
             return;
         }
 
-        event(new WebhookAttemptsExhausted($this->data, $attempt, $outcome->response, $outcome->exception));
+        // Either the budget is spent, or the queue cannot carry a retry at all. The second
+        // case has to say so: without it, a retryable failure on the sync connection fired
+        // WebhookAttemptRetrying and then NOTHING — no terminal event, no failed(), and a
+        // delivery row left at a non-final state for ever, which is the one failure
+        // observability cannot see. This class promises that cannot happen; it now keeps it.
+        event(new WebhookAttemptsExhausted(
+            $this->data,
+            $attempt,
+            $outcome->response,
+            $this->canRelease() ? $outcome->exception : QueueCannotRetry::onSyncConnection($outcome->exception),
+        ));
     }
 
     /**
@@ -182,9 +210,45 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
         return $attempt - $this->data->retryAfterDeferrals < $this->tries;
     }
 
+    /**
+     * Whether releasing this job actually re-queues it.
+     *
+     * Only the sync connection is asked about, and a null job deliberately is NOT: a job
+     * with no queue context is one being driven directly, which is a test or a manual call
+     * rather than anything a host deploys. Treating that as terminal would change behavior
+     * on a path production never takes.
+     */
+    private function canRelease(): bool
+    {
+        return ! $this->job instanceof SyncJob;
+    }
+
     private function canDefer(): bool
     {
-        return $this->data->retryAfterDeferrals < $this->data->options->retryAfterMaxDeferrals;
+        return $this->data->retryAfterDeferrals < $this->data->options->retryAfterMaxDeferrals
+            && $this->queueCanDelay();
+    }
+
+    /**
+     * Whether the connection a deferral would land on can actually hold it back.
+     *
+     * The connection rather than `$this->job`, and the difference is why this is a second method
+     * and not a call to {@see self::canRelease()}. A deferral is not a release: it dispatches a
+     * fresh job, so the question is what the target connection does with a delay, and
+     * `SyncQueue::later()` ignores its `$delay` argument outright and calls `push()`.
+     *
+     * Without this, a 429 asking for longer than the cap re-ran the delivery immediately, and
+     * did so once per remaining deferral. Measured on the sync connection with the shipped
+     * defaults and a `Retry-After: 3600`: SEVEN real requests, in milliseconds, at the endpoint
+     * that had just asked for an hour of quiet — the initial attempt plus all six deferrals.
+     *
+     * The code two branches up already warns about exactly this shape for a zero cap and
+     * excludes it. The same thing happens on `sync` at ANY cap, because there the delay is not
+     * short — it is not honoured at all.
+     */
+    private function queueCanDelay(): bool
+    {
+        return ! app(QueueManager::class)->connection($this->connection) instanceof SyncQueue;
     }
 
     /**

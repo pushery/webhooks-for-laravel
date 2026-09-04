@@ -84,13 +84,35 @@ final readonly class WebhookProcessor
             );
 
         if (! $result->isValid()) {
-            InvalidWebhookSignature::dispatch(
-                $this->config->name,
-                $result->reason(),
-                $this->request->ip(),
-                $this->request->path(),
-                $this->request->userAgent(),
-            );
+            // Guarded like the two announcements below, and this is the one with a recorded
+            // incident behind it: the event's own docblock describes a throw landing INSIDE
+            // dispatch(), before the abort() on the next line, turning every forged, unsigned
+            // or expired POST into a 500 from an anonymous caller — on the one path three
+            // docblocks promise is never a 500. That cause was fixed by taking the Request out
+            // of the payload; the SHAPE that let a listener reach the abort() was not, and this
+            // event's docblock invites exactly the listener most likely to throw ("so a
+            // listener can alert or rate-limit an abusive source" — an abuse listener is the
+            // kind that reaches for Gate::authorize() or abort()).
+            //
+            // The asymmetry with the siblings also ran the wrong way: there, a guard protects a
+            // delivery that is already stored. Here nothing is stored, but the caller is
+            // unauthenticated and the answer is the one thing a producer acts on — 5xx is read
+            // as "try again" for a request that can never become valid.
+            try {
+                InvalidWebhookSignature::dispatch(
+                    $this->config->name,
+                    $result->reason(),
+                    $this->request->ip(),
+                    $this->request->path(),
+                    $this->request->userAgent(),
+                );
+            } catch (Throwable $listenerFailure) {
+                try {
+                    report(InboundListenerFailed::for('invalid-signature', $this->config->name, $listenerFailure));
+                } catch (Throwable) {
+                    // Nothing above this can report, and the refusal below still answers.
+                }
+            }
 
             // Every refusal stores nothing and dispatches nothing. What can differ is the
             // one thing the SENDER can act on: whether to try again. A verification that did
@@ -128,10 +150,11 @@ final readonly class WebhookProcessor
         $fastPathDedupe = $webhookId !== null && $this->config->usesFastPathDedupe();
 
         // Fast-path dedupe: a repeated delivery whose id was already stored AND queued
-        // short-circuits to the success response before touching the database. The
-        // "seen" marker is armed only after both the store and the dispatch succeed
-        // (below), never here, so neither a store nor a dispatch failure can leave a
-        // marker that would swallow the producer's retry with a bare success. The
+        // short-circuits to the success response before touching the database. The "seen"
+        // marker is armed after both the store and the dispatch succeed, and — for a repeat the
+        // DATABASE recognized — by the duplicate branch below. Neither a store nor a dispatch
+        // failure may leave a marker behind that would swallow the producer's retry with a bare
+        // success, which is why the rollback clears it as well as deleting the row. The
         // authoritative partial-unique insert still guards a concurrent race.
         if ($fastPathDedupe && Cache::has($this->cacheKey($webhookId))) {
             return $this->respond();
@@ -164,9 +187,24 @@ final readonly class WebhookProcessor
 
         $call = $this->store($rawBody, $webhookId, $message);
 
-        // Authoritative dedupe: the partial-unique insert returned nothing, so a
-        // concurrent request already stored this id. Arm the fast path for the next
-        // retry and do not dispatch a second time.
+        // Authoritative dedupe: the partial-unique insert returned nothing, so a concurrent
+        // request already stored this id. Arm the fast path for the next retry and do not
+        // dispatch a second time — a further repeat then costs a cache hit instead of another
+        // parse, offload and insert, which is the retry storm this path exists to absorb.
+        //
+        // This branch vouches for a row somebody else may still roll back, which is why the
+        // rollback below now clears the marker as well. The marker means "stored and queued"
+        // everywhere else; here it can only mean "stored by someone", because whether that someone
+        // went on to queue anything is a fact this request does not have. Measured before the
+        // rollback cleared it:
+        //
+        //   A stores its row and has not dispatched yet
+        //   B lands here, arms the marker, answers 200
+        //   A's dispatch throws -> A deletes its row, leaving the id "UNSEEN" per its comment
+        //   the producer retries -> markedSeenByDuplicate=true, retryStatus=200, rowsAfterRetry=0
+        //
+        // A verified delivery, acknowledged with a bare success, stored nowhere and handled by
+        // nobody — the outcome that delete exists to prevent, defeated from three lines above it.
         if (! $call instanceof WebhookCall) {
             $this->markSeen($fastPathDedupe, $webhookId);
 
@@ -183,6 +221,15 @@ final readonly class WebhookProcessor
             $this->dispatchProcessing($call, $message);
         } catch (Throwable $e) {
             $call->delete();
+
+            // And the marker, which this request may not have set. A concurrent duplicate can have
+            // armed it against the row being deleted right here — it saw the row, it could not see
+            // that this dispatch would fail. Deleting the row without clearing the marker leaves
+            // the id looking handled and stored nowhere, which is the one state this rollback
+            // exists to rule out. Clearing a marker this request did not set is safe in the other
+            // direction too: the worst it costs a genuine repeat is one more trip through the
+            // authoritative insert.
+            $this->forgetSeen($fastPathDedupe, $webhookId);
 
             throw $e;
         }
@@ -247,6 +294,22 @@ final readonly class WebhookProcessor
     }
 
     /**
+     * Withdraw the "seen" marker for an id this request is rolling back.
+     *
+     * The mirror of {@see self::markSeen()}, and it exists because the marker is not private to
+     * the request that set it: a concurrent duplicate arms it against a row that only later turns
+     * out to be doomed. Symmetry with the delete is the whole property — the row and the marker
+     * are two halves of "this delivery is handled", and half of that surviving a rollback is
+     * exactly the state a retry gets swallowed by.
+     */
+    private function forgetSeen(bool $fastPathDedupe, ?string $webhookId): void
+    {
+        if ($fastPathDedupe && $webhookId !== null) {
+            Cache::forget($this->cacheKey($webhookId));
+        }
+    }
+
+    /**
      * Insert the call as a partial-unique upsert. The ON CONFLICT target carries the
      * index predicate because the unique index is partial; a null webhook_id is not
      * covered by the index, so such a row always inserts. Returns null when a row
@@ -287,8 +350,8 @@ final readonly class WebhookProcessor
                 return null;
             }
         } else {
-            // ⚠️ THE POSTGRES ARM IS A WRITE THAT LARAVEL'S SELECT PATH CANNOT RECOGNIZE AS ONE,
-            // and it needs BOTH lines below rather than either.
+            // The Postgres arm is a write that Laravel's select path cannot recognize as one, and
+            // it needs both lines below rather than either.
             //
             // `INSERT … ON CONFLICT … RETURNING id` has to come back through `selectOne()` to
             // read the returned id, and `selectOne()` defaults `$useReadPdo` to TRUE
@@ -351,15 +414,46 @@ final readonly class WebhookProcessor
     }
 
     /**
-     * The compact stub kept in the payload column for an offloaded body: the envelope
-     * type when present, so the generated payload_type column stays populated and the
-     * dashboard can still group by event type without the full body.
+     * The compact stub kept in the payload column for an offloaded body: the envelope's OWN
+     * type when it had one, so the generated payload_type column reads the same for an
+     * offloaded row as it would have for an inline one.
+     *
+     * It writes the body's type rather than the resolved one, and the difference is a whole
+     * column's trustworthiness. `payload_type` is `payload->>'type'` — the docs call it "a stored
+     * generated column mirroring the payload's own type field" — and this stub used to write
+     * `$message->type`, which by this point carries whatever `event_type` resolved to, including a
+     * value read from a header the body never had.
+     *
+     * Measured on a header-typed source with offload on:
+     *
+     *   large  offloaded=true   event_type=thing.happened  payload_type=thing.happened
+     *   small  offloaded=false  event_type=thing.happened  payload_type=NULL
+     *
+     * So the column was populated for exactly the rows that cleared the size threshold. A query
+     * filtering on it silently returned a size-biased subset — not an error, not an empty
+     * result, just the large deliveries — and the bias grows with the threshold, which is the
+     * one knob an operator turns without expecting it to change what queries mean.
+     *
+     * Dropping the stub's type entirely would have inverted the asymmetry rather than removed
+     * it: for the ordinary body-typed producer, the offloaded rows would then be the NULL ones.
+     * Reading the payload's own type makes both halves agree in both cases, which is what the
+     * column's definition already claimed.
      *
      * @return array<string, string>
      */
     private function offloadStub(InboundMessage $message): array
     {
-        return $message->type === null ? [] : ['type' => $message->type];
+        $bodyType = $message->payload['type'] ?? null;
+
+        // Two statements rather than a ternary, for the coverage reason ConstantFallbackVisibility
+        // holds across this package: pcov credits a one-line expression to every line it spans, so
+        // a ternary reads as covered the first time EITHER arm runs — and the arm that goes
+        // unexercised here is the one deciding whether payload_type stays empty.
+        if (is_string($bodyType) && $bodyType !== '') {
+            return ['type' => $bodyType];
+        }
+
+        return [];
     }
 
     /**
@@ -380,9 +474,9 @@ final readonly class WebhookProcessor
         $key = "webhooks:inbound:{$this->config->name}";
 
         if (RateLimiter::tooManyAttempts($key, $limit['max_attempts'])) {
-            // The cast is unkillable — PHP coerces the int into the header value either way,
-            // and mutation testing says so. It stays because the header array is declared as
-            // strings and the cast is where that becomes true, not because a test needs it.
+            // The cast changes no outcome — PHP coerces the int into the header value either way.
+            // It stays because the header array is declared as strings and the cast is where that
+            // becomes true, not because a test needs it.
             abort(429, headers: ['Retry-After' => (string) RateLimiter::availableIn($key)]);
         }
 
@@ -420,15 +514,14 @@ final readonly class WebhookProcessor
         $kept = [];
 
         foreach ($this->flattenHeaders() as $name => $value) {
-            // ⚠️ The strtolower on the NAME is unkillable, and mutation testing reports it.
-            // Symfony's HeaderBag::all() already returns every key lowercased — measured, even
-            // for a header set as 'X-MiXeD-CaSe' — so no request can produce a name this would
-            // change. Its twin on the config side, six lines up, is NOT in that position and
-            // goes red when removed: that asymmetry is what makes this a claim about this call
-            // rather than about an untested filter.
+            // The strtolower on the name cannot change anything: Symfony's HeaderBag::all() already
+            // returns every key lowercased, even for a header set as 'X-MiXeD-CaSe', so no request
+            // can produce a name it would alter. Its twin on the config side, six lines up, is not
+            // in that position and goes red when removed; that asymmetry is what makes this a claim
+            // about this call rather than about an untested filter.
             //
-            // Kept: it says the comparison is case-insensitive at the point where a reader asks,
-            // rather than making them go and check what HeaderBag guarantees.
+            // It is kept because it says the comparison is case-insensitive at the point where a
+            // reader asks, instead of making them go and check what HeaderBag guarantees.
             if ($only !== null && ! in_array(strtolower($name), $only, true)) {
                 continue;
             }

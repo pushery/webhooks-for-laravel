@@ -4,8 +4,8 @@
      Rotation keeps the old secret as the verify-only rotation secret. Styled with
      WireKit tokens throughout.
 
-     THE TIMER IS A REGISTERED COMPONENT SERVED AS A FILE, NOT AN INLINE EXPRESSION AND NOT
-     AN INLINE SCRIPT — and both halves of that are load-bearing.
+     The timer is a registered component served as a file, rather than an inline expression and not
+     an inline script — and both halves of that are load-bearing.
 
      Registered rather than inline EXPRESSION: under a Content-Security-Policy without
      `unsafe-eval`, Alpine parses attribute expressions against a small grammar rather than
@@ -30,7 +30,11 @@
     {{-- Persistent polite live region: survives the reveal card being torn down, so a
          screen reader still hears that the secret was withdrawn. --}}
     <x-wirekit::visually-hidden role="status" aria-live="polite">
-        @if ($hidden){{ __('webhooks::self-service.secret.hidden_announcement') }}@endif
+        {{-- Both ends of the window, and NEITHER contains the key. This region announces that a
+             secret appeared and that it went away again; the card itself announces nothing,
+             because a live region wrapped around the card would read the key out loud on every
+             unrelated change inside it. --}}
+        @if ($hidden){{ __('webhooks::self-service.secret.hidden_announcement') }}@elseif ($secret !== null){{ __('webhooks::self-service.secret.shown_announcement') }}@endif
     </x-wirekit::visually-hidden>
     @if ($secret !== null)
         {{-- The countdown sentence and the impending-expiry cue are handed over as whole
@@ -42,11 +46,11 @@
              setInterval. Clicking Hide tears this card out of the DOM, and an interval left
              behind would keep ticking against a dead scope — calling $wire.hide() on a
              component that no longer exists, once per second, for every reveal. --}}
-        {{-- ⚠️ THE SCOPE SITS ON OUR OWN ELEMENT, NOT ON THE CARD, and that is deliberate.
-             The card sets an `x-data` of its own when its slot carries visible text with no
-             card.body — a debug-only composition warning. This panel uses card.body, so that
-             branch is not taken today and both scopes coexist; measured, with app.debug on,
-             the card root carried exactly one x-data and it was ours.
+        {{-- The scope sits on our own element rather than on the card, and that is deliberate. The
+             card sets an `x-data` of its own when its slot carries visible text with no card.body —
+             a debug-only composition warning. This panel uses card.body, so that branch is not
+             taken today and both scopes coexist; measured, with app.debug on, the card root carried
+             exactly one x-data and it was ours.
 
              But HTML keeps the FIRST of two identical attributes. If that branch is ever
              taken — someone drops the card.body wrapper, or the component stops making the
@@ -66,7 +70,24 @@
         >
         <x-wirekit::card>
             <x-wirekit::card.body>
-                <div class="flex flex-col gap-[var(--padding-wk-y-md)]" role="status" aria-live="polite">
+                {{-- A plain region, NOT a live one, and that is the whole point of this line.
+                     It used to be `role="status" aria-live="polite"` around the entire card
+                     body -- and role="status" carries an implicit aria-atomic="true", so ANY
+                     change inside it re-announced the WHOLE region: the heading, the endpoint
+                     URL, the notice, the plaintext signing secret character by character, the
+                     previous secret and every button. Pressing Copy is such a change, because
+                     the button swaps its icon and its label. So was the ten-second expiry
+                     warning. In an open-plan office or on a speaker, that reads a production
+                     secret out loud without anyone asking for it.
+
+                     It also nested live regions two deep -- the countdown's hidden region below
+                     and the copy button's own `role="status"` -- which ARIA practice advises
+                     against on its own.
+
+                     The announcements live where they belong instead: the permanent hidden
+                     region above says a secret was revealed, and the one below says the window
+                     is closing. Both are small, both are atomic, and neither contains the key. --}}
+                <div class="flex flex-col gap-[var(--padding-wk-y-md)]" role="region" aria-label="{{ __('webhooks::self-service.secret.region_label') }}">
                     <div class="flex flex-wrap items-start justify-between gap-[var(--padding-wk-x-md)]">
                         <x-wirekit::stack gap="none">
                             <x-wirekit::heading :level="3" size="sm">{{ __('webhooks::self-service.secret.heading') }}</x-wirekit::heading>

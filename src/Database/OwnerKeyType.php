@@ -12,7 +12,7 @@ use InvalidArgumentException;
 use Pushery\Webhooks\Database\Dialect\Dialect;
 
 /**
- * The storage type of the denormalised owner key (`owner_id`) — the one decision that has to
+ * The storage type of the denormalized owner key (`owner_id`) — the one decision that has to
  * hold identically across every table the owner morph pair spans: the subscriptions table,
  * the delivery log and the dashboard rollup. A polymorphic owner may be keyed by a bigint
  * (the default), a UUID or a ULID; the package renders each table's `owner_id` column, the
@@ -74,7 +74,17 @@ enum OwnerKeyType: string
     public function rawType(Dialect $dialect): string
     {
         return match ($this) {
-            self::Bigint => 'bigint',
+            // `unsigned` here is what makes the three owner columns the same type, and it was
+            // missing. blueprintColumn() renders a Bigint through unsignedBigInteger(), which
+            // Laravel's MySQL grammar emits as `bigint unsigned` — so webhook_subscriptions and the
+            // MySQL rollup got the unsigned column while webhook_deliveries, whose DDL is
+            // hand-written and comes through here, got the signed one. This class's own docblock
+            // says the three tables "can never disagree"; on MySQL they did, by a factor of two at
+            // the top of the range.
+            //
+            // PostgreSQL has no unsigned integers, so the word would be a syntax error there —
+            // which is also why the split never showed up on the engine the suite defaults to.
+            self::Bigint => $dialect === Dialect::MySql ? 'bigint unsigned' : 'bigint',
             self::Uuid => $dialect === Dialect::MySql ? 'char(36)' : 'uuid',
             self::Ulid => 'char(26)',
         };
@@ -105,10 +115,9 @@ enum OwnerKeyType: string
     public function accepts(int|string $key): bool
     {
         return match ($this) {
-            // ⚠️ The `$key !== ''` clause changes no answer, and mutation testing reports it as
-            // a survivor for exactly that reason. `ctype_digit('')` is false (measured, PHP 8),
-            // so the empty string is refused by the second clause alone, and the two clauses
-            // agree on every other input as well. It is an equivalent mutant.
+            // The `$key !== ''` clause changes no answer: `ctype_digit('')` is false on PHP 8, so
+            // the empty string is refused by the second clause alone, and the two clauses agree on
+            // every other input as well.
             //
             // It stays, and it is NOT to be "killed" by deletion. Without it a reader has to
             // know what ctype_digit does with an empty string to see that '' is refused — and

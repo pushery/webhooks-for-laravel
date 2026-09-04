@@ -6,6 +6,7 @@ namespace Pushery\Webhooks\Server\Data;
 
 use Pushery\Webhooks\Core\Signing\SignatureScheme;
 use Pushery\Webhooks\Server\Backoff\BackoffStrategy;
+use Pushery\Webhooks\Server\Jobs\CallWebhookJob;
 
 /**
  * The immutable, queue-serializable context for one webhook delivery. Carries

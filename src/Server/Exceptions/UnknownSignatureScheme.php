@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pushery\Webhooks\Server\Exceptions;
 
 use InvalidArgumentException;
+use Pushery\Webhooks\Core\Signing\SignatureScheme;
 
 /**
  * Thrown when a delivery's configured signature scheme class does not resolve to a

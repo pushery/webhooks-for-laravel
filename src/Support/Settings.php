@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pushery\Webhooks\Support;
 
 use Illuminate\Support\Facades\Config;
+use Pushery\Webhooks\Console\PreflightCommand;
 use Pushery\Webhooks\Core\Signing\Ed25519Scheme;
 use Pushery\Webhooks\Core\Signing\SignatureScheme;
 use Pushery\Webhooks\Core\Signing\StandardWebhooksScheme;
@@ -14,10 +15,22 @@ use Pushery\Webhooks\Server\Exceptions\MissingSigningKey;
 use Pushery\Webhooks\Server\Exceptions\UnknownSignatureScheme;
 
 /**
- * Typed reader over the package configuration, so the rest of the code never
- * juggles mixed config values. Every accessor carries the same default as
- * config/webhooks.php, so a partially-published config (mergeConfigFrom only
- * shallow-merges top-level keys) can never leave a nested key undefined.
+ * Typed reader over the package configuration, so the rest of the code never juggles mixed
+ * config values. Every accessor carries the same default as config/webhooks.php, so a nested key
+ * can never be undefined here.
+ *
+ * That default is not about `mergeConfigFrom`, which this package does not use. The sentence here
+ * used to say it was — "mergeConfigFrom only shallow-merges top-level keys" — and that stopped
+ * being the mechanism when {@see MergesPackageConfig} replaced it with {@see ConfigMerge::tree()},
+ * a recursive merge that leaves no nested key missing. A reader who checked the claim would find no
+ * `mergeConfigFrom` call anywhere in the package and reasonably conclude the defaults below are
+ * redundant.
+ *
+ * They are not, and the reason is a different one: a host running a stale config cache is served
+ * the array it cached, not a freshly merged tree. Nothing re-merges for them until they clear it.
+ * So the default in each accessor is what stands between such a host and a null — and where that
+ * null would switch a safety brake off rather than merely blank a value,
+ * `ConfigDefaultsAreInSyncTest` holds it against the shipped file so the pair cannot drift.
  *
  * @internal
  */
@@ -70,6 +83,159 @@ final class Settings
     public function retryAfterCap(): int
     {
         return Config::integer('webhooks.server.backoff.retry_after_cap', 900);
+    }
+
+    /**
+     * The advisory for a half-installed icon stack, or null when the pair is coherent.
+     *
+     * `blade-icons` renders and `blade-heroicons` is the set the shipped screens ask for. With
+     * either one missing, WireKit draws its inert placeholder where an icon belongs: the screens
+     * render, they are simply without iconography. Both directions therefore cost the same, and
+     * the message says which half to install rather than how bad it is.
+     *
+     * This used to say the renderer-alone case answers 500, and it did. An alias like `inbox`
+     * resolves cleanly through a static preset table that never checks whether the SVG behind it
+     * exists, so with `blade-icons` present and `blade-heroicons` absent the lookup reached a set
+     * nobody registered and threw, taking down every screen that draws an icon — which through
+     * buttons and dropdowns is every screen. WireKit's graceful path covered the unknown alias and
+     * not the resolved-alias-missing-set case.
+     *
+     * That gap is closed upstream as of WireKit 2.38, which this package's `conflict` now requires,
+     * so the state is no longer broken but merely incomplete, and a message still claiming a 500
+     * would be the kind of overstatement that teaches a reader to skip the next one.
+     *
+     * Both inputs are ARGUMENTS rather than reads, so every state is testable on a tree that has
+     * neither package — which is this one, and every CI lane.
+     */
+    public function iconPairingAdvisory(bool $rendererInstalled, bool $heroiconSetInstalled): ?string
+    {
+        if ($rendererInstalled === $heroiconSetInstalled) {
+            return null;
+        }
+
+        // Named rather than left to the reader: told only that "the pair is incomplete", someone
+        // reaches for the package the message mentions first, and on a host that already uses
+        // blade-icons for its own set that is the one they already have.
+        $missing = $rendererInstalled ? 'blade-ui-kit/blade-heroicons' : 'blade-ui-kit/blade-icons';
+
+        return sprintf(
+            'The icon pair is half installed: %s is missing, so the shipped screens draw '
+            .'WireKit\'s inert placeholder where an icon belongs. They render — they are simply '
+            .'without iconography. Install it: composer require %s.',
+            $missing,
+            $missing,
+        );
+    }
+
+    /**
+     * The 4xx status codes that stay retryable while `no_retry_on_4xx` is on.
+     *
+     * Values are read leniently on purpose. The only realistic way a string reaches this list is
+     * a host building it from an environment variable — `explode(',', env('...'))` yields
+     * `['408', '425', '429']` — and dropping those left the classifier with an EMPTY list, which
+     * it reads as the deliberate statement "no 4xx is retryable" rather than as a fallback. The
+     * host who wrote the three most retryable codes into their config got the exact opposite of
+     * what they asked for: a 429 became a final failure, the Retry-After path was never entered,
+     * and every one of those failures counted against the circuit breaker.
+     *
+     * @return list<int>
+     */
+    public function retryable4xx(): array
+    {
+        [$codes, $faults] = $this->parseRetryable4xx();
+        unset($faults);
+
+        return $codes;
+    }
+
+    /**
+     * What was unusable in that list, as advisory lines for the preflight.
+     *
+     * The lenient read above fixes the common case and hides the rest, which would trade one
+     * silence for another: a value nothing can make sense of is still dropped, and a list of
+     * nothing but those still falls back to the default. Both are the host's mistake to see.
+     *
+     * @return list<string>
+     */
+    public function retryable4xxFaults(): array
+    {
+        [$codes, $faults] = $this->parseRetryable4xx();
+        unset($codes);
+
+        return $faults;
+    }
+
+    /**
+     * @return array{0: list<int>, 1: list<string>}
+     */
+    private function parseRetryable4xx(): array
+    {
+        $default = [408, 425, 429];
+        $configured = Config::array('webhooks.server.retryable_4xx', $default);
+
+        $codes = [];
+        $unusable = [];
+        $inert = [];
+
+        foreach ($configured as $value) {
+            if (is_int($value)) {
+                $code = $value;
+            } elseif (is_string($value) && trim($value) !== '' && trim($value) === (string) (int) trim($value)) {
+                // Exact round-trip, not is_numeric(): that also accepts '4.5e2' and ' 429abc'
+                // under a loose cast, and a status code read out of either is a guess.
+                $code = (int) trim($value);
+            } else {
+                $unusable[] = get_debug_type($value).' '.json_encode($value);
+
+                continue;
+            }
+
+            // Kept, not dropped: the classifier only consults this list for a 4xx, so an entry
+            // outside the range is already inert and removing it would change nothing. What it
+            // needs is to be SAID — a host who wrote 503 here is waiting for a retry that the
+            // list was never going to produce.
+            if ($code < 400 || $code > 499) {
+                $inert[] = $code;
+            }
+
+            $codes[] = $code;
+        }
+
+        $faults = [];
+
+        if ($unusable !== []) {
+            $faults[] = sprintf(
+                'webhooks.server.retryable_4xx: %d entr%s could not be read as a status code and '
+                .'%s ignored (%s). Write them as integers or as plain digit strings.',
+                count($unusable),
+                count($unusable) === 1 ? 'y' : 'ies',
+                count($unusable) === 1 ? 'was' : 'were',
+                implode(', ', $unusable),
+            );
+        }
+
+        if ($inert !== []) {
+            $faults[] = sprintf(
+                'webhooks.server.retryable_4xx: %s outside the 4xx range, so %s never consulted — '
+                .'this list only decides which 4xx stays retryable while no_retry_on_4xx is on.',
+                implode(', ', array_map(strval(...), $inert)),
+                count($inert) === 1 ? 'it is' : 'they are',
+            );
+        }
+
+        // An explicitly empty list is a real choice and stays empty. A list the host FILLED that
+        // survives as nothing is not the same statement, and reading it as one turns a typo into
+        // "no 4xx is ever retried" — silently, because the config file still shows three codes.
+        if ($configured !== [] && $codes === []) {
+            return [$default, [...$faults, sprintf(
+                'webhooks.server.retryable_4xx was set but nothing in it could be read, so the '
+                .'default [%s] is in force. An empty list would have meant "no 4xx is retryable", '
+                .'which is not what a non-empty setting asks for.',
+                implode(', ', array_map(strval(...), $default)),
+            )]];
+        }
+
+        return [$codes, $faults];
     }
 
     /**
@@ -286,10 +452,11 @@ final class Settings
      */
     public function largePayloadThreshold(): int
     {
-        // 262144, matching config/webhooks.php — not 0. mergeConfigFrom only shallow-merges the
-        // top-level keys, so a host that publishes a trimmed `server` block with
+        // 262144, matching config/webhooks.php — not 0. A host on a stale config cache is served
+        // the array it cached rather than a freshly merged tree, so a cached `server` block with
         // large_payload.enabled = true but no threshold would otherwise fall to 0 here and offload
-        // EVERY payload to disk, not just the large ones.
+        // EVERY payload to disk, not just the large ones. (The reason used to be given as
+        // mergeConfigFrom's shallow merge; this package merges recursively and does not call it.)
         return Config::integer('webhooks.server.large_payload.threshold', 262144);
     }
 
@@ -365,15 +532,55 @@ final class Settings
      * The relative weights of the three health signals (success rate, latency,
      * failure streak) in the blended score.
      *
+     * Read numerically rather than through `Config::float()`, and this is the one knob where that
+     * getter refuses the literal an operator would actually write. It throws an
+     * InvalidArgumentException on an int, so the most natural way to say "score on success rate
+     * alone" is also the way that breaks:
+     *
+     * 'weights' => ['success' => 1, 'latency' => 0, 'consecutive' => 0]
+     *
+     * Every one of those three is an int. Nothing about the config file suggests otherwise: it
+     * ships `0.7` and `0.15` because those happen to have decimals, not because a rule says a whole
+     * number is forbidden. And the throw lands on the health-scoring path, so it is a scheduled
+     * command and a status board failing over a legal-looking setting.
+     *
+     * The same doctrine {@see PreflightCommand} states for
+     * `Config::string()`: where a host's plausible value would make a typed getter throw, read
+     * it null-safe and coerce.
+     *
      * @return array{success: float, latency: float, consecutive: float}
      */
     public function healthWeights(): array
     {
         return [
-            'success' => Config::float('webhooks.platform.health.weights.success', 0.7),
-            'latency' => Config::float('webhooks.platform.health.weights.latency', 0.15),
-            'consecutive' => Config::float('webhooks.platform.health.weights.consecutive', 0.15),
+            'success' => $this->weight('webhooks.platform.health.weights.success', 0.7),
+            'latency' => $this->weight('webhooks.platform.health.weights.latency', 0.15),
+            'consecutive' => $this->weight('webhooks.platform.health.weights.consecutive', 0.15),
         ];
+    }
+
+    /**
+     * One health weight, accepting anything numeric a host might reasonably write.
+     *
+     * An int, a float and a numeric string all mean the same weight to a reader, so they mean
+     * the same weight here. Anything else — an array, a bare word, null — falls back to the
+     * shipped default rather than throwing: a mistyped weight must not take down the health
+     * board, and the default is the value the config file shows beside the key anyway.
+     */
+    private function weight(string $key, float $default): float
+    {
+        $value = Config::get($key, $default);
+
+        // Two statements rather than a ternary, for the coverage reason its siblings in this file
+        // state. `ConstantFallbackVisibility` does not flag this one — its fallback is a variable
+        // rather than a literal — but the measurement behind the rule is the same either way, and
+        // the arm that would go unexercised is the one that keeps a mistyped weight from taking
+        // the health board down.
+        if (is_numeric($value)) {
+            return (float) $value;
+        }
+
+        return $default;
     }
 
     /**

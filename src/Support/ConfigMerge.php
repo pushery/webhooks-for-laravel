@@ -18,9 +18,15 @@ namespace Pushery\Webhooks\Support;
  * arrays BY INDEX, so a host narrowing `dashboard.windows` to `['7d']` gets back
  * `['7d', '7d', '30d']` — two windows it never asked for, one of them a value it removed
  * on purpose. A list is the value an operator SETS, not a container to descend into, so a
- * list is replaced whole and never merged. There are ten of them in the shipped file, and
+ * list is replaced whole and never merged. There are eleven of them in the shipped file, and
  * `core.ssrf.allowed_hosts` is the one where getting this wrong is a security question
  * rather than a cosmetic one.
+ *
+ * That count is held by a test, because it said "ten" while the predicate below found
+ * eleven — a sentence about a set drifts the moment the set grows, and this one names the
+ * security-relevant member, so a reader who counts and finds a mismatch has reason to doubt the
+ * rest of the paragraph. `ConfigMergeTest` derives the number with this very predicate and holds
+ * the word against it.
  *
  * `array_is_list([])` is true, which makes an empty array a leaf as well. That is the
  * behavior you want: an empty list is a host saying "none", and descending into it could

@@ -6,6 +6,7 @@ namespace Pushery\Webhooks\Platform\Livewire;
 
 use Illuminate\Container\Container;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -32,6 +33,21 @@ use Pushery\Webhooks\Support\WebhookConnection;
 final class EndpointHealthMatrix extends Component
 {
     use InteractsWithEndpoints;
+
+    /**
+     * The most rows one board draws, and therefore the most endpoints one recompute touches.
+     *
+     * There was no ceiling here at all: render() read every endpoint the tenant owns, and
+     * `max_endpoints_per_tenant` ships as null, so a board could be arbitrarily long and a
+     * recompute cost two synchronous queries for each of its rows. The same cap in the same shape
+     * as the operator console's endpoint filter, for the same reason — and, like it, when it
+     * truncates the view says so. A short list that looks complete is how a reader concludes an
+     * endpoint is gone.
+     */
+    private const int MAX_ROWS = 200;
+
+    /** A message for the reader — why an action was refused, or what was left out. */
+    public string $message = '';
 
     /** The cached column a row is sorted by: 'score' or 'status'. */
     public string $sortField = 'score';
@@ -78,10 +94,10 @@ final class EndpointHealthMatrix extends Component
         // nothing and fails not-found before any action runs — the row-level policy below is the
         // second, defense-in-depth guard, not the only one.
         $subscription = $this->findOwnedEndpoint($id);
-        // Reported as a survivor, and unreachable as the SOLE refusal — InteractsWithEndpoints
-        // spells out why in full: the boot gate reads the same ability, and findOwnedEndpoint()
-        // has already enforced the ownership this policy would add. That docblock ends "Do not
-        // 'kill' them by deleting them", and this is one of the five it means.
+        // This authorize() call cannot be the sole refusal — InteractsWithEndpoints spells out why
+        // in full: the boot gate reads the same ability, and findOwnedEndpoint() has already
+        // enforced the ownership this policy would add. That docblock ends "Do not 'kill' them by
+        // deleting them", and this is one of the five it means.
         $this->authorize('update', $subscription);
 
         $this->refreshRow($subscription);
@@ -95,11 +111,39 @@ final class EndpointHealthMatrix extends Component
      */
     public function recomputeAll(): void
     {
-        foreach ($this->scopedQuery()->get() as $subscription) {
+        // The brake the other three tenant actions have had all along. This one is the most
+        // expensive of them by a wide margin — two queries per endpoint, synchronously, in the
+        // web request — and it was the one with nothing in front of it. The button is only
+        // disabled by wire:loading, so a second press starts the whole pass again.
+        if ($this->recomputeRateExceeded()) {
+            $this->message = __('webhooks::self-service.health_page.recompute_throttled');
+
+            return;
+        }
+
+        $this->message = '';
+
+        foreach ($this->boardQuery()->get() as $subscription) {
             $this->refreshRow($subscription);
         }
 
         $this->dispatch('wirekit-toast', variant: 'success', message: __('webhooks::self-service.toast.health_recomputed_all'));
+    }
+
+    /**
+     * The tenant's endpoints in board order, bounded.
+     *
+     * One query shape for the board and for the recompute, so the pass can never touch a row
+     * the reader is not looking at — and can never be longer than the board either.
+     *
+     * @return Builder<WebhookSubscription>
+     */
+    private function boardQuery(): Builder
+    {
+        return $this->scopedQuery()
+            ->orderByRaw($this->orderClause())
+            ->orderBy('id')
+            ->limit(self::MAX_ROWS + 1);
     }
 
     /**
@@ -111,9 +155,9 @@ final class EndpointHealthMatrix extends Component
     {
         $report = Container::getInstance()->make(EndpointHealth::class)->refresh($subscription);
 
-        // The (int) cast is unkillable: the id is an int already, and PHP normalizes a numeric
-        // array key regardless (measured). Kept because the array is documented as keyed by the
-        // endpoint id, and the view looks a row up by exactly that.
+        // The (int) cast changes nothing: the id is an int already, and PHP normalizes a numeric
+        // array key regardless. It is kept because the array is documented as keyed by the endpoint
+        // id, and the view looks a row up by exactly that.
         $this->reports[(int) $subscription->id] = [
             'successRate' => $report->successRate,
             'p95' => $report->p95,
@@ -148,24 +192,25 @@ final class EndpointHealthMatrix extends Component
 
     public function render(): View
     {
-        $endpoints = $this->scopedQuery()
-            ->orderByRaw($this->orderClause())
-            ->orderBy('id')
-            ->get();
+        $endpoints = $this->boardQuery()->get();
 
-        // ⚠️ Three of the entries below are REDUNDANT, and mutation testing reports one
-        // survivor each: `reports`, `sortField` and `sortDirection` are public properties of
-        // this component, and Livewire hands every public property to the view already. Removing
-        // them changes nothing — measured, one at a time, suite green.
+        // One row beyond the cap is asked for so the truncation can be DETECTED, then dropped.
+        $truncated = $endpoints->count() > self::MAX_ROWS;
+        $endpoints = $endpoints->take(self::MAX_ROWS);
+
+        // Three of the entries below are redundant: `reports`, `sortField` and `sortDirection` are
+        // public properties of this component, and Livewire hands every public property to the view
+        // already. Removing them changes nothing, measured one at a time with the suite green.
         //
         // They stay because the view reads them by those names and this list is where a reader
-        // looks to see what it is given. `endpoints` and `portalUrl` are NOT redundant: neither
-        // is a property, and the view has no other source for them.
+        // looks to see what it is given. `endpoints` and `portalUrl` are not redundant: neither is
+        // a property, and the view has no other source for them.
         //
-        // What must NOT be concluded from this note is that the three properties are unused. It
-        // is the opposite: they are used, and by the view, which is why they are public.
+        // What must not be concluded from this note is that the three properties are unused. It is
+        // the opposite: they are used, and by the view, which is why they are public.
         return ViewFactory::make('webhooks::self-service.livewire.endpoint-health-matrix', [
             'endpoints' => $endpoints,
+            'endpointsTruncated' => $truncated,
             'reports' => $this->reports,
             'sortField' => $this->sortField,
             'sortDirection' => $this->sortDirection,

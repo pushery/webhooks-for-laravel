@@ -8,6 +8,7 @@ use Illuminate\Container\Container;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Pushery\Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
@@ -28,15 +29,37 @@ final class EndpointSecretPanel extends Component
 {
     use InteractsWithEndpoints;
 
+    /**
+     * Every value the reveal window is decided from, and each one is #[Locked].
+     *
+     * The class docblock says the expiry is "enforced server-side by the visibleSecret guard,
+     * so a stale panel can never keep leaking the secret". The guard is isExpired(), isExpired()
+     * reads $expiresAt, and $expiresAt was an ordinary public property — which means the browser
+     * wrote the value the guard compared against. A window enforced by a number the client picks
+     * is not enforced. #[Locked] is what makes the sentence true: Livewire refuses an incoming
+     * update to these and raises rather than accepting it.
+     *
+     * The two secrets and the endpoint are locked for a different reason, and it is not
+     * confidentiality — a revealed secret is already in that browser. It is that reveal() and
+     * rotate() resolve the endpoint through the owner-scoped query and authorize the row
+     * policy; a client-writable endpointId would let the next request act on an id that never
+     * went through either. $hidden stays writable: it is the one value here the browser
+     * legitimately owns, and it decides nothing but an announcement.
+     */
+    #[Locked]
     public ?int $endpointId = null;
 
+    #[Locked]
     public ?string $endpointUrl = null;
 
+    #[Locked]
     public ?string $currentSecret = null;
 
+    #[Locked]
     public ?string $previousSecret = null;
 
     /** Unix timestamp after which the revealed secret is withheld again. */
+    #[Locked]
     public ?int $expiresAt = null;
 
     /**
@@ -140,11 +163,11 @@ final class EndpointSecretPanel extends Component
      */
     public function remainingSeconds(): int
     {
-        // ⚠️ Equivalent, and reported as a survivor. I expected removing it to be a TypeError;
-        // measured, PHP coerces the null to 0 and `max(0, 0 - timestamp)` answers 0 — the same
-        // number. So no test can tell the two apart.
+        // Removing this guard looks like it would be a TypeError and is not: PHP coerces the
+        // null to 0, and `max(0, 0 - timestamp)` answers 0 — the same number. So no test can
+        // tell the two versions apart.
         //
-        // It stays because the guard states the CASE rather than relying on a coercion: "no
+        // It stays because the guard states the case rather than relying on a coercion: "no
         // window open" is a state this panel is in for most of its life, and reading it out of
         // arithmetic on null is how a later edit turns it into a negative countdown.
         if ($this->expiresAt === null) {

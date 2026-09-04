@@ -8,7 +8,7 @@ use Pushery\Webhooks\Core\Signing\SecretSet;
 use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 
 /**
- * Resolves the signing secrets for a delivery AT HANDLE TIME, so the raw secret
+ * Resolves the signing secrets for a delivery at handle time, so the raw secret
  * never has to sit in the serialized job payload. The default
  * {@see EncryptedSecretResolver} unseals an encrypted inline secret; the Platform
  * layer binds a resolver that loads a subscription's secret by id instead, keeping

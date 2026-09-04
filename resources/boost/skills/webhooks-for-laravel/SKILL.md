@@ -49,7 +49,8 @@ sends you looking at Livewire rather than at a missing provider.
 
 ### 2. Decide which layers the application needs
 
-Five layers sit on a shared crypto/transport core, each with one switch:
+Four layers sit on a shared crypto/transport core — the core is the first row below, and it
+is the one row with no switch:
 
 | Layer | What it does | Default |
 | --- | --- | --- |
@@ -110,8 +111,12 @@ application never enabled.
 | `webhooks-server-migrations` | Standalone persistence: `webhook_server_deliveries` |
 | `webhooks-dashboard-migrations` | The dashboard's hourly materialized view |
 
-Publishing migrations is itself optional: with `$runsMigrations` left alone,
-every enabled layer registers its own and `php artisan migrate` runs them.
+Publishing migrations is itself optional: left alone, every enabled layer
+registers its own and `php artisan migrate` runs them. To manage them in the app
+instead, call `ignoreMigrations()` on that layer's provider from a service
+provider's `register()` — `WebhooksServiceProvider`, `ServerServiceProvider`,
+`WebhookClientServiceProvider` or `WebhooksDashboardServiceProvider`, one per
+layer.
 
 The persistent layers need **PostgreSQL or MySQL 8.4+**. An application that only
 sends needs no database at all — see the send-only path below.
@@ -187,7 +192,7 @@ class HandlePartnerWebhook extends ProcessWebhookJob
         // missing rather than absent.
         if (! $this->message->format->readable()) {
             // $this->webhookCall->body() still returns the exact bytes.
-            throw new RuntimeException('Unread delivery');
+            throw new \RuntimeException('Unread delivery');
         }
     }
 }
@@ -242,11 +247,10 @@ The action name (`create`, `edit`, `toggle`, `rotate`, `delete`, `redeliver`, `p
 is passed to the gate. Default `null` means no per-action check. It is not tenant
 scoping.
 
-⚠️ **If the capabilities come from spatie/laravel-permission, use `admin.abilities`
-instead.** That package's `Gate::before` hook reads the first positional gate argument
-as a guard name and shifts it off, so the action name turns into a guard nobody
-defined and every action denies every operator — silently. An ability taken from the
-map is authorized with no argument at all:
+**If the capabilities come from spatie/laravel-permission, use `admin.abilities` instead.** That
+package's `Gate::before` hook reads the first positional gate argument as a guard name and shifts it
+off, so the action name turns into a guard nobody defined and every action denies every operator —
+silently. An ability taken from the map is authorized with no argument at all:
 
 ```php
 'admin' => ['abilities' => ['*' => 'manage webhooks']],

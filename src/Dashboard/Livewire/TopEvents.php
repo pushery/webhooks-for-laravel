@@ -29,6 +29,18 @@ final class TopEvents extends Component
 {
     use InteractsWithDashboard;
 
+    /**
+     * The window this panel counts over. LOCKED for the reason $limit is locked beside it:
+     * it is a mount parameter and nothing else — no `wire:model` binds it, and a public
+     * Livewire property that nothing binds is still client input. The page decides the
+     * window, screens it against the configured set, and remounts every panel on it through
+     * the wire:key; a panel that also accepted the value from the browser re-opened the hole
+     * the page had just closed, one component deeper, where nothing screens it at all.
+     *
+     * The failure is not silent: WindowResolver throws on a token it does not know, so an
+     * unscreened value is a 500 where the panel should be.
+     */
+    #[Locked]
     public string $window = '24h';
 
     /**

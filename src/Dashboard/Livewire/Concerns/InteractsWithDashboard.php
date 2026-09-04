@@ -73,6 +73,12 @@ trait InteractsWithDashboard
         return $this->sourceModel()
             ->newQuery()
             ->whereRaw($ownerSql, $ownerBindings)
+            // withinRetention() is what lets the planner prune. The table is partitioned on
+            // created_at with PRIMARY KEY (id, created_at), so an id alone does not name a
+            // partition and PostgreSQL probes the primary index of every one of them — a count
+            // that grows with each month the log survives. It hides no reachable row: the bound
+            // sits a month below the retention floor.
+            ->withinRetention()
             ->findOrFail($deliveryId);
     }
 

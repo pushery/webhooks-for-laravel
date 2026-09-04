@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pushery\Webhooks\Client\Exceptions;
 
 use Pushery\Webhooks\Client\Events\InboundWebhookVerified;
+use Pushery\Webhooks\Client\Events\InvalidWebhookSignature;
 use Pushery\Webhooks\Client\Events\UnreadableWebhookPayload;
 use RuntimeException;
 use Throwable;
@@ -21,10 +22,11 @@ use Throwable;
  * exists to end, one level up. A package-owned class is in no host's ignore list, so the signal
  * arrives.
  *
- * It covers both guarded inbound events — {@see UnreadableWebhookPayload} and
- * {@see InboundWebhookVerified} — because the failure mode and the reasoning above are identical
- * for them, and a second class would have been the same twelve lines drifting apart. The event's
- * short name travels in the message so the report says which one it was.
+ * It covers all three guarded inbound events — {@see UnreadableWebhookPayload},
+ * {@see InboundWebhookVerified} and {@see InvalidWebhookSignature} — because the failure mode and
+ * the reasoning above are identical for them, and a second class would have been the same twelve
+ * lines drifting apart. The event's short name travels in the message so the report says which
+ * one it was.
  */
 final class InboundListenerFailed extends RuntimeException
 {

@@ -52,6 +52,11 @@ final class DatabaseRequirement
         $driver = $resolved->getDriverName();
 
         if ($driver === 'pgsql') {
+            // The same floor the PostgreSQL-only guard applies, read from one place. Until this
+            // line existed, pgsql passed both guards with no version read at all while MySQL was
+            // checked four ways — the asymmetry is documented on PostgresRequirement::MIN_VERSION.
+            PostgresRequirement::ensureVersion($name, $resolved->getServerVersion());
+
             return;
         }
 

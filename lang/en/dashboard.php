@@ -19,6 +19,7 @@ return [
     ],
 
     'kpis' => [
+        'title' => 'At a glance',
         'total' => 'Total Webhooks Sent',
         'successful' => 'Successful',
         'failed' => 'Failed',
@@ -26,21 +27,38 @@ return [
         'retry_rate' => 'Retry Rate',
     ],
 
-    // Date patterns are translated, not just their month names: the ORDER differs by
-    // locale (English leads with the month, German with the day).
-    // The `z` on 'absolute' is the whole point of it being a translatable pattern rather
-    // than a literal: a delivery timestamp is the one column an operator holds against
-    // their own records, and an hour of unexplained offset there is not cosmetic. Without
-    // the zone the reader cannot tell which clock they are being shown.
+    // Date patterns are translated, not just their month names: the order differs by locale, since
+    // English leads with the month and German with the day. The `z` on 'absolute' is the whole
+    // point of it being a translatable pattern rather than a literal: a delivery timestamp is the
+    // one column an operator holds against their own records, and an hour of unexplained offset
+    // there is not cosmetic. Without the zone the reader cannot tell which clock they are being
+    // shown.
     //
-    // ⚠️ 'hour_bucket' ends in `H:i` and NOT the literal `H:00` it used to. The buckets are
-    // whole hours, so the two render identically — until the dashboard's display zone has a
-    // sub-hour offset (India, Nepal, parts of Australia), where the value really is :30 or
-    // :45 and a hardcoded `00` prints a time that never existed. A literal that is true for
-    // most readers and silently false for some is worse than a format character.
+    // 'hour_bucket' ends in `H:i`, not the literal `H:00` it used to. The buckets are whole
+    // hours, so the two render identically until the dashboard's display zone has a sub-hour offset
+    // (India, Nepal, parts of Australia), where the value really is :30 or :45 and a hardcoded `00`
+    // prints a time that never existed. A literal that is true for most readers and silently false
+    // for some is worse than a format character.
     'formats' => [
         'hour_bucket' => 'M j H:i',
         'absolute' => 'LLL z',
+
+        // 'precise' exists because 'absolute' cannot separate two rows, and the accessible names
+        // need it to. `LLL` carries no seconds in any of the seven shipped locales — measured
+        // against the vendored Carbon on two deliveries 37 seconds apart, identical in all seven —
+        // and `redeliver()` writes a new row on every replay, same event type, same endpoint. So a
+        // tenant pressing Send again twice inside a minute produces two rows whose control names
+        // agree in every part, which is the state the names were widened to prevent.
+        //
+        // It is a second pattern rather than seconds added to 'absolute': on the visible surface a
+        // per-second timestamp is noise in a column an operator scans, and this string is read by
+        // exactly one reader, one row at a time, where the extra precision is the whole point.
+        //
+        // It still does not separate two replays in the same second, and that is stated here
+        // instead of papered over. Two requests inside one second need two clicks a human cannot make, and the
+        // alternative — an opaque id in the name — costs every reader legibility to cover a case no
+        // reader reaches.
+        'precise' => 'LL LTS z',
     ],
 
     'api' => [
@@ -97,11 +115,16 @@ return [
     // Badge labels for the stored DeliveryStatus values. The key is the persisted
     // value and is never translated; only the label a reader sees is. English keeps
     // the lowercase styling the badges shipped with.
+    // Shown when the rollup the counts come from has fallen behind the rows it summarizes --
+    // twice the configured refresh cadence or more, so a run merely in progress never triggers it.
+    'rollup_stale' => 'The delivery counts on this page are :minutes minutes behind. They come from a rollup that `webhooks:refresh-metrics` advances; the latency figures beside them are live, so the two disagree until that command runs again.',
+
     'status' => [
         'pending' => 'pending',
         'succeeded' => 'succeeded',
         'failed' => 'failed',
         'exhausted' => 'exhausted',
+        'refused' => 'refused',
     ],
 
     // The same statuses as filter options, where the surrounding form wants them
@@ -111,6 +134,7 @@ return [
         'succeeded' => 'Succeeded',
         'failed' => 'Failed',
         'exhausted' => 'Exhausted',
+        'refused' => 'Refused',
     ],
 
     'drawer' => [
@@ -170,12 +194,35 @@ return [
         'sections' => 'Dashboard sections',
         'retry_rate' => 'Retry rate',
         'deliveries_per_hour' => 'Deliveries per hour',
-        'hour_summary' => ':hour: :total total, :delivered delivered, :pending pending, :failed failed',
+        'hour_summary' => [
+            // Four choice fragments rather than one sentence with four numbers in it. The key here
+            // used to be `':hour: :total total, :delivered delivered, …'`, and four of the seven
+            // locales froze the adjectives in the plural — so every hour bucket holding exactly one
+            // delivery announced "1 livrées", "1 entregados", "1 consegnate", "1 entregues". That
+            // is the common bucket, not an edge case: a thirty-day window renders up to 720
+            // of them and most are sparse. And these strings exist for one reader only, so the
+            // ungrammatical half is the whole of what that reader hears.
+            //
+            // A placeholder cannot fix it. Agreement is decided by the number, `trans_choice` takes
+            // one count per string, and there are four. So the sentence is assembled from four
+            // fragments the view joins — the pieces are a list, and a list's order is not grammar,
+            // so nothing a translator needs is taken away.
+            //
+            // English, German and Dutch carry identical forms on both sides on purpose: their
+            // participles do not inflect here, and writing the pair anyway keeps every locale the
+            // same shape, so a translator adding one is never guessing whether their language needs
+            // it.
+            'total' => '{0} :count total|{1} :count total|[2,*] :count total',
+            'delivered' => '{0} :count delivered|{1} :count delivered|[2,*] :count delivered',
+            'pending' => '{0} :count pending|{1} :count pending|[2,*] :count pending',
+            'failed' => '{0} :count failed|{1} :count failed|[2,*] :count failed',
+        ],
         'latency_trend' => 'Per-hour P95 latency trend',
+        'latency_bar' => ':hour: :value ms',
         'recent_deliveries_table' => 'Recent webhook deliveries',
         'deliveries_table' => 'Webhook deliveries',
-        'replay_delivery' => 'Replay :event delivery',
-        'view_delivery' => 'View :event delivery details',
+        'replay_delivery' => ':label — :event · :endpoint · :at',
+        'view_delivery' => 'View the :event delivery to :endpoint from :at',
         'delivery_details' => 'Delivery details',
         'close_details' => 'Close details',
         'loading_kpis' => 'Loading key metrics',

@@ -78,8 +78,8 @@ final class SelfServicePortalServiceProvider extends ServiceProvider
         // own origin so it runs under a strict `script-src 'self'` with no nonce and nothing
         // for the host to publish.
         //
-        // ⚠️ OUTSIDE the register_routes gate on purpose. That flag is about the portal's own
-        // PAGES: a host that mounts the panels inside its own guarded screens turns it off
+        // Outside the register_routes gate on purpose. That flag is about the portal's own
+        // pages: a host that mounts the panels inside its own guarded screens turns it off
         // and still renders the secret panel. Putting the asset behind it would leave exactly
         // that host with a countdown that never starts — the same silent dead surface, moved.
         UiAssets::registerRoute();
@@ -94,7 +94,7 @@ final class SelfServicePortalServiceProvider extends ServiceProvider
     }
 
     /**
-     * Whether the portal also mounts its OWN pages, or only registers the panels.
+     * Whether the portal also mounts its own pages, or only registers the panels.
      *
      * These were one decision until a host tried to embed a panel in a screen it already
      * guards: registering the provider was all-or-nothing, and the all included a second

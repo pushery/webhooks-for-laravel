@@ -22,7 +22,7 @@ use Pushery\Webhooks\Models\WebhookSubscription;
  * acceptable even once the catalog stops declaring it. This is the same care one method
  * earlier, at the load.
  *
- * ⚠️ NON-SCALARS ARE DROPPED, AND THAT IS DELIBERATE RATHER THAN CONVENIENT. `strval()` on a
+ * Non-scalars are dropped, and that is deliberate rather than convenient. `strval()` on a
  * nested array does not fail — it emits an "Array to string conversion" warning and yields the
  * literal string `Array`, which would be written back as if it were an event type. A value that
  * cannot be a name cannot be deselected either, so keeping it would leave the endpoint exactly

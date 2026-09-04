@@ -48,8 +48,28 @@ final readonly class DefaultSsrfGuard implements SsrfGuard
             throw BlockedDestination::insecureScheme();
         }
 
-        $host = strtolower(trim($parts['host'], '[]'));
+        // The trailing root dot is cut here, not in matchesHostList(), and the place matters.
+        // `blocked.example.` and `blocked.example` are the same name to every resolver and two
+        // different strings to an exact comparison, so an operator's blocklist entry was
+        // bypassed by one character. Cutting it at the comparison alone would leave the dot on
+        // $host, which travels into PinnedEndpoint::curlResolveEntries() — and then the
+        // blocklist and the pin would be talking about different names.
+        $host = rtrim(strtolower(trim($parts['host'], '[]')), '.');
+
+        // A host of nothing but dots trims away to nothing. parse_url() accepts it, and an
+        // empty host is not a destination — it belongs with the other malformed URLs rather
+        // than reaching a resolver.
+        if ($host === '') {
+            throw BlockedDestination::malformed($url);
+        }
         $port = $parts['port'] ?? ($scheme === 'http' ? 80 : 443);
+
+        // And the same name has to reach the TRANSPORT, or the pin describes a destination the
+        // request never asks for: PinnedEndpoint names $host in its CURLOPT_RESOLVE entry while
+        // the request goes to ->url, so a URL still carrying the dot is resolved again at
+        // connect time — the TOCTOU rebind window the pin exists to close. Rebuilt only when
+        // the two disagree, so an ordinary URL reaches curl exactly as its caller wrote it.
+        $url = $this->canonicalize($url, $parts, $host);
 
         if ($this->matchesHostList($host, $this->blockedHosts)) {
             throw BlockedDestination::blockedHost($host);
@@ -83,10 +103,47 @@ final readonly class DefaultSsrfGuard implements SsrfGuard
     }
 
     /**
+     * The caller's URL with its host replaced by the canonical form, or unchanged when it
+     * already carries it.
+     *
+     * @param  array<string, int|string>  $parts
+     */
+    private function canonicalize(string $url, array $parts, string $host): string
+    {
+        // An IPv6 literal is the one host that is not written as it is stored: parse_url() keeps
+        // its brackets, PinnedEndpoint's entry does not, and reassembling without them would
+        // produce a URL no parser accepts.
+        $authority = str_contains($host, ':') ? "[{$host}]" : $host;
+
+        if (($parts['host'] ?? null) === $authority) {
+            return $url;
+        }
+
+        $userinfo = '';
+
+        if (isset($parts['user'])) {
+            $userinfo = $parts['user'].(isset($parts['pass']) ? ':'.$parts['pass'] : '').'@';
+        }
+
+        // The port is carried only where the caller wrote one. Adding the default would change
+        // the Host header of every request this branch touches.
+        return strtolower((string) $parts['scheme']).'://'
+            .$userinfo
+            .$authority
+            .(isset($parts['port']) ? ':'.$parts['port'] : '')
+            .($parts['path'] ?? '')
+            .(isset($parts['query']) ? '?'.$parts['query'] : '')
+            .(isset($parts['fragment']) ? '#'.$parts['fragment'] : '');
+    }
+
+    /**
      * @param  list<string>  $list
      */
     private function matchesHostList(string $host, array $list): bool
     {
-        return array_any($list, fn (string $entry): bool => strtolower($entry) === $host);
+        // The same cut on the entries, so an operator may write the name either way. $host has
+        // already been canonicalized by the caller; this is about what the CONFIG is allowed
+        // to contain.
+        return array_any($list, fn (string $entry): bool => rtrim(strtolower($entry), '.') === $host);
     }
 }

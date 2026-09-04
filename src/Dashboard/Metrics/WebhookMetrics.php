@@ -91,10 +91,9 @@ final readonly class WebhookMetrics
         $counts = (array) $this->db()->table(self::HOURLY_VIEW)
             ->whereRaw($ownerSql, $ownerBindings)
             ->where('bucket', '>=', $this->since())
-            // ⚠️ The three mutants mutation testing reports on this list are ORDER swaps, and all
-            // three are equivalent: the row is read back by column NAME below, so a SELECT list
-            // in a different order returns the same KpiSet. There is no assertion that could
-            // tell them apart, and none should be invented.
+            // Reordering this list changes nothing: the row is read back by column name below, so a
+            // SELECT list in a different order returns the same KpiSet. There is no assertion that
+            // could tell two orders apart, and none should be invented.
             //
             // The surface itself is covered, which is the half worth checking before believing
             // the paragraph above: DROP any one of these five aggregates and the metrics suite
@@ -108,14 +107,13 @@ final readonly class WebhookMetrics
             )
             ->first();
 
-        // ⚠️ The five `?? 0` defaults below are UNREACHABLE, and mutation testing reports all
-        // ten mutants on them. The SELECT above wraps every aggregate in coalesce(..., 0), so
-        // the row always carries the key and never carries null — and `??` fires on null.
-        // Measured: all five moved to `?? 1` at once, with the dashboard suites green.
+        // The five `?? 0` defaults below cannot be reached. The SELECT above wraps every aggregate
+        // in coalesce(..., 0), so the row always carries the key and never carries null, and `??`
+        // fires on null. All five moved to `?? 1` at once left the dashboard suites green.
         //
-        // The control is the surface itself, one method up: DROP any one of those five
-        // aggregates from the SELECT and the suite goes red. This is a statement about the
-        // defaults, not about an unmeasured KpiSet.
+        // The control is the surface itself, one method up: drop any one of those five aggregates
+        // from the SELECT and the suite goes red. This is a statement about the defaults, not about
+        // an unmeasured KpiSet.
         //
         // They stay because KpiSet's constructor takes ints and this is the boundary where
         // that becomes true, rather than one call further in.
@@ -150,6 +148,63 @@ final readonly class WebhookMetrics
     }
 
     /**
+     * How far the rollup has fallen behind the rows it summarizes, in seconds — or null when it
+     * has not.
+     *
+     * The dashboard shows two kinds of number on one screen, and only one of them can go stale. The
+     * counts are summed from the materialised rollup, which only `webhooks:refresh-metrics`
+     * advances; the latency percentiles and the endpoint counts are computed live. Let the refresh
+     * stop — a crashed cron, a mutex left behind by a hard kill, a thrown exception — and frozen
+     * delivery counts sit next to current percentiles that make them look plausible. Nothing on the
+     * screen said which was which.
+     *
+     * It is measured against the raw rows rather than against the clock, and that is what keeps it
+     * quiet on a quiet installation. Comparing the newest rollup bucket to `now()` reports every
+     * endpoint that simply had no traffic as stale; comparing it to the newest delivery reports
+     * only the case where rows exist that the rollup has not seen. No traffic, no lag, no warning.
+     *
+     * Null has two causes and they are the same answer: nothing to summarize yet, or the rollup
+     * is level with the rows. Neither is a problem to show anybody.
+     */
+    public function rollupLagSeconds(): ?int
+    {
+        [$ownerSql, $ownerBindings] = $this->tenant->rollupCondition(WebhookConnection::dialect());
+        [$rawSql, $rawBindings] = $this->tenant->condition();
+
+        $newestBucket = $this->db()->table(self::HOURLY_VIEW)
+            ->whereRaw($ownerSql, $ownerBindings)
+            ->max('bucket');
+
+        $newestRow = $this->db()->table($this->sourceTable())
+            ->whereRaw($rawSql, $rawBindings)
+            ->max('created_at');
+
+        if (! is_string($newestRow)) {
+            return null;
+        }
+
+        $rowAt = CarbonImmutable::parse($newestRow);
+
+        // Nothing in the rollup at all while rows exist: the whole lag is the age of the oldest
+        // thing it should have seen, and the newest row is the cheapest honest floor for that.
+        if (! is_string($newestBucket)) {
+            return (int) max(0, CarbonImmutable::now()->diffInSeconds($rowAt, absolute: true));
+        }
+
+        $bucketAt = CarbonImmutable::parse($newestBucket);
+
+        // The rollup buckets by hour, so it is up to an hour behind the newest row BY DESIGN.
+        // Reporting that as lag would make a healthy installation warn once an hour.
+        $lag = $rowAt->diffInSeconds($bucketAt->addHour(), absolute: false);
+
+        if ($lag < 0) {
+            return (int) abs($lag);
+        }
+
+        return null;
+    }
+
+    /**
      * The most frequent event types in the window, busiest first.
      *
      * @return Collection<int, stdClass>
@@ -180,6 +235,10 @@ final readonly class WebhookMetrics
 
         return $this->sourceModel()
             ->newQuery()
+            // The endpoint each row's replay button names, fetched once for the panel rather
+            // than once per row. Named columns only: a subscription carries its signing secret,
+            // and nothing on this strip needs it.
+            ->with(['subscription:id,name,url'])
             ->whereRaw($ownerSql, $ownerBindings)
             // The window the caller already asked for. Every other query here carries it;
             // this one did not, so a panel named "recent" would sort the owner's WHOLE

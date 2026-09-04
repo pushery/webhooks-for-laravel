@@ -122,12 +122,56 @@ final class WebhooksServiceProvider extends ServiceProvider
                 return;
             }
 
-            $schedule->command('webhooks:partition-maintenance')->daily();
+            // The only scheduled command in this package that issues DDL — CREATE TABLE,
+            // CREATE TABLE ... PARTITION OF, ATTACH PARTITION, DROP TABLE — and it was the only
+            // one without an overlap guard, while the three below it all had one.
+            //
+            // This line used to name `DETACH PARTITION` as well, and that is the one piece of DDL
+            // the command deliberately does not issue.
+            // `PartitionManager::drainDefaultPartitionInto()` explains at length why: a
+            // non-concurrent DETACH takes ACCESS EXCLUSIVE on the parent and holds it to commit,
+            // which would stop the entire outbound delivery path for the length of the move. The
+            // drain is built the way it is precisely to avoid it. Naming it here described the
+            // shape that was rejected, so a reader weighing the lock cost of this schedule entry
+            // weighed the wrong statement.
+            //
+            // The exposure is narrow and real. ensureMonthlyPartition() short-circuits on
+            // partitionExists() before any DDL, so a steady-state daily run creates nothing; the
+            // window is the once-a-month CREATE, where PostgreSQL's IF NOT EXISTS is not
+            // race-free and two schedulers can collide on pg_class. On MySQL the prune is an
+            // unbounded chunked-delete loop instead, so two overlapping runs simply double the
+            // delete load on the table everything else is writing to.
+            //
+            // onOneServer() is the half that matters for a cluster — the Laravel scheduler fires
+            // on every app server, so without it the command runs N times in parallel by design.
+            // withoutOverlapping() is the half that matters for a long first run over a backlog,
+            // where tomorrow's run would start on top of today's. The expiry is generous for the
+            // same reason: a lock left behind by a killed run must not silence the command for
+            // ever, and a maintenance pass that has not finished in six hours has a problem the
+            // next run will not fix by joining in.
+            //
+            // Neither reaches the DB-per-tenant host that turns the package schedule off and
+            // drives the command from its own tenant loop — there is no scheduler lock to take.
+            // That host owns its own serialization, which is the trade it made by opting out.
+            $schedule->command('webhooks:partition-maintenance')
+                ->daily()
+                ->withoutOverlapping(360)
+                ->onOneServer();
 
             // A delivery revokes its own endpoint's expired secret, so this only has to
             // catch the endpoints that go quiet: without it, an endpoint that stops
             // sending the day it rotates would keep the old secret valid for ever.
-            $schedule->command('webhooks:revoke-rotated-secrets')->hourly()->withoutOverlapping();
+            //
+            // The expiry is explicit, and the default is the reason. Laravel's is 1440 minutes, a
+            // full day. releaseOnTerminationSignals covers SIGTERM and SIGINT, so an ordinary
+            // deploy releases the lock; a SIGKILL, an OOM kill or a hard container stop does not.
+            // After one of those, this hourly command is skipped for up to 24 hours, and
+            // withoutOverlapping is implemented as skip() — a skipped run is not a failure, so
+            // nothing anywhere turns red.
+            //
+            // 55 minutes: comfortably past any real run of this command, and under the hour that
+            // separates two of them, so a stale lock costs exactly one skipped run rather than a day.
+            $schedule->command('webhooks:revoke-rotated-secrets')->hourly()->withoutOverlapping(55);
 
             // A finished delivery only refreshes ITS OWN endpoint's cached health, so an
             // endpoint whose traffic dries up would keep the last score a delivery left
@@ -136,7 +180,10 @@ final class WebhooksServiceProvider extends ServiceProvider
             // endpoint decays to its true band. Off when health scoring is off — nothing
             // caches a score then, so there is nothing to keep fresh.
             if (Config::boolean('webhooks.platform.health.enabled', false)) {
-                $event = $schedule->command('webhooks:refresh-endpoint-health')->withoutOverlapping();
+                // 30 minutes, for the reason spelled out above the hourly command: twice the
+                // default fifteen-minute cadence, so a lock left by a hard kill costs one or two
+                // skipped sweeps instead of a day of frozen health scores.
+                $event = $schedule->command('webhooks:refresh-endpoint-health')->withoutOverlapping(30);
 
                 // An unknown cadence token falls back to fifteen minutes rather than
                 // silently never running.
@@ -170,20 +217,20 @@ final class WebhooksServiceProvider extends ServiceProvider
      * Say so when `webhooks.platform.owner_key_type` and the `owner_id` column it claims to
      * describe disagree — at the end of the migration that could have caused it.
      *
-     * ⚠️ THE HOOK IS THE MIGRATOR'S EVENT, NOT THIS PACKAGE'S MIGRATION FILES, AND THAT IS
-     * THE WHOLE POINT. The contradiction arises exactly when a host FORKS the two
-     * create-table migrations to partition differently or add its own indexes — an expected
-     * thing to do, not an abuse. In that installation this package's migration files are not
-     * in the tree at all, so a guard written inside them would never run on the one host that
-     * needs it. A listener on MigrationsEnded hears every migration run, forked or not.
+     * The hook is the migrator's event rather than this package's migration files, and that is the
+     * whole point. The contradiction arises exactly when a host forks the two create-table
+     * migrations to partition differently or add its own indexes, which is an expected thing to do
+     * and not an abuse. In that installation this package's migration files are not in the tree
+     * at all, so a guard written inside them would never run on the one host that needs it. A
+     * listener on MigrationsEnded hears every migration run, forked or not.
      *
-     * A LOG LINE RATHER THAN CONSOLE OUTPUT, and the reason is worth stating because the
-     * console would obviously read better. Illuminate\Console\Events\CommandFinished carries
-     * an output handle and would have been the natural hook — but the framework deliberately
-     * does not dispatch it under tests (Kernel::__construct skips rerouteSymfonyCommandEvents
-     * when runningUnitTests), so the branch could never be proven by an arm. The Migrator's
-     * own output handle has no public getter. An unprovable guard is one that rots silently,
-     * which is the same failure class this check exists to find. The place a reader is told
+     * It writes a log line rather than console output, and the reason is worth stating because the
+     * console would obviously read better. Illuminate\Console\Events\CommandFinished carries an
+     * output handle and would have been the natural hook, but the framework deliberately does not
+     * dispatch it under tests (Kernel::__construct skips rerouteSymfonyCommandEvents when
+     * runningUnitTests), so the branch could never be proven by an arm. The Migrator's own output
+     * handle has no public getter. An unprovable guard is one that rots silently, which is the same
+     * failure class this check exists to find. The place a reader is told
      * on screen is `webhooks:preflight`, which fails outright.
      *
      * It reports and never fails: the migration's exit code is untouched, so a deploy is
@@ -238,10 +285,10 @@ final class WebhooksServiceProvider extends ServiceProvider
         // Every customization group also answers to the umbrella tag `webhooks`, so
         // `vendor:publish --tag=webhooks` hands a host everything it may edit in one command.
         //
-        // The umbrella covers config, views and lang and DELIBERATELY STOPS THERE. Two groups
+        // The umbrella covers config, views and lang and deliberately stops there. Two groups
         // are held out, and neither is an oversight:
         //
-        //  - The migration tags. A published migration RUNS (see registerPublishing's note
+        //  - The migration tags. A published migration runs (see registerPublishing's note
         //    below), so sweeping them into an "everything" tag would create the client,
         //    server and dashboard tables in a send-only host that never switched those layers
         //    on. Splitting them by layer exists precisely to prevent that; an umbrella over
@@ -270,10 +317,25 @@ final class WebhooksServiceProvider extends ServiceProvider
         // The tags are split by layer because a published migration RUNS: handing a
         // send-only consumer the client and dashboard migrations would create tables for
         // layers they never switched on.
-        $this->publishes($this->migrationsIn(), 'webhooks-migrations');
-        $this->publishes($this->migrationsIn('client'), 'webhooks-client-migrations');
-        $this->publishes($this->migrationsIn('server'), 'webhooks-server-migrations');
-        $this->publishes($this->migrationsIn('dashboard'), 'webhooks-dashboard-migrations');
+        // publishesMigrations(), not publishes(). Since Laravel 11 `vendor:publish` re-dates a
+        // published migration to the current timestamp, but only for paths registered through
+        // publishesMigrations(), because that is the sole writer of the list VendorPublishCommand
+        // consults. With the plain call the setting that switches it on
+        // (database.migrations.update_date_on_publish, true in the shipped skeleton) had nothing to
+        // act on for this package.
+        //
+        // What a host got instead were files named 0001_01_01_* in their own database/migrations
+        // — the exact class Laravel uses for its own base migrations, so they sort before every
+        // application migration in a project upgraded from Laravel 10 and read as though the
+        // framework put them there.
+        //
+        // Everything else is unchanged: publishesMigrations() calls publishes() with the same
+        // tags, so the four documented tag names and the per-layer split stay exactly as they
+        // are. Only the re-dating is added.
+        $this->publishesMigrations($this->migrationsIn(), 'webhooks-migrations');
+        $this->publishesMigrations($this->migrationsIn('client'), 'webhooks-client-migrations');
+        $this->publishesMigrations($this->migrationsIn('server'), 'webhooks-server-migrations');
+        $this->publishesMigrations($this->migrationsIn('dashboard'), 'webhooks-dashboard-migrations');
 
         $this->publishes([
             __DIR__.'/../resources/views' => resource_path('views/vendor/webhooks'),

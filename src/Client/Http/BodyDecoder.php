@@ -41,7 +41,7 @@ final class BodyDecoder
     private const string FORM_MEDIA_TYPE = 'application/x-www-form-urlencoded';
 
     /**
-     * Whitespace, minus the NUL byte that {@see trim()} strips by default. A body of NUL bytes
+     * Whitespace, minus the NUL byte that {@see \trim()} strips by default. A body of NUL bytes
      * is bytes: reporting it as `None` would claim the producer sent nothing.
      */
     private const string BLANK = " \t\n\r\x0B";
@@ -56,12 +56,12 @@ final class BodyDecoder
      * payload into a jsonb column of its own hit the refusal the package already knew about
      * ({@see PayloadSanitizer} for why jsonb refuses it at all).
      *
-     * ⚠️ THE DECODED ARRAY IS SCRUBBED, NEVER THE RAW BODY, and the difference is a false claim
-     * rather than a nicety. `BLANK` below deliberately excludes NUL so that a body of NUL bytes
-     * is reported as unread rather than as `None`; scrubbing the bytes first would empty such a
-     * body and produce exactly the "the producer sent nothing" claim that exclusion exists to
-     * prevent. Scrubbing after the reading also leaves the format decision, the stored raw body
-     * and its SHA-256 untouched, so the exact received bytes stay beside the cleaned view.
+     * The decoded array is scrubbed, never the raw body, and the difference is a false claim rather
+     * than a nicety. `BLANK` below deliberately excludes NUL so that a body of NUL bytes is
+     * reported as unread rather than as `None`; scrubbing the bytes first would empty such a body
+     * and produce exactly the "the producer sent nothing" claim that exclusion exists to prevent.
+     * Scrubbing after the reading also leaves the format decision, the stored raw body and its
+     * SHA-256 untouched, so the exact received bytes stay beside the cleaned view.
      *
      * @return array{0: PayloadFormat, 1: array<array-key, mixed>}
      */
@@ -158,11 +158,11 @@ final class BodyDecoder
             return null;
         }
 
-        // The limit is 2 rather than a bare `explode`, because only the part before the first
-        // `;` is wanted and splitting the rest is work nobody reads. Raising it is EQUIVALENT
-        // and reported as a survivor every run: `[0]` is the same at any limit above 1
-        // (measured across five inputs). Lowering it to 1 is not — that keeps the whole header
-        // including its parameters — and BodyDecoderTest holds that direction.
+        // The limit is 2 rather than a bare `explode`, because only the part before the first `;`
+        // is wanted and splitting the rest is work nobody reads. Raising it changes nothing: `[0]`
+        // is the same at any limit above 1, measured across five inputs. Lowering it to 1 is not —
+        // that keeps the whole header including its parameters — and BodyDecoderTest holds that
+        // direction.
         return strtolower(trim(explode(';', $contentType, 2)[0]));
     }
 

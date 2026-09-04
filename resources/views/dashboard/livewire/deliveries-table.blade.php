@@ -5,6 +5,19 @@
      inline replay re-queues the delivery. Empty results render the WireKit empty state;
      the control below the table is the package's own pagination view. --}}
 <div class="wh-dash-deliveries" wire:key="deliveries-table">
+
+    {{-- Permanently in the DOM, so a filter change has something to speak THROUGH: a region
+         inserted together with its own text is not announced by most screen readers. The
+         wire:key carries the count, so Livewire's morph sees a changed node rather than an
+         identical one it can leave alone -- the same detail the transform editor's preview
+         region already depends on.
+
+         A live-bound filter swaps the table underneath and says nothing on its own. The count
+         is in the document, in the pagination summary, but as a plain paragraph outside any
+         live region: a reader has to travel back down and read to learn whether the change
+         produced three rows, two hundred, or none. And the empty state REPLACES the table, so a
+         virtual cursor that was standing in it loses its position silently (WCAG 4.1.3). --}}
+    <x-wirekit::visually-hidden role="status" aria-live="polite" wire:key="wh-filtered-{{ $deliveries->total() }}">{{ trans_choice('webhooks::pagination.filtered', $deliveries->total()) }}</x-wirekit::visually-hidden>
     <div class="mb-[var(--padding-wk-y-md)] flex flex-wrap items-end gap-[var(--padding-wk-x-md)]">
         <x-wirekit::select name="status" wire:model.live="status" :label="__('webhooks::dashboard.filters.status')" hideLabel>
             <option value="">{{ __('webhooks::dashboard.filters.all_statuses') }}</option>
@@ -12,6 +25,7 @@
             <option value="succeeded">{{ __('webhooks::dashboard.status_options.succeeded') }}</option>
             <option value="failed">{{ __('webhooks::dashboard.status_options.failed') }}</option>
             <option value="exhausted">{{ __('webhooks::dashboard.status_options.exhausted') }}</option>
+            <option value="refused">{{ __('webhooks::dashboard.status_options.refused') }}</option>
         </x-wirekit::select>
 
         <x-wirekit::input
@@ -51,11 +65,7 @@
             </x-wirekit::table.head>
             <x-wirekit::table.body>
                 @foreach ($deliveries as $delivery)
-                    @php($intent = match ($delivery->status->value) {
-                        'succeeded' => 'success',
-                        'failed', 'exhausted' => 'danger',
-                        default => 'warning',
-                    })
+                    @php($intent = $delivery->status->intent())
                     @php($when = \Pushery\Webhooks\Dashboard\DashboardTimezone::apply($delivery->created_at)->settings(['locale' => app()->getLocale()]))
                     <x-wirekit::table.row wire:key="dt-{{ $delivery->id }}">
                         <x-wirekit::table.th headerScope="row">
@@ -67,7 +77,7 @@
                                  surface, and every row would then be a row of buttons.
                                  Said out loud because a silent escape in a file that uses the
                                  library twenty lines further down reads as an oversight. --}}
-                            <button type="button" wire:click="viewDelivery('{{ $delivery->id }}')" class="cursor-pointer text-[color:var(--color-wk-accent)]" aria-label="{{ __('webhooks::dashboard.a11y.view_delivery', ['event' => $delivery->event_type]) }}">
+                            <button type="button" wire:click="viewDelivery('{{ $delivery->id }}')" class="cursor-pointer text-[color:var(--color-wk-accent)]" aria-label="{{ __('webhooks::dashboard.a11y.view_delivery', ['event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat(__('webhooks::dashboard.formats.precise'))]) }}">
                                 {{ $delivery->event_type }}
                             </button>
                         </x-wirekit::table.th>
@@ -82,8 +92,17 @@
                                  in the reader's locale and in the dashboard's display zone,
                                  never the raw stored timestamp. The datetime attribute stays
                                  ISO-8601 with its own offset, which is what a machine reads and
-                                 what a zone change must not reshape. --}}
-                            <time datetime="{{ $delivery->created_at->toIso8601String() }}" title="{{ $when->isoFormat('LLL') }}">{{ $when->diffForHumans() }}</time>
+                                 what a zone change must not reshape.
+
+                                 Through `formats.absolute` rather than a literal `LLL`. The two
+                                 accessible names on this very row already read that key, so the
+                                 tooltip was the one value on the row rendered by a different rule —
+                                 without the `z` its own lang file argues for at length, and out of
+                                 reach of the host override that key documents. On a dashboard with
+                                 `dashboard.timezone` set, a sighted operator hovering this column
+                                 saw a time with nothing saying which clock it was, while a
+                                 screen-reader user on the same row was told. --}}
+                            <time datetime="{{ $delivery->created_at->toIso8601String() }}" title="{{ $when->isoFormat(__('webhooks::dashboard.formats.absolute')) }}">{{ $when->diffForHumans() }}</time>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td align="right">
                             {{-- Disabled while a replay is in flight, so a double-click cannot
@@ -96,7 +115,7 @@
                                 wire:click="redeliver('{{ $delivery->id }}')"
                                 wire:loading.attr="disabled"
                                 wire:target="redeliver"
-                                :aria-label="__('webhooks::dashboard.a11y.replay_delivery', ['event' => $delivery->event_type])"
+                                :aria-label="__('webhooks::dashboard.a11y.replay_delivery', ['label' => __('webhooks::dashboard.table.replay'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat(__('webhooks::dashboard.formats.precise'))])"
                             >{{ __('webhooks::dashboard.table.replay') }}</x-wirekit::button>
                         </x-wirekit::table.td>
                     </x-wirekit::table.row>

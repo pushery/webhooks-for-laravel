@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Server\Backoff;
 
+use Pushery\Webhooks\Server\Jobs\CallWebhookJob;
+
 /**
  * Exponential backoff with FULL jitter: the delay before retry N is a uniform
  * random value in `[0, min(cap, base * 2^(N-1))]`. Full jitter is the
@@ -19,6 +21,11 @@ namespace Pushery\Webhooks\Server\Backoff;
  * hint exceeds that cap is the job's decision, not the schedule's
  * ({@see CallWebhookJob}): it waits the cap without charging
  * the attempt to the retry budget.
+ *
+ * A Retry-After cap of ZERO switches the hint off rather than shortening it to nothing: the
+ * delay comes from the jitter schedule as if the endpoint had sent no header. That is what the
+ * option means, and it is the only reading that is not worse than not having the feature —
+ * "wait zero seconds" would answer `Retry-After: 60` with an immediate retry.
  */
 final readonly class ExponentialWithJitter implements BackoffStrategy
 {
@@ -54,17 +61,26 @@ final readonly class ExponentialWithJitter implements BackoffStrategy
      */
     public function withRetryAfterCap(int $retryAfterCapSeconds): self
     {
-        // Lowering this floor is EQUIVALENT and reported every run: delayAfterAttempt() reads
-        // the cap through `max(0, min($cap, $hint))`, so a stored -1 and a stored 0 both answer
-        // 0. Raising it is not equivalent, and the arm distinguishing a zero cap from a
-        // one-second one holds that direction — the two floors on this class are deliberately
-        // different, and that is the one worth guarding.
+        // Lowering this floor is EQUIVALENT and reported every run: a stored -1 and a stored 0
+        // both mean "no cap to honour", so both fall through to the jitter schedule. Raising it
+        // is not equivalent, and the arm distinguishing a zero cap from a one-second one holds
+        // that direction — the two floors on this class are deliberately different, and that is
+        // the one worth guarding.
         return new self($this->baseSeconds, $this->capSeconds, max(0, $retryAfterCapSeconds));
     }
 
     public function delayAfterAttempt(int $attempt, ?int $retryAfterSeconds = null): int
     {
-        if ($retryAfterSeconds !== null) {
+        // A cap of zero means IGNORE the hint and use our own schedule — the reading the option
+        // is documented with, and the only one that is not strictly worse than the schedule it
+        // replaces. Read as "wait zero seconds", it turns `Retry-After: 60` into an immediate
+        // retry against the endpoint that just asked for a minute of quiet, which is the one
+        // thing the whole feature exists to prevent.
+        //
+        // Zero is not floored to one the way the base and the jitter cap are, because zero is a
+        // legitimate choice here rather than a misconfiguration; what it configures away is the
+        // hint, not the wait.
+        if ($retryAfterSeconds !== null && $this->retryAfterCapSeconds > 0) {
             return max(0, min($this->retryAfterCapSeconds, $retryAfterSeconds));
         }
 

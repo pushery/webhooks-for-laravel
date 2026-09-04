@@ -13,14 +13,20 @@
     wire:poll.{{ config('webhooks.dashboard.poll_interval', '30s') }}
     wire:key="kpi-cards"
 >
+    {{-- Visually hidden, and a heading rather than a label: the five tiles are a section of
+         the page like the panels beneath them, and without one they hang between two headings
+         with nothing naming them in a heading list. Level 2 puts them on the same rung as
+         every other panel -- the page is the only level 1. --}}
+    <x-wirekit::heading :level="2" size="sm" class="sr-only">{{ __('webhooks::dashboard.kpis.title') }}</x-wirekit::heading>
+
     <x-wirekit::stats cols="5">
-        <x-wirekit::stat :label="__('webhooks::dashboard.kpis.total')" :value="number_format($metrics->total)" intent="neutral" />
+        <x-wirekit::stat :label="__('webhooks::dashboard.kpis.total')" :value="\Pushery\Webhooks\Support\LocalizedNumber::format($metrics->total)" intent="neutral" />
 
-        <x-wirekit::stat :label="__('webhooks::dashboard.kpis.successful')" :value="number_format($metrics->delivered)" intent="success" />
+        <x-wirekit::stat :label="__('webhooks::dashboard.kpis.successful')" :value="\Pushery\Webhooks\Support\LocalizedNumber::format($metrics->delivered)" intent="success" />
 
-        <x-wirekit::stat :label="__('webhooks::dashboard.kpis.failed')" :value="number_format($metrics->failed)" intent="danger" />
+        <x-wirekit::stat :label="__('webhooks::dashboard.kpis.failed')" :value="\Pushery\Webhooks\Support\LocalizedNumber::format($metrics->failed)" intent="danger" />
 
-        <x-wirekit::stat :label="__('webhooks::dashboard.kpis.pending')" :value="number_format($metrics->pending)" intent="warning" />
+        <x-wirekit::stat :label="__('webhooks::dashboard.kpis.pending')" :value="\Pushery\Webhooks\Support\LocalizedNumber::format($metrics->pending)" intent="warning" />
 
         <x-wirekit::stat
             :label="__('webhooks::dashboard.kpis.retry_rate')"

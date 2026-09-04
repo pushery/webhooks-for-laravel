@@ -6,6 +6,7 @@ namespace Pushery\Webhooks\Core\Ssrf;
 
 use Pushery\Webhooks\Core\Http\Exceptions\BlockedDestination;
 use Pushery\Webhooks\Core\Http\Exceptions\HostUnresolvable;
+use Pushery\Webhooks\Core\Http\Exceptions\NonRetryable;
 
 /**
  * Vets an attacker-influenced webhook URL and returns a {@see PinnedEndpoint}

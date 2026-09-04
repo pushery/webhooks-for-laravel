@@ -26,7 +26,13 @@
             :description="__('webhooks::self-service.empty.no_endpoints.description')"
         />
     @else
+        {{-- The focus target of the delete dialog below. Both halves are needed: without
+             tabindex="-1" the table cannot take focus programmatically, and focus-return-to
+             then points at an element that refuses it — which behaves exactly like declaring
+             nothing at all. --}}
         <x-wirekit::table
+            id="wh-portal-endpoints-table"
+            tabindex="-1"
             hoverable
             :aria-label="__('webhooks::self-service.a11y.endpoints_table')"
             :table-label="__('webhooks::self-service.a11y.endpoints_table')"
@@ -75,7 +81,14 @@
                                 :intent="$endpoint->is_active ? 'success' : 'neutral'"
                                 wire:click="toggle({{ $endpoint->id }})"
                                 :aria-pressed="$endpoint->is_active ? 'true' : 'false'"
-                                :aria-label="__('webhooks::self-service.a11y.toggle_active', ['url' => $endpoint->url])"
+                                :aria-label="__('webhooks::self-service.a11y.toggle_active', [
+                                    // The visible word is interpolated rather than described,
+                                    // so the accessible name CONTAINS it verbatim in all seven
+                                    // languages (WCAG 2.5.3) and cannot drift when one of them
+                                    // is retranslated. Voice control matches what is on screen.
+                                    'state' => $endpoint->is_active ? __('webhooks::self-service.list.active') : __('webhooks::self-service.list.disabled'),
+                                    'url' => $endpoint->url,
+                                ])"
                             >{{ $endpoint->is_active ? __('webhooks::self-service.list.active') : __('webhooks::self-service.list.disabled') }}</x-wirekit::button>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td align="right">
@@ -83,7 +96,7 @@
                                 {{-- First, and the order is the point: this is the action a
                                      tenant reaches for most and the only one that costs
                                      nothing. Destructive stays last. It carries a loading
-                                     state the neighbours do not, because it is the only one
+                                     state the neighbors do not, because it is the only one
                                      that waits on a network round trip. --}}
                                 <x-wirekit::button
                                     size="sm"
@@ -91,7 +104,7 @@
                                     wire:click="ping({{ $endpoint->id }})"
                                     wire:loading.attr="disabled"
                                     wire:target="ping"
-                                    :aria-label="__('webhooks::self-service.a11y.ping_endpoint', ['url' => $endpoint->url])"
+                                    :aria-label="__('webhooks::self-service.a11y.ping_endpoint', ['label' => __('webhooks::self-service.list.ping'), 'url' => $endpoint->url])"
                                 >{{ __('webhooks::self-service.list.ping') }}</x-wirekit::button>
                                 <x-wirekit::button
                                     size="sm"
@@ -116,12 +129,30 @@
                                         surface="ghost"
                                         :href="route('webhooks.self-service.transform', $endpoint->id)"
                                         wire:navigate
-                                        :aria-label="__('webhooks::self-service.a11y.edit_transform', ['url' => $endpoint->url])"
+                                        :aria-label="__('webhooks::self-service.a11y.edit_transform', ['label' => __('webhooks::self-service.list.transform'), 'url' => $endpoint->url])"
                                     >{{ __('webhooks::self-service.list.transform') }}</x-wirekit::button>
                                 @endif
 
                                 @if ($allowDelete)
-                                    <x-wirekit::alert-dialog :name="'delete-endpoint-' . $endpoint->id">
+                                    {{-- focus-return-to, because this is the dialog whose trigger
+                                         does not survive its own action. A dialog normally hands
+                                         focus back to the button that opened it; destroy() removes
+                                         the row and calls resetPage(), so that button is gone and
+                                         focus falls to <body> — a keyboard or screen-reader user is
+                                         returned to the top of the document right after confirming
+                                         something irreversible. The table survives and is where the
+                                         row was.
+
+                                         The operator stub beside this one already solves it and
+                                         explains why; this is the surface that ships to tenants and
+                                         needs no publishing, so it is the one that had to be right
+                                         first. Note the counter-case there: the rotate dialog
+                                         deliberately declares no target, because its row survives
+                                         and focus returns to the trigger by itself. --}}
+                                    <x-wirekit::alert-dialog
+                                        :name="'delete-endpoint-' . $endpoint->id"
+                                        focus-return-to="#wh-portal-endpoints-table"
+                                    >
                                         <x-slot:trigger>
                                             <x-wirekit::button
                                                 size="sm"

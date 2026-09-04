@@ -11,34 +11,33 @@ use Pushery\Webhooks\Support\Http\UiScriptController;
  * The package's own front-end asset: one small JavaScript file, served from the application's
  * own origin by a route this package registers.
  *
- * ⚠️ A FILE FROM 'self', NOT AN INLINE SCRIPT, AND THE DIFFERENCE IS THE WHOLE POINT. The two
- * Alpine factories these screens mount used to be registered by an inline <script> inside
- * each view's @assets block, with an OPTIONAL CSP nonce. On a host running a strict,
- * nonce-less policy — `script-src 'self'`, which an application is entitled to choose and
- * which the package must not ask it to loosen — the browser refuses to run it. Nothing
- * throws, nothing reaches a server log, and a CSP audit reads the expression as perfectly
- * valid: the panel is simply dead. That was the THIRD distinct cause of the same dead
- * surface, which is why the answer chosen here is the one with no policy dependency left
- * rather than another correction inside the inline path.
+ * A file from 'self' rather than an inline script, and the difference is the whole point. The two
+ * Alpine factories these screens mount used to be registered by an inline <script> inside each
+ * view's @assets block, with an optional CSP nonce. On a host running a strict, nonce-less policy —
+ * `script-src 'self'`, which an application is entitled to choose and which the package must not
+ * ask it to loosen — the browser refuses to run it. Nothing throws, nothing reaches a server log,
+ * and a CSP audit reads the expression as perfectly valid: the panel is simply dead. That was the
+ * third distinct cause of the same dead surface, which is why the answer chosen here is the one
+ * with no policy dependency left, instead of another correction inside the inline path.
  *
- * SERVED, NOT PUBLISHED. A publishable asset would work only for a host that remembers to run
- * `vendor:publish` — and to run it AGAIN after every upgrade. The failure of forgetting is the
- * same silent dead panel this replaces, so the file is served instead: it is always present,
+ * It is served rather than published. A publishable asset would work only for a host that remembers
+ * to run `vendor:publish` — and to run it again after every upgrade. The failure of forgetting is
+ * the same silent dead panel this replaces, so the file is served instead: it is always present,
  * always the version the installed package ships, and needs nothing from the host.
  *
- * NO MIDDLEWARE, AND THAT IS DELIBERATE. The response is a static file with no user data in
- * it. Putting it behind the host's auth stack would make it a session-bearing request per page
- * load, and behind the dashboard's gate it would 403 for exactly the readers who are allowed
- * to see the screen but arrive before their session is established.
+ * No middleware, and that is deliberate. The response is a static file with no user data in it.
+ * Putting it behind the host's auth stack would make it a session-bearing request per page load,
+ * and behind the dashboard's gate it would 403 for exactly the readers who are allowed to see the
+ * screen but arrive before their session is established.
  *
- * ⚠️ url() RESOLVES THROUGH route() AND IS ALLOWED TO THROW. A host upgrading with a STALE
- * route cache has no such route, and route() then raises RouteNotFoundException — a 500 on the
- * dashboard until `route:cache` is rebuilt. That is the correct failure and it is not to be
- * softened: the obvious fix, falling back to url(self::URI), emits a path that the cached
- * route table does not serve, so the browser gets a 404 for the script and the panel is dead
- * again WITHOUT SAYING SO. Silent death is the exact defect this whole seam replaces, three
- * times over. Every package that adds a route carries the same contract, a deploy that skips
- * its own cache rebuild is already broken, and the exception names the route it could not find.
+ * url() resolves through route() and is allowed to throw. A host upgrading with a stale route cache
+ * has no such route, and route() then raises RouteNotFoundException — a 500 on the dashboard until
+ * `route:cache` is rebuilt. That is the correct failure and it is not to be softened: the obvious
+ * fix, falling back to url(self::URI), emits a path that the cached route table does not serve, so
+ * the browser gets a 404 for the script and the panel is dead again without saying so. Silent death
+ * is the exact defect this whole seam replaces, three times over. Every package that adds a route
+ * carries the same contract, a deploy that skips its own cache rebuild is already broken, and the
+ * exception names the route it could not find.
  *
  * @internal
  */

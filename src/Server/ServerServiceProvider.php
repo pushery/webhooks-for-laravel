@@ -21,6 +21,8 @@ use Pushery\Webhooks\Server\Signing\SecretResolver;
 use Pushery\Webhooks\Server\Telemetry\NullSpanEmitter;
 use Pushery\Webhooks\Server\Telemetry\RecordDeliverySpan;
 use Pushery\Webhooks\Server\Telemetry\SpanEmitter;
+use Pushery\Webhooks\Support\MergesPackageConfig;
+use Pushery\Webhooks\Support\Settings;
 
 /**
  * Registers the Server delivery layer: the by-reference secret resolver and the
@@ -30,6 +32,8 @@ use Pushery\Webhooks\Server\Telemetry\SpanEmitter;
  */
 final class ServerServiceProvider extends ServiceProvider
 {
+    use MergesPackageConfig;
+
     /**
      * Whether the standalone delivery-log migration is registered automatically when
      * persistence is enabled. Disable with self::ignoreMigrations() to publish and
@@ -45,6 +49,15 @@ final class ServerServiceProvider extends ServiceProvider
     #[Override]
     public function register(): void
     {
+        // This layer did not merge, while the trait's docblock named it among the ones that do.
+        // Nothing broke, because every webhooks.server.* read carries an inline default that
+        // matches the shipped file — and a discovered install registers Core alongside this one
+        // anyway, so the merge arrived from there. What it cost was the claim: a host that mounts
+        // the Server layer alone, under dont-discover, had no shipped configuration at all, and
+        // the first server key read without an inline default would have come back null with
+        // nothing turning red.
+        $this->mergePackageConfig();
+
         $this->app->singleton(SecretResolver::class, EncryptedSecretResolver::class);
 
         // The engine's own gate lets every queued delivery through: a consumer driving
@@ -55,7 +68,7 @@ final class ServerServiceProvider extends ServiceProvider
 
         $this->app->singleton(ResponseClassifier::class, fn (): ResponseClassifier => new ResponseClassifier(
             retryOn4xx: ! Config::boolean('webhooks.server.no_retry_on_4xx', true),
-            retryable4xx: $this->intList('webhooks.server.retryable_4xx', [408, 425, 429]),
+            retryable4xx: new Settings()->retryable4xx(),
         ));
 
         // The tracing seam defaults to a no-op emitter, so nothing is emitted and no
@@ -125,14 +138,5 @@ final class ServerServiceProvider extends ServiceProvider
     public function persistsDeliveries(): bool
     {
         return Config::boolean('webhooks.server.persistence.enabled', false);
-    }
-
-    /**
-     * @param  list<int>  $default
-     * @return list<int>
-     */
-    private function intList(string $key, array $default): array
-    {
-        return array_values(array_filter(Config::array($key, $default), is_int(...)));
     }
 }

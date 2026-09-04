@@ -19,6 +19,7 @@ return [
     ],
 
     'kpis' => [
+        'title' => 'In één oogopslag',
         'total' => 'Totaal verzonden webhooks',
         'successful' => 'Geslaagd',
         'failed' => 'Mislukt',
@@ -31,6 +32,11 @@ return [
     'formats' => [
         'hour_bucket' => 'j M H:i',
         'absolute' => 'LLL z',
+
+        // 'precise' is a second pattern because 'absolute' cannot separate two rows and the
+        // accessible names need it to. lang/en/dashboard.php states the case in full, including
+        // what it still does not cover.
+        'precise' => 'LL LTS z',
     ],
 
     'api' => [
@@ -87,11 +93,16 @@ return [
     // Badge labels for the stored DeliveryStatus values. The key is the persisted
     // value and is never translated; only the label a reader sees is. Lowercase, as
     // in the original design.
+    // Shown when the rollup the counts come from has fallen behind the rows it summarizes --
+    // twice the configured refresh cadence or more, so a run merely in progress never triggers it.
+    'rollup_stale' => 'De bezorgtellingen op deze pagina lopen :minutes minuten achter. Ze komen uit een rollup die `webhooks:refresh-metrics` bijwerkt; de latencies ernaast zijn live, dus de twee spreken elkaar tegen tot dat commando weer draait.',
+
     'status' => [
         'pending' => 'in afwachting',
         'succeeded' => 'geslaagd',
         'failed' => 'mislukt',
         'exhausted' => 'uitgeput',
+        'refused' => 'geweigerd',
     ],
 
     // The same statuses as filter options, where the surrounding form wants them
@@ -101,6 +112,7 @@ return [
         'succeeded' => 'Geslaagd',
         'failed' => 'Mislukt',
         'exhausted' => 'Uitgeput',
+        'refused' => 'Geweigerd',
     ],
 
     'drawer' => [
@@ -160,12 +172,22 @@ return [
         'sections' => 'Dashboardsecties',
         'retry_rate' => 'Herhaalpercentage',
         'deliveries_per_hour' => 'Leveringen per uur',
-        'hour_summary' => ':hour: :total totaal, :delivered afgeleverd, :pending in afwachting, :failed mislukt',
+        'hour_summary' => [
+            // Four choice fragments rather than one sentence with four numbers in it: agreement is
+            // decided by the number, `trans_choice` takes one count per string, and there are four.
+            // lang/en/dashboard.php states the case in full, including why English, German and
+            // Dutch carry identical forms on both sides.
+            'total' => '{0} :count totaal|{1} :count totaal|[2,*] :count totaal',
+            'delivered' => '{0} :count afgeleverd|{1} :count afgeleverd|[2,*] :count afgeleverd',
+            'pending' => '{0} :count in afwachting|{1} :count in afwachting|[2,*] :count in afwachting',
+            'failed' => '{0} :count mislukt|{1} :count mislukt|[2,*] :count mislukt',
+        ],
         'latency_trend' => 'P95-latentietrend per uur',
+        'latency_bar' => ':hour: :value ms',
         'recent_deliveries_table' => 'Recente webhook-leveringen',
         'deliveries_table' => 'Webhook-leveringen',
-        'replay_delivery' => 'Levering :event opnieuw versturen',
-        'view_delivery' => 'Details van levering :event bekijken',
+        'replay_delivery' => ':label — :event · :endpoint · :at',
+        'view_delivery' => 'Details van levering :event naar :endpoint van :at bekijken',
         'delivery_details' => 'Leveringsdetails',
         'close_details' => 'Details sluiten',
         'loading_kpis' => 'Kerncijfers worden geladen',

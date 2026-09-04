@@ -7,7 +7,6 @@ namespace Pushery\Webhooks\Livewire;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -16,26 +15,27 @@ use Pushery\Webhooks\Facades\Webhooks;
 use Pushery\Webhooks\Livewire\Concerns\AuthorizesOperatorActions;
 use Pushery\Webhooks\Models\WebhookDelivery;
 use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Support\CalendarDay;
+use Pushery\Webhooks\Support\UiVariant;
 
 /**
- * The OPERATOR view of the delivery log: browse every delivery, filter it, and replay or
- * test-ping one. A published stub — restyle it and make it yours.
+ * The operator view of the delivery log: browse every delivery, filter it, and replay or test-ping
+ * one. A published stub — restyle it and make it yours.
  *
- * It is deliberately UNSCOPED, and unauthorized by default: it reads EVERY tenant's
- * deliveries, so it MUST be embedded behind an operator-only gate of your own. It is not a
- * tenant-facing surface.
+ * It is deliberately unscoped, and unauthorized by default: it reads every tenant's deliveries, so
+ * it must be embedded behind an operator-only gate of your own. It is not a tenant-facing surface.
  *
  * Its two mutating actions — redeliver() and ping() — additionally honor
  * webhooks.admin.abilities and webhooks.admin.ability (or an overridden authorizeAction())
  * when a host sets one, so the whole console gates the same way rather than only half of it.
  * Left unset, nothing changes.
  *
- * ⚠️ Not `final`, and deliberately so: the override that sentence offers has to be reachable.
- * See {@see AuthorizesOperatorActions} — a spatie/laravel-permission name in the SINGLE
- * ability key denies every action silently, because the action name travels positionally and
- * that package's Gate::before hook takes the first positional argument for a guard. The map
- * passes no argument at all and is the direct way past it; the subclass remains the way past
- * anything an ability cannot express.
+ * Not `final`, and deliberately so: the override that sentence offers has to be reachable. See
+ * {@see AuthorizesOperatorActions} — a spatie/laravel-permission name in the single ability key
+ * denies every action silently, because the action name travels positionally and that package's
+ * Gate::before hook takes the first positional argument for a guard. The map passes no argument at
+ * all and is the direct way past it; the subclass remains the way past anything an ability cannot
+ * express.
  *
  * The tenant-facing surface is the observability dashboard
  * (`Pushery\Webhooks\Dashboard\Livewire\DeliveriesTable`), which is owner-scoped and
@@ -126,7 +126,9 @@ class DeliveryLog extends Component
 
         $this->message = '';
 
-        $delivery = WebhookDelivery::query()->findOrFail($id);
+        // Same partition-key bound the table above already carries, on the single-row lookup
+        // the redeliver action makes. Without it this one read visits every partition.
+        $delivery = WebhookDelivery::query()->withinRetention()->findOrFail($id);
 
         if (! $delivery->subscription->is_active) {
             $this->message = __('webhooks::management.messages.endpoint_disabled');
@@ -173,52 +175,28 @@ class DeliveryLog extends Component
     }
 
     /**
-     * The start of the day a bound names, or null when the value is absent or not a date.
+     * And the same control for the SIMPLE paginator this component actually builds.
      *
-     * Both bounds are public properties, so they carry whatever the browser sends —
-     * including the half-typed dates `wire:model.live` delivers between keystrokes
-     * ('2026-0' on the way to '2026-06-20'). A filter that threw on those would turn typing
-     * into an error page, so an unreadable value is simply not a bound.
-     *
-     * The round-trip comparison is what rejects '2026-13-45': Carbon rolls an out-of-range
-     * part forward into a real date rather than refusing it, so the parse alone would answer
-     * a question the reader did not ask.
+     * Livewire resolves the two independently: paginationView() feeds
+     * Paginator::defaultView, paginationSimpleView() feeds Paginator::defaultSimpleView,
+     * and a simple paginator reads only the second. Overriding just the first left this
+     * screen on livewire::simple-tailwind -- Livewire's own markup, with a hardcoded
+     * English landmark and the raw palette the docblock above says is deliberately not
+     * used. The package view carries both types.
      */
-    private function dayStart(string $value): ?CarbonInterface
+    public function paginationSimpleView(): string
     {
-        if ($value === '') {
-            return null;
-        }
-
-        // The shape is checked BEFORE Carbon sees it, because Carbon THROWS on a string it
-        // cannot read rather than returning false — measured on '2026-0', which is what
-        // wire:model.live sends while a reader is still typing the year ("A four digit year
-        // could not be found"). /D so a trailing newline cannot slip past the anchor.
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/D', $value) !== 1) {
-            return null;
-        }
-
-        $date = Date::createFromFormat('!Y-m-d', $value);
-
-        // And the round-trip rejects what Carbon reads TOO willingly. Every well-shaped
-        // string parses — measured: '2026-13-45' becomes 2027-02-14, '2026-02-30' becomes
-        // 2026-03-02, '0000-00-00' becomes -0001-11-30 — so the parse alone would answer a
-        // question the reader did not ask. Comparing the result back against the input is
-        // what turns "parsed" into "meant".
-        if (! $date instanceof CarbonInterface || $date->format('Y-m-d') !== $value) {
-            return null;
-        }
-
-        return $date;
+        return 'webhooks::pagination';
     }
 
     public function render(): View
     {
-        $from = $this->dayStart($this->from);
-        // The upper bound is the START OF THE DAY AFTER the one named, compared strictly.
-        // A reader asking for "up to the 20th" means the whole 20th, and the half-open form
-        // says that without arguing about how many decimals a timestamp has.
-        $until = $this->dayStart($this->until)?->addDay();
+        // {@see CalendarDay} rather than a parse here: the same three defenses are needed by
+        // the portal's own delivery panel, and a second copy of them is a second copy that
+        // drifts. The upper bound is the start of the day after the one named, compared
+        // strictly, so "up to the 20th" means the whole 20th.
+        $from = CalendarDay::start($this->from);
+        $until = CalendarDay::endExclusive($this->until);
 
         $endpoints = WebhookSubscription::query()
             ->select(['id', 'name', 'url'])
@@ -246,7 +224,7 @@ class DeliveryLog extends Component
         // database SESSION zone. Measured while building this: with the session on +01, a
         // delivery stored at 23:59 UTC on the 20th vanished from a window whose upper bound
         // was the 20th. No error, no warning, an answer off by the offset.
-        // {@see ScopesByTimestamp} binds it per dialect instead.
+        // {@see \Pushery\Webhooks\Database\Concerns\ScopesByTimestamp} binds it per dialect instead.
         if ($from instanceof CarbonInterface) {
             $query->createdAfter($from);
         }
@@ -257,6 +235,13 @@ class DeliveryLog extends Component
 
         $deliveries = $query
             ->latest('created_at')
+            // A tiebreaker rather than a second sort preference. The column above ties — a fan-out
+            // writes a burst of deliveries inside one second, and `created_at` has second
+            // resolution — and a paginated read is several queries. Where the order is not total
+            // the database may return tied rows differently per query, so a reader paging through a
+            // burst sees rows twice and never sees others, with every individual page correct. The
+            // primary key is unique, which is what makes the order total.
+            ->orderByDesc('id')
             // simplePaginate, not paginate: this operator stub is unscoped over the whole
             // delivery log, and a full count(*) on every render does not scale on a partitioned
             // table with millions of rows. Prev/next navigation needs no total.
@@ -269,7 +254,7 @@ class DeliveryLog extends Component
             // rather than a count(*) over millions of rows on every render for everyone else.
             ->simplePaginate(25);
 
-        return ViewFactory::make('webhooks::livewire.delivery-log', [
+        return ViewFactory::make(UiVariant::view('delivery-log'), [
             'deliveries' => $deliveries,
             'endpoints' => $endpoints->take(self::ENDPOINT_OPTIONS),
             'endpointsTruncated' => $truncated,

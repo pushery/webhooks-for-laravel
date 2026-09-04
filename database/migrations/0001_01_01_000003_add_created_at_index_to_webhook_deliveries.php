@@ -17,11 +17,11 @@ use Pushery\Webhooks\Support\WebhookConnection;
  * That is the failure worth naming — a schema improvement that quietly skips every existing
  * user, and a changelog entry that is false for them.
  *
- * ⚠️ "THIS PACKAGE'S" IS NOT A FLOURISH. A host that partitions differently or needs its own
- * indexes FORKS the create-table migration, and that fork is a normal thing to do. In such an
- * installation this file is the ONLY source of the index — so reading the sentence above as
- * "the create migration already did it, this one is a no-op" is wrong there, and dropping the
- * file on that basis silently removes an index the delivery log's newest-first reads depend on.
+ * "This package's" is not a flourish. A host that partitions differently or needs its own indexes
+ * forks the create-table migration, and that fork is a normal thing to do. In such an installation
+ * this file is the only source of the index — so reading the sentence above as "the create
+ * migration already did it, this one is a no-op" is wrong there, and dropping the file on that
+ * basis silently removes an index the delivery log's newest-first reads depend on.
  *
  * PostgreSQL only. The MySQL lane's flat table has carried `webhook_deliveries_created_idx`
  * since it was created, so re-adding it there would fail on the duplicate name.

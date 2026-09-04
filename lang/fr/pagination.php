@@ -14,6 +14,10 @@ return [
     // Every number travels as a placeholder, so a locale is free to put them wherever
     // its grammar wants them.
     'summary' => 'Affichage de :first à :last sur :total résultats',
+    'summary_of_unknown_total' => 'Affichage de :first à :last',
+
+    'filtered' => '{0} Aucun résultat.|{1} Un résultat.|[2,*] :count résultats.',
+    'filtered_of_unknown_total' => '{0} Aucun résultat.|{1} Un résultat sur cette page.|[2,*] :count résultats sur cette page.',
 
     // Strings only a screen reader announces. An untranslated accessible name is an
     // untranslated interface.
