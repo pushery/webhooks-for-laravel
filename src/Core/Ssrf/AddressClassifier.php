@@ -121,6 +121,10 @@ final class AddressClassifier
             if (str_starts_with($packed, $prefix)) {
                 $unwrapped = inet_ntop(substr($packed, 12));
 
+                // The false arm cannot be reached: inet_ntop() only fails on a length that is
+                // neither 4 nor 16 bytes, and this substr takes exactly the last 4 of a packed
+                // IPv6. It is written because the declared return is `string|false` and a
+                // reader should find the answer here rather than count bytes.
                 return $unwrapped === false ? $ip : $unwrapped;
             }
         }

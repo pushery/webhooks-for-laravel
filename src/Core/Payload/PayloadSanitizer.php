@@ -71,6 +71,10 @@ final class PayloadSanitizer
      *
      * PHP's own cast produces these spellings, so this is the name the value already answers to
      * rather than one invented here.
+     *
+     * The caller reaches this only for a float that is not finite, so past the NAN branch the
+     * value is one of the two infinities. The comparison is a sign test with no boundary to get
+     * wrong: any finite bound in place of the zero, and either strictness, reads the same.
      */
     private static function nameOf(float $value): string
     {

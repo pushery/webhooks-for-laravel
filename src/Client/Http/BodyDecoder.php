@@ -163,6 +163,9 @@ final class BodyDecoder
         // is the same at any limit above 1, measured across five inputs. Lowering it to 1 is not —
         // that keeps the whole header including its parameters — and BodyDecoderTest holds that
         // direction.
+        // The limit is not a decision the result can see: only element [0] is read, and the
+        // first piece before a semicolon is the same whether the rest is split once or not at
+        // all. It is a 2 because that is the cheapest split that yields it.
         return strtolower(trim(explode(';', $contentType, 2)[0]));
     }
 

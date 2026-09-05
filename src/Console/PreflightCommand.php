@@ -170,6 +170,11 @@ final class PreflightCommand extends Command
         //
         // The second register below is config-driven, so it is entered on demand; filtering a
         // null out of one list costs nothing and leaves no unreachable line behind.
+        // The filter cannot be exercised from this tree: it drops a null, and the advisory below
+        // only returns one when BOTH icon packages are installed -- which this test environment
+        // does not have, so nothing is ever filtered here. Measured, the suite is green without
+        // it. Removing it anyway would hand a null to warn() on the consumer installations that
+        // DO have both, which is the ordinary case rather than the exotic one.
         $warnings = array_filter([
             new Settings()->iconPairingAdvisory(
                 function_exists('svg'),

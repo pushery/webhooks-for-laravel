@@ -59,6 +59,8 @@ final class CollationAudit
             return [];
         }
 
+        // The start index is not a choice being made here: implode() reads values and ignores
+        // keys, so every starting key produces the same list of placeholders.
         $placeholders = implode(', ', array_fill(0, count(self::TABLES), '?'));
 
         /** @var list<object{table_name: string, column_name: string, collation_name: string, index_name: string}> $rows */

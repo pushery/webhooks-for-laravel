@@ -173,6 +173,17 @@ final class PayloadTransformEditor extends Component
         // purely to stamp its id with no field changes" — so constraining the field to the
         // configured set would narrow documented behavior to fix a column width. The width is
         // what is wrong here, so the width is what is bounded.
+        // Eight of these rules cannot fire, and they stay anyway -- measured one at a time, the
+        // suite is green without each of them. The five top-level properties are DECLARED
+        // `string` and `array`, so PHP makes those two rules true before validation reads them,
+        // whatever the caller. What is genuinely enforced here is everything under a `.*`:
+        // nothing checks the type of an array ELEMENT, which is the shape that used to reach
+        // trim() and raise there.
+        //
+        // They stay because the set is read as a whole -- somebody looking for what
+        // `includeFields` accepts should find a line about `includeFields` rather than have to
+        // infer it from an absence -- and because widening one of those declared types later
+        // would leave the field guarded here instead of silently open.
         $this->validate([
             'payloadVersion' => ['string', 'max:20'],
             'includeFields' => ['array'],

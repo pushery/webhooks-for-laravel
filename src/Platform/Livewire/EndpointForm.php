@@ -75,6 +75,10 @@ final class EndpointForm extends Component
         // InteractsWithEndpoints states that in full and ends "Do not 'kill' them by deleting
         // them"; this is one of the five it means. The (int) cast beside it is in the same position
         // — the value is already an int, and the cast is the boundary that makes the argument one.
+        // Redundant with the boot gate, and deliberately kept: {@see InteractsWithEndpoints}
+        // states the rule and its measurement -- the gate reads the same ability this policy
+        // consults, and the ownership it adds is already enforced by the scoped lookup. This is
+        // what still refuses if a future caller reaches the action without that lookup.
         $this->authorize('update', $subscription);
 
         $this->endpointId = $subscription->id;
@@ -282,7 +286,13 @@ final class EndpointForm extends Component
 
     private function updateEndpoint(): void
     {
+        // The cast answers the declared `?int` and the null check above it, not the value: past
+        // that check the property is already an int. It changes no lookup.
         $subscription = $this->findOwnedEndpoint((int) $this->endpointId);
+        // Redundant with the boot gate, and deliberately kept: {@see InteractsWithEndpoints}
+        // states the rule and its measurement -- the gate reads the same ability this policy
+        // consults, and the ownership it adds is already enforced by the scoped lookup. This is
+        // what still refuses if a future caller reaches the action without that lookup.
         $this->authorize('update', $subscription);
 
         try {

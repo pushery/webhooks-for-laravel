@@ -32,11 +32,11 @@ use Pushery\Webhooks\Support\UiVariant;
  * Left unset, nothing changes.
  *
  * Not `final`, and deliberately so: the override that sentence offers has to be reachable. See
- * {@see AuthorizesOperatorActions} — a spatie/laravel-permission name in the single ability key
- * denies every action silently, because the action name travels positionally and that package's
- * Gate::before hook takes the first positional argument for a guard. The map passes no argument at
- * all and is the direct way past it; the subclass remains the way past anything an ability cannot
- * express.
+ * {@see AuthorizesOperatorActions} — a permission name in the single ability key denies every
+ * action silently wherever permissions resolve through a `Gate::before` hook that takes the first
+ * positional argument for a guard, because the action name travels in exactly that position. The
+ * map passes no argument at all and is the direct way past it; the subclass remains the way past
+ * anything an ability cannot express.
  *
  * The tenant-facing surface is the observability dashboard
  * (`Pushery\Webhooks\Dashboard\Livewire\DeliveriesTable`), which is owner-scoped and
@@ -236,6 +236,9 @@ class DeliveryLog extends Component
             ->select(['id', 'name', 'url'])
             ->orderBy('id')
             // One more than are shown, purely to learn whether there ARE more.
+            // One past the cap is what makes the truncation detectable. Asking for MORE than one
+            // extra changes nothing observable: the flag compares against the cap and the view takes
+            // exactly the cap, so only the +0 and the -1 readings are real.
             ->limit(self::ENDPOINT_OPTIONS + 1)
             ->get();
 
@@ -244,6 +247,9 @@ class DeliveryLog extends Component
         $query = WebhookDelivery::query()
             ->when($this->status !== '', fn (Builder $query): Builder => $query->where('status', $this->status))
             ->when($this->eventType !== '', fn (Builder $query): Builder => $query->where('event_type', $this->eventType))
+            // The cast is for the declared column type, not for the comparison: ctype_digit has
+            // already established the string is all digits, and the driver compares a numeric
+            // string against a bigint the same way either side of it.
             ->when(ctype_digit($this->subscriptionId), fn (Builder $query): Builder => $query->where('subscription_id', (int) $this->subscriptionId));
 
         // Through the package's own timestamp scopes, and NOT through whereDate() or a bare

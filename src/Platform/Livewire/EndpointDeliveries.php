@@ -8,6 +8,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\View as ViewFactory;
@@ -18,8 +19,11 @@ use Livewire\WithPagination;
 use Pushery\Webhooks\Enums\DeliveryStatus;
 use Pushery\Webhooks\Facades\Webhooks;
 use Pushery\Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
+use Pushery\Webhooks\Platform\Support\ReadableEndpoints;
 use Pushery\Webhooks\Platform\Support\SubscriptionScope;
+use Pushery\Webhooks\Server\Exceptions\DeliveryRefused;
 use Pushery\Webhooks\Support\CalendarDay;
 use Pushery\Webhooks\Support\TenantIdentity;
 
@@ -287,6 +291,11 @@ final class EndpointDeliveries extends Component
         $delivery = $this->deliveryQuery()->select('*')->whereKey($id)->firstOrFail();
         $endpoint = $this->findOwnedEndpoint($delivery->subscription_id);
 
+        // Redundant with the boot gate, and deliberately kept: {@see InteractsWithEndpoints}
+        // states the rule and its measurement in full -- the gate reads the same ability this
+        // policy consults, and the ownership the policy adds is already enforced by the scoped
+        // lookup above. This is what still refuses if a future caller reaches the action without
+        // that lookup.
         $this->authorize('redeliver', $endpoint);
 
         if (! $endpoint->is_active) {
@@ -301,7 +310,19 @@ final class EndpointDeliveries extends Component
             return;
         }
 
-        Webhooks::redeliver($delivery);
+        // The check above reads the endpoint this panel loaded; redeliver() re-reads the
+        // subscription off the delivery and checks again. Between the two the endpoint can be
+        // switched off -- by the circuit breaker on a concurrent failure, or by the tenant in
+        // another tab -- and then the refusal arrives here as an exception.
+        //
+        // That window is small and it is not hypothetical: the breaker disables an endpoint
+        // precisely while its deliveries are failing, which is exactly when somebody is looking
+        // at this list and pressing Send again. Uncaught it is a 500 over an ordinary outcome.
+        try {
+            Webhooks::redeliver($delivery);
+        } catch (DeliveryRefused) {
+            $this->message = __('webhooks::self-service.deliveries.endpoint_disabled');
+        }
     }
 
     public function paginationView(): string
@@ -322,12 +343,10 @@ final class EndpointDeliveries extends Component
             $deliveries = $this->page();
         }
 
-        // One row past the cap, so the truncation is DETECTABLE rather than assumed.
-        $endpoints = $this->scopedQuery()
-            ->select(['id', 'url', 'name'])
-            ->latest()
-            ->limit(self::ENDPOINT_OPTIONS + 1)
-            ->get();
+        // One row past the cap, so the truncation is DETECTABLE rather than assumed. Asking for
+        // MORE than one extra changes nothing observable -- the flag is a comparison against the
+        // cap and the view takes exactly the cap -- so only the +0 and the -1 readings are real.
+        $endpoints = $this->endpointChoices();
 
         $endpointsTruncated = $endpoints->count() > self::ENDPOINT_OPTIONS;
 
@@ -340,6 +359,40 @@ final class EndpointDeliveries extends Component
             'emptyStateKey' => $this->emptyStateKey(),
             'showsErrors' => $this->showsErrors(),
         ]);
+    }
+
+    /**
+     * The endpoints offered in the filter: the ones the reader owns, plus the ones a host has
+     * declared readable. One query rather than two merged lists, so the ordering and the cap
+     * mean the same thing they meant before -- a merge would have had to re-sort, and a cap
+     * applied twice is not the cap.
+     *
+     * The owned half stays a subquery on the scoped builder instead of a repeated owner
+     * predicate: there is one definition of "owned" in this package and this is not the place
+     * to grow a second.
+     *
+     * @return Collection<int, WebhookSubscription>
+     */
+    private function endpointChoices(): Collection
+    {
+        $readable = ReadableEndpoints::ids();
+
+        if ($readable === []) {
+            return $this->scopedQuery()
+                ->select(['id', 'url', 'name'])
+                ->latest()
+                ->limit(self::ENDPOINT_OPTIONS + 1)
+                ->get();
+        }
+
+        return WebhookSubscription::query()
+            ->select(['id', 'url', 'name'])
+            ->where(fn (Builder $scope): Builder => $scope
+                ->whereIn('id', $this->scopedQuery()->select('id'))
+                ->orWhereIn('id', $readable))
+            ->latest()
+            ->limit(self::ENDPOINT_OPTIONS + 1)
+            ->get();
     }
 
     /**
@@ -384,7 +437,10 @@ final class EndpointDeliveries extends Component
         // did not: redeliver() calls `->select('*')`, which replaces the column list rather than
         // adding to it, so the row it works from was always complete. Measured by dropping the
         // column with both panel suites running.
-        $columns = ['id', 'event_type', 'status', 'response_code', 'created_at'];
+        // duration_ms rides along with response_code because it is only ever rendered beside
+        // one: a duration with no answer behind it is the time spent failing to get one, and
+        // reading it as latency would be wrong in the direction that looks reassuring.
+        $columns = ['id', 'event_type', 'status', 'response_code', 'duration_ms', 'created_at'];
 
         if ($this->showsErrors()) {
             $columns[] = 'error';
@@ -392,12 +448,30 @@ final class EndpointDeliveries extends Component
 
         $query = WebhookDelivery::query()->select($columns);
         $owner = SubscriptionScope::currentOwner();
+        $readable = ReadableEndpoints::ids();
 
-        if (! $owner instanceof TenantIdentity) {
+        // Still closed when there is nothing to open it with. The owner pair is the ground set
+        // and a host may ADD to it (see ReadableEndpoints) -- with neither an owner nor a
+        // declared readable endpoint the panel constrains to nothing rather than to everything,
+        // which is the property this line has always had and the one worth not losing.
+        if (! $owner instanceof TenantIdentity && $readable === []) {
             return $query->whereRaw('1 = 0');
         }
 
-        $query->where('owner_type', $owner->type)->where('owner_id', $owner->id);
+        // Grouped, because an ungrouped `orWhereIn` beside the later filters would bind them to
+        // the OR rather than to the whole set -- a window or status filter would then widen the
+        // result instead of narrowing it, which is the one direction this panel must not move in.
+        $query->where(function (Builder $scope) use ($owner, $readable): void {
+            if ($owner instanceof TenantIdentity) {
+                $scope->where(fn (Builder $pair): Builder => $pair
+                    ->where('owner_type', $owner->type)
+                    ->where('owner_id', $owner->id));
+            }
+
+            if ($readable !== []) {
+                $scope->orWhereIn('subscription_id', $readable);
+            }
+        });
 
         if ($this->endpointId !== null) {
             // The lenient lookup is the strict path's, and the pairing is the wrong way round
@@ -414,15 +488,23 @@ final class EndpointDeliveries extends Component
             // and a tampered one close the list, and the trade is stated rather than
             // discovered: this mode gives up telling those two apart, in exchange for never
             // widening. That is the direction a host chooses this switch for.
-            $endpoint = $this->strictEndpoint
-                ? $this->scopedQuery()->whereKey($this->endpointId)->first()
-                : $this->findOwnedEndpoint($this->endpointId);
+            // A declared readable endpoint is filterable without the owner-scoped lookup, which
+            // would 404 on it -- the reader legitimately does not own it. Checked against the
+            // resolved list rather than against the database, so the host's answer is the only
+            // thing that can widen this.
+            if (in_array($this->endpointId, $readable, true)) {
+                $query->where('subscription_id', $this->endpointId);
+            } else {
+                $endpoint = $this->strictEndpoint
+                    ? $this->scopedQuery()->whereKey($this->endpointId)->first()
+                    : $this->findOwnedEndpoint($this->endpointId);
 
-            if ($endpoint === null) {
-                return $query->whereRaw('1 = 0');
+                if ($endpoint === null) {
+                    return $query->whereRaw('1 = 0');
+                }
+
+                $query->where('subscription_id', $endpoint->id);
             }
-
-            $query->where('subscription_id', $endpoint->id);
         }
 
         // The lower bound is what makes this query prunable. webhook_deliveries is range
@@ -540,6 +622,11 @@ final class EndpointDeliveries extends Component
 
         $ceiling = Config::integer('webhooks.platform.deliveries.window_days', self::WINDOW_DAYS);
 
+        // The left half is redundant against the right: the guard above leaves windowDays
+        // positive, so a ceiling of zero or less already fails the comparison. Measured -- every
+        // bound this constant can take leaves the suite green. It stays because "a non-positive
+        // ceiling means no ceiling" is the rule the method beside it states, and reading it here
+        // is cheaper than deriving it from the comparison.
         return $ceiling > 0 && $this->windowDays < $ceiling;
     }
 
@@ -577,6 +664,9 @@ final class EndpointDeliveries extends Component
             return [];
         }
 
+        // The re-index answers the declared list type rather than the data: WINDOW_STEPS ascends
+        // and the predicate is a single upper bound, so what survives is always a prefix and the
+        // keys never gain a hole.
         $choices = array_values(array_filter(self::WINDOW_STEPS, fn (int $days): bool => $days < $ceiling));
         $choices[] = $ceiling;
 

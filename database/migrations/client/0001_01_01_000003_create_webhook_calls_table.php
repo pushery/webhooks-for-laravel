@@ -60,7 +60,6 @@ return new class extends Migration
             $table->char('body_sha256', 64);
             $table->jsonb('headers')->nullable();       // redacted before storage
             $table->string('status')->default('received');
-            $table->text('exception')->nullable();
             $table->timestampsTz();
         });
 
@@ -91,8 +90,8 @@ return new class extends Migration
     {
         // Case-sensitive collation on the identity/dedupe columns so MySQL's case-insensitive
         // default cannot collapse a distinct (source, webhook_id) — or a distinct hash — onto an
-        // existing row. raw_body is LONGTEXT (a base64 body far exceeds TEXT's 64 KB), and the
-        // exception is MEDIUMTEXT. There is no partial-index or GIN equivalent on MySQL: the
+        // existing row. raw_body is LONGTEXT, because a base64 body far exceeds TEXT's 64 KB.
+        // There is no partial-index or GIN equivalent on MySQL: the
         // dedupe key is a plain UNIQUE (NULL is DISTINCT in a unique index on both engines, so a
         // null webhook_id never blocks an insert — exactly the partial predicate's effect), the
         // worklist index leads with status, and payload containment search is served by Scout.
@@ -110,7 +109,6 @@ return new class extends Migration
             $table->char('body_sha256', 64)->collation($cs);
             $table->json('headers')->nullable();
             $table->string('status')->collation($cs)->default('received');
-            $table->mediumText('exception')->nullable();
             $table->dateTime('created_at', 6)->nullable();
             $table->dateTime('updated_at', 6)->nullable();
 

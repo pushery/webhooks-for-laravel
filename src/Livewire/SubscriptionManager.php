@@ -38,7 +38,7 @@ use Pushery\Webhooks\Support\UiVariant;
  *
  * The map is the one a permission-based host needs, and it exists because the other two
  * were both barred there for a while. The single-ability key passes the action name to the
- * gate positionally, which spatie/laravel-permission's Gate::before hook takes for a guard
+ * gate positionally, which a permission package's `Gate::before` hook takes for a guard
  * name and shifts away — every action then denies every operator, silently. The documented
  * escape was the subclass override, and until v2.0.1 this class was `final`, so it could
  * not be written: `cannot extend final class`. A host had exactly one screw to turn and it

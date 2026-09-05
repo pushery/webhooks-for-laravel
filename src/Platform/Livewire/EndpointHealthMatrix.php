@@ -98,6 +98,10 @@ final class EndpointHealthMatrix extends Component
         // in full: the boot gate reads the same ability, and findOwnedEndpoint() has already
         // enforced the ownership this policy would add. That docblock ends "Do not 'kill' them by
         // deleting them", and this is one of the five it means.
+        // Redundant with the boot gate, and deliberately kept: {@see InteractsWithEndpoints}
+        // states the rule and its measurement -- the gate reads the same ability this policy
+        // consults, and the ownership it adds is already enforced by the scoped lookup. This is
+        // what still refuses if a future caller reaches the action without that lookup.
         $this->authorize('update', $subscription);
 
         $this->refreshRow($subscription);

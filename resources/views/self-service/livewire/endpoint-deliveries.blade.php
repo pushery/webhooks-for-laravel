@@ -169,8 +169,31 @@
                         </x-wirekit::table.td>
                         <x-wirekit::table.td>
                             {{-- Null whenever no HTTP answer arrived at all, which is not
-                                 the same as a zero. --}}
-                            <x-wirekit::text size="sm" intent="muted">{{ $delivery->response_code ?? '—' }}</x-wirekit::text>
+                                 the same as a zero.
+
+                                 The duration hangs off the code rather than standing alone:
+                                 the package measures it on every attempt, including the ones
+                                 that never got an answer, and printing that number by itself
+                                 would read as "the receiver took 30s" when it means "we waited
+                                 30s for nothing". It is the question that comes after the
+                                 status code -- it arrived, so why did it take that long -- and
+                                 a receiver getting slower is the run-up to one that fails. --}}
+                            {{-- The duration hangs off the code rather than standing alone: the
+                                 package measures it on every attempt, including the ones that
+                                 never got an answer, and printing that number by itself would
+                                 read as "the receiver took 30s" when it means "we waited 30s for
+                                 nothing". It is the question that comes after the status code --
+                                 it arrived, so why did it take that long -- and a receiver
+                                 getting slower is the run-up to one that fails.
+
+                                 One expression rather than a raw PHP block, and the reason is
+                                 not style. Blade lifts raw blocks out of the template BEFORE it
+                                 strips comments, matching non-greedily from the first opening
+                                 directive -- so a block form anywhere below the inline ones this
+                                 file already uses swallows everything between them, and the rest
+                                 of the template ships uncompiled. Naming those two directives in
+                                 prose here does it too, which is why this paragraph does not. --}}
+                            <x-wirekit::text size="sm" intent="muted">{{ $delivery->response_code === null ? '—' : $delivery->response_code.($delivery->duration_ms === null ? '' : ' · '.__('webhooks::self-service.deliveries.duration', ['ms' => \Pushery\Webhooks\Support\LocalizedNumber::format($delivery->duration_ms)])) }}</x-wirekit::text>
                         </x-wirekit::table.td>
                         @if ($showsErrors)
                             {{-- Blade escapes it, so markup a receiver wrote back is text. --}}

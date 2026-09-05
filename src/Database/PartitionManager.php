@@ -452,6 +452,10 @@ final class PartitionManager
                 ),
                 [$from, $to],
             ));
+            // The bound cannot be read wrongly: the DELETE takes at most DRAIN_CHUNK rows, so a
+            // batch that moves fewer than that has emptied the range -- and a batch of exactly
+            // one is such a batch. Raising the comparison ends the loop one turn earlier on a
+            // turn that would have moved nothing. Measured: the suite is green either way.
         } while ($moved > 0);
 
         // The parent's only lock window, and it is a DDL statement rather than a row move.

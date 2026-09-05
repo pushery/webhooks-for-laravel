@@ -63,6 +63,9 @@ final class PruneOrphanedPayloadsCommand extends Command
         // value, so Symfony hands back a real bool and there is nothing to convert. It stays
         // for the type checker — `option()` is `mixed`, and without the cast the flag reaches
         // every branch below as an unnarrowed value.
+        // The cast answers the declared option type, not the value: a flag option is already
+        // true or null, and both readings reach the same branch. Measured -- the suite is green
+        // without it.
         $dryRun = (bool) $this->option('dry-run');
         $totalOrphaned = 0;
         $totalDeleted = 0;
@@ -143,6 +146,9 @@ final class PruneOrphanedPayloadsCommand extends Command
 
         // Deduplicated because both layers may point at one disk, and sweeping it twice would
         // double a scan the reclaimer already documents as unindexed.
+        // array_unique keeps the keys it had, so deduplicating two entries onto one disk leaves
+        // a hole -- and the only reader is a foreach, which does not care. The re-index is for
+        // the declared list type; dropping it changes no sweep. Measured.
         return array_values(array_unique($disks));
     }
 }

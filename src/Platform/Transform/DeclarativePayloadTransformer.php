@@ -132,6 +132,10 @@ final class DeclarativePayloadTransformer implements PayloadTransformer
                 continue;
             }
 
+            // Neither of these two lines can be told apart from its obvious alternative, and
+            // both stay for the declared types rather than for the behavior. PHP normalizes a
+            // numeric string key to an int, so casting $from or not produces the same key --
+            // and $taken is read with array_key_exists(), which does not look at the value.
             $moved[(string) $from] = $to;
             $taken[$to] = true;
         }
@@ -143,6 +147,8 @@ final class DeclarativePayloadTransformer implements PayloadTransformer
         $result = [];
 
         foreach ($payload as $key => $value) {
+            // Same normalization as above: the cast answers the declared array-key union, not
+            // the lookup, which finds a numeric key either way.
             if (! array_key_exists((string) $key, $moved)) {
                 $result[$key] = $value;
             }

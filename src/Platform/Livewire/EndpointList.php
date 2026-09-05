@@ -115,6 +115,10 @@ final class EndpointList extends Component
     public function ping(int $id): void
     {
         $subscription = $this->findOwnedEndpoint($id);
+        // Redundant with the boot gate, and deliberately kept: {@see InteractsWithEndpoints}
+        // states the rule and its measurement -- the gate reads the same ability this policy
+        // consults, and the ownership it adds is already enforced by the scoped lookup. This is
+        // what still refuses if a future caller reaches the action without that lookup.
         $this->authorize('update', $subscription);
 
         // A disabled endpoint accepts the ping, logs a delivery and is then dropped at

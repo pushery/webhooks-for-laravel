@@ -8,7 +8,7 @@ namespace Pushery\Webhooks\Core\Http;
  * Masks the credential-bearing headers before they are persisted to the inbound call log —
  * so a stored request never carries a bearer token, a signing secret or a session cookie in
  * clear text. The names in {@see self::ALWAYS} are masked regardless of configuration; a host
- * adds more through its redact list. Both the live receive path and the spatie backfill import redact through
+ * adds more through its redact list. Both the live receive path and the backlog import redact through
  * here, so the two can never drift on which headers are secret.
  *
  * @internal

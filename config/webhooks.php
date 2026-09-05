@@ -1148,9 +1148,9 @@ return [
     | non-final so that override is actually reachable; until v2.0.1 they were not, which
     | made this sentence describe something the language forbids.
     |
-    | This must name an ability you declared with Gate::define(), not a spatie/laravel-permission
-    | permission. That package installs a Gate::before hook which reads the first positional gate
-    | argument as a guard name and shifts it off:
+    | This must name an ability you declared with Gate::define(), not a permission name from a
+    | package that resolves permissions through its own Gate::before hook. Such a hook
+    | conventionally reads the first positional gate argument as a guard name and shifts it off:
     |
     |     if (is_string($args[0] ?? null) && ! class_exists($args[0])) {
     |         $guard = array_shift($args);

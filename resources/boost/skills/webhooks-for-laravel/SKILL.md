@@ -247,10 +247,11 @@ The action name (`create`, `edit`, `toggle`, `rotate`, `delete`, `redeliver`, `p
 is passed to the gate. Default `null` means no per-action check. It is not tenant
 scoping.
 
-**If the capabilities come from spatie/laravel-permission, use `admin.abilities` instead.** That
-package's `Gate::before` hook reads the first positional gate argument as a guard name and shifts it
-off, so the action name turns into a guard nobody defined and every action denies every operator —
-silently. An ability taken from the map is authorized with no argument at all:
+**If the capabilities come from a permission package, use `admin.abilities` instead.** A package
+that resolves permissions through its own `Gate::before` hook reads the first positional gate
+argument as a guard name and shifts it off, so the action name turns into a guard nobody defined and
+every action denies every operator — silently. Grep your own vendor tree for `Gate::before` if you
+are unsure. An ability taken from the map is authorized with no argument at all:
 
 ```php
 'admin' => ['abilities' => ['*' => 'manage webhooks']],

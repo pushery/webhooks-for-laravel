@@ -37,7 +37,6 @@ use Pushery\Webhooks\Database\Factories\WebhookCallFactory;
  * @property string $body_sha256
  * @property array<string, mixed>|null $headers
  * @property WebhookCallStatus $status
- * @property string|null $exception
  * @property string|null $payload_type
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at

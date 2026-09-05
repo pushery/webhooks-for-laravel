@@ -389,6 +389,11 @@ final readonly class WebhookProcessor
      */
     private function forgetSeen(bool $fastPathDedupe, ?string $webhookId): void
     {
+        // Widening this to an OR is unobservable, which is worth saying because its twin in
+        // markSeen() is not. Forgetting a key that was never marked is a no-op, and a null id
+        // would raise inside the try that already swallows everything here -- so neither half
+        // of the condition can change what a request sees. It is written as the mirror of
+        // markSeen() because the row and the marker are two halves of one fact.
         if ($fastPathDedupe && $webhookId !== null) {
             try {
                 Cache::forget($this->cacheKey($webhookId));
@@ -541,6 +546,10 @@ final readonly class WebhookProcessor
         // holds across this package: pcov credits a one-line expression to every line it spans, so
         // a ternary reads as covered the first time EITHER arm runs — and the arm that goes
         // unexercised here is the one deciding whether payload_type stays empty.
+        // Only the emptiness half is observable. Widening the type check to an OR yields
+        // `['type' => null]` for a body that carries no type, and `payload->>'type'` reads NULL
+        // out of that exactly as it reads NULL out of an absent key -- so the generated column
+        // lands on the same value either way.
         if (is_string($bodyType) && $bodyType !== '') {
             return ['type' => $bodyType];
         }

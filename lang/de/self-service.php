@@ -151,6 +151,9 @@ return [
         'event' => 'Event',
         'outcome' => 'Ergebnis',
         'response_code' => 'Antwort',
+        // The unit sits in the translation because the ORDER can differ, not because 'ms'
+        // does: a locale that writes the unit first has somewhere to say so.
+        'duration' => ':ms ms',
         'when' => 'Wann',
         // The paginator's own landmark. Distinct from the table's region name and from
         // the heading above it, or a screen-reader user is offered three landmarks with

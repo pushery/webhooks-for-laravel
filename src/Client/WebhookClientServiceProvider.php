@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Route as RouteFacade;
 use Illuminate\Support\ServiceProvider;
 use Override;
-use Pushery\Webhooks\Client\Console\ImportSpatieCallsCommand;
+use Pushery\Webhooks\Client\Console\ImportCallsCommand;
 use Pushery\Webhooks\Client\Http\CaptureRawBody;
 use Pushery\Webhooks\Client\Http\WebhookController;
 use Pushery\Webhooks\Client\Models\WebhookCall;
@@ -72,7 +72,7 @@ final class WebhookClientServiceProvider extends ServiceProvider
         }
 
         if ($this->app->runningInConsole()) {
-            $this->commands([ImportSpatieCallsCommand::class]);
+            $this->commands([ImportCallsCommand::class]);
         }
 
         $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
