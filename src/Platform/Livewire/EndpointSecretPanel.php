@@ -73,6 +73,10 @@ final class EndpointSecretPanel extends Component
     public function reveal(int $id): void
     {
         $subscription = $this->findOwnedEndpoint($id);
+        // Redundant with the boot gate, and deliberately kept: {@see InteractsWithEndpoints}
+        // states the rule and its measurement -- the gate reads the same ability this policy
+        // consults, and the ownership it adds is already enforced by the scoped lookup. This is
+        // what still refuses if a future caller reaches the action without that lookup.
         $this->authorize('view', $subscription);
 
         $this->endpointId = $subscription->id;
@@ -95,6 +99,10 @@ final class EndpointSecretPanel extends Component
         }
 
         $subscription = $this->findOwnedEndpoint($this->endpointId);
+        // Redundant with the boot gate, and deliberately kept: {@see InteractsWithEndpoints}
+        // states the rule and its measurement -- the gate reads the same ability this policy
+        // consults, and the ownership it adds is already enforced by the scoped lookup. This is
+        // what still refuses if a future caller reaches the action without that lookup.
         $this->authorize('rotateSecret', $subscription);
 
         $newSecret = Container::getInstance()->make(WebhookManager::class)->rotateSecret($subscription);

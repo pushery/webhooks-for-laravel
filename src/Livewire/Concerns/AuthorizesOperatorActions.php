@@ -26,9 +26,9 @@ use Illuminate\Support\Facades\Config;
  * config keys left at their defaults this method does nothing at all, which is exactly the
  * behavior the console shipped with — a host that wants none of this notices nothing.
  *
- * The ability must be one `Gate::define()` declared, not a spatie/laravel-permission permission
- * name. That package installs a `Gate::before` hook which reads the first positional gate argument
- * as a guard name and shifts it off the argument list:
+ * The ability must be one `Gate::define()` declared, not a permission name from a package that
+ * resolves permissions through its own `Gate::before` hook. Such a hook conventionally reads the
+ * first positional gate argument as a GUARD name and shifts it off the argument list:
  *
  *     if (is_string($args[0] ?? null) && ! class_exists($args[0])) {
  *         $guard = array_shift($args);
@@ -54,8 +54,8 @@ use Illuminate\Support\Facades\Config;
  *     'abilities' => ['delete' => 'delete webhooks', …],    // or one per action
  *
  * That is also the shape a permission-based host wants anyway: the action is encoded in the
- * NAME rather than passed beside it, which is how spatie models capabilities in the first
- * place. The older single-ability key keeps its argument and its behavior untouched, so a
+ * NAME rather than passed beside it, which is how a permission package models capabilities in
+ * the first place. The older single-ability key keeps its argument and its behavior untouched, so a
  * host already relying on `fn ($user, string $action) => …` sees no change.
  *
  * The one-line workaround for a host that would rather not touch the config shape remains
@@ -84,7 +84,7 @@ trait AuthorizesOperatorActions
      * Otherwise the single-ability key answers, and there the name still travels to the gate
      * as its argument: one ability can answer differently for a delete than for a toggle
      * without the host having to define five. A gate closure that ignores the extra argument
-     * is unaffected. That argument is what makes a spatie permission name unusable on this
+     * is unaffected. That argument is what makes such a permission name unusable on this
      * path — see the class docblock — and it is kept rather than removed because removing it
      * would take a documented capability away from every host that does use it. The map is
      * the way past it, not a replacement for it.

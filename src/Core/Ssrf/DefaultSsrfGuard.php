@@ -127,6 +127,10 @@ final readonly class DefaultSsrfGuard implements SsrfGuard
 
         // The port is carried only where the caller wrote one. Adding the default would change
         // the Host header of every request this branch touches.
+        // The cast answers the declared shape of parse_url()'s result, not the value: this
+        // branch is only reached for a URL that already parsed with a scheme, so it is a string
+        // by then. strtolower() beside it is NOT redundant -- a scheme is case-insensitive and
+        // the caller may have written it in capitals.
         return strtolower((string) $parts['scheme']).'://'
             .$userinfo
             .$authority

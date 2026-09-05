@@ -2,10 +2,15 @@
 
 declare(strict_types=1);
 
-// The two characters that decide how every number on every shipped screen reads. They live
-// here, beside the date patterns, for the same reason those do: they are properties of the
-// LANGUAGE, not of a screen, and a host that disagrees with one of them can publish the file
-// and change it.
+// The two characters that decide how every number on every shipped screen reads. They live in a
+// file of their own rather than on any screen's, because they are properties of the LANGUAGE and
+// not of a surface — a host that disagrees with one of them publishes this file and changes it
+// once, for everything.
+//
+// Date patterns are per-language as well and are NOT here, which this comment claimed for a
+// while. Each surface carries its own under its own `formats` KEY — the dashboard's are in
+// dashboard.php — because which pattern a column wants depends on the column. The two names
+// collide, so: this file is the numbers.
 //
 // Not `Illuminate\Support\Number`, and that is the whole reason this file exists. Every
 // locale-aware method on that class calls `ensureIntlExtensionIsInstalled()` and throws when

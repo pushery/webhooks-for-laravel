@@ -50,6 +50,9 @@ final class LocalizedNumber
      */
     public static function format(int|float $value, int $precision = 0): string
     {
+        // All three casts answer the type checker rather than the values. `__()` is declared
+        // `array|string|null` because a translation file may return an array, and an int
+        // argument widens on its own. Dropping any of them leaves every output unchanged.
         return number_format(
             (float) $value,
             $precision,
@@ -63,6 +66,9 @@ final class LocalizedNumber
      */
     public static function fileSize(int|float $bytes, int $precision = 0): string
     {
+        // As in format(): the cast reads the union once, here, so the rest of the method is
+        // about the ladder. It changes no output either -- abs(), the division and format()
+        // all take an int just as well.
         $value = (float) $bytes;
         $unit = 0;
         $last = count(self::UNITS) - 1;

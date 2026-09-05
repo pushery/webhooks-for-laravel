@@ -7,17 +7,17 @@ namespace Pushery\Webhooks\Database\Dialect\Sql;
 use Pushery\Webhooks\Database\Dialect\Dialect;
 
 /**
- * The idempotent insert the spatie backfill command writes each historical row with. It is a
+ * The idempotent insert the backlog import command writes each historical row with. It is a
  * sibling of {@see DedupeInsert}, but for a different job, so it differs in three ways:
  *
  *  - it conflicts on the PRIMARY KEY (id), not on (source, webhook_id). An imported row carries
- *    no producer webhook_id — spatie never captured one — so the receipt-time dedupe key does not
- *    apply. Idempotency comes from a DETERMINISTIC id (uuid5 over source + the spatie row id): a
- *    second run re-derives the same id and the conflict clause skips it. A conflict on
+ *    no producer webhook_id — such a table never captured one — so the receipt-time dedupe key
+ *    does not apply. Idempotency comes from a DETERMINISTIC id (uuid5 over source + the source
+ *    row id): a second run re-derives the same id and the conflict clause skips it. A conflict on
  *    (source, webhook_id) would let the null-webhook_id rows insert again on every run.
  *  - status is BOUND, not the literal 'received'. An imported call is history, not something the
  *    receiver still has to process, so the command writes a terminal 'processed'/'failed'.
- *  - created_at/updated_at are BOUND (the spatie row's own timestamps, preserved), not now().
+ *  - created_at/updated_at are BOUND (the source row's own timestamps, preserved), not now().
  *
  * Both engines take the same 13 columns in the same order as DedupeInsert; only the conflict
  * clause and the JSON cast differ. PostgreSQL RETURNs the id so the caller can count inserts
@@ -33,7 +33,7 @@ use Pushery\Webhooks\Database\Dialect\Dialect;
  */
 final class ImportInsert
 {
-    public static function spatieCalls(Dialect $dialect): string
+    public static function calls(Dialect $dialect): string
     {
         return match ($dialect) {
             Dialect::Pgsql => <<<'SQL'

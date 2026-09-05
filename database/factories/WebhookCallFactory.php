@@ -40,12 +40,14 @@ final class WebhookCallFactory extends Factory
         return $this->state(fn (): array => ['status' => WebhookCallStatus::Processed]);
     }
 
+    /**
+     * A call whose handling failed. The status is the whole of it: this log records THAT a call
+     * failed and not what was thrown, since the column that used to hold the text was written by
+     * nothing in the package and has been dropped.
+     */
     public function failed(): self
     {
-        return $this->state(fn (): array => [
-            'status' => WebhookCallStatus::Failed,
-            'exception' => 'Handler threw an exception.',
-        ]);
+        return $this->state(fn (): array => ['status' => WebhookCallStatus::Failed]);
     }
 
     public function withoutWebhookId(): self

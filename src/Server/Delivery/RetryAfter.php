@@ -91,12 +91,26 @@ final class RetryAfter
         ];
 
         foreach ($formats as $format) {
+            // The `!` resets every field the format does not name, and none of these three
+            // leaves one unnamed -- all of year, month, day, hour, minute and second are read
+            // from the value. So it changes no result here; it stays because a format string
+            // without it silently borrows from "now" the moment somebody adds a shorter one.
             $parsed = DateTimeImmutable::createFromFormat('!'.$format, $value, new DateTimeZone('GMT'));
 
             // `createFromFormat` succeeds on a value with trailing junk and on impossible dates
             // it rolls over (32 January becomes 1 February), so the warnings are what decide it.
             $errors = DateTimeImmutable::getLastErrors();
 
+            // Two halves of this line cannot be told apart from their alternatives, and one
+            // fact explains both: an ERROR never coexists with a successful parse. Measured over
+            // fourteen malformed values across all three formats -- rollovers, out-of-range
+            // times, trailing junk, wrong zones -- and every one that produced an error returned
+            // false as well. So the instanceof already implies error_count is zero, which leaves
+            // the sum and the difference reading the same, and leaves the type check unable to
+            // let a false through even if it were removed.
+            //
+            // Both stay: the instanceof is what the declared `static|false` return asks for, and
+            // the sum is what the sentence above says -- warnings and errors both disqualify.
             if ($parsed instanceof DateTimeImmutable && ($errors === false || ($errors['warning_count'] + $errors['error_count']) === 0)) {
                 return $parsed->getTimestamp();
             }

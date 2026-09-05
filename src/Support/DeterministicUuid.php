@@ -11,8 +11,8 @@ namespace Pushery\Webhooks\Support;
  * fixed — so its output is byte-for-byte the value uuid.uuid5() produces in any other
  * language, which the test pins against the canonical python.org DNS vector.
  *
- * The package needs it in exactly one place: the spatie import command derives a stable
- * primary key from (source, spatie-row-id) so a second run of the same import re-derives
+ * The package needs it in exactly one place: the backlog import command derives a stable
+ * primary key from (source, source-row-id) so a second run of the same import re-derives
  * the same ids and skips what it already wrote, rather than duplicating history. A random
  * UUID could not do that.
  *

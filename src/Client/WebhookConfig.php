@@ -193,6 +193,9 @@ final class WebhookConfig
                 continue;
             }
 
+            // The value is never read, only its presence: every reader below is an isset(),
+            // so false would do exactly as well. Written as true because that is what the
+            // name says -- seen.
             $seen[$name] = true;
 
             try {
@@ -264,6 +267,9 @@ final class WebhookConfig
                 continue;
             }
 
+            // The value is never read, only its presence: every reader below is an isset(),
+            // so false would do exactly as well. Written as true because that is what the
+            // name says -- seen.
             $seen[$name] = true;
 
             try {

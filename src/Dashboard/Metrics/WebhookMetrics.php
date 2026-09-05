@@ -188,6 +188,9 @@ final readonly class WebhookMetrics
         // Nothing in the rollup at all while rows exist: the whole lag is the age of the oldest
         // thing it should have seen, and the newest row is the cheapest honest floor for that.
         if (! is_string($newestBucket)) {
+            // The floor can only ever bind at zero: the difference is absolute, so it is never
+            // negative and any lower bound reads the same. It is written because "a lag is not
+            // negative" is the claim, not because a clock could hand back one.
             return (int) max(0, CarbonImmutable::now()->diffInSeconds($rowAt, absolute: true));
         }
 

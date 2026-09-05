@@ -40,6 +40,9 @@ final class RefreshEndpointHealthCommand extends Command
             } catch (Throwable $failure) {
                 $key = $subscription->getKey();
 
+                // As in RevokeRotatedSecretsCommand: the cast is for the declared list type,
+                // not for the output. The only reader is the implode() below, which renders an
+                // int identically. Measured -- the suite is green without it.
                 $failed[] = is_scalar($key) ? (string) $key : 'unknown';
 
                 report($failure);

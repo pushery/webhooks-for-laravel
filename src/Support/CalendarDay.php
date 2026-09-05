@@ -27,6 +27,10 @@ final class CalendarDay
      */
     public static function start(string $value): ?CarbonInterface
     {
+        // Redundant against the pattern below, which an empty string fails too -- measured, and
+        // the suite stays green without this guard. It stays because a bound is absent far more
+        // often than it is malformed, and saying so at the top is cheaper to read than inferring
+        // it from a regex.
         if ($value === '') {
             return null;
         }
@@ -46,6 +50,11 @@ final class CalendarDay
         // 2026-03-02, '0000-00-00' becomes -0001-11-30 — so the parse alone would answer a
         // question the reader did not ask. Comparing the result back against the input is
         // what turns "parsed" into "meant".
+        // The instanceof half cannot fire: createFromFormat is declared `static|false`, but every
+        // string that reaches here has already matched the pattern, and each of those parses.
+        // Measured over the pathological ones -- '0000-00-00', '9999-99-99', '2026-99-99' all
+        // return a date rather than false. It is the narrowing the declared type asks for, and
+        // the comparison after it is what does the work.
         if (! $date instanceof CarbonInterface || $date->format('Y-m-d') !== $value) {
             return null;
         }

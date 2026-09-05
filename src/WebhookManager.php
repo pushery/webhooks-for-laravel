@@ -740,6 +740,10 @@ final readonly class WebhookManager
     private function rateLimitDelayFor(WebhookSubscription $subscription): int
     {
         if (! $this->config->rateLimitEnabled()) {
+            // Zero rather than any other non-positive number, and the difference is not
+            // observable: the value becomes a queue delay, and a delay in the past is available
+            // immediately just as a delay of none is. It is a zero because that is what "no
+            // delay" is called, not because a test can tell it from a negative one.
             return 0;
         }
 

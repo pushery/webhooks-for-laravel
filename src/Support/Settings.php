@@ -676,6 +676,10 @@ final class Settings
             return null;
         }
 
+        // The default cannot apply: config/webhooks.php declares this key as a bool and the
+        // package merges its own config, so the value is present in every host. It is written
+        // anyway because Config::boolean() raises on a present null, and a reader asking whether
+        // that can happen should find the answer at the call.
         if (! Config::boolean('webhooks.platform.wildcards', false)) {
             return $types;
         }

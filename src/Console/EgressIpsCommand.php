@@ -67,6 +67,10 @@ final class EgressIpsCommand extends Command
             return;
         }
 
+        // The default here can never apply: config/webhooks.php declares this key as a bool and
+        // the package merges its own config, so the value is present in every host. It is
+        // written out anyway because Config::boolean() raises on a null, and a reader deciding
+        // whether that can happen should find the answer at the call rather than in the config.
         if (Config::boolean('webhooks.core.egress.enabled', false)) {
             return;
         }
