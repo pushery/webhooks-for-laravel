@@ -76,7 +76,7 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
 
         // The JOB timeout must always sit above the HTTP timeout it wraps, or the worker
         // kills the job mid-request: no lifecycle event fires, the delivery row is left
-        // pending for ever and the retry budget is never honoured. Raising
+        // pending for ever and the retry budget is never honored. Raising
         // webhooks.server.timeout is a perfectly reasonable thing to do for a slow
         // consumer, so it must not be able to overtake a hard-coded ceiling.
         $this->timeout = max(
@@ -203,7 +203,7 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
     /**
      * Whether the delivery may make another attempt. Attempts spent waiting out an
      * endpoint's own rate-limit window are not charged to the budget: the endpoint told
-     * us when to come back, and honouring that is not a failed try of ours.
+     * us when to come back, and honoring that is not a failed try of ours.
      */
     private function budgetRemaining(int $attempt): bool
     {
@@ -244,7 +244,7 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
      *
      * The code two branches up already warns about exactly this shape for a zero cap and
      * excludes it. The same thing happens on `sync` at ANY cap, because there the delay is not
-     * short — it is not honoured at all.
+     * short — it is not honored at all.
      */
     private function queueCanDelay(): bool
     {

@@ -36,7 +36,7 @@ use Pushery\Webhooks\Client\Models\WebhookCall;
  * with it, into the queue store, and into the log of any listener that recorded the event. That
  * needed no queue either: a reporter serializing the event after a listener threw did the same.
  * `WebhookConfig::forName($event->source)` returns the whole config, read from configuration
- * rather than from a payload that travelled.
+ * rather than from a payload that traveled.
  */
 final class UnreadableWebhookPayload
 {

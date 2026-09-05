@@ -4,6 +4,18 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1] - 2026-09-05
+
+### Fixed
+
+- **A dashboard reader who belongs to no tenant sees an empty page again, not a 500.** `DashboardScope::current()` resolved the acting tenant through a method that promises one and therefore had to throw when the resolver returned nothing — so the standalone dashboard answered `500` for every state where `view-webhook-dashboard` lets somebody in and no tenant comes back: an operator on a fresh installation before the first tenant exists, a support account with no company of its own, and any test asserting the empty state.
+
+  The ability is documented as the way into the dashboard. A state the ability admits and the page cannot survive is a defect rather than a configuration question, and until v2.3.0 the same state simply rendered nothing.
+
+  It is now a scope of its own rather than one of the three that already existed, because none of them answers it. `all_tenants` would show every other tenant's delivery history — a wider permission traded for an empty state. `operator` would show the owner-less rows, which answers a different question than "mine, and there are none". So the new scope resolves to nothing, on the raw tables and on the hourly rollup alike, and its per-row guard admits nothing: an untenanted reader must not end up seeing exactly what an operator sees.
+
+  **The exception message was misleading too, and that is fixed separately.** It said "Register a resolver with `DashboardScope::resolveUsing()`" in both cases — including the one where a resolver *was* registered and simply had nothing to return, which sent the reader to the one place the problem was not. The two states are now told apart, because they are repaired differently: one is a wiring step nobody took, the other is an ordinary runtime state.
+
 ## [2.6.0] - 2026-09-05
 
 ### Added
@@ -2903,7 +2915,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v2.6.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v2.6.1...HEAD
+[2.6.1]: https://github.com/pushery/webhooks-for-laravel/compare/v2.6.0...v2.6.1
 [2.6.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.3.0...v2.4.0

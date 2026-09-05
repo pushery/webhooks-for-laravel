@@ -143,7 +143,7 @@ final class EndpointList extends Component
 
     /**
      * Permanently remove one owned endpoint, gated by both the row-level policy and the
-     * allow_delete switch (the policy already honours the switch).
+     * allow_delete switch (the policy already honors the switch).
      *
      * NOT named `delete`, and the reason is not style. Livewire's CSP-safe build parses a
      * `wire:click` expression itself rather than handing it to the JS engine, and `delete`

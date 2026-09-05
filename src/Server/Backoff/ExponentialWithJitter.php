@@ -62,7 +62,7 @@ final readonly class ExponentialWithJitter implements BackoffStrategy
     public function withRetryAfterCap(int $retryAfterCapSeconds): self
     {
         // Lowering this floor is EQUIVALENT and reported every run: a stored -1 and a stored 0
-        // both mean "no cap to honour", so both fall through to the jitter schedule. Raising it
+        // both mean "no cap to honor", so both fall through to the jitter schedule. Raising it
         // is not equivalent, and the arm distinguishing a zero cap from a one-second one holds
         // that direction — the two floors on this class are deliberately different, and that is
         // the one worth guarding.

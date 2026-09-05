@@ -70,7 +70,7 @@ final class AddressClassifier
         '2002::/16',          // 6to4 (RFC 3056) — embeds an IPv4 in bits 16-47
         'fc00::/7',           // ULA (incl. fd00:ec2::254 cloud metadata)
         'fe80::/10',          // link-local
-        // Site-local. Deprecated in favour of ULA (RFC 3879), but private BY INTENT and
+        // Site-local. Deprecated in favor of ULA (RFC 3879), but private BY INTENT and
         // still routed inside some networks — a webhook endpoint never legitimately lives
         // there, so it is blocked like every other private range.
         'fec0::/10',          // site-local (deprecated)

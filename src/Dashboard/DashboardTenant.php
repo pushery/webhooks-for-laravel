@@ -67,6 +67,25 @@ final readonly class DashboardTenant
     }
 
     /**
+     * The scope of a reader who holds the dashboard ability and belongs to no tenant.
+     *
+     * It resolves to nothing, and that is the whole point: an operator on a fresh installation,
+     * a support account with no company of its own, and a test asserting the empty state are all
+     * states the ability admits. Before this existed the resolver returned null, currentOwner()
+     * threw, and the page answered 500 -- a state the ability lets a person into and the screen
+     * could not survive.
+     *
+     * None of the three existing scopes is the answer. All-tenants shows every other tenant's
+     * history, which is a permission escalation traded for an empty state; global shows the
+     * owner-less rows, which is a different question than "mine, and there are none"; and the
+     * per-tenant scope is exactly the one that cannot be built without an identity.
+     */
+    public static function untenanted(): self
+    {
+        return new self(null, DashboardScopeKind::Untenanted);
+    }
+
+    /**
      * The owner-less-only scope. Deliberately FALSE for all-tenants: that scope has no owner
      * identity either, so a `! $identity instanceof TenantIdentity` test would call it global
      * and quietly hand a caller the wrong answer about what it can see.
@@ -103,9 +122,15 @@ final readonly class DashboardTenant
         // into whereRaw() — an empty condition there is a SQL syntax error, and making each
         // call site branch on "did I get a condition?" is how one of them ends up unscoped
         // by accident.
-        return $this->kind === DashboardScopeKind::AllTenants
-            ? ['1 = 1', []]
-            : ['owner_type IS NULL AND owner_id IS NULL', []];
+        // `1 = 0` for the untenanted scope, and it is written as a fragment for the same reason
+        // `1 = 1` is above: every caller splices this straight into whereRaw(), so an empty
+        // string is a syntax error and a null return makes each call site branch on "did I get
+        // a condition?" -- which is how one of them ends up unscoped by accident.
+        return match ($this->kind) {
+            DashboardScopeKind::AllTenants => ['1 = 1', []],
+            DashboardScopeKind::Untenanted => ['1 = 0', []],
+            default => ['owner_type IS NULL AND owner_id IS NULL', []],
+        };
     }
 
     /**
@@ -131,6 +156,12 @@ final readonly class DashboardTenant
             return ['1 = 1', []];
         }
 
+        // Matched before the dialect branch, because the answer does not depend on how either
+        // engine spells a null owner: there is no owner to spell.
+        if ($this->kind === DashboardScopeKind::Untenanted) {
+            return ['1 = 0', []];
+        }
+
         return $dialect === Dialect::MySql
             ? ['owner_type = ? AND owner_id = ?', ['', OwnerKeyType::fromConfig()->sentinelId()]]
             : ['owner_type IS NULL AND owner_id IS NULL', []];
@@ -150,6 +181,13 @@ final readonly class DashboardTenant
         // All-tenants covers every row by definition, so the per-row guard admits them all.
         // The ACTION behind that guard is still gated separately (the delivery policy also
         // requires the manage ability) — this says what the scope can SEE, not what it may do.
+        // The untenanted scope covers nothing, so the per-row guard admits nothing. Reaching the
+        // owner-less test below it would make an untenanted reader see exactly the rows an
+        // OPERATOR sees, which is the confusion the separate case exists to prevent.
+        if ($this->kind === DashboardScopeKind::Untenanted) {
+            return false;
+        }
+
         return $this->kind === DashboardScopeKind::AllTenants
             || ($ownerType === null && $ownerId === null);
     }
