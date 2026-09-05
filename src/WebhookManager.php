@@ -340,7 +340,7 @@ final readonly class WebhookManager
      *
      * It is the same delivery, not a second kind of one. The payload goes through the
      * catalog schema, the NUL scrub and the same offload; the send re-validates SSRF,
-     * signs, honours the circuit breaker, and is SHAPED by the rate limit rather than
+     * signs, honors the circuit breaker, and is SHAPED by the rate limit rather than
      * discarded by it. A targeted send with its own semantics would be a second surface
      * to keep in step, and the gaps would open in the copy nobody reads.
      *

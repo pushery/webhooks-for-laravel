@@ -7,7 +7,7 @@ namespace Pushery\Webhooks\Server\Backoff;
 /**
  * Computes how long to wait before the retry that follows a failed attempt. The
  * default is {@see ExponentialWithJitter}. The optional Retry-After hint is a
- * seam: a strategy MAY honour a server-supplied delay (e.g. from a 429/503
+ * seam: a strategy MAY honor a server-supplied delay (e.g. from a 429/503
  * `Retry-After` header) instead of its own schedule — wired up later, but
  * present from day zero so it stays an additive change.
  */

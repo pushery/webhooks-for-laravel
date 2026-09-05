@@ -193,7 +193,7 @@
                                 wire:click="redeliver('{{ $delivery->id }}')"
                                 wire:loading.attr="disabled"
                                 {{-- Scoped like every sibling replay button. Without it the row
-                                     greys out on any commit of this component, a filter change
+                                     grays out on any commit of this component, a filter change
                                      included. --}}
                                 wire:target="redeliver"
                                 :aria-label="__('webhooks::self-service.deliveries.replay_sr', ['label' => __('webhooks::self-service.deliveries.replay'), 'event' => $delivery->event_type, 'at' => $when->isoFormat(__('webhooks::self-service.formats.precise'))])"

@@ -34,14 +34,14 @@ use Pushery\Webhooks\Core\Signing\VerificationStatus;
  * `abort()` that answers 401 — so every forged, unsigned or expired POST came back 500, from
  * an anonymous caller, on the default configuration, on the one path this docblock promises is
  * never a 500. The listener never ran either, so the rate-limiting it was queued for did not
- * happen. The invitation above was a trap for exactly as long as the request travelled.
+ * happen. The invitation above was a trap for exactly as long as the request traveled.
  *
  * **No WebhookConfig.** It holds the signing secret and the rotation secret in cleartext, so
  * any listener that logged the event, or any reporter that serialized it after one threw,
  * wrote `whsec_…` into the log and into the queue store — a copy no retention policy on
  * anything covers, and one that needed no queue at all. `source` is the config's name, and
  * `Pushery\Webhooks\Client\WebhookConfig::forName($event->source)` returns the whole
- * config, resolved from configuration rather than from a payload that travelled through a store.
+ * config, resolved from configuration rather than from a payload that traveled through a store.
  *
  * What is here is what an abuse listener acts on: who ({@see self::$ip}), where
  * ({@see self::$path}), what happened ({@see self::$reason}) and which producer

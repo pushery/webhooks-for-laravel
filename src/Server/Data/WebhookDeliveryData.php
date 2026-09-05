@@ -20,7 +20,7 @@ use Pushery\Webhooks\Server\Jobs\CallWebhookJob;
  *
  * {@see self::$attemptOffset} and {@see self::$retryAfterDeferrals} carry the parts of
  * a delivery's history that a queue release cannot: releasing a job re-pushes its
- * ORIGINAL payload, so state mutated on the job object is lost. A delivery that honours
+ * ORIGINAL payload, so state mutated on the job object is lost. A delivery that honors
  * an endpoint's long Retry-After is therefore re-dispatched as a fresh job carrying
  * these two counters — how many requests it has already made, and how many of those
  * ended in a rate-limit wait that must not be charged to its retry budget.

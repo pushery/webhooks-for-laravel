@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 /**
- * The default acknowledgement: a 200 with a plain "ok" body.
+ * The default acknowledgment: a 200 with a plain "ok" body.
  */
 final class DefaultRespondsTo implements RespondsToWebhook
 {

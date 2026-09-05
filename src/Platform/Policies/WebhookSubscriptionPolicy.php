@@ -19,7 +19,7 @@ use Pushery\Webhooks\Support\TenantIdentity;
  * Every ability is granted only when the subscription belongs to the acting tenant
  * AND — when a host has wired the manage-webhook-endpoints ability — that ability
  * passes. With the ability undefined, tenant ownership alone authorizes, so the layer
- * is usable turnkey while a host can still tighten it. Deletion additionally honours
+ * is usable turnkey while a host can still tighten it. Deletion additionally honors
  * the allow_delete switch.
  */
 final class WebhookSubscriptionPolicy

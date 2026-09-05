@@ -35,7 +35,7 @@ enum DeliveryStatus: string
      * `pending` — while the dashboard and the portal mapped it to `danger`, so the worst
      * outcome a delivery has read one step too harmless on the surface a host publishes and
      * restyles. And the dashboard's own delivery table had no `refused` arm at all, so a
-     * delivery that was never sent fell through to amber there and grey beside it.
+     * delivery that was never sent fell through to amber there and gray beside it.
      *
      * The portal's copy carried a comment stating the rule — "exhausted is danger, not warning.
      * Two surfaces disagreeing about which outcome is grave is a difference a reader would have

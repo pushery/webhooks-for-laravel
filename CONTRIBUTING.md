@@ -14,7 +14,7 @@ these documents — the development harness stays upstream).
 Two consequences worth knowing before you start:
 
 - **Pull requests cannot be merged here.** The next release would overwrite them.
-  That is a property of the mirror, not a judgement on the change.
+  That is a property of the mirror, not a judgment on the change.
 - **Issues are the real channel** — and they are read. A bug report or a feature
   request here is what drives the upstream backlog.
 

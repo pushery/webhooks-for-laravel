@@ -85,7 +85,22 @@ final class DashboardScope
             return DashboardTenant::global();
         }
 
-        return DashboardTenant::forTenant(self::currentOwner());
+        // Resolved here rather than through currentOwner(), and the difference is a 500.
+        //
+        // currentOwner() promises a TenantIdentity, so it has to throw when there is none. But
+        // "no tenant" is a state the `view-webhook-dashboard` ability ADMITS: an operator on a
+        // fresh installation before the first tenant exists, a support account with no company
+        // of its own, and every test that asserts the empty state. A state the ability lets a
+        // person into and the page cannot survive is a defect, not a configuration question.
+        //
+        // Reported from a consumer against v2.6.0, where the standalone dashboard answered 500.
+        // Under v2.3.0 the same state simply rendered nothing; the untenanted scope is that
+        // behavior named rather than a new one.
+        $identity = self::normalize(self::resolve());
+
+        return $identity instanceof TenantIdentity
+            ? DashboardTenant::forTenant($identity)
+            : DashboardTenant::untenanted();
     }
 
     /**
@@ -147,9 +162,34 @@ final class DashboardScope
         $identity = self::normalize(self::resolve());
 
         if (! $identity instanceof TenantIdentity) {
+            // Two cases, two sentences, and merging them cost a reader an afternoon. The old
+            // message said "Register a resolver with DashboardScope::resolveUsing()" for both --
+            // and in the reported case a resolver WAS registered, it simply had nothing to
+            // return. That sends the reader to the one place the problem is not.
+            //
+            // They are also repaired differently: one is a wiring step the host never took, the
+            // other is a person who belongs to no tenant, which is an ordinary runtime state.
+            // One sentence, not two, and the second draft is why.
+            //
+            // The old message said "Register a resolver with DashboardScope::resolveUsing()" --
+            // and in the reported case a resolver WAS registered, it simply had nothing to
+            // return, so the reader was sent to the one place the problem was not.
+            //
+            // The obvious repair was to split it in two. That was wrong twice over. Written as
+            // a ternary it took the coverage floor from 100 to 94.6, because pcov credits a
+            // multi-line ternary line by line and the arm that does not run reads as uncovered.
+            // Written as two statements it stayed uncovered, because the unregistered case
+            // CANNOT reach here: the default resolver throws its own message first, or returns
+            // something normalize() can read. The arm asserting it passed only because that
+            // other message happens to contain the same sentence.
+            //
+            // So the unregistered case keeps its wording where it already lives, and this one
+            // says what is true when it is reached.
             throw new RuntimeException(
-                'The webhook dashboard is tenant-scoped but no owner identity was resolved. '
-                .'Register a resolver with DashboardScope::resolveUsing().'
+                'The webhook dashboard is tenant-scoped and its resolver returned no owner '
+                .'identity. That is an ordinary state for a reader who belongs to no tenant '
+                .'-- DashboardScope::current() answers it with an empty scope. Call that '
+                .'instead, or have the resolver return a tenant.'
             );
         }
 

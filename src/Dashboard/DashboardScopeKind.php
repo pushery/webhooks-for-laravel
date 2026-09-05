@@ -24,4 +24,13 @@ enum DashboardScopeKind
 
     /** Every row, whoever owns it — the cross-tenant support console. */
     case AllTenants;
+
+    /**
+     * No tenant at all: the reader holds the dashboard ability and belongs to nobody.
+     *
+     * A distinct case rather than reusing Global, because the two are opposites in what they
+     * show. Global reads the owner-less rows an operator registered; this one reads NOTHING.
+     * Folding them together would answer "what did I send?" with somebody else's endpoints.
+     */
+    case Untenanted;
 }
