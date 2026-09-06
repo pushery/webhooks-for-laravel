@@ -4,78 +4,41 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.1] - 2026-09-06
+
+### Fixed
+
+- **The 3.0.0 entry is formatted the way a release body needs, so it reads as written.** A published release body renders a single newline as a LINE BREAK, unlike the same newline in a Markdown file — so the hard-wrapped 3.0.0 entry came out as a narrow column of stubs beside the paragraphs nobody wrapped. It is one paragraph per line now, and the paragraphs that continue a bullet are indented so they stay part of it rather than closing the list. No wording changed; the reflow verifies the word sequence and refuses if it did.
+
 ## [3.0.0] - 2026-09-05
 
 ### Added
 
-- **A host can declare which endpoints a reader may SEE.** The self-service delivery panel
-  scopes by the denormalized owner pair, which answers *does this row belong to this owner?* An
-  application that shares an endpoint has a second question — *may this person see this row?* —
-  and the two part company at exactly that point: a member of an organization a destination is
-  shared into is not the owner, so under owner scoping alone they see nothing.
+- **A host can declare which endpoints a reader may SEE.** The self-service delivery panel scopes by the denormalized owner pair, which answers *does this row belong to this owner?* An application that shares an endpoint has a second question — *may this person see this row?* — and the two part company at exactly that point: a member of an organization a destination is shared into is not the owner, so under owner scoping alone they see nothing.
 
-  `Pushery\Webhooks\Platform\Support\ReadableEndpoints::resolveUsing()` takes a closure
-  returning the endpoint ids that reader may read beyond the ones they own. A set of ids rather
-  than a predicate, on purpose: a closure handed the query could drop the owner scoping, and
-  then the panel's central promise would depend on host code. The resolver can only **add**.
+  `Pushery\Webhooks\Platform\Support\ReadableEndpoints::resolveUsing()` takes a closure returning the endpoint ids that reader may read beyond the ones they own. A set of ids rather than a predicate, on purpose: a closure handed the query could drop the owner scoping, and then the panel's central promise would depend on host code. The resolver can only **add**.
 
-  It reaches the delivery list, the endpoint filter and the filter's option list. It does **not**
-  reach the replay, which still loads its endpoint through the owner-scoped lookup — so a reader
-  who may see a shared endpoint's history cannot send from it. With no resolver registered
-  nothing changes anywhere.
+  It reaches the delivery list, the endpoint filter and the filter's option list. It does **not** reach the replay, which still loads its endpoint through the owner-scoped lookup — so a reader who may see a shared endpoint's history cannot send from it. With no resolver registered nothing changes anywhere.
 
-- **The delivery list shows how long each delivery took**, beside the response code it took
-  that long to get. The package already measured it on every attempt. Bound to the code rather
-  than standing alone: a failure that never got an answer also has a duration — the time spent
-  failing to get one — and printing that beside an em dash would read as latency.
+- **The delivery list shows how long each delivery took**, beside the response code it took that long to get. The package already measured it on every attempt. Bound to the code rather than standing alone: a failure that never got an answer also has a duration — the time spent failing to get one — and printing that beside an em dash would read as latency.
 
 ### Changed
 
-- **BREAKING — `webhooks:import-spatie-calls` is now `webhooks:import-calls`, and it reads the
-  shape you declare instead of one it assumed.** Five new options name the source columns
-  (`--from-id`, `--from-source`, `--from-payload`, `--from-headers`, `--from-error`), and their
-  defaults are exactly the columns the old command hardcoded — so an existing invocation needs
-  only the new name. Any prior inbound-webhook table can now be imported, not just one shape.
-- **BREAKING — the derived import key changed, so ids from an earlier import no longer
-  re-derive.** Running the command over a source table you already imported would import all of
-  it a second time; the old rows are indistinguishable from ones this package received itself,
-  so nothing can detect it for you. `--dry-run` shows it before any write: over a backlog you
-  already imported it must report everything as already present.
-- The operator console's permission guidance names the mechanism rather than one package: the
-  trap is any permission package that resolves through its own `Gate::before` hook and reads the
-  first positional gate argument as a guard name. `admin.abilities` remains the way past it, and
-  nothing about its behavior changed.
+- **BREAKING — `webhooks:import-spatie-calls` is now `webhooks:import-calls`, and it reads the shape you declare instead of one it assumed.** Five new options name the source columns (`--from-id`, `--from-source`, `--from-payload`, `--from-headers`, `--from-error`), and their defaults are exactly the columns the old command hardcoded — so an existing invocation needs only the new name. Any prior inbound-webhook table can now be imported, not just one shape.
+- **BREAKING — the derived import key changed, so ids from an earlier import no longer re-derive.** Running the command over a source table you already imported would import all of it a second time; the old rows are indistinguishable from ones this package received itself, so nothing can detect it for you. `--dry-run` shows it before any write: over a backlog you already imported it must report everything as already present.
+- The operator console's permission guidance names the mechanism rather than one package: the trap is any permission package that resolves through its own `Gate::before` hook and reads the first positional gate argument as a guard name. `admin.abilities` remains the way past it, and nothing about its behavior changed.
 
 ### Removed
 
-- **BREAKING — the `exception` column is dropped from `webhook_calls`.** Nothing in this package
-  ever wrote it: not the receive path, not the backlog import, not a listener. It was declared
-  when the table was created, outlived the rewrite it came in with, and stood null on every row
-  while reading like a feature — the documentation promised the import filled it, and the import
-  never did. A migration drops it from existing installations; if you adopted the column for your
-  own bookkeeping, copy the values out before migrating. The status it decided is unchanged and
-  still imported.
+- **BREAKING — the `exception` column is dropped from `webhook_calls`.** Nothing in this package ever wrote it: not the receive path, not the backlog import, not a listener. It was declared when the table was created, outlived the rewrite it came in with, and stood null on every row while reading like a feature — the documentation promised the import filled it, and the import never did. A migration drops it from existing installations; if you adopted the column for your own bookkeeping, copy the values out before migrating. The status it decided is unchanged and still imported.
 
-  The shipped `WebhookCall` factory follows: its `failed()` state now sets the status alone,
-  which is the whole of what that state means here — this log records *that* a call failed, not
-  what was thrown. If your own tests asserted on the value that state used to write, that
-  assertion goes.
+  The shipped `WebhookCall` factory follows: its `failed()` state now sets the status alone, which is the whole of what that state means here — this log records *that* a call failed, not what was thrown. If your own tests asserted on the value that state used to write, that assertion goes.
 
 ### Fixed
 
-- **A replay refused by the engine is answered with a sentence instead of a 500.** The panel
-  checks whether the endpoint is active on the row it loaded; the manager re-reads the
-  subscription off the delivery and checks again. Between the two the endpoint can be switched
-  off — by the circuit breaker on a concurrent failure, or by the tenant in another tab — and
-  the refusal then arrived over an ordinary button press. The window is small and not
-  hypothetical: the breaker disables an endpoint precisely while its deliveries are failing,
-  which is when somebody is looking at that list and pressing Send again.
+- **A replay refused by the engine is answered with a sentence instead of a 500.** The panel checks whether the endpoint is active on the row it loaded; the manager re-reads the subscription off the delivery and checks again. Between the two the endpoint can be switched off — by the circuit breaker on a concurrent failure, or by the tenant in another tab — and the refusal then arrived over an ordinary button press. The window is small and not hypothetical: the breaker disables an endpoint precisely while its deliveries are failing, which is when somebody is looking at that list and pressing Send again.
 
-- The localization guide now lists all six shipped translation files. `formats` — the thousands
-  and decimal separators every screen counts with — was missing from its table, so a host whose
-  house style disagrees with ICU's had no documented place to change them. That file's own
-  comment pointed at the wrong place for date patterns as well: those sit under each surface's
-  own `formats` key, not beside the separators.
+- The localization guide now lists all six shipped translation files. `formats` — the thousands and decimal separators every screen counts with — was missing from its table, so a host whose house style disagrees with ICU's had no documented place to change them. That file's own comment pointed at the wrong place for date patterns as well: those sit under each surface's own `formats` key, not beside the separators.
 
 ## [2.6.1] - 2026-09-05
 
@@ -2988,7 +2951,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.0.1...HEAD
+[3.0.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.6.1...v3.0.0
 [2.6.1]: https://github.com/pushery/webhooks-for-laravel/compare/v2.6.0...v2.6.1
 [2.6.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.5.0...v2.6.0
