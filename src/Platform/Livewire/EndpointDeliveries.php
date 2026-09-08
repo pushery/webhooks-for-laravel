@@ -22,6 +22,7 @@ use Pushery\Webhooks\Models\WebhookDelivery;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
 use Pushery\Webhooks\Platform\Support\ReadableEndpoints;
+use Pushery\Webhooks\Platform\Support\ReplayableEndpoints;
 use Pushery\Webhooks\Platform\Support\SubscriptionScope;
 use Pushery\Webhooks\Server\Exceptions\DeliveryRefused;
 use Pushery\Webhooks\Support\CalendarDay;
@@ -329,7 +330,17 @@ final class EndpointDeliveries extends Component
         $this->message = '';
 
         $delivery = $this->deliveryQuery()->select('*')->whereKey($id)->firstOrFail();
-        $endpoint = $this->findOwnedEndpoint($delivery->subscription_id);
+
+        // Two lookups rather than one, and which runs is the host's declaration.
+        //
+        // The owner-scoped one is still the default and still the whole answer for a host that
+        // declared nothing. The unscoped one is reachable only for an id the host named through
+        // {@see ReplayableEndpoints} -- and only after the line above already admitted the row
+        // through the READ scope, so an endpoint declared replayable but not readable never gets
+        // this far. The policy below re-asks anyway; this decides which row it is asked about.
+        $endpoint = ReplayableEndpoints::allows($delivery->subscription_id)
+            ? WebhookSubscription::query()->findOrFail($delivery->subscription_id)
+            : $this->findOwnedEndpoint($delivery->subscription_id);
 
         // Redundant with the boot gate, and deliberately kept: {@see InteractsWithEndpoints}
         // states the rule and its measurement in full -- the gate reads the same ability this

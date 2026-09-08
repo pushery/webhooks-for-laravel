@@ -36,10 +36,13 @@ use RuntimeException;
  * exactly what it was — the seam is inert until somebody uses it, which is the only acceptable
  * default for something that widens a read.
  *
- * It widens READING and nothing else. The replay action stays owner-scoped: it loads its
- * endpoint through the owner-scoped lookup, so a reader who may see a shared endpoint's history
- * cannot replay from it. That is the distinction the case asks for, and it is enforced by two
- * different lookups rather than by one flag read twice.
+ * It widens READING and nothing else, and that is still true of THIS resolver: declaring an
+ * endpoint readable grants no right to replay from it. A host that wants to grant both says so
+ * twice, through {@see ReplayableEndpoints} as well — two resolvers rather than one flag read
+ * in two places, because seeing what was sent and sending it again are different permissions
+ * and a real policy answers them apart.
+ *
+ * With only this one registered, replay stays owner-scoped exactly as before.
  */
 final class ReadableEndpoints
 {
