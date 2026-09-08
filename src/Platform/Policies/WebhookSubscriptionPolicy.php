@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Gate;
 use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Platform\Support\ReplayableEndpoints;
 use Pushery\Webhooks\Platform\Support\SubscriptionScope;
 use Pushery\Webhooks\Support\TenantIdentity;
 
@@ -63,12 +64,22 @@ final class WebhookSubscriptionPolicy
      *
      * Deliberately its OWN ability rather than folding into `update`: replaying causes an
      * outbound HTTP request to leave the installation, which is a different kind of act from
-     * editing a row, and a host tightening one has no reason to be forced to tighten the
-     * other. The same tenant-ownership floor applies either way.
+     * editing a row, and a host tightening one has no reason to be forced to tighten the other.
+     *
+     * The ownership floor is the one place this ability differs from its siblings, and only
+     * because a host asked it to. {@see ReplayableEndpoints} lets an application name endpoints
+     * somebody may replay from without owning -- the administrator of an organization a
+     * destination is shared into, in the case it was built for. It can only ADD: with no
+     * resolver registered this is ownership alone, exactly as before.
+     *
+     * What it does NOT do is skip the ability. Whose endpoint and may-this-person-manage-webhooks
+     * are two questions, and a host that tightened the second did not ask for the first to
+     * reopen it.
      */
     public function redeliver(Authenticatable $user, WebhookSubscription $subscription): bool
     {
-        return $this->ownsAndCan($user, $subscription);
+        return ($this->ownedByCurrentTenant($subscription) || ReplayableEndpoints::allows($subscription->id))
+            && $this->hasManageAbility($user);
     }
 
     private function ownsAndCan(Authenticatable $user, WebhookSubscription $subscription): bool

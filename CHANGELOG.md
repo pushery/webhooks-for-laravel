@@ -4,6 +4,16 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-09-08
+
+### Added
+
+- **A host can declare who may REPLAY from an endpoint they do not own.** `Pushery\Webhooks\Platform\Support\ReplayableEndpoints::resolveUsing()`, the sibling of the read seam beside it. Reading and replaying were one question with one answer — ownership — so an application that shares a destination into an organization could grant its members the history and had no way to grant an administrator the replay. The button rendered and then refused, which is the shape that teaches a reader the screen is unreliable.
+
+  A second resolver rather than the first one consulted twice, because the two permissions genuinely differ: membership is enough to see what an organization's destinations received, while causing a fresh request to leave your installation under one of those destinations is what you reserve for an administrator. Declaring an endpoint readable still grants no right to replay from it.
+
+  It can only **add**. The owner path is untouched, `manage-webhook-endpoints` still has to pass where you define it — this answers whose endpoint, never whether somebody may manage webhooks at all — and with nothing registered replay is exactly what it was. One invariant falls out of the order rather than being enforced twice: replay implies readable, because the action loads the delivery row through the read-scoped query before it looks at the endpoint.
+
 ## [3.1.0] - 2026-09-08
 
 ### Added
@@ -2983,7 +2993,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.1.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.0...HEAD
+[3.2.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.0.1...v3.1.0
 [3.0.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.6.1...v3.0.0
