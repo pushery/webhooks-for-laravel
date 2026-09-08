@@ -17,6 +17,7 @@ use Pushery\Webhooks\Livewire\Concerns\AuthorizesOperatorActions;
 use Pushery\Webhooks\Models\WebhookDelivery;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Support\CalendarDay;
+use Pushery\Webhooks\Support\Settings;
 use Pushery\Webhooks\Support\UiVariant;
 
 /**
@@ -74,6 +75,29 @@ class DeliveryLog extends Component
      * is bound to a <select> whose empty option carries '' — and because every public
      * property here is writable from the browser, so it holds whatever arrives.
      */
+    public string $endpointId = '';
+
+    /**
+     * The former name of $endpointId, kept working rather than removed.
+     *
+     * It held an endpoint's id while calling it a subscription, and the two words are not
+     * interchangeable to a reader: the portal panel beside it calls the same thing
+     * `endpointId`, every option in this filter is described as one customer endpoint, and
+     * the docblock above has always said endpoint. A consumer evaluating adoption compares
+     * property names — the cheapest comparison and therefore the usual one — and this one
+     * read as a filter that did not exist, so the capability was invisible and got built a
+     * second time. That is the expensive kind of naming defect: it disguises itself as a
+     * missing feature.
+     *
+     * Renaming alone would have been a breaking change for the wrong people. Both stubs are
+     * meant to be PUBLISHED and edited — that is this package's main customization path — and
+     * a published copy binds this name in its markup, so dropping it would break the filter in
+     * every host that took the package up on its own advice. The two are kept in step in both
+     * directions instead, and a host on either name sees no difference.
+     *
+     * @deprecated Renamed to $endpointId. Bind to that in a published view; this keeps
+     *             working, and nothing is planned that removes it before the next major.
+     */
     public string $subscriptionId = '';
 
     /**
@@ -102,9 +126,29 @@ class DeliveryLog extends Component
      * it is a decision the reader takes rather than a state they arrive in.
      *
      * `0` opens the log unbounded, for a host that wants the old behavior back.
+     *
+     * A range the host passed in wins, and that is the whole reason for the first condition
+     * below. This used to set the bound unconditionally, so a link carrying a date range lost
+     * it on arrival: the reader opened on the last thirty days and never saw what somebody
+     * had sent them, with nothing to suggest a range had been discarded. A default is what
+     * happens when nobody said otherwise, and somebody said otherwise here.
      */
     public function mount(): void
     {
+        // A host passing the deprecated name gets the same panel. Properties arrive before
+        // mount() runs, so this is the one place that sees what was handed in.
+        if ($this->subscriptionId !== '' && $this->endpointId === '') {
+            $this->endpointId = $this->subscriptionId;
+        }
+
+        if ($this->endpointId !== '' && $this->subscriptionId === '') {
+            $this->subscriptionId = $this->endpointId;
+        }
+
+        if ($this->from !== '') {
+            return;
+        }
+
         $days = Config::integer('webhooks.ui.deliveries.default_window_days', self::DEFAULT_WINDOW_DAYS);
 
         if ($days > 0) {
@@ -134,9 +178,31 @@ class DeliveryLog extends Component
         $this->resetPage();
     }
 
+    public function updatingEndpointId(): void
+    {
+        $this->resetPage();
+    }
+
     public function updatingSubscriptionId(): void
     {
         $this->resetPage();
+    }
+
+    /**
+     * Keep the deprecated alias and its replacement in step, in both directions.
+     *
+     * Assigning a property in PHP fires no Livewire hook, so neither of these can call the
+     * other back. A published view binds one of the two names and never both, and whichever it
+     * binds has to be the one the query reads.
+     */
+    public function updatedEndpointId(string $value): void
+    {
+        $this->subscriptionId = $value;
+    }
+
+    public function updatedSubscriptionId(string $value): void
+    {
+        $this->endpointId = $value;
     }
 
     public function updatingFrom(): void
@@ -245,12 +311,17 @@ class DeliveryLog extends Component
         $truncated = $endpoints->count() > self::ENDPOINT_OPTIONS;
 
         $query = WebhookDelivery::query()
+            // Eagerly, and with three columns rather than the row: every rendered delivery names
+            // its endpoint now -- in the column and in both action names -- so the lazy read this
+            // view has always done in its aria-labels was already 25 queries a page. It simply
+            // cost nothing visible, which is why nobody counted it.
+            ->with(['subscription:id,name,url'])
             ->when($this->status !== '', fn (Builder $query): Builder => $query->where('status', $this->status))
             ->when($this->eventType !== '', fn (Builder $query): Builder => $query->where('event_type', $this->eventType))
             // The cast is for the declared column type, not for the comparison: ctype_digit has
             // already established the string is all digits, and the driver compares a numeric
             // string against a bigint the same way either side of it.
-            ->when(ctype_digit($this->subscriptionId), fn (Builder $query): Builder => $query->where('subscription_id', (int) $this->subscriptionId));
+            ->when(ctype_digit($this->endpointId), fn (Builder $query): Builder => $query->where('subscription_id', (int) $this->endpointId));
 
         // Through the package's own timestamp scopes, and NOT through whereDate() or a bare
         // where(). Two separate reasons, both silent when got wrong:
@@ -294,10 +365,26 @@ class DeliveryLog extends Component
             // rather than a count(*) over millions of rows on every render for everyone else.
             ->simplePaginate(25);
 
+        // The catalog, or an empty list when the application declares none. Empty is the
+        // load-bearing value rather than a missing one: a host that keeps the catalog empty
+        // registers any type it likes, so the filter has to stay free text there. Only a
+        // populated catalog becomes a choice -- {@see Settings::acceptedEventTypes()} states
+        // the same distinction for the registration side.
+        $eventTypes = new Settings()->eventTypes();
+
         return ViewFactory::make(UiVariant::view('delivery-log'), [
             'deliveries' => $deliveries,
             'endpoints' => $endpoints->take(self::ENDPOINT_OPTIONS),
             'endpointsTruncated' => $truncated,
+            'eventTypes' => $eventTypes,
+            // Decided here and passed in, rather than asked as `$this->canAction()` from the
+            // markup. The two stubs are rendered by the package's own tests through
+            // `View::make()` with a plain data array -- there is no component instance there, so
+            // a view that reached for `$this` would work under Livewire and throw under the
+            // suite that proves the stub compiles at all. Every other decision this view needs
+            // already arrives the same way.
+            'canRedeliver' => $this->canAction('redeliver'),
+            'canPing' => $this->canAction('ping'),
         ]);
     }
 }

@@ -1,5 +1,21 @@
 {{-- Published stub: restyle with your design system (WireKit recommended) and
      place behind your own authorization. --}}
+@php
+    // Defaults, because this stub is rendered from two kinds of caller. The component passes
+    // all three; the package's own suite renders the file directly through `View::make()` with a
+    // hand-built array, from ten call sites across four files. Requiring the keys there would
+    // make every one of them a place to remember rather than a place to read.
+    //
+    // The values are today's behavior exactly: an empty catalog leaves the event-type filter as
+    // free text, and both actions render. The ability check is the COURTESY -- the action itself
+    // still calls `authorizeAction()` and still refuses -- so defaulting it to "show" cannot open
+    // anything. Defaulting it the other way would hide controls from every host that renders this
+    // view directly, which is a silent regression rather than a safe one.
+    $eventTypes = $eventTypes ?? [];
+    $canRedeliver = $canRedeliver ?? true;
+    $canPing = $canPing ?? true;
+@endphp
+
 <div class="wh-deliveries space-y-4">
 
     {{-- Permanently in the DOM, so a filter change has something to speak THROUGH: a region
@@ -30,8 +46,23 @@
             <option value="exhausted">{{ __('webhooks::management.status_options.exhausted') }}</option>
             <option value="refused">{{ __('webhooks::management.status_options.refused') }}</option>
         </select>
-        <input type="text" name="eventType" wire:model.live.debounce.300ms="eventType" placeholder="{{ __('webhooks::management.filters.event_type_placeholder') }}" aria-label="{{ __('webhooks::management.filters.event_type') }}" class="rounded border px-3 py-2">
-        <select name="subscriptionId" wire:model.live="subscriptionId" class="rounded border px-3 py-2" aria-label="{{ __('webhooks::management.filters.endpoint') }}">
+        {{-- A choice where the application HAS a catalog, free text where it has none. The
+             empty catalog is the load-bearing case rather than an oversight: a host that
+             declares none goes on registering any type it likes, and a select there would offer
+             nothing while hiding the only control that works. Free text is compared with an
+             exact `where`, so a typo returns an empty list indistinguishable from "nothing was
+             delivered" -- which is why the list is better wherever it exists. --}}
+        @if ($eventTypes !== [])
+            <select name="eventType" wire:model.live="eventType" class="rounded border px-3 py-2" aria-label="{{ __('webhooks::management.filters.event_type') }}">
+                <option value="">{{ __('webhooks::management.filters.all_event_types') }}</option>
+                @foreach ($eventTypes as $type)
+                    <option value="{{ $type }}">{{ $type }}</option>
+                @endforeach
+            </select>
+        @else
+            <input type="text" name="eventType" wire:model.live.debounce.300ms="eventType" placeholder="{{ __('webhooks::management.filters.event_type_placeholder') }}" aria-label="{{ __('webhooks::management.filters.event_type') }}" class="rounded border px-3 py-2">
+        @endif
+        <select name="endpointId" wire:model.live="endpointId" class="rounded border px-3 py-2" aria-label="{{ __('webhooks::management.filters.endpoint') }}">
             <option value="">{{ __('webhooks::management.filters.all_endpoints') }}</option>
             @foreach ($endpoints as $endpoint)
                 <option value="{{ $endpoint->id }}">{{ $endpoint->name ?: $endpoint->url }}</option>
@@ -73,6 +104,11 @@
         <thead>
             <tr>
                 <th class="px-3 py-2">{{ __('webhooks::management.table.event') }}</th>
+                {{-- On THIS screen and not on the portal's: the query is deliberately unscoped
+                     across every tenant, so rows for different endpoints stand under one another
+                     and without this cell the row does not say where it went. The endpoint
+                     filter is optional, so "set one first" is not an answer. --}}
+                <th class="px-3 py-2">{{ __('webhooks::management.table.endpoint') }}</th>
                 <th class="px-3 py-2">{{ __('webhooks::management.table.status') }}</th>
                 <th class="px-3 py-2">{{ __('webhooks::management.table.attempt') }}</th>
                 <th class="px-3 py-2">{{ __('webhooks::management.table.code') }}</th>
@@ -86,10 +122,19 @@
                 @php($when = $delivery->created_at->settings(['locale' => app()->getLocale()]))
                 <tr wire:key="del-{{ $delivery->id }}" class="border-t">
                     <th scope="row" class="px-3 py-2">{{ $delivery->event_type }}</th>
+                    {{-- Name, then url, then the bare id -- the same ladder both action names
+                         already walk, so the cell and the announcement never disagree about what
+                         this endpoint is called. The id is the last rung rather than an em dash:
+                         a deleted endpoint still has rows, and "which one" is the question. --}}
+                    <td class="px-3 py-2">{{ $delivery->subscription?->name ?: $delivery->subscription?->url ?: $delivery->subscription_id }}</td>
                     {{-- The stored status value keys the label; only the label is translated. --}}
                     <td class="px-3 py-2">{{ __('webhooks::management.status.'.$delivery->status->value) }}</td>
                     <td class="px-3 py-2">{{ $delivery->attempt }}</td>
-                    <td class="px-3 py-2">{{ $delivery->response_code ?? '—' }}</td>
+                    {{-- The duration hangs off the code rather than standing in its own column:
+                         a duration without an answer says nothing, and the pair is the question a
+                         reader actually has -- it arrived, but how slow was it? A receiver
+                         getting slower is the run-up to one that fails. --}}
+                    <td class="px-3 py-2">{{ $delivery->response_code === null ? '—' : $delivery->response_code.($delivery->duration_ms === null ? '' : ' · '.__('webhooks::management.deliveries.duration', ['ms' => \Pushery\Webhooks\Support\LocalizedNumber::format($delivery->duration_ms)])) }}</td>
                     {{-- Relative in the cell, absolute on hover — both in the reader's locale,
                          never the raw stored timestamp. --}}
                     <td class="px-3 py-2">
@@ -104,8 +149,40 @@
                              Twenty buttons all reading "Redeliver" are twenty identical entries
                              in a screen reader's element list, where the reading order that
                              supplies the event does not exist. --}}
-                        <button type="button" wire:click="redeliver('{{ $delivery->id }}')" wire:loading.attr="disabled" wire:target="redeliver" class="text-indigo-600" aria-label="{{ __('webhooks::management.a11y.redeliver_delivery', ['label' => __('webhooks::management.deliveries.redeliver'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat('LLL')]) }}">{{ __('webhooks::management.deliveries.redeliver') }}</button>
-                        <button type="button" wire:click="ping({{ $delivery->subscription_id }})" wire:loading.attr="disabled" wire:target="ping" class="ml-3 text-indigo-600" aria-label="{{ __('webhooks::management.a11y.ping_subscription', ['label' => __('webhooks::management.deliveries.ping'), 'url' => $delivery->subscription?->url ?? $delivery->subscription_id]) }}">{{ __('webhooks::management.deliveries.ping') }}</button>
+                        {{-- Asked per action, and the markup is the courtesy rather than the
+                             control: `canAction()` walks the same two config keys in the same
+                             order the action walks before it refuses, so the two can only agree.
+                             With neither key set this renders exactly as it always has. --}}
+                        @if ($canRedeliver)
+                            {{-- `wire:confirm`, the browser's own dialog, because this stub
+                                 deliberately depends on no design system -- the WireKit variant
+                                 (publish tag webhooks-ui-wirekit) confirms through a real
+                                 alert-dialog, and that is the pattern to copy when restyling
+                                 this view. The same split the subscription manager already uses
+                                 for rotate and delete.
+
+                                 It is confirmed because pressing it sends a real HTTP request to
+                                 a customer's endpoint under the delivery's ORIGINAL id, and the
+                                 wrong row is one keystroke away in a list of twenty
+                                 identical-looking actions. --}}
+                            <button
+                                type="button"
+                                wire:click="redeliver('{{ $delivery->id }}')"
+                                wire:confirm="{{ __('webhooks::management.redeliver_dialog.title') }}&#10;&#10;{{ __('webhooks::management.redeliver_dialog.description') }}"
+                                wire:loading.attr="disabled"
+                                wire:target="redeliver"
+                                class="text-indigo-600"
+                                aria-label="{{ __('webhooks::management.a11y.redeliver_delivery', ['label' => __('webhooks::management.deliveries.redeliver'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat('LLL')]) }}"
+                            >{{ __('webhooks::management.deliveries.redeliver') }}</button>
+                        @endif
+
+                        {{-- A ping is not confirmed: it sends nothing of the customer's and spends
+                             an allowance the component already refuses past. The ability check
+                             applies to both, because it answers "may this reader act", not "is
+                             this action dangerous". --}}
+                        @if ($canPing)
+                            <button type="button" wire:click="ping({{ $delivery->subscription_id }})" wire:loading.attr="disabled" wire:target="ping" class="ml-3 text-indigo-600" aria-label="{{ __('webhooks::management.a11y.ping_subscription', ['label' => __('webhooks::management.deliveries.ping'), 'url' => $delivery->subscription?->url ?? $delivery->subscription_id]) }}">{{ __('webhooks::management.deliveries.ping') }}</button>
+                        @endif
                     </td>
                 </tr>
             @endforeach

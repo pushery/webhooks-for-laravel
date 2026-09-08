@@ -80,6 +80,14 @@ return [
     // Faire tourner la clé met l'ancienne sous délai plutôt que de l'invalider, mais cela
     // reste un changement que chaque récepteur doit suivre : les deux stubs le confirment
     // donc comme la suppression à côté.
+    // Replaying sends a real HTTP request to a customer's endpoint, so it is never a bare
+    // click -- the same reasoning as the rotate and delete confirmations below it.
+    'redeliver_dialog' => [
+        'title' => 'Renvoyer cette livraison ?',
+        'description' => 'L\'événement est renvoyé sous son identifiant d\'origine. Un destinataire qui déduplique le traitera comme un événement déjà reçu.',
+        'confirm' => 'Renvoyer',
+    ],
+
     'rotate_dialog' => [
         'title' => 'Faire tourner cette clé de signature ?',
         'description' => 'Une nouvelle clé est émise immédiatement et affichée une seule fois. La clé actuelle reste valide jusqu\'à la fermeture de la fenêtre de rotation, mets donc le récepteur à jour avant.',
@@ -104,6 +112,10 @@ return [
     'deliveries' => [
         'redeliver' => 'Renvoyer',
         'ping' => 'Tester',
+        // The unit, not a column header: the duration hangs off the response code rather
+        // than standing in its own cell, because a duration without an answer says nothing.
+        // Same string and same reasoning as the portal panel beside it.
+        'duration' => ':ms ms',
     ],
 
     'filters' => [
@@ -116,6 +128,7 @@ return [
         'event_type_placeholder' => 'Filtrer par type d\'événement',
         'endpoint' => 'Endpoint',
         'all_endpoints' => 'Tous les endpoints',
+        'all_event_types' => 'Tous les types d’événement',
         'from' => 'Du',
         'until' => 'Au',
         'endpoints_truncated' => 'Seuls les premiers endpoints sont proposés ici. Si celui que tu cherches manque, filtre par type d\'événement ou adapte ce stub.',

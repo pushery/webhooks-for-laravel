@@ -80,6 +80,14 @@ return [
     // Eine Rotation setzt den bisherigen Schlüssel unter eine Frist, statt ihn sofort
     // ungültig zu machen — sie bleibt aber eine Änderung, der jeder Empfänger folgen
     // muss. Deshalb bestätigen beide Stubs sie, wie das Löschen daneben.
+    // Replaying sends a real HTTP request to a customer's endpoint, so it is never a bare
+    // click -- the same reasoning as the rotate and delete confirmations below it.
+    'redeliver_dialog' => [
+        'title' => 'Diese Zustellung erneut senden?',
+        'description' => 'Das Ereignis wird unter seiner ursprünglichen Id erneut gesendet. Ein Empfänger, der dedupliziert, behandelt es als eines, das er bereits kennt.',
+        'confirm' => 'Erneut senden',
+    ],
+
     'rotate_dialog' => [
         'title' => 'Diesen Signaturschlüssel rotieren?',
         'description' => 'Ein neuer Schlüssel wird sofort erzeugt und einmal angezeigt. Der bisherige bleibt gültig, bis das Rotationsfenster schließt — aktualisiere den Empfänger bis dahin.',
@@ -104,6 +112,10 @@ return [
     'deliveries' => [
         'redeliver' => 'Erneut senden',
         'ping' => 'Test senden',
+        // The unit, not a column header: the duration hangs off the response code rather
+        // than standing in its own cell, because a duration without an answer says nothing.
+        // Same string and same reasoning as the portal panel beside it.
+        'duration' => ':ms ms',
     ],
 
     'filters' => [
@@ -116,6 +128,7 @@ return [
         'event_type_placeholder' => 'Nach Event-Typ filtern',
         'endpoint' => 'Endpunkt',
         'all_endpoints' => 'Alle Endpunkte',
+        'all_event_types' => 'Alle Ereignistypen',
         'from' => 'Von',
         'until' => 'Bis',
         'endpoints_truncated' => 'Es werden nur die ersten Endpunkte zur Auswahl angeboten. Fehlt einer, filtere über den Event-Typ oder passe diesen Stub an.',

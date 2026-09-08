@@ -80,6 +80,14 @@ return [
     // Roteren zet de oude sleutel onder een termijn in plaats van hem meteen ongeldig te
     // maken, maar het blijft een wijziging die elke ontvanger moet volgen — beide stubs
     // bevestigen hem dus, net als het verwijderen ernaast.
+    // Replaying sends a real HTTP request to a customer's endpoint, so it is never a bare
+    // click -- the same reasoning as the rotate and delete confirmations below it.
+    'redeliver_dialog' => [
+        'title' => 'Deze levering opnieuw versturen?',
+        'description' => 'De gebeurtenis wordt opnieuw verstuurd onder haar oorspronkelijke id. Een ontvanger die dedupliceert, behandelt haar als een die al is gezien.',
+        'confirm' => 'Opnieuw versturen',
+    ],
+
     'rotate_dialog' => [
         'title' => 'Deze ondertekeningssleutel roteren?',
         'description' => 'Er wordt meteen een nieuwe sleutel uitgegeven, die één keer wordt getoond. De huidige sleutel blijft geldig tot het rotatievenster sluit — werk de ontvanger daarvoor bij.',
@@ -104,6 +112,10 @@ return [
     'deliveries' => [
         'redeliver' => 'Opnieuw versturen',
         'ping' => 'Test versturen',
+        // The unit, not a column header: the duration hangs off the response code rather
+        // than standing in its own cell, because a duration without an answer says nothing.
+        // Same string and same reasoning as the portal panel beside it.
+        'duration' => ':ms ms',
     ],
 
     'filters' => [
@@ -116,6 +128,7 @@ return [
         'event_type_placeholder' => 'Filteren op event-type',
         'endpoint' => 'Endpoint',
         'all_endpoints' => 'Alle endpoints',
+        'all_event_types' => 'Alle gebeurtenistypen',
         'from' => 'Van',
         'until' => 'Tot en met',
         'endpoints_truncated' => 'Hier worden alleen de eerste endpoints aangeboden. Ontbreekt degene die je zoekt, filter dan op event-type of pas deze stub aan.',

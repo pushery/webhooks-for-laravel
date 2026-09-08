@@ -109,6 +109,46 @@ final class EndpointDeliveries extends Component
     private const array WINDOW_STEPS = [7, 30, 90, 365];
 
     /**
+     * The endpoint this instance belongs to, or null for a panel that spans the tenant.
+     *
+     * #[Locked] because it is the only narrowing here the reader must not be able to move.
+     * $endpointId below is a filter over rows they may see anyway, so a tampered value costs
+     * nothing; this one is what a host embeds INSTEAD of trusting that filter, which makes a
+     * writable version of it exactly as useless as the filter it replaces.
+     *
+     * It narrows and never grants. The pin is applied as its own condition beside the owner
+     * scoping rather than in place of it, so an endpoint the reader may not see yields an
+     * empty list rather than access to it — a host that pins the wrong resource gets nothing
+     * back, which is the direction a scoping mistake has to fail in.
+     *
+     * The case: a surface cut per RESOURCE rather than per account. There the panel belongs to
+     * one destination and who may read it hangs off a policy over that destination, so the
+     * static resolvers beside it — which answer for the whole request — can only be satisfied
+     * by declaring every endpoint the account may read anywhere and then leaning on the filter.
+     * A filter is not an authorization, and the host cannot narrow the resolver just before
+     * rendering either: a Livewire update request never runs the page build that would do it.
+     */
+    #[Locked]
+    public ?int $pinnedEndpointId = null;
+
+    /**
+     * Bind this instance to one endpoint:
+     *
+     *     <livewire:webhooks.self-service.endpoint-deliveries :subscription="$subscription" />
+     *
+     * An id is accepted for a host holding one without the model. Nothing is stored but the
+     * id: a component property is serialized into every subsequent request, and a whole model
+     * riding along there is both larger and a second copy of state the database already has.
+     */
+    public function mount(WebhookSubscription|int|null $subscription = null): void
+    {
+        // One line rather than three, and that is about the coverage floor rather than taste:
+        // the else branch of a ternary written across three lines is never marked as executed,
+        // so no test can close it and a 100% floor holds the release over a branch that ran.
+        $this->pinnedEndpointId = $subscription instanceof WebhookSubscription ? $subscription->id : $subscription;
+    }
+
+    /**
      * Narrow the list to a single endpoint, or null for every endpoint the tenant owns.
      */
     public ?int $endpointId = null;
@@ -375,6 +415,14 @@ final class EndpointDeliveries extends Component
      */
     private function endpointChoices(): Collection
     {
+        // A pinned panel offers none. A select whose only usable option is the endpoint already
+        // pinned is a control that cannot do anything, and a reader who moves it and sees the
+        // list stay put learns the screen is unreliable. The view renders the filter only when
+        // this is non-empty, so returning nothing removes the control rather than disabling it.
+        if ($this->pinnedEndpointId !== null) {
+            return new Collection;
+        }
+
         $readable = ReadableEndpoints::ids();
 
         if ($readable === []) {
@@ -473,7 +521,13 @@ final class EndpointDeliveries extends Component
             }
         });
 
-        if ($this->endpointId !== null) {
+        // Its own condition, ANDed against the scope above rather than folded into it. That is
+        // what makes it incapable of widening: whatever the group admits, this can only cut
+        // down. The reader's own filter steps aside while it is set, because a second
+        // subscription_id predicate could only ever agree with this one or empty the list.
+        if ($this->pinnedEndpointId !== null) {
+            $query->where('subscription_id', $this->pinnedEndpointId);
+        } elseif ($this->endpointId !== null) {
             // The lenient lookup is the strict path's, and the pairing is the wrong way round
             // only until you read what each mode is protecting.
             //
@@ -549,8 +603,10 @@ final class EndpointDeliveries extends Component
             return 'no_match';
         }
 
-        // One endpoint selected: "your endpoints" would be a claim about the others too.
-        if ($this->endpointId !== null) {
+        // One endpoint selected: "your endpoints" would be a claim about the others too. A
+        // pinned panel is the same sentence for a stronger reason — there the others are not
+        // merely unselected, they are not this panel's subject at all.
+        if ($this->endpointId !== null || $this->pinnedEndpointId !== null) {
             return 'filtered';
         }
 

@@ -80,6 +80,14 @@ return [
     // Rodar coloca a chave anterior sob prazo em vez de a invalidar, mas continua a ser
     // uma alteração que cada recetor tem de acompanhar, por isso ambos os stubs a
     // confirmam, tal como a eliminação ao lado.
+    // Replaying sends a real HTTP request to a customer's endpoint, so it is never a bare
+    // click -- the same reasoning as the rotate and delete confirmations below it.
+    'redeliver_dialog' => [
+        'title' => 'Enviar esta entrega novamente?',
+        'description' => 'O evento é enviado novamente com o seu identificador original. Um destinatário que faz deduplicação irá tratá-lo como um que já viu.',
+        'confirm' => 'Enviar novamente',
+    ],
+
     'rotate_dialog' => [
         'title' => 'Rodar esta chave de assinatura?',
         'description' => 'É emitida imediatamente uma nova chave, mostrada uma única vez. A chave atual continua a validar até a janela de rotação fechar — atualiza o recetor até lá.',
@@ -104,6 +112,10 @@ return [
     'deliveries' => [
         'redeliver' => 'Reenviar',
         'ping' => 'Testar',
+        // The unit, not a column header: the duration hangs off the response code rather
+        // than standing in its own cell, because a duration without an answer says nothing.
+        // Same string and same reasoning as the portal panel beside it.
+        'duration' => ':ms ms',
     ],
 
     'filters' => [
@@ -116,6 +128,7 @@ return [
         'event_type_placeholder' => 'Filtrar por tipo de evento',
         'endpoint' => 'Endpoint',
         'all_endpoints' => 'Todos os endpoints',
+        'all_event_types' => 'Todos os tipos de evento',
         'from' => 'De',
         'until' => 'Até',
         'endpoints_truncated' => 'Aqui só são oferecidos os primeiros endpoints. Se faltar o que procuras, filtra por tipo de evento ou adapta este stub.',

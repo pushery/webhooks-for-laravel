@@ -4,6 +4,38 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-09-08
+
+### Added
+
+- **The operator delivery log says which endpoint each row went to.** That console is deliberately unscoped across every tenant, so rows for different endpoints stand under one another — and the endpoint appeared only inside the redeliver button's accessible name, present for a screen reader and absent for everybody else. The endpoint filter is optional, so "set one first" was never an answer. The subscription is eager-loaded with it: the accessible names were already resolving it lazily, one query per row, which cost nothing visible and so nobody counted it.
+- **The response code carries its duration**, in the shape the portal panel already uses: `202 · 143 ms`. It hangs off the code rather than standing in its own column because a duration without an answer says nothing, and the pair is the question a reader actually has — it arrived, but how slow was it? A receiver getting slower is the run-up to one that fails.
+- **The event-type filter is a choice wherever the application declares a catalog**, built from the same `Settings::eventTypes()` the self-service form already picks from. It stays free text where the catalog is empty, and that is the load-bearing case rather than a fallback: a host that declares none goes on registering any type it likes, so a select there would offer nothing while hiding the only control that works. Free text is compared with an exact `where`, so a typo returned an empty list indistinguishable from "nothing was delivered".
+- **`AuthorizesOperatorActions::canAction()`**, the non-throwing twin of `authorizeAction()`, and both stubs now ask it before rendering a row action. It walks the same two config keys in the same order, so the markup and the action cannot disagree; with neither key set — the shape most hosts run — every control renders exactly as before. The markup is the courtesy, not the control: the action still authorizes and still refuses, which is what protects an operator whose capability was revoked while a page stayed open.
+- **A replay is confirmed before it fires.** Pressing it sends a real HTTP request to a customer's endpoint under the delivery's original id, so a receiver that deduplicates treats it as one it has already seen — and the wrong row is one keystroke away in a list of twenty identical-looking actions. The WireKit stub confirms through an `alert-dialog`, the neutral one through `wire:confirm`, the same split the subscription manager already uses for rotate and delete. The ping is deliberately left unconfirmed: it sends nothing of the customer's and spends an allowance the component already refuses past, and confirming everything is how a confirmation stops being read.
+- **The portal delivery panel can be bound to ONE endpoint, bindingly.** `<livewire:webhooks.self-service.endpoint-deliveries :subscription="$subscription" />`, and the pin is `#[Locked]` so it is the host's and not the reader's. Both scoping seams the panel had are static and answer for the whole request, which is the right shape for a portal cut per account and the wrong one for a surface cut per resource — there the only way to satisfy a request-wide resolver was to declare every endpoint the account may read anywhere and then lean on the endpoint filter, and `endpointId` is a public property, so a tampered update walked straight across everything the resolver had just declared readable. A filter is not an authorization. Narrowing the resolver just before rendering does not work either: a Livewire update request never runs the page build that would do it.
+
+  It narrows and never grants. The pin is applied beside the owner scoping rather than in place of it, so pinning an endpoint the reader may not see yields an empty list rather than access to it. An endpoint **id** is accepted in place of the model, for a host that holds one without having loaded it. While it is set the endpoint filter is not offered — a select whose only usable option is the one already pinned is a control that cannot do anything — and the empty-state sentence speaks about that endpoint rather than about "your endpoints".
+- **A refused operator action can answer 404 instead of 403.** `webhooks.ui.refusal_status`, default 403, so nothing changes unless a host asks. It exists for the host whose admin area is deliberately unfindable: there a 403 confirms that something is at that address and only the permission is missing, while a 404 says nothing at all — and such a host wants every surface answering alike rather than one imported console announcing itself. Only a client- or server-error status is honored; anything else leaves the refusal untouched, because a refusal that answered 200 would read as success to every caller. At the default the original `AuthorizationException` is rethrown rather than rebuilt, so the type a host already catches is the type it keeps. `refusalStatus()` is overridable for a rule a status cannot express.
+
+Both stubs default `eventTypes`, `canRedeliver` and `canPing` when they are absent, to the behavior that shipped before this change. The package's own suite renders these views directly through `View::make()` from ten call sites across four files, and requiring the keys there would turn each into a place to remember rather than a place to read. A test asserts the component really does pass all three, so a `render()` that stopped would still go red.
+
+
+### Changed
+
+- **The operator console's endpoint filter is `$endpointId`; `$subscriptionId` still works.** It held an endpoint's id while calling it a subscription, and the two words are not interchangeable to somebody reading from outside: the portal panel beside it already called the same thing `endpointId`, every option the filter renders is described as one customer endpoint, and its own docblock said endpoint. A consumer evaluating adoption lined the property names up — the cheapest comparison and therefore the usual one — read a name that named something else, and recorded the endpoint filter as absent. The capability was there the whole time and got built a second time anyway, which is the expensive kind of naming defect: it disguises itself as a missing feature.
+
+  **This is not a breaking change.** Both stubs are meant to be published and edited — that is this package's main customization path — and a published copy binds this name in its own markup, so dropping it would have broken the filter in exactly the hosts that took the package up on its advice. The two names are kept in step in both directions, so a host on either sees no difference; bind the new one in anything you write from here.
+
+### Fixed
+
+- **A date range passed into the operator delivery log survives mounting.** The default window was applied unconditionally, so a link carrying `from` lost it on arrival: the reader opened on the last thirty days and never saw what somebody had sent them, with nothing on screen to suggest a range had been discarded. The default itself is right and stays exactly as it was — including `0` for a host that wants no default at all — it simply now applies when nobody said otherwise. Measured by a consumer part-way through replacing its own copy of this console, with twenty of its twenty-four existing arms already green.
+- **Every boolean switch in the shipped config now reads `off`, `no` and `OFF` as off.** `env()` converts exactly the spellings `true` and `false`; anything else comes back as a string, and a non-empty string is truthy. All seventeen switches carried a `(bool)` cast, which does not convert anything — it confirms what `env()` already returned, so `WEBHOOKS_DASHBOARD_ALL_TENANTS=off` turned the switch on. Fourteen of the seventeen default to `false`, which is the direction that hurts: the operator got the opposite of what they wrote, with nothing red anywhere to say so. The cast was worse than none at all, because a reader checking the line saw a conversion and moved on.
+
+  Each one is now `filter_var(env(KEY, DEFAULT), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? DEFAULT`, which is the expression the rest of the fleet already uses. A value nothing can parse — a typo — falls back to the **declared default** rather than to off, because the switch whose default is protective is `WEBHOOKS_HTTPS_ONLY`, and answering "unreadable" with "off" there would open plaintext egress on a misspelling.
+
+  A host that publishes the config carries its own copy, so republish it or apply the same change to pick this up. `KEY=` with no value reads as off, unchanged from the other configs in the fleet.
+
 ## [3.0.1] - 2026-09-06
 
 ### Fixed
@@ -2951,7 +2983,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.0.1...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.0.1...v3.1.0
 [3.0.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/pushery/webhooks-for-laravel/compare/v2.6.1...v3.0.0
 [2.6.1]: https://github.com/pushery/webhooks-for-laravel/compare/v2.6.0...v2.6.1
