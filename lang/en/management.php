@@ -72,6 +72,14 @@ return [
     // still a change every consumer of the endpoint has to follow, so both stubs confirm
     // it — the WireKit variant through an alert-dialog, the neutral one through the
     // browser confirm.
+    // Replaying sends a real HTTP request to a customer's endpoint, so it is never a bare
+    // click -- the same reasoning as the rotate and delete confirmations below it.
+    'redeliver_dialog' => [
+        'title' => 'Send this delivery again?',
+        'description' => 'The event is sent again under its original id. A receiver that deduplicates will treat it as one it has already seen.',
+        'confirm' => 'Send again',
+    ],
+
     'rotate_dialog' => [
         'title' => 'Rotate this signing secret?',
         'description' => 'A new secret is issued immediately and shown once. The current secret keeps verifying until the rotation window closes, so update the receiver before then.',
@@ -105,6 +113,10 @@ return [
     'deliveries' => [
         'redeliver' => 'Redeliver',
         'ping' => 'Ping',
+        // The unit, not a column header: the duration hangs off the response code rather
+        // than standing in its own cell, because a duration without an answer says nothing.
+        // Same string and same reasoning as the portal panel beside it.
+        'duration' => ':ms ms',
     ],
 
     'filters' => [
@@ -117,6 +129,7 @@ return [
         'event_type_placeholder' => 'Filter by event type',
         'endpoint' => 'Endpoint',
         'all_endpoints' => 'All endpoints',
+        'all_event_types' => 'All event types',
         'from' => 'From',
         'until' => 'Until',
         'endpoints_truncated' => 'Only the first endpoints are offered here. If the one you want is missing, filter by event type instead, or adapt this stub.',

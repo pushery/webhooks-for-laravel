@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Livewire\Concerns;
 
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * The per-action authorization seam of the operator console.
@@ -91,24 +93,117 @@ trait AuthorizesOperatorActions
      */
     protected function authorizeAction(string $action): void
     {
+        try {
+            $mapped = $this->mappedAbility($action);
+
+            if ($mapped !== null) {
+                $this->authorize($mapped);
+
+                return;
+            }
+
+            $ability = Config::get('webhooks.admin.ability');
+
+            // An empty string is treated as unset rather than as an ability named '': a blank
+            // env value must not silently become a gate nobody defined, which would deny every
+            // action and read as the console being broken.
+            if (! is_string($ability) || $ability === '') {
+                return;
+            }
+
+            $this->authorize($ability, [$action]);
+        } catch (AuthorizationException $exception) {
+            $this->refuseAction($exception);
+        }
+    }
+
+    /**
+     * How a refused action answers.
+     *
+     * 403 is what this console has always sent, and it stays the default: the original
+     * exception is rethrown untouched, so a host that configured nothing sees the same type
+     * it saw before rather than an equivalent one.
+     *
+     * A host whose admin area is deliberately unfindable needs 404 instead. There a 403 is a
+     * disclosure — it confirms something exists at that address — and such a host wants every
+     * surface answering alike rather than one imported console announcing itself. Set
+     * webhooks.ui.refusal_status, or override this method for a rule a status cannot express.
+     *
+     * Anything outside the error range is ignored rather than honored. A refusal that answered
+     * 200 would read as success to every caller, which is a far worse outcome than a setting
+     * that quietly did nothing — and it is the kind of value that arrives from a mistyped
+     * config rather than from a decision.
+     */
+    protected function refuseAction(AuthorizationException $exception): never
+    {
+        $status = $this->refusalStatus();
+
+        // 403 leaves the refusal exactly as it was rather than rebuilding an equivalent one
+        // through abort(). It is the default, so this is the path almost every host takes,
+        // and on it the caller must keep seeing the same exception type it always saw.
+        if ($status === 403) {
+            throw $exception;
+        }
+
+        abort($status);
+    }
+
+    /**
+     * The status a refused action answers with.
+     *
+     * Repeats the shipped default, because an absent key reads as null and a null here would
+     * have to mean something -- and every meaning available is worse than the declared 403.
+     * A host on a trimmed publish or a stale config cache keeps the behavior it had.
+     * ConfigDefaultsAreInSyncTest holds this number against the shipped one.
+     *
+     * Anything outside the error range collapses to 403 rather than being honored. A refusal
+     * that answered 200 would read as success to every caller, which is a far worse outcome
+     * than an ignored setting -- and such a value arrives from a mistyped config, never from
+     * a decision.
+     */
+    protected function refusalStatus(): int
+    {
+        $status = Config::get('webhooks.ui.refusal_status', 403);
+
+        return is_int($status) && $status >= 400 && $status <= 599 ? $status : 403;
+    }
+
+    /**
+     * Whether this action would be allowed, WITHOUT throwing.
+     *
+     * The twin of {@see self::authorizeAction()}, and it exists so a view can decide whether to
+     * render a control rather than offering one that answers 403 on click. It is not a second
+     * decision: it walks the same two config keys in the same order and returns true in the
+     * same place the other one returns without authorizing, so a host that configures nothing
+     * sees every control exactly as before.
+     *
+     * This is not a replacement for the check on the action, and nothing here weakens it.
+     * Markup is a suggestion: the action still calls authorizeAction() and still refuses, which
+     * is what protects an operator who kept a page open past a revoked capability. Hiding a
+     * button a reader may not use is a courtesy; refusing the request is the control.
+     *
+     * A subclass that overrides authorizeAction() for a rule no ability can express should
+     * override this too, or its controls will render for readers the action then refuses. The
+     * default here cannot see such a rule, and guessing at one would be worse than saying so.
+     */
+    public function canAction(string $action): bool
+    {
         $mapped = $this->mappedAbility($action);
 
         if ($mapped !== null) {
-            $this->authorize($mapped);
-
-            return;
+            return Gate::allows($mapped);
         }
 
         $ability = Config::get('webhooks.admin.ability');
 
-        // An empty string is treated as unset rather than as an ability named '': a blank
-        // env value must not silently become a gate nobody defined, which would deny every
-        // action and read as the console being broken.
+        // The same reading as above: an empty string is unset, not an ability named '', so a
+        // blank env value leaves the console exactly as it shipped instead of hiding every
+        // control on every row.
         if (! is_string($ability) || $ability === '') {
-            return;
+            return true;
         }
 
-        $this->authorize($ability, [$action]);
+        return Gate::allows($ability, [$action]);
     }
 
     /**

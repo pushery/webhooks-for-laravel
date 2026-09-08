@@ -87,7 +87,7 @@ return [
         //                          way to "tighten" egress. Empty means nothing bypasses
         //                          the guard, which is what you want.
         'ssrf' => [
-            'https_only' => (bool) env('WEBHOOKS_HTTPS_ONLY', true),
+            'https_only' => filter_var(env('WEBHOOKS_HTTPS_ONLY', true), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true,
             'block_private_networks' => true,
             'allowed_hosts' => [],
             'blocked_hosts' => [],
@@ -104,7 +104,7 @@ return [
         // is NOT enforced through a proxy. The operator's proxy
         // must enforce egress control itself. Off by default.
         'egress' => [
-            'enabled' => (bool) env('WEBHOOKS_EGRESS_ENABLED', false),
+            'enabled' => filter_var(env('WEBHOOKS_EGRESS_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
             'published_ips' => [],
             'proxy' => env('WEBHOOKS_EGRESS_PROXY'),
         ],
@@ -146,7 +146,7 @@ return [
         // The outbound delivery engine. NOTE: the Platform layer delivers its fan-out
         // THROUGH this engine, so platform.enabled => true boots the Server regardless
         // of this switch. To stop outbound delivery entirely, set BOTH to false.
-        'enabled' => (bool) env('WEBHOOKS_SERVER_ENABLED', true),
+        'enabled' => filter_var(env('WEBHOOKS_SERVER_ENABLED', true), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true,
         'queue' => env('WEBHOOKS_SERVER_QUEUE', 'default'),
         'connection' => env('WEBHOOKS_SERVER_CONNECTION'),
 
@@ -166,7 +166,7 @@ return [
         // is already correct, and turning this on changes the wire body, so a
         // receiver comparing raw bytes must canonicalize too. Deliberately conservative.
         'signing' => [
-            'canonicalize' => (bool) env('WEBHOOKS_CANONICALIZE_JSON', false),
+            'canonicalize' => filter_var(env('WEBHOOKS_CANONICALIZE_JSON', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
             'ed25519' => [
                 'enabled' => false,
                 'secret_key' => env('WEBHOOKS_ED25519_SECRET_KEY'),
@@ -230,7 +230,7 @@ return [
         // the scheduled model:prune command. Off by default; nothing is created or
         // written while disabled.
         'persistence' => [
-            'enabled' => (bool) env('WEBHOOKS_SERVER_PERSISTENCE_ENABLED', false),
+            'enabled' => filter_var(env('WEBHOOKS_SERVER_PERSISTENCE_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
             'prune_after_days' => 30,
         ],
 
@@ -269,7 +269,7 @@ return [
     */
 
     'platform' => [
-        'enabled' => (bool) env('WEBHOOKS_PLATFORM_ENABLED', true),
+        'enabled' => filter_var(env('WEBHOOKS_PLATFORM_ENABLED', true), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true,
 
         // The primary-key type of the models that OWN webhook subscriptions: 'bigint'
         // (default), 'uuid' or 'ulid'. It fixes the storage type of the denormalized
@@ -396,7 +396,7 @@ return [
         // board, the back link) rather than failing to render, so what you get is the
         // list, the form and the secret panel, working.
         'self_service' => [
-            'enabled' => (bool) env('WEBHOOKS_SELF_SERVICE_ENABLED', false),
+            'enabled' => filter_var(env('WEBHOOKS_SELF_SERVICE_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
             'middleware' => ['web', 'auth'],
             'route_prefix' => 'webhooks/endpoints',
             'register_routes' => true,
@@ -493,7 +493,7 @@ return [
         // everyThirtyMinutes, hourly, …); an unknown token falls back to fifteen
         // minutes rather than silently never running.
         'health' => [
-            'enabled' => (bool) env('WEBHOOKS_HEALTH_ENABLED', false),
+            'enabled' => filter_var(env('WEBHOOKS_HEALTH_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
             'refresh' => 'everyFifteenMinutes',
             'window_hours' => 24,
             'latency_budget_ms' => 2000,
@@ -526,7 +526,7 @@ return [
         // reusable default rule sets an endpoint can inherit by naming a version instead
         // of storing its own transform.
         'payload_versioning' => [
-            'enabled' => (bool) env('WEBHOOKS_PAYLOAD_VERSIONING_ENABLED', false),
+            'enabled' => filter_var(env('WEBHOOKS_PAYLOAD_VERSIONING_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
             'versions' => [
                 // 'v2' => [
                 //     'exclude' => ['internal_note'],
@@ -591,7 +591,7 @@ return [
     */
 
     'client' => [
-        'enabled' => (bool) env('WEBHOOKS_CLIENT_ENABLED', false),
+        'enabled' => filter_var(env('WEBHOOKS_CLIENT_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
 
         // Keep true. A middleware is prepended to the GLOBAL stack so the EXACT received
         // bytes are captured before any other middleware can parse or re-encode the body;
@@ -821,7 +821,7 @@ return [
     'dashboard' => [
         // Requires the Platform layer: the dashboard reads Platform's delivery log
         // (see 'source_model'), whose table exists only while platform.enabled is true.
-        'enabled' => (bool) env('WEBHOOKS_DASHBOARD_ENABLED', false),
+        'enabled' => filter_var(env('WEBHOOKS_DASHBOARD_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
         'prefix' => 'webhooks',
         'middleware' => ['web', 'auth', 'can:view-webhook-dashboard'],
         // Operator mode: read the GLOBAL, owner-less endpoints (subscriptions registered with
@@ -829,7 +829,7 @@ return [
         // operator dashboard over your own global endpoints; leave it off (the default) for a
         // per-tenant customer dashboard. It shows global rows to everyone the
         // view-webhook-dashboard gate admits, so gate that ability to operators.
-        'operator' => (bool) env('WEBHOOKS_DASHBOARD_OPERATOR', false),
+        'operator' => filter_var(env('WEBHOOKS_DASHBOARD_OPERATOR', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
 
         'deliveries' => [
             // How many days back the delivery table reads. A CEILING, not merely a default:
@@ -854,7 +854,7 @@ return [
         // rather than quietly falling back to a narrower scope — a support screen that
         // silently shrinks to the handful of owner-less rows is the failure this exists to
         // prevent, and it shows no error while doing it.
-        'all_tenants' => (bool) env('WEBHOOKS_DASHBOARD_ALL_TENANTS', false),
+        'all_tenants' => filter_var(env('WEBHOOKS_DASHBOARD_ALL_TENANTS', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
         // The ability guarding cross-tenant reads. REQUIRED while 'all_tenants' is on: leave it
         // undefined and the dashboard refuses to load rather than reading every tenant's data.
         // Operator mode can default open because it shows only your own owner-less rows; this
@@ -943,7 +943,7 @@ return [
     */
 
     'pulse' => [
-        'enabled' => (bool) env('WEBHOOKS_PULSE_ENABLED', false),
+        'enabled' => filter_var(env('WEBHOOKS_PULSE_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
     ],
 
     /*
@@ -976,7 +976,7 @@ return [
     */
 
     'search' => [
-        'enabled' => (bool) env('WEBHOOKS_SEARCH_ENABLED', false),
+        'enabled' => filter_var(env('WEBHOOKS_SEARCH_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
 
         // Whether the delivery BODY is copied into the index. Off, and off is the only
         // safe default, because an index is not a screen.
@@ -992,7 +992,7 @@ return [
         // Turn it on only where the index is as protected as the database it mirrors, and
         // read `security.md` first. With it off the index still carries everything a
         // search actually needs: event type, url, status, the owner pair and the timestamp.
-        'index_payload' => (bool) env('WEBHOOKS_SEARCH_INDEX_PAYLOAD', false),
+        'index_payload' => filter_var(env('WEBHOOKS_SEARCH_INDEX_PAYLOAD', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
 
         'payload_excerpt_chars' => 500,
     ],
@@ -1014,7 +1014,7 @@ return [
     */
 
     'otel' => [
-        'enabled' => (bool) env('WEBHOOKS_OTEL_ENABLED', false),
+        'enabled' => filter_var(env('WEBHOOKS_OTEL_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
     ],
 
     /*
@@ -1091,6 +1091,19 @@ return [
         // a table row, where a third rank is exactly right. Widening this without measuring which
         // is which would restyle buttons nobody asked about.
         'secondary_surface' => 'ghost',
+
+        // The HTTP status a REFUSED operator action answers with. 403 is what this console
+        // has always sent and stays the default; nothing changes for a host that leaves it.
+        //
+        // 404 is for a host whose admin area is deliberately unfindable. There 403 is a
+        // disclosure -- it says something is here and you may not have it -- while 404 says
+        // nothing at all, and such a host wants every surface answering the same way rather
+        // than one imported console breaking the pattern.
+        //
+        // Only a client- or server-error status is honored; anything else leaves the refusal
+        // exactly as it was, because a refusal that answered 200 would read as success to
+        // every caller and would be a far worse outcome than an ignored setting.
+        'refusal_status' => 403,
 
         'deliveries' => [
             // How far back the operator delivery log opens, in days. A DEFAULT, not a ceiling:
