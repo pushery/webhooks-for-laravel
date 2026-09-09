@@ -4,6 +4,12 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.1] - 2026-09-09
+
+### Added
+
+- A contract test holds the documented `Gate::define()` examples to the ability layer they belong to. The package defines `manage-webhook-endpoints` and `view-webhook-dashboard` itself, fail-closed, and each asks whether the HOST ability exists before allowing anything, so a consumer following an example that named a package-owned ability would replace that definition and lose the check entirely. The arm refuses that shape, and strips comments before reading the source, since one lane file spells out a host-side `Gate::define()` inside a docblock.
+
 ## [3.2.0] - 2026-09-08
 
 ### Added
@@ -2993,7 +2999,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.1...HEAD
+[3.2.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.0.1...v3.1.0
 [3.0.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.0.0...v3.0.1
