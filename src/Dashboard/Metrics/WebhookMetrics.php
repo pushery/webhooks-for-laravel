@@ -336,10 +336,23 @@ final readonly class WebhookMetrics
 
     /**
      * Tier-2 percentiles: merge the per-bucket latency digests in the window with the
-     * tdigest extension's rollup() and read the percentiles off the merged digest,
-     * touching one row per hour rather than every raw delivery. Selecting this driver
-     * without the extension installed is a hard, actionable error (never a cryptic SQL
-     * failure); an empty window's rollup is NULL, so the percentiles fall back to zero.
+     * tdigest extension's tdigest() aggregate and read the percentiles off the merged
+     * digest, touching one row per hour rather than every raw delivery. Selecting this
+     * driver without the extension installed is a hard, actionable error (never a cryptic
+     * SQL failure); an empty window merges to NULL, so the percentiles fall back to zero.
+     *
+     * The merge aggregate is `tdigest(tdigest)`, and until 2026-09-10 this query asked for
+     * `rollup(...)`, which the extension does not define. Its five aggregates are `tdigest`,
+     * `tdigest_avg`, `tdigest_percentile`, `tdigest_percentile_of` and `tdigest_sum`; the one
+     * that merges digests is declared `CREATE AGGREGATE tdigest(tdigest)` with `SFUNC =
+     * tdigest_add_digest`. That is read out of the extension's own installation SQL rather
+     * than inferred from its name.
+     *
+     * The mistake survived because the query had never run. The extension is not part of the
+     * postgres image, so the end-to-end test skipped in every lane and on every developer
+     * machine, and the driver's shape was asserted only against a stubbed connection - which
+     * pins what the driver asks for and cannot notice that no such function exists. Installing
+     * the extension in CI is what made it run, and it failed on its first real execution.
      *
      * @return array{p50: float, p90: float, p95: float, p99: float}
      */
@@ -355,7 +368,7 @@ final readonly class WebhookMetrics
 
         $row = (array) $this->db()->selectOne(
             'WITH merged AS ('
-            .'SELECT rollup(latency_digest) AS digest FROM '.self::HOURLY_VIEW.' '
+            .'SELECT tdigest(latency_digest) AS digest FROM '.self::HOURLY_VIEW.' '
             .'WHERE '.$ownerSql.' AND bucket >= ?'
             .') SELECT '
             .'tdigest_percentile(digest, 0.5)  AS p50, '

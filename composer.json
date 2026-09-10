@@ -25,7 +25,11 @@
     "require": {
         "php": "^8.4",
         "ext-curl": "*",
+        "ext-ctype": "*",
+        "ext-filter": "*",
+        "ext-hash": "*",
         "ext-json": "*",
+        "ext-mbstring": "*",
         "ext-sodium": "*",
         "guzzlehttp/guzzle": "^7.0|^8.0",
         "guzzlehttp/psr7": "^2.0|^3.0",

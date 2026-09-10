@@ -4,6 +4,22 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.2] - 2026-09-10
+
+### Changed
+
+- **The manifest now declares the four PHP extensions the shipped code calls directly** — `ext-ctype`, `ext-filter`, `ext-hash` and `ext-mbstring`. All four signing schemes reach for `hash_hmac()` and `hash_equals()`, the SSRF address classifiers for `filter_var()`, the owner-key type and the delivery log for `ctype_digit()`, and the owner-key declaration and the client config for `mb_strlen()`, `mb_strtolower()` and `mb_substr()`. None of the four was required.
+
+  **Nothing changes for an install that already worked, and that is worth saying plainly rather than leaving you to check:** `laravel/framework ^13.0` requires all four itself (and openssl, session and tokenizer besides), so every PHP that could resolve this package already had them. What changes is where the requirement is written. A transitive guarantee is a property of someone else's manifest — nothing that reads THIS one can see it, `composer check-platform-reqs` included, and it can be narrowed upstream without a signal here.
+
+  A contract test now holds both directions: every extension the shipped source calls is declared, and every declared extension is called. The second direction is the one that breaks a consumer — Composer refuses an install over a requirement nobody uses, and such a requirement passes a forward-only check forever.
+
+### Fixed
+
+- **The `tdigest` percentile driver could never have worked, and now does.** Its SQL merged the hourly latency digests with `rollup(latency_digest)` — and the PostgreSQL `tdigest` extension has no function by that name. It defines five aggregates (`tdigest`, `tdigest_avg`, `tdigest_percentile`, `tdigest_percentile_of`, `tdigest_sum`), and the one that merges digests is `tdigest(tdigest)`. Selecting `webhooks.dashboard.percentiles.driver = 'tdigest'` on a database that HAS the extension raised `function rollup(tdigest) does not exist` on the first dashboard read. The default driver (`live`) was never affected, and neither was any installation without the extension — there the driver stops at its own actionable guard before reaching SQL.
+
+  **It shipped because it had never executed.** The extension is not part of the `postgres` image, so the end-to-end arm skipped in every lane and on every developer machine; the driver's query, bindings and result mapping were asserted against a stubbed connection, which pins what the driver ASKS for and cannot notice that the database has no such function. Installing the extension in CI is what made the arm run, and it failed on its first real execution.
+
 ## [3.2.1] - 2026-09-09
 
 ### Added
@@ -2999,7 +3015,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.1...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.2...HEAD
+[3.2.2]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.1...v3.2.2
 [3.2.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.0.1...v3.1.0
