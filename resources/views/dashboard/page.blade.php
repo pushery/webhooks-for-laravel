@@ -45,7 +45,14 @@
                 href="{{ route('webhooks.dashboard', ['tab' => $t, 'window' => $window]) }}"
                 wire:navigate
                 @class([
-                    'wh-dash-tab px-[var(--padding-wk-x-md)] py-[var(--padding-wk-y-sm)]',
+                    {{-- A FLOOR, not a repair — and the difference is measured. On a styled page these
+                         links come out at 36px, well clear of the 24px minimum in WCAG 2.5.8, so nothing
+                         here is broken today. What is not guaranteed is that they stay there: the height
+                         is padding token plus line height, and BOTH are values a host re-themes. Pinning
+                         the floor makes the guarantee structural instead of incidental, and costs a
+                         host nothing that it did not already agree to. 24px is WireKit's own number for
+                         this; its input and combobox affordances carry the same pair. --}}
+                    'wh-dash-tab inline-flex items-center min-h-[24px] px-[var(--padding-wk-x-md)] py-[var(--padding-wk-y-sm)]',
                     'border-b-[length:var(--border-wk-width)] border-[color:var(--color-wk-accent)] font-[number:var(--font-wk-heading-weight)]' => $tab === $t,
                     'text-[color:var(--color-wk-text-muted)]' => $tab !== $t,
                 ])

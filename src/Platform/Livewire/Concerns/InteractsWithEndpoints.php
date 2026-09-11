@@ -46,16 +46,23 @@ trait InteractsWithEndpoints
      * the same answer here as from its own screens, without the gate itself changing.
      * Row-level ownership stays a separate, second guard (a foreign id fails not-found first).
      *
-     * That second guard is unreachable as the sole refusal, and knowing why saves the next
-     * reader a wasted afternoon. Every `authorize('view'|'update'|'rotateSecret',
-     * $subscription)` in these panels is redundant with the one above it — measured 2026-08-20:
-     * comment any of the five out and the whole 236-test portal suite stays green. They are not
-     * untested, they are unreachable: this boot gate reads the same `manage-webhook-endpoints`
-     * ability the policy consults, and the only condition the policy adds on top is
-     * `ownedByCurrentTenant()`, which findOwnedEndpoint() has already enforced —
-     * scopeToCurrentOwner() answers `1 = 0` for a null tenant, so a row that loaded at all is a
-     * row the tenant owns. Do not delete them: they are what still refuses if a future caller
-     * reaches an action without the scoped query.
+     * boot() does not run on every request, and this paragraph used to say that it did. A
+     * `#[Lazy]` panel is mounted as a placeholder first, and Livewire skips the hydrate of that
+     * placeholder snapshot, boot() included, on the request that follows. That request is meant
+     * to be the `__lazyLoad` that mounts the panel for real, and nothing makes it so. Measured
+     * 2026-09-11 on EndpointList, the one lazy panel here: a `$refresh` or a `gotoPage()` sent
+     * against an unloaded placeholder rendered the tenant's list after the ability had been
+     * revoked. So the gate runs again before every render (the `rendering` hook below), which no
+     * placeholder skips, and the render is where a tenant's rows leave the server.
+     *
+     * An ACTION on that path still runs without the gate, and that is why the row-level
+     * `authorize('view'|'update'|'rotateSecret', $subscription)` calls stay. Mutation run 1419
+     * removed each of the eleven. In the five panels that are not lazy all seven survived: the
+     * gate above refuses first, and the policy adds only `ownedByCurrentTenant()`, which
+     * findOwnedEndpoint() has already enforced — scopeToCurrentOwner() answers `1 = 0` for a null
+     * tenant, so a row that loaded at all is a row the tenant owns. In EndpointList they are the
+     * only refusal on the placeholder path, and the arm that revokes the ability mid-session
+     * fails without any one of them. Do not delete them.
      *
      * `create` is the one that is genuinely reachable, and it is reachable for a structural
      * reason: there is no row yet, so the scoping cannot speak, and the policy's
@@ -65,6 +72,16 @@ trait InteractsWithEndpoints
      * EndpointList::newEndpoint()).
      */
     public function bootInteractsWithEndpoints(): void
+    {
+        PortalRefusal::shape(fn () => $this->authorize('manage-webhook-endpoints'));
+    }
+
+    /**
+     * The same gate before every render, because boot() does not run on the request that follows
+     * a lazy placeholder (see above). Variadic because Livewire hands trait hooks their context as
+     * named arguments, and this check needs none of it.
+     */
+    public function renderingInteractsWithEndpoints(mixed ...$context): void
     {
         PortalRefusal::shape(fn () => $this->authorize('manage-webhook-endpoints'));
     }
