@@ -4,6 +4,49 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.3] - 2026-09-11
+
+### Security
+
+- **A revoked tenant could still reload the endpoint list it had open.** `EndpointList` is lazy,
+  and Livewire skips the hydrate of a lazy placeholder, `boot()` included, on the request that
+  follows it. The portal's gate lived in `boot()`, so a refresh or a page change sent against a
+  placeholder that had not loaded yet rendered the tenant's endpoints after `webhooks.manage` had
+  been revoked. The same gate now runs before every render, which no placeholder skips.
+
+  What was exposed is narrow: the tenant's own list, scoped to its owner, with no secrets on it.
+  Every row action already carried its own authorization and was refused on that path.
+
+### Fixed
+
+- **The browser suite rendered every screen unstyled, so nothing it said about appearance was
+  about your screen.** The package ships no compiled CSS on purpose — its views are Tailwind
+  utilities over WireKit's design tokens, built by the host — and the demo host that stands in for
+  that build linked its stylesheet from a provider the test case deliberately never registers,
+  while the route serving the file lived in a route file only the demo reads. Two independent
+  halves, both false, and the suite stayed green because text, clicks, Livewire round trips and
+  JavaScript-error checks all pass on an unstyled page. Only geometry notices.
+
+  Measured on 2026-09-10: the dashboard loaded WireKit's token sheet and nothing else, every
+  element `display: inline` at `min-height: 0px`. Both halves now sit in the shared host provider,
+  `composer test:browser` compiles the sheet before it runs, and a precondition arm fails the suite
+  when the stylesheet stops arriving — proven against its own defect rather than assumed.
+
+  Nothing here reaches an installed copy: the demo host and the test harness are development
+  surfaces. What changes is that the suite's visual arms now measure the screen you get.
+
+  **For contributors:** `composer test:browser` is now `composer demo-css && pest tests/Browser`,
+  and `composer demo-css` is the single definition of that build — `just demo-css` calls it rather
+  than repeating the Tailwind command. Running the browser suite needs no separate step any more,
+  in CI or locally.
+
+### Changed
+
+- The dashboard's section tabs carry an explicit 24px minimum height (WCAG 2.5.8, Target Size).
+  On a styled page they already measure 36px, so this fixes nothing visible today — it pins a
+  floor that is otherwise the sum of a padding token and a line height, both of which a host
+  re-themes.
+
 ## [3.2.2] - 2026-09-10
 
 ### Changed
@@ -3015,7 +3058,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.2...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.3...HEAD
+[3.2.3]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.2...v3.2.3
 [3.2.2]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.1...v3.2.2
 [3.2.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.1.0...v3.2.0
