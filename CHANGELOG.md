@@ -4,6 +4,12 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] - 2026-09-13
+
+### Security
+
+- **A form on the package's own pages could be sent as a GET before Livewire had bound it, with its fields in the address.** A `<form wire:submit>` carries no `method`, so until Livewire's scripts at the end of the body had loaded, Enter sent the page to its own URL and every named field landed in the query string: the endpoint form's name and URL, and from there the browser history, the access log and an error tracker's request URL. The window opened on every page load. Both package layouts, the self-service portal's and the dashboard's, now load a guard in the head that cancels the default submission of a `wire:submit` form; a bound form saves as before. The guard is a constant inline script, so a host under a strict Content-Security-Policy admits it once with `LivewireSubmitGuard::cspHash()` in `script-src`. A layout you published keeps the old head until you publish it again.
+
 ## [3.2.3] - 2026-09-11
 
 ### Security
@@ -3058,7 +3064,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.3...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.3.0...HEAD
+[3.3.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.3...v3.3.0
 [3.2.3]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.2...v3.2.3
 [3.2.2]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.1...v3.2.2
 [3.2.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.0...v3.2.1
