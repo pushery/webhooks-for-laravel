@@ -34,6 +34,11 @@
             })();
         </script>
     @endif
+    {{-- Holds a wire:submit form still until Livewire has bound it. Without it, Enter pressed before the
+         scripts at the end of the body arrive sends the page to its own address as a GET, with every
+         named field in the query string. A constant, so a strict CSP admits it by its hash:
+         LivewireSubmitGuard::cspHash(). --}}
+    <script{!! $theme::nonceAttribute() !!}>{!! \Pushery\Webhooks\Support\LivewireSubmitGuard::SCRIPT !!}</script>
     @wirekitStyles
     {{-- The host's own compiled assets (its @vite tags), so the shipped screens use the
          host's asset pipeline. Configured via webhooks.ui.assets; nothing renders when unset. --}}
