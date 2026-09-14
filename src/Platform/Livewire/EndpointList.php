@@ -68,6 +68,11 @@ final class EndpointList extends Component
     public function edit(int $id): void
     {
         $subscription = $this->findOwnedEndpoint($id);
+        // Redundant on both paths, and deliberately kept: {@see InteractsWithEndpoints} states the
+        // rule and its measurement. On a loaded list the boot gate refuses first. On an unloaded
+        // placeholder this action only dispatches an event, and the render gate refuses the
+        // response that would carry it. This is what still refuses if a future caller reaches the
+        // action another way.
         $this->authorize('update', $subscription);
 
         $this->dispatch('edit-endpoint', id: $subscription->id);
@@ -79,6 +84,11 @@ final class EndpointList extends Component
     public function reveal(int $id): void
     {
         $subscription = $this->findOwnedEndpoint($id);
+        // Redundant on both paths, and deliberately kept: {@see InteractsWithEndpoints} states the
+        // rule and its measurement. On a loaded list the boot gate refuses first. On an unloaded
+        // placeholder this action only dispatches an event, and the render gate refuses the
+        // response that would carry it. This is what still refuses if a future caller reaches the
+        // action another way.
         $this->authorize('view', $subscription);
 
         $this->dispatch('reveal-secret', id: $subscription->id);

@@ -26,7 +26,16 @@
 @endassets
 @php($secret = $this->visibleCurrentSecret)
 @php($previous = $this->visiblePreviousSecret)
-<div class="wh-portal-secret" wire:key="secret-panel">
+{{-- `contents` while closed, so the panel forms no box of its own. Both panels render their
+     root unconditionally -- the live region above has to be in the DOM before its text appears,
+     which is the whole reason it is permanent -- and a root that renders is a flex child of the
+     portal's column even with nothing visible in it. The column then sets a gap before it and a
+     gap after it. Two closed panels cost two gaps, measured at 48px between the page heading and
+     the endpoint list against 27px on a screen with one panel.
+
+     `display: contents` removes the box, not the element: the live region keeps its own box and
+     its place in the accessibility tree, and Livewire keeps the single root it needs. --}}
+<div @class(['wh-portal-secret', 'contents' => $secret === null]) wire:key="secret-panel">
     {{-- Persistent polite live region: survives the reveal card being torn down, so a
          screen reader still hears that the secret was withdrawn. --}}
     <x-wirekit::visually-hidden role="status" aria-live="polite">
@@ -87,7 +96,7 @@
                      The announcements live where they belong instead: the permanent hidden
                      region above says a secret was revealed, and the one below says the window
                      is closing. Both are small, both are atomic, and neither contains the key. --}}
-                <div class="flex flex-col gap-[var(--padding-wk-y-md)]" role="region" aria-label="{{ __('webhooks::self-service.secret.region_label') }}">
+                <div class="flex flex-col gap-[var(--space-wk-sm)]" role="region" aria-label="{{ __('webhooks::self-service.secret.region_label') }}">
                     <div class="flex flex-wrap items-start justify-between gap-[var(--padding-wk-x-md)]">
                         <x-wirekit::stack gap="none">
                             {{-- Level 2 for the reason the form gives: this panel opens above the list, under the page's h1. --}}
@@ -96,7 +105,7 @@
                                 <x-wirekit::text size="sm" intent="muted" class="break-all">{{ $this->endpointUrl }}</x-wirekit::text>
                             @endif
                         </x-wirekit::stack>
-                        <x-wirekit::button size="sm" surface="ghost" intent="neutral" wire:click="hide">{{ __('webhooks::self-service.secret.hide') }}</x-wirekit::button>
+                        <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" intent="neutral" wire:click="hide">{{ __('webhooks::self-service.secret.hide') }}</x-wirekit::button>
                     </div>
 
                     <x-wirekit::text size="sm" intent="muted">
@@ -139,7 +148,7 @@
                     @endif
 
                     <div>
-                        <x-wirekit::button surface="ghost" wire:click="rotate">{{ __('webhooks::self-service.secret.rotate') }}</x-wirekit::button>
+                        <x-wirekit::button surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" wire:click="rotate">{{ __('webhooks::self-service.secret.rotate') }}</x-wirekit::button>
                     </div>
                 </div>
             </x-wirekit::card.body>

@@ -17,7 +17,7 @@
                     :description="__('webhooks::dashboard.empty.no_activity.description')"
                 />
             @else
-                <div class="wh-dash-activity-legend mb-[var(--padding-wk-y-md)] flex flex-wrap gap-[var(--padding-wk-x-md)]">
+                <div class="wh-dash-activity-legend mb-[var(--space-wk-sm)] flex flex-wrap gap-[var(--padding-wk-x-md)]">
                     <span class="inline-flex items-center gap-[var(--gap-wk-sm)] text-[length:var(--text-wk-sm)]">
                         <span class="inline-block size-3 rounded-[var(--radius-wk-sm)] bg-[var(--color-wk-success)]" aria-hidden="true"></span>
                         {{ __('webhooks::dashboard.activity.delivered') }}

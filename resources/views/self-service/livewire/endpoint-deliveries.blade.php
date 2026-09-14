@@ -17,7 +17,7 @@
          produced three rows, two hundred, or none. And the empty state REPLACES the table, so a
          virtual cursor that was standing in it loses its position silently (WCAG 4.1.3). --}}
     <x-wirekit::visually-hidden role="status" aria-live="polite" wire:key="wh-filtered-{{ $deliveries->total() }}">{{ trans_choice('webhooks::pagination.filtered', $deliveries->total()) }}</x-wirekit::visually-hidden>
-    <div class="mb-[var(--padding-wk-y-md)] flex flex-wrap items-center justify-between gap-[var(--padding-wk-x-md)]">
+    <div class="mb-[var(--space-wk-sm)] flex flex-wrap items-center justify-between gap-[var(--padding-wk-x-md)]">
         <x-wirekit::heading :level="2" size="md">{{ __('webhooks::self-service.deliveries.heading') }}</x-wirekit::heading>
 
         <div class="grid w-full gap-[var(--padding-wk-x-md)] sm:flex sm:w-auto sm:flex-wrap sm:items-end">
@@ -128,7 +128,7 @@
     </div>
 
     @if ($message !== '')
-        <p role="status" class="mb-[var(--padding-wk-y-md)] text-[length:var(--text-wk-sm)] text-[color:var(--color-wk-text)]">{{ $message }}</p>
+        <p role="status" class="mb-[var(--space-wk-sm)] text-[length:var(--text-wk-sm)] text-[color:var(--color-wk-text)]">{{ $message }}</p>
     @endif
 
     {{-- Keyed on the TOTAL, not on this page being empty. A page past the end — which a
@@ -226,7 +226,7 @@
                                  and this one sends an HTTP request when picked wrong. --}}
                             <x-wirekit::button
                                 size="sm"
-                                surface="ghost"
+                                surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}"
                                 wire:click="redeliver('{{ $delivery->id }}')"
                                 wire:loading.attr="disabled"
                                 {{-- Scoped like every sibling replay button. Without it the row
@@ -241,7 +241,7 @@
             </x-wirekit::table.body>
         </x-wirekit::table>
 
-        <div class="mt-[var(--padding-wk-y-md)]">
+        <div class="mt-[var(--space-wk-sm)]">
             {{-- Its own landmark name: the endpoint list on this same page carries a
                  paginator too, and two navigation landmarks called "Pagination" leave a
                  screen-reader user picking between them at random. --}}

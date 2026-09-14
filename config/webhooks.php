@@ -1078,19 +1078,45 @@ return [
         // NOT a closure here: a closure in config makes `php artisan config:cache` throw.
         'csp_nonce' => null,
 
-        // The WireKit surface the two OPERATOR screens draw their SECONDARY actions with.
-        // 'ghost' is what they have always used, so leaving this alone changes nothing.
+        // The WireKit surface every shipped screen draws its SECONDARY actions with -- the two
+        // operator screens and the self-service panels alike. 'ghost' is what they have always
+        // used, so leaving this alone changes nothing.
         //
         // It exists because a design system usually settles on one secondary style, and a
         // borderless untinted button next to a tinted one reads as a THIRD rank where there are
-        // two. Until now the only way to change it was to publish the view and carry the diff
-        // through every package update -- for a style choice.
+        // two. Until this existed the only way to change it was to publish the view and carry the
+        // diff through every package update -- for a style choice.
         //
-        // Scoped to the two operator screens on purpose. The self-service views also use 'ghost',
-        // and not every one of those is a secondary action: several are icon-only controls inside
-        // a table row, where a third rank is exactly right. Widening this without measuring which
-        // is which would restyle buttons nobody asked about.
+        // It covered only the two operator screens until 3.4.0, and the reason written down for
+        // that scope did not survive being checked. It read: the self-service views also use
+        // 'ghost', and several of those are icon-only controls in a table row, where a third rank
+        // is exactly right. All 21 of them were read, and not one is icon-only -- every single one
+        // renders a text label. So the premise that kept the self-service screens out did not
+        // describe them. A tenant on the portal saw a row of borderless text beside a solid green
+        // toggle, which is what a consuming application reported.
+        //
+        // One button stays hardwired, and it is not a secondary action: the active/inactive toggle
+        // in the endpoint list draws 'ghost' as the off half of a two-state control. That ghost is
+        // a state rather than a rank, and moving it with this key would make "disabled" look like
+        // every other button on the row.
         'secondary_surface' => 'ghost',
+
+        // The icon each row action in the self-service endpoint list carries, as a semantic
+        // WireKit alias. Set an entry to null to drop that one icon; set the whole key to an
+        // empty array for the label-only list this package shipped before 3.4.0.
+        //
+        // Icons are here because the surface above cannot fix a row on its own: 'ghost' reads as
+        // a text link mainly for want of anything else to read, and a tinted surface with no icon
+        // trades one flat row for another. Every alias below is one all four WireKit icon presets
+        // carry (heroicons, lucide, phosphor, tabler), so this default resolves whichever preset
+        // the host has configured -- a host naming its own alias is on the hook for that.
+        'row_action_icons' => [
+            'ping' => 'send',
+            'secret' => 'key',
+            'edit' => 'edit',
+            'transform' => 'sliders',
+            'delete' => 'trash',
+        ],
 
         // The HTTP status a REFUSED operator action answers with. 403 is what this console
         // has always sent and stays the default; nothing changes for a host that leaves it.

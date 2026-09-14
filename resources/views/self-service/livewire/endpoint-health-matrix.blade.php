@@ -12,12 +12,12 @@
             {{-- Absent when this board is embedded without the portal's own routes: there
                  is no endpoint page of ours to go back to. --}}
             @if ($portalUrl !== null)
-                <x-wirekit::button :href="$portalUrl" wire:navigate size="sm" surface="ghost" intent="neutral">
+                <x-wirekit::button :href="$portalUrl" wire:navigate size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" intent="neutral">
                     {{ __('webhooks::self-service.actions.back_to_endpoints') }}
                 </x-wirekit::button>
             @endif
             @if (! $endpoints->isEmpty())
-                <x-wirekit::button size="sm" surface="ghost" wire:click="recomputeAll" wire:loading.attr="disabled" wire:target="recomputeAll">
+                <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" wire:click="recomputeAll" wire:loading.attr="disabled" wire:target="recomputeAll">
                     {{ __('webhooks::self-service.health_page.recompute_all') }}
                 </x-wirekit::button>
             @endif
@@ -117,7 +117,7 @@
                         <x-wirekit::table.td align="right">
                             <x-wirekit::button
                                 size="sm"
-                                surface="ghost"
+                                surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}"
                                 wire:click="recompute({{ $endpoint->id }})"
                                 wire:loading.attr="disabled"
                                 wire:target="recompute"

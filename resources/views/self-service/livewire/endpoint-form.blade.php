@@ -2,7 +2,16 @@
      The URL field is a real http(s) URL input; the event types come from the
      configured catalog; validation messages surface through each field's error slot.
      Styled with WireKit tokens throughout. --}}
-<div class="wh-portal-form" wire:key="endpoint-form">
+{{-- `contents` while closed, so the panel forms no box of its own. Both panels render their
+     root unconditionally -- the live region above has to be in the DOM before its text appears,
+     which is the whole reason it is permanent -- and a root that renders is a flex child of the
+     portal's column even with nothing visible in it. The column then sets a gap before it and a
+     gap after it. Two closed panels cost two gaps, measured at 48px between the page heading and
+     the endpoint list against 27px on a screen with one panel.
+
+     `display: contents` removes the box, not the element: the live region keeps its own box and
+     its place in the accessibility tree, and Livewire keeps the single root it needs. --}}
+<div @class(['wh-portal-form', 'contents' => ! $open]) wire:key="endpoint-form">
     {{-- Permanent, so the announcement is not inserted together with its own region -- a live
          region has to be in the DOM before its text appears. It says the form opened, which
          nothing did before: the card simply materialized above the list. --}}
@@ -84,7 +93,7 @@
                             <x-wirekit::button type="submit">
                                 {{ $endpointId === null ? __('webhooks::self-service.form.register') : __('webhooks::self-service.form.save') }}
                             </x-wirekit::button>
-                            <x-wirekit::button type="button" surface="ghost" intent="neutral" wire:click="cancel">
+                            <x-wirekit::button type="button" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" intent="neutral" wire:click="cancel">
                                 {{ __('webhooks::self-service.actions.cancel') }}
                             </x-wirekit::button>
                         </div>
