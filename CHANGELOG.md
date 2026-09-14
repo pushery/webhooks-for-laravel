@@ -4,6 +4,24 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.0] - 2026-09-14
+
+### Fixed
+
+- **The endpoint list's loading skeleton reserves the height an empty list will take.** The list is lazy, so it arrives on a second request behind a skeleton of four rows -- a fixed height swapped for a variable one, and the two matched only by accident. Measured: 125 pixels of skeleton against the 210 the list takes when the account is empty, so everything below it jumped 85 pixels down on the first screen every new tenant sees. A consuming application that embeds the panel near the top of its own page measured a Cumulative Layout Shift of 0.148 against the 0.1 budget for "good", on that screen and on none of its other twenty-three. The skeleton now keeps a floor at the empty list's height, and a browser arm holds the floor against that height as it is really drawn rather than against a number written down twice. An account with rows will still move what follows it -- ten rows are taller than four skeleton ones whatever the skeleton says -- and the portal guide now says how to switch the deferral off where that matters, with the warning that `lazy="false"` passes a string and only `:lazy="false"` turns it off.
+
+- **A closed self-service panel no longer sets a gap aside for itself.** The new-endpoint form and the signing-secret panel render their root whatever their state, because the live region that announces them has to be in the DOM before its text appears. A rendered root is a child of the portal's column, so each closed panel -- drawing nothing at all -- still collected a gap before it and a gap after it. Between the page heading and the endpoint list stood three gaps where one belongs: 36 pixels on the portal's own page, and 48 on an embedding host that stacks wider, against 27 on a screen carrying a single panel. A closed panel now forms no box, which removes the box and not the element: the live region keeps its place in the accessibility tree and still announces the form opening, and an opened panel pushes the list down exactly as before. Browser arms in Blink and WebKit hold all three. A view you published keeps the old markup until you publish it again.
+
+- **On a phone, an endpoint row is the height of a row instead of the height of the screen.** The self-service endpoint list scrolls sideways inside its own container on a narrow screen, which is the right answer for a table this wide -- but the column carrying the name and URL was free to collapse under the auto table layout, and a real URL set in `break-all` has a minimum width of about one character. It was measured at 92 pixels, and the row it belonged to stood 359 pixels tall: taller than the screen, and almost all of it whitespace beside the health badge. The identifying column now keeps a floor of 16rem, on the header cell and the row cell both, because a column's width is a property of the column and one floor alone would not hold it. Measured over two endpoints with realistic names and URLs at 375 pixels: the row falls from 197 pixels to 77. A browser arm at phone size holds both halves in Blink and WebKit. A view you published keeps the old markup until you publish it again.
+
+### Changed
+
+- **Fourteen gaps between elements are drawn from the spacing scale instead of the padding scale.** A margin, a `gap` or a `space-*` utility fed from a `--padding-wk-*` token is the wrong family for the job: padding says how much room a control keeps inside its own box, and a host that retunes that scale was silently moving the distance BETWEEN boxes as well. Only the occurrences whose value exists on the `--space-wk-*` scale moved, so every one of the fourteen is pixel-identical to what it drew before. The reported fix was a plain rename on the premise that the two scales agree today -- measured against WireKit's stylesheet they do not, the padding scale runs 0.25 / 0.375 / 0.5 / 0.625 / 0.75 / 1 / 1.5rem against the space scale's 0.25 / 0.5 / 1 / 1.5 / 2.5 / 4rem, and renaming `--padding-wk-y-md` to `--space-wk-md` would have doubled that gap in all fourteen places. The 35 occurrences sitting at a step the space scale has no name for keep their padding token rather than take a resize nobody asked for; a guard derived from the stylesheet itself reports them the day that step exists. A view you published keeps the old markup until you publish it again.
+
+### Added
+
+- **The self-service panels draw their secondary actions with the surface you configure, and the endpoint list's row actions carry icons.** `ui.secondary_surface` moved the two operator screens and left the tenant-facing panels on a hardwired `ghost`, so a host with its own secondary style had to publish the view and carry the whole diff through every update -- for a style choice. It now covers both, unchanged at `ghost`, so nothing moves for a host that sets nothing. One button stays hardwired because it is not a secondary action: the active/inactive toggle in the endpoint list, whose `ghost` is the OFF half of a two-state control. The list's five row actions -- test, secret, edit, transform, delete -- also take an icon each, configurable per action under `ui.row_action_icons`; set one entry to `null` to drop that icon, or the whole key to `[]` for the label-only row this package shipped before. The shipped aliases are ones all four WireKit icon presets carry, and without `blade-ui-kit/blade-icons` installed WireKit draws its inert placeholder, exactly as the rest of the package's iconography already does.
+
 ## [3.3.2] - 2026-09-14
 
 ### Fixed
@@ -3084,7 +3102,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.3.2...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.4.0...HEAD
+[3.4.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.3.2...v3.4.0
 [3.3.2]: https://github.com/pushery/webhooks-for-laravel/compare/v3.3.1...v3.3.2
 [3.3.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.3...v3.3.0

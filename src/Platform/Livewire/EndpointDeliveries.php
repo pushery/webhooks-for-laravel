@@ -436,6 +436,11 @@ final class EndpointDeliveries extends Component
 
         $readable = ReadableEndpoints::ids();
 
+        // The early return changes no row. Without it the query further down runs with an empty
+        // list, `orWhereIn('id', [])` compiles to `or 0 = 1`, and what is left is the same owner's
+        // endpoints, ordered by the same column under the same limit. Weekly mutation run 1452
+        // removed it and the suite stayed green. It stays so that a host that declared nothing
+        // runs the query it always ran, not its owner scope wrapped in a subquery.
         if ($readable === []) {
             return $this->scopedQuery()
                 ->select(['id', 'url', 'name'])

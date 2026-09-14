@@ -18,7 +18,7 @@
          produced three rows, two hundred, or none. And the empty state REPLACES the table, so a
          virtual cursor that was standing in it loses its position silently (WCAG 4.1.3). --}}
     <x-wirekit::visually-hidden role="status" aria-live="polite" wire:key="wh-filtered-{{ $deliveries->total() }}">{{ trans_choice('webhooks::pagination.filtered', $deliveries->total()) }}</x-wirekit::visually-hidden>
-    <div class="mb-[var(--padding-wk-y-md)] flex flex-wrap items-end gap-[var(--padding-wk-x-md)]">
+    <div class="mb-[var(--space-wk-sm)] flex flex-wrap items-end gap-[var(--padding-wk-x-md)]">
         <x-wirekit::select name="status" wire:model.live="status" :label="__('webhooks::dashboard.filters.status')" hideLabel>
             <option value="">{{ __('webhooks::dashboard.filters.all_statuses') }}</option>
             <option value="pending">{{ __('webhooks::dashboard.status_options.pending') }}</option>
@@ -123,7 +123,7 @@
             </x-wirekit::table.body>
         </x-wirekit::table>
 
-        <div class="mt-[var(--padding-wk-y-md)]">
+        <div class="mt-[var(--space-wk-sm)]">
             {{ $deliveries->links() }}
         </div>
     @endif

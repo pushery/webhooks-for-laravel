@@ -137,6 +137,11 @@ class DeliveryLog extends Component
     {
         // A host passing the deprecated name gets the same panel. Properties arrive before
         // mount() runs, so this is the one place that sees what was handed in.
+        //
+        // The `!== ''` half of each condition decides nothing: without it the copy also runs
+        // when both names are empty, and writes an empty string over an empty string. Weekly
+        // mutation run 1452 made each half always true and the suite stayed green. It stays
+        // because it says which name is the source.
         if ($this->subscriptionId !== '' && $this->endpointId === '') {
             $this->endpointId = $this->subscriptionId;
         }

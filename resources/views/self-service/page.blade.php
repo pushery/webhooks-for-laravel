@@ -11,7 +11,7 @@
         </div>
         {{-- Absent when this shell is embedded without the portal's own routes. --}}
         @if ($healthBoardUrl !== null)
-            <x-wirekit::button :href="$healthBoardUrl" wire:navigate size="sm" surface="ghost" intent="neutral">
+            <x-wirekit::button :href="$healthBoardUrl" wire:navigate size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" intent="neutral">
                 {{ __('webhooks::self-service.page.health_link') }}
             </x-wirekit::button>
         @endif

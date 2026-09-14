@@ -63,13 +63,13 @@
             ></button>
 
             <div x-ref="panel" tabindex="-1" class="relative flex h-full w-full max-w-md flex-col overflow-y-auto bg-[var(--color-wk-bg-elevated)] p-[var(--padding-wk-x-lg)] shadow-[var(--shadow-wk-lg)]">
-                <div class="mb-[var(--padding-wk-y-md)] flex items-start justify-between gap-[var(--padding-wk-x-md)]">
+                <div class="mb-[var(--space-wk-sm)] flex items-start justify-between gap-[var(--padding-wk-x-md)]">
                     <x-wirekit::heading :level="2" size="md">{{ $delivery->event_type }}</x-wirekit::heading>
                     <x-wirekit::button size="sm" surface="ghost" wire:click="close" :aria-label="__('webhooks::dashboard.a11y.close_details')">{{ __('webhooks::dashboard.drawer.close') }}</x-wirekit::button>
                 </div>
 
 @php($intent = $delivery->status->intent())
-                <div class="mb-[var(--padding-wk-y-md)] flex flex-wrap items-center gap-[var(--padding-wk-x-md)]">
+                <div class="mb-[var(--space-wk-sm)] flex flex-wrap items-center gap-[var(--padding-wk-x-md)]">
                     <x-wirekit::badge :intent="$intent">{{ __('webhooks::dashboard.status.'.$delivery->status->value) }}</x-wirekit::badge>
                     <x-wirekit::text size="sm" intent="muted">{{ __('webhooks::dashboard.drawer.attempt', ['number' => $delivery->attempt]) }}</x-wirekit::text>
                     @if ($delivery->response_code !== null)
@@ -93,7 +93,7 @@
                      why the label alone was not enough. --}}
                 @php($locale = ['locale' => app()->getLocale()])
                 @php($zone = \Pushery\Webhooks\Dashboard\DashboardTimezone::apply(...))
-                <x-wirekit::timeline class="mb-[var(--padding-wk-y-md)]">
+                <x-wirekit::timeline class="mb-[var(--space-wk-sm)]">
                     <x-wirekit::timeline.item :time="$zone($delivery->created_at)->settings($locale)->isoFormat(__('webhooks::dashboard.formats.absolute'))" intent="default">
                         {{ __('webhooks::dashboard.drawer.queued') }}
                     </x-wirekit::timeline.item>
@@ -138,7 +138,7 @@
                     >{{ $this->payloadJson }}</x-wirekit::code-block>
                 @endif
 
-                <div class="mt-[var(--padding-wk-y-md)]">
+                <div class="mt-[var(--space-wk-sm)]">
                     {{-- Disabled while the replay is in flight, so a double-click cannot enqueue
                          the same delivery twice. --}}
                     <x-wirekit::button
