@@ -38,9 +38,11 @@
     @endif
 
     @if ($endpoints->isEmpty())
+        {{-- Level 2, not WireKit's default 3: the empty state sits directly under the board's h1. --}}
         <x-wirekit::empty-state
             icon="globe"
             variant="outline"
+            :level="2"
             :title="__('webhooks::self-service.empty.no_endpoints_health.title')"
             :description="__('webhooks::self-service.empty.no_endpoints_health.description')"
         />

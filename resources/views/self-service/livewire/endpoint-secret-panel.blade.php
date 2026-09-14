@@ -90,7 +90,8 @@
                 <div class="flex flex-col gap-[var(--padding-wk-y-md)]" role="region" aria-label="{{ __('webhooks::self-service.secret.region_label') }}">
                     <div class="flex flex-wrap items-start justify-between gap-[var(--padding-wk-x-md)]">
                         <x-wirekit::stack gap="none">
-                            <x-wirekit::heading :level="3" size="sm">{{ __('webhooks::self-service.secret.heading') }}</x-wirekit::heading>
+                            {{-- Level 2 for the reason the form gives: this panel opens above the list, under the page's h1. --}}
+                            <x-wirekit::heading :level="2" size="sm">{{ __('webhooks::self-service.secret.heading') }}</x-wirekit::heading>
                             @if ($this->endpointUrl !== null)
                                 <x-wirekit::text size="sm" intent="muted" class="break-all">{{ $this->endpointUrl }}</x-wirekit::text>
                             @endif

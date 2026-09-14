@@ -38,11 +38,13 @@
     @endif
 
     {{-- Full width on a narrow screen, so the wrapped row stacks into one column of equal fields; from `sm` up each control keeps its own width.
-         Each control also has one fixed height, the height of the date fields. WebKit draws a native select as a menu-list button and
-         drops its vertical padding, so the selects came out 23px tall beside 38px date fields while Blink drew them at 38px. A fixed
-         height is the one size WebKit honors there (it ignores min-height), and the select keeps its native arrow. --}}
+         Every control, the date fields included, also has one fixed height of 40px. WebKit draws a native select as a menu-list button and
+         drops its vertical padding, so on macOS the selects came out 23px tall beside 38px date fields while Blink drew them at 38px. A fixed
+         height is the one size WebKit honors there (it ignores min-height), and the select keeps its native arrow. The date fields need
+         it as well: WebKit's Linux build draws them 40px tall on its own, 2px taller than Blink and WebKit on macOS. 40px is the tallest
+         of the three, so the fixed height never squeezes a date field below the height its engine draws. --}}
     <div class="flex flex-wrap items-end gap-4">
-        <select name="status" wire:model.live="status" class="h-9.5 w-full rounded border px-3 py-2 sm:w-auto" aria-label="{{ __('webhooks::management.filters.status') }}">
+        <select name="status" wire:model.live="status" class="h-10 w-full rounded border px-3 py-2 sm:w-auto" aria-label="{{ __('webhooks::management.filters.status') }}">
             <option value="">{{ __('webhooks::management.filters.all_statuses') }}</option>
             <option value="pending">{{ __('webhooks::management.status_options.pending') }}</option>
             <option value="succeeded">{{ __('webhooks::management.status_options.succeeded') }}</option>
@@ -57,16 +59,16 @@
              exact `where`, so a typo returns an empty list indistinguishable from "nothing was
              delivered" -- which is why the list is better wherever it exists. --}}
         @if ($eventTypes !== [])
-            <select name="eventType" wire:model.live="eventType" class="h-9.5 w-full rounded border px-3 py-2 sm:w-auto" aria-label="{{ __('webhooks::management.filters.event_type') }}">
+            <select name="eventType" wire:model.live="eventType" class="h-10 w-full rounded border px-3 py-2 sm:w-auto" aria-label="{{ __('webhooks::management.filters.event_type') }}">
                 <option value="">{{ __('webhooks::management.filters.all_event_types') }}</option>
                 @foreach ($eventTypes as $type)
                     <option value="{{ $type }}">{{ $type }}</option>
                 @endforeach
             </select>
         @else
-            <input type="text" name="eventType" wire:model.live.debounce.300ms="eventType" placeholder="{{ __('webhooks::management.filters.event_type_placeholder') }}" aria-label="{{ __('webhooks::management.filters.event_type') }}" class="h-9.5 w-full rounded border px-3 py-2 sm:w-auto">
+            <input type="text" name="eventType" wire:model.live.debounce.300ms="eventType" placeholder="{{ __('webhooks::management.filters.event_type_placeholder') }}" aria-label="{{ __('webhooks::management.filters.event_type') }}" class="h-10 w-full rounded border px-3 py-2 sm:w-auto">
         @endif
-        <select name="endpointId" wire:model.live="endpointId" class="h-9.5 w-full rounded border px-3 py-2 sm:w-auto" aria-label="{{ __('webhooks::management.filters.endpoint') }}">
+        <select name="endpointId" wire:model.live="endpointId" class="h-10 w-full rounded border px-3 py-2 sm:w-auto" aria-label="{{ __('webhooks::management.filters.endpoint') }}">
             <option value="">{{ __('webhooks::management.filters.all_endpoints') }}</option>
             @foreach ($endpoints as $endpoint)
                 <option value="{{ $endpoint->id }}">{{ $endpoint->name ?: $endpoint->url }}</option>
@@ -78,10 +80,10 @@
              fields side by side say nothing about which one starts the range. The fixed width keeps
              the row from wrapping differently in engines that size a date input differently. --}}
         <label class="flex w-full flex-col gap-1 text-sm sm:w-40">{{ __('webhooks::management.filters.from') }}
-            <input type="date" name="from" wire:model.live.debounce.500ms="from" class="rounded border px-3 py-2">
+            <input type="date" name="from" wire:model.live.debounce.500ms="from" class="h-10 rounded border px-3 py-2">
         </label>
         <label class="flex w-full flex-col gap-1 text-sm sm:w-40">{{ __('webhooks::management.filters.until') }}
-            <input type="date" name="until" wire:model.live.debounce.500ms="until" class="rounded border px-3 py-2">
+            <input type="date" name="until" wire:model.live.debounce.500ms="until" class="h-10 rounded border px-3 py-2">
         </label>
     </div>
 

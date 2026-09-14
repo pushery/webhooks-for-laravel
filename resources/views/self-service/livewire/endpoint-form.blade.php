@@ -40,7 +40,9 @@
             <x-wirekit::card.body>
                 <x-wirekit::form wire:submit="save">
                     <x-wirekit::stack gap="md">
-                        <x-wirekit::heading :level="3" size="sm">
+                        {{-- Level 2: the form opens above the endpoint list, directly under the page's h1 and
+                             beside "Your endpoints". An h3 here skipped a level in every heading list. --}}
+                        <x-wirekit::heading :level="2" size="sm">
                             {{ $endpointId === null ? __('webhooks::self-service.form.new_heading') : __('webhooks::self-service.form.edit_heading') }}
                         </x-wirekit::heading>
 
