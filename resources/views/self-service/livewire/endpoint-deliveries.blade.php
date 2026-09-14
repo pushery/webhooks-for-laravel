@@ -20,75 +20,89 @@
     <div class="mb-[var(--padding-wk-y-md)] flex flex-wrap items-center justify-between gap-[var(--padding-wk-x-md)]">
         <x-wirekit::heading :level="2" size="md">{{ __('webhooks::self-service.deliveries.heading') }}</x-wirekit::heading>
 
-        <div class="flex flex-wrap items-center gap-[var(--padding-wk-x-md)]">
-        @if ($windowChoices !== [])
-            {{-- Both filters are the library's own select again. They were native from
-                 2026-08-15 to today, because a WireKit select bound with wire:model.live made
-                 the endpoint list's delete confirmation unclickable on the same page — the
-                 dialog opened and the click on its destructive action never landed.
+        <div class="grid w-full gap-[var(--padding-wk-x-md)] sm:flex sm:w-auto sm:flex-wrap sm:items-end">
+            {{-- The two lists pair up on a phone and dissolve into the row from `sm` up. --}}
+            <div class="grid grid-cols-2 items-end gap-[var(--padding-wk-x-md)] sm:contents">
+            @if ($windowChoices !== [])
+                {{-- Both filters are the library's own select again. They were native from
+                     2026-08-15 to today, because a WireKit select bound with wire:model.live made
+                     the endpoint list's delete confirmation unclickable on the same page — the
+                     dialog opened and the click on its destructive action never landed.
 
-                 RETIRED 2026-08-27, on the condition this file itself set: not on an upstream
-                 ticket closing, but on THIS composition — two separate Livewire components, a
-                 dialog per row, lazy panels — passing again. It was re-measured against v2.35.0
-                 two days earlier and was still broken then, which is why the condition was
-                 written that way and why "upstream says fixed" was not enough on its own.
+                     RETIRED 2026-08-27, on the condition this file itself set: not on an upstream
+                     ticket closing, but on THIS composition — two separate Livewire components, a
+                     dialog per row, lazy panels — passing again. It was re-measured against v2.35.0
+                     two days earlier and was still broken then, which is why the condition was
+                     written that way and why "upstream says fixed" was not enough on its own.
 
-                 CONFIRMED against WireKit v2.37.2, the first version that carries the upstream
-                 fix (it landed in v2.37.0: the overlay took its geometry only from Tailwind
-                 utilities the host build had to compile, so the dialog sat in normal document
-                 flow and its confirm button was below the fold). The two arms that matter —
-                 "deletes an endpoint only through the alert-dialog" and the same under the
-                 CSP-safe bundle — run 1961 ms TOGETHER, against the two-second bar that was the
-                 retirement gate. `conflict` now refuses anything below 2.37, so the version
-                 without that fix is no longer reachable for a supported install. --}}
-            <x-wirekit::select
-                name="windowDays"
-                wire:model.live="windowDays"
-                :label="__('webhooks::self-service.deliveries.window_label')"
-                hideLabel
-            >
-                @foreach ($windowChoices as $choice)
-                    <option value="{{ $choice }}">{{ __('webhooks::self-service.deliveries.window_days', ['days' => $choice]) }}</option>
-                @endforeach
-            </x-wirekit::select>
-        @endif
+                     CONFIRMED against WireKit v2.37.2, the first version that carries the upstream
+                     fix (it landed in v2.37.0: the overlay took its geometry only from Tailwind
+                     utilities the host build had to compile, so the dialog sat in normal document
+                     flow and its confirm button was below the fold). The two arms that matter —
+                     "deletes an endpoint only through the alert-dialog" and the same under the
+                     CSP-safe bundle — run 1961 ms TOGETHER, against the two-second bar that was the
+                     retirement gate. `conflict` now refuses anything below 2.37, so the version
+                     without that fix is no longer reachable for a supported install. --}}
+                <x-wirekit::select
+                    name="windowDays"
+                    wire:model.live="windowDays"
+                    :label="__('webhooks::self-service.deliveries.window_label')"
+                    hideLabel
+                >
+                    @foreach ($windowChoices as $choice)
+                        <option value="{{ $choice }}">{{ __('webhooks::self-service.deliveries.window_days', ['days' => $choice]) }}</option>
+                    @endforeach
+                </x-wirekit::select>
+            @endif
 
-            {{-- The outcome filter. Its options are the enum's cases, handed in by the
-                 component, rather than five literal options like the three older consoles
-                 carry: those had to be edited in three files when `refused` was added, and
-                 two of them were missed — a reader could see a refused delivery in the table
-                 and had no way to ask for them, while the translation sat unused in all
-                 seven locales. A loop over the case set cannot fall behind the enum. --}}
-            <x-wirekit::select
-                name="status"
-                wire:model.live="status"
-                :label="__('webhooks::self-service.deliveries.status_label')"
-                hideLabel
-            >
-                <option value="">{{ __('webhooks::self-service.deliveries.all_statuses') }}</option>
-                @foreach ($statusChoices as $choice)
-                    <option value="{{ $choice->value }}">{{ __('webhooks::self-service.deliveries.status.'.$choice->value) }}</option>
-                @endforeach
-            </x-wirekit::select>
+                {{-- The outcome filter. Its options are the enum's cases, handed in by the
+                     component, rather than five literal options like the three older consoles
+                     carry: those had to be edited in three files when `refused` was added, and
+                     two of them were missed — a reader could see a refused delivery in the table
+                     and had no way to ask for them, while the translation sat unused in all
+                     seven locales. A loop over the case set cannot fall behind the enum. --}}
+                <x-wirekit::select
+                    name="status"
+                    wire:model.live="status"
+                    :label="__('webhooks::self-service.deliveries.status_label')"
+                    hideLabel
+                >
+                    <option value="">{{ __('webhooks::self-service.deliveries.all_statuses') }}</option>
+                    @foreach ($statusChoices as $choice)
+                        <option value="{{ $choice->value }}">{{ __('webhooks::self-service.deliveries.status.'.$choice->value) }}</option>
+                    @endforeach
+                </x-wirekit::select>
+            </div>
 
             {{-- Debounced, because a date input reports every keystroke while a reader types
                  the year and each one is a round trip and a query. The pair narrows WITHIN
                  the window above and can never reach past it — the window's own bound stays
-                 on the query, so the older of the two bounds simply loses. --}}
-            <x-wirekit::input
-                type="date"
-                name="from"
-                wire:model.live.debounce.500ms="from"
-                :label="__('webhooks::self-service.deliveries.from')"
-                hideLabel
-            />
-            <x-wirekit::input
-                type="date"
-                name="until"
-                wire:model.live.debounce.500ms="until"
-                :label="__('webhooks::self-service.deliveries.until')"
-                hideLabel
-            />
+                 on the query, so the older of the two bounds simply loses.
+
+                 VISIBLE labels, unlike the lists: a list names itself through its first option,
+                 and two bare date fields say nothing about which one starts the range. On a phone
+                 the pair shares a row in two equal columns, and from `sm` up each keeps a width of
+                 its own. A date input without one takes the width its engine gives it, Chromium and
+                 WebKit disagree by up to 53 pixels, and that alone decided how this row wrapped:
+                 three rows in one engine, two in the other. --}}
+            <div class="grid grid-cols-2 items-end gap-[var(--padding-wk-x-md)] sm:contents">
+                <div class="min-w-0 sm:w-40">
+                    <x-wirekit::input
+                        type="date"
+                        name="from"
+                        wire:model.live.debounce.500ms="from"
+                        :label="__('webhooks::self-service.deliveries.from')"
+                    />
+                </div>
+                <div class="min-w-0 sm:w-40">
+                    <x-wirekit::input
+                        type="date"
+                        name="until"
+                        wire:model.live.debounce.500ms="until"
+                        :label="__('webhooks::self-service.deliveries.until')"
+                    />
+                </div>
+            </div>
 
         @if ($endpoints->isNotEmpty())
             <x-wirekit::select

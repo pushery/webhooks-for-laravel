@@ -4,6 +4,16 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.1] - 2026-09-14
+
+### Fixed
+
+- **The delivery filters say which date starts the range, and lay out alike in every engine.** The two date filters on the portal's recent deliveries and on both operator delivery logs hid their labels, so two bare date fields sat side by side with nothing to say which was `From` and which `Until`. Both now carry visible labels. Each also keeps a width of its own: a date input without one takes the width its engine gives it, Chromium and WebKit disagreed by up to 53 pixels, and on a phone the portal's filters wrapped into three rows in one engine and two in the other. On a phone the portal now sets the two lists side by side and the two dates side by side below them. A view you published keeps the old markup until you publish it again.
+
+- **On a phone, both operator delivery logs stack their filters into one column of equal width.** The filter row wrapped with the width each control brings, so at 375 pixels it broke into three rows of different lengths, with a right edge somewhere else on every line, in both renderings and both engines. Below the `sm` breakpoint every filter now takes the full width; from `sm` up the row keeps its own widths. A view you published keeps the old markup until you publish it again.
+
+- **The neutral operator log's filter selects are as tall as the date fields beside them, in every engine.** WebKit draws a native select as a menu-list button and drops its vertical padding, so the three selects came out 23 pixels tall next to 38-pixel date fields, below the 24-pixel minimum for a target, while Blink drew them at 38. Every filter control in the row now has one fixed height, the one size WebKit honors on a select, and the selects keep their native arrow. The free-text event type field, shown when the catalog is empty, takes the same height. A view you published keeps the old markup until you publish it again.
+
 ## [3.3.0] - 2026-09-13
 
 ### Security
@@ -3064,7 +3074,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.3.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.3.1...HEAD
+[3.3.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.3...v3.3.0
 [3.2.3]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.2...v3.2.3
 [3.2.2]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.1...v3.2.2

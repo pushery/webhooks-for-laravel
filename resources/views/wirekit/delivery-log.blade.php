@@ -41,17 +41,23 @@
         <x-wirekit::alert intent="warning" role="status" data-wh-region="refusal">{{ $message }}</x-wirekit::alert>
     @endif
 
+    {{-- On a narrow screen every filter takes the whole width, so the wrapped row stacks into one column
+         of equal fields. With the widths each control brings it broke into rows of different lengths,
+         a right edge somewhere else on every line (measured at 375px: 121, 279, 130, 306, 160). From
+         `sm` up the row keeps its own widths. --}}
     <x-wirekit::row gap="md" class="flex-wrap items-end">
         {{-- Both filters hide their label visually, so the label reaches sighted readers
              only through assistive technology — it is translated like any other. --}}
-        <x-wirekit::select name="status" wire:model.live="status" :label="__('webhooks::management.filters.status')" hideLabel>
-            <option value="">{{ __('webhooks::management.filters.all_statuses') }}</option>
-            <option value="pending">{{ __('webhooks::management.status_options.pending') }}</option>
-            <option value="succeeded">{{ __('webhooks::management.status_options.succeeded') }}</option>
-            <option value="failed">{{ __('webhooks::management.status_options.failed') }}</option>
-            <option value="exhausted">{{ __('webhooks::management.status_options.exhausted') }}</option>
-            <option value="refused">{{ __('webhooks::management.status_options.refused') }}</option>
-        </x-wirekit::select>
+        <div class="w-full sm:w-auto">
+            <x-wirekit::select name="status" wire:model.live="status" :label="__('webhooks::management.filters.status')" hideLabel>
+                <option value="">{{ __('webhooks::management.filters.all_statuses') }}</option>
+                <option value="pending">{{ __('webhooks::management.status_options.pending') }}</option>
+                <option value="succeeded">{{ __('webhooks::management.status_options.succeeded') }}</option>
+                <option value="failed">{{ __('webhooks::management.status_options.failed') }}</option>
+                <option value="exhausted">{{ __('webhooks::management.status_options.exhausted') }}</option>
+                <option value="refused">{{ __('webhooks::management.status_options.refused') }}</option>
+            </x-wirekit::select>
+        </div>
 
         {{-- A choice where the application HAS a catalog, free text where it has none, and the
              empty catalog is the load-bearing case rather than an oversight: a host that
@@ -62,51 +68,63 @@
              is indistinguishable from "nothing was delivered" -- which is the whole reason the
              list is better wherever it exists. The catalog is the same one the self-service
              form already builds its selection from; no second source. --}}
-        @if ($eventTypes !== [])
-            <x-wirekit::select name="eventType" wire:model.live="eventType" :label="__('webhooks::management.filters.event_type')" hideLabel>
-                <option value="">{{ __('webhooks::management.filters.all_event_types') }}</option>
-                @foreach ($eventTypes as $type)
-                    <option value="{{ $type }}">{{ $type }}</option>
-                @endforeach
-            </x-wirekit::select>
-        @else
-            <x-wirekit::input
-                name="eventType"
-                wire:model.live.debounce.300ms="eventType"
-                :label="__('webhooks::management.filters.event_type')"
-                hideLabel
-                :placeholder="__('webhooks::management.filters.event_type_placeholder')"
-            />
-        @endif
+        <div class="w-full sm:w-auto">
+            @if ($eventTypes !== [])
+                <x-wirekit::select name="eventType" wire:model.live="eventType" :label="__('webhooks::management.filters.event_type')" hideLabel>
+                    <option value="">{{ __('webhooks::management.filters.all_event_types') }}</option>
+                    @foreach ($eventTypes as $type)
+                        <option value="{{ $type }}">{{ $type }}</option>
+                    @endforeach
+                </x-wirekit::select>
+            @else
+                <x-wirekit::input
+                    name="eventType"
+                    wire:model.live.debounce.300ms="eventType"
+                    :label="__('webhooks::management.filters.event_type')"
+                    hideLabel
+                    :placeholder="__('webhooks::management.filters.event_type_placeholder')"
+                />
+            @endif
+        </div>
 
         {{-- A LIST of the reader's endpoints, not a free-text id: the log is unscoped across
              every tenant, and "what happened at THIS endpoint" is the first question after an
              incident. A control that takes a number is one nobody can use without running a
              query first. --}}
-        <x-wirekit::select name="endpointId" wire:model.live="endpointId" :label="__('webhooks::management.filters.endpoint')" hideLabel>
-            <option value="">{{ __('webhooks::management.filters.all_endpoints') }}</option>
-            @foreach ($endpoints as $endpoint)
-                <option value="{{ $endpoint->id }}">{{ $endpoint->name ?: $endpoint->url }}</option>
-            @endforeach
-        </x-wirekit::select>
+        <div class="w-full sm:w-auto">
+            <x-wirekit::select name="endpointId" wire:model.live="endpointId" :label="__('webhooks::management.filters.endpoint')" hideLabel>
+                <option value="">{{ __('webhooks::management.filters.all_endpoints') }}</option>
+                @foreach ($endpoints as $endpoint)
+                    <option value="{{ $endpoint->id }}">{{ $endpoint->name ?: $endpoint->url }}</option>
+                @endforeach
+            </x-wirekit::select>
+        </div>
 
         {{-- Debounced like the event-type field: a date input reports every keystroke while a
-             reader types the year, and each one would be a round trip and a query. --}}
-        <x-wirekit::input
-            type="date"
-            name="from"
-            wire:model.live.debounce.500ms="from"
-            :label="__('webhooks::management.filters.from')"
-            hideLabel
-        />
+             reader types the year, and each one would be a round trip and a query.
 
-        <x-wirekit::input
-            type="date"
-            name="until"
-            wire:model.live.debounce.500ms="until"
-            :label="__('webhooks::management.filters.until')"
-            hideLabel
-        />
+             The two dates carry VISIBLE labels, unlike the lists beside them. A list names itself
+             through its first option; two bare date fields side by side say nothing about which one
+             starts the range. Each also sits in a box of its own width: a date input without one
+             takes the width its engine gives it, Chromium and WebKit disagree by up to 53 pixels,
+             and that alone decides how the row wraps. --}}
+        <div class="w-full sm:w-40">
+            <x-wirekit::input
+                type="date"
+                name="from"
+                wire:model.live.debounce.500ms="from"
+                :label="__('webhooks::management.filters.from')"
+            />
+        </div>
+
+        <div class="w-full sm:w-40">
+            <x-wirekit::input
+                type="date"
+                name="until"
+                wire:model.live.debounce.500ms="until"
+                :label="__('webhooks::management.filters.until')"
+            />
+        </div>
     </x-wirekit::row>
 
     @if ($endpointsTruncated)
