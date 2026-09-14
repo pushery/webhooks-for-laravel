@@ -4,6 +4,16 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.2] - 2026-09-14
+
+### Fixed
+
+- **The neutral operator log's date filters are as tall as the controls beside them in WebKit's Linux build too.** 3.3.1 gave the row's selects and the free-text event type field one fixed height and left the two date fields at the height their engine draws them. That matched in Blink and in WebKit on macOS, but WebKit's Linux build draws a date field 2 pixels taller, so there the row stood at 38 pixels beside 40. Every filter control in the row, the date fields included, is now 40 pixels tall. A view you published keeps the old markup until you publish it again.
+
+- **The self-service portal's headings go down one level at a time.** The new-endpoint form and the signing-secret panel open above the endpoint list, directly under the page's `h1`, and both titled themselves with an `h3`. So did the health board's empty state. A screen reader's list of headings went from the page title straight to a third level. All three are `h2` now, beside "Your endpoints" and "Recent deliveries". A view you published keeps the old markup until you publish it again.
+
+- **The WireKit operator screens' empty states no longer skip a heading level.** The subscription manager and the delivery log bring no heading of their own, so the title of an empty state is the first heading under the host page's. WireKit renders that title as an `h3` unless told otherwise, which under a page's `h1` skipped a level. Both empty states are `h2` now. A view you published keeps the old markup until you publish it again.
+
 ## [3.3.1] - 2026-09-14
 
 ### Fixed
@@ -3074,7 +3084,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.3.1...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.3.2...HEAD
+[3.3.2]: https://github.com/pushery/webhooks-for-laravel/compare/v3.3.1...v3.3.2
 [3.3.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.3...v3.3.0
 [3.2.3]: https://github.com/pushery/webhooks-for-laravel/compare/v3.2.2...v3.2.3
