@@ -4,6 +4,12 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.0] - 2026-09-15
+
+### Changed
+
+- **The WireKit floor moves to 2.44, where a code block stops being a landmark unless the caller names it.** Until 2.44 every code block carried `role="region"` with an accessible name derived from its language, so the self-service transform editor -- which shows the sample payload and the transformed result side by side, both JSON -- rendered two landmarks both called "json code". Two landmarks of one name is `landmark-unique`, a WCAG-mapped failure that an automated audit of your own application reports against your page rather than ours, and nothing on the screen looks wrong while it is true: a duplicate region name is something a screen-reader rotor shows and a sighted reader never sees. `conflict` is now `<2.44` and the dev constraint `^2.44`; the four places that state the number moved together, the styling guide included. The accessibility check over that screen also gained a companion that reads the landmark names straight off the page, because a scan that finds nothing and a scan that cannot see are the same green line -- and this repository does not commit its lockfile, so the version a contributor happens to have installed is not the one the package promises.
+
 ## [3.4.0] - 2026-09-14
 
 ### Fixed
@@ -3102,7 +3108,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.4.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.5.0...HEAD
+[3.5.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.4.0...v3.5.0
 [3.4.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.3.2...v3.4.0
 [3.3.2]: https://github.com/pushery/webhooks-for-laravel/compare/v3.3.1...v3.3.2
 [3.3.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.3.0...v3.3.1

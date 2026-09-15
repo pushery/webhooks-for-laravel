@@ -11,7 +11,7 @@
 
              A hand-rolled button group stood here, and its stated reason — "the component
              forwards only a bare `wire:model` to its hidden input" — was fixed upstream in
-             WireKit v2.12.0 and is unreachable below the 2.38 floor this package enforces.
+             WireKit v2.12.0 and is unreachable below the 2.44 floor this package enforces.
              It was a rebuild of a component we ship.
 
              No `optimistic` prop, and that is measured rather than chosen. The optimistic layer
