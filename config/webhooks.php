@@ -1110,12 +1110,19 @@ return [
         // trades one flat row for another. Every alias below is one all four WireKit icon presets
         // carry (heroicons, lucide, phosphor, tabler), so this default resolves whichever preset
         // the host has configured -- a host naming its own alias is on the hook for that.
+        //
+        // 'delete_confirm' is the button that confirms the deletion inside the dialog, the one
+        // action on the list that cannot be taken back. It drew no icon at all while the button
+        // that only opens the dialog drew one. A config published before this key existed has no
+        // entry for it, and there it follows 'delete', so both buttons of one deletion keep
+        // carrying the same symbol; null drops it.
         'row_action_icons' => [
             'ping' => 'send',
             'secret' => 'key',
             'edit' => 'edit',
             'transform' => 'sliders',
             'delete' => 'trash',
+            'delete_confirm' => 'trash',
         ],
 
         // The HTTP status a REFUSED operator action answers with. 403 is what this console

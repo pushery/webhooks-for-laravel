@@ -4,6 +4,12 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.2] - 2026-09-15
+
+### Fixed
+
+- **The button that confirms a deletion in the self-service endpoint list carries the delete icon.** Since 3.4.0 the row action that opens the delete dialog drew `ui.row_action_icons.delete`, while the button inside the dialog that actually deletes the endpoint, the one action on the list that cannot be taken back, drew only its label, with no setting for it. It now takes `ui.row_action_icons.delete_confirm`, shipped as `trash`. A config published before the key existed has no entry for it, and there the confirmation follows `delete`, so both buttons of one deletion keep one symbol; `null` drops the icon.
+
 ## [3.5.1] - 2026-09-15
 
 ### Fixed
@@ -3118,7 +3124,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.5.1...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.5.2...HEAD
+[3.5.2]: https://github.com/pushery/webhooks-for-laravel/compare/v3.5.1...v3.5.2
 [3.5.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.5.0...v3.5.1
 [3.5.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.4.0...v3.5.0
 [3.4.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.3.2...v3.4.0

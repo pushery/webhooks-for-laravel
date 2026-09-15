@@ -17,6 +17,9 @@
     'edit' => config('webhooks.ui.row_action_icons.edit'),
     'transform' => config('webhooks.ui.row_action_icons.transform'),
     'delete' => config('webhooks.ui.row_action_icons.delete'),
+    {{-- A published config from before this key has no entry for it, and there the confirmation
+         follows the row action, so one deletion keeps one symbol. A present null still drops it. --}}
+    'delete_confirm' => config('webhooks.ui.row_action_icons.delete_confirm', config('webhooks.ui.row_action_icons.delete')),
 ])
 <div class="wh-portal-list" wire:key="endpoint-list">
     <div class="mb-[var(--space-wk-sm)] flex flex-wrap items-center justify-between gap-[var(--padding-wk-x-md)]">
@@ -226,7 +229,12 @@
                                             <x-wirekit::button
                                                 intent="danger"
                                                 wire:click="destroy({{ $endpoint->id }})"
-                                            >{{ __('webhooks::self-service.delete_dialog.confirm') }}</x-wirekit::button>
+                                            >
+                                                @if (($rowActionIcons['delete_confirm'] ?? null) !== null)
+                                                    <x-slot:iconLeft><x-wirekit::icon :name="$rowActionIcons['delete_confirm']" size="sm" /></x-slot:iconLeft>
+                                                @endif
+                                                {{ __('webhooks::self-service.delete_dialog.confirm') }}
+                                            </x-wirekit::button>
                                         </x-wirekit::alert-dialog.actions>
                                     </x-wirekit::alert-dialog>
                                 @endif
