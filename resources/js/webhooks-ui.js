@@ -17,6 +17,44 @@
  * and the body below is ordinary JavaScript that never meets that evaluator at all.
  */
 (function () {
+    /*
+     * The control a reader last pressed, for the two components below that give focus back to
+     * whatever opened them.
+     *
+     * `document.activeElement` is not that control in every engine. macOS WebKit does not focus a
+     * button on click: it focuses the nearest focusable ancestor instead, which on the deliveries
+     * table is the table's scroll region. A drawer that remembered the active element remembered
+     * that region and gave focus back to it on close. Blink and Linux WebKit focus the button itself,
+     * which is why the lane stayed green while the same arm was red on every Mac.
+     *
+     * So the pressed control wins when nothing else has focus, when focus sits on an element that
+     * CONTAINS the pressed control, or when the press is the newer of the two events. A keyboard
+     * reader never presses, so their focus decides.
+     */
+    var lastPressed = null;
+    var pressedAt = 0;
+    var focusedAt = 0;
+    document.addEventListener('pointerdown', function (event) {
+        lastPressed = event.target instanceof Element
+            ? event.target.closest('a[href], button, input, select, textarea, [tabindex]')
+            : null;
+        pressedAt = performance.now();
+    }, true);
+    document.addEventListener('focusin', function () {
+        focusedAt = performance.now();
+    }, true);
+    var openedFrom = function () {
+        var active = document.activeElement;
+        var focused = active && active !== document.body ? active : null;
+        var pressed = lastPressed && lastPressed.isConnected ? lastPressed : null;
+
+        if (pressed && (! focused || focused.contains(pressed) || pressedAt > focusedAt)) {
+            return pressed;
+        }
+
+        return focused;
+    };
+
     var register = function () {
         /*
          * The reveal-window countdown on the self-service secret panel.
@@ -72,14 +110,14 @@
                     return Array.from(this.$refs.panel.querySelectorAll('a[href], button, input, select, textarea, [tabindex]')).filter((el) => ! el.disabled && el.tabIndex !== -1 && el.offsetParent !== null);
                 },
                 init() {
-                    this.trigger = document.activeElement;
+                    this.trigger = openedFrom();
                     this.$nextTick(() => {
                         const targets = this.focusables();
                         (targets[0] ?? this.$refs.panel).focus();
                     });
                 },
                 destroy() {
-                    if (this.trigger && typeof this.trigger.focus === 'function') {
+                    if (this.trigger && this.trigger.isConnected && typeof this.trigger.focus === 'function') {
                         this.trigger.focus();
                     }
                 },
@@ -121,7 +159,7 @@
             return {
                 trigger: null,
                 init() {
-                    this.trigger = document.activeElement;
+                    this.trigger = openedFrom();
                     this.$nextTick(() => {
                         const first = this.$el.querySelector('input, select, textarea, button');
                         (first ?? this.$el).focus();

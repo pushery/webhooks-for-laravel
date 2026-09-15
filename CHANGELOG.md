@@ -4,6 +4,16 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.1] - 2026-09-15
+
+### Fixed
+
+- **The hourly activity chart did not draw its bars.** Its bar row aligns entries to the bottom with `items-end`, which sizes each entry to its content instead of stretching it to the row, and the entry had no height of its own — so every percentage inside it resolved to zero. Measured on a dashboard with a delivery in the window: a bar labeled "1 total, 1 delivered" rendered 709 pixels wide and 0 pixels tall, and every hour is drawn by the same markup. The accessible labels were right all along, which is why nothing noticed: the existing tests read the rendered HTML, not the size of what it draws. Each bar now fills the row's height, so its column is the share of the busiest hour it was always computed to be, and a browser test measures the rendered boxes.
+- **A window with a single hourly value drew one bar across the whole panel.** Both dashboard charts give a bar `flex-1`, so with one value the latency trend painted a 42 ms reading as a dark 709 × 64 pixel block, and the activity chart would have done the same once its bars were visible. Bars are now capped at `--wh-chart-bar-max-width` and `--wh-sparkline-bar-max-width`, 2rem by default and overridable like the chart heights beside them. Windows with many hours are unchanged.
+- **The self-service portal was the narrowest of its own family of screens while carrying the widest table, so two row actions were off the right edge.** The endpoint table needs 1015 pixels for its eight columns and five row actions; the page gave it 864. WireKit wraps a table in a scroll region, so nothing was unreachable and every existing arm was right to stay green -- the document never scrolled sideways and the actions were present, labeled and focusable. They were simply not on the screen: measured at a 1728-pixel viewport, `Transform` was cut mid-word and `Delete` and the `Actions` column header were outside the container entirely, with 432 pixels of empty margin on either side. A reader has no reason to go looking for a horizontal scrollbar inside a table on a wide display. The page now uses the dashboard's width, which is the other screen whose primary content is a wide table; the health board and the transform editor are separate full-page routes one step above where the portal used to sit, so the portal being the narrowest was the inconsistency rather than the rule. The next width up would not have been enough -- it leaves 992 pixels against the 1015 the table asks for. A browser arm holds the result as geometry, walking from each table up to its own scrolling ancestor and comparing what it needs against what it has, because a class assertion would keep passing on the day a new column pushes the content back over the edge. Scrolling at phone width is unchanged and correct: 1015 pixels fit in no phone.
+- **The recent queue keeps Replay in view in a narrow panel.** On the overview the panel sits in the dashboard's side column, where its four columns needed 359 px against 331 on a desktop and 254 on a phone, so Replay slid past the table's edge. Below 24rem of panel width the Status and Code columns now step aside and their values stack under the event, which leaves the event and Replay side by side.
+- **Closing the delivery drawer returns focus to the row that opened it in WebKit on macOS, the engine behind Safari, too.** That engine does not focus a button on click; it focuses the nearest focusable ancestor, here the deliveries table's scroll region, so the drawer remembered the region and gave focus back to it instead of to the row. The drawer now remembers the control that was pressed whenever focus sits on something that contains it.
+
 ## [3.5.0] - 2026-09-15
 
 ### Changed
@@ -3108,7 +3118,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.5.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.5.1...HEAD
+[3.5.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.5.0...v3.5.1
 [3.5.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.4.0...v3.5.0
 [3.4.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.3.2...v3.4.0
 [3.3.2]: https://github.com/pushery/webhooks-for-laravel/compare/v3.3.1...v3.3.2
