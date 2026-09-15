@@ -54,6 +54,11 @@
                     aria-label="{{ __('webhooks::dashboard.a11y.deliveries_per_hour') }}"
                 >
                 <div class="wh-dash-activity-bars flex h-[var(--wh-chart-height,10rem)] items-end gap-[var(--gap-wk-sm)]" role="list" aria-label="{{ __('webhooks::dashboard.a11y.deliveries_per_hour') }}">
+                    {{-- `h-full` on the bar is the whole of the drawing fix. The row aligns its entries with
+                         `items-end`, which sizes an entry to its content instead of stretching it, and without a
+                         height of its own every percentage inside the bar resolved to zero: a bar labeled
+                         "1 total, 1 delivered" rendered 709 pixels wide and 0 tall. The max-width keeps a window
+                         with a single hour from drawing one bar across the whole panel. --}}
                     @foreach ($rows as $row)
                         @php($total = (int) $row->total)
                         @php($delivered = (int) $row->delivered)
@@ -62,7 +67,7 @@
                         @php($barHeight = (int) round($total / $peak * 100))
                         @php($hour = \Pushery\Webhooks\Dashboard\DashboardTimezone::apply(\Illuminate\Support\Carbon::parse((string) $row->bucket))->settings(['locale' => app()->getLocale()])->translatedFormat(__('webhooks::dashboard.formats.hour_bucket')))
                         <div
-                            class="wh-dash-activity-bar min-w-[3px] flex-1"
+                            class="wh-dash-activity-bar h-full min-w-[3px] max-w-[var(--wh-chart-bar-max-width,2rem)] flex-1"
                             role="listitem"
                             {{-- Four trans_choice calls rather than one __() with four numbers.
                                  Every one of these counts decides an adjective's form,

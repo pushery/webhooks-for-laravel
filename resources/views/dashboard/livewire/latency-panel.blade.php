@@ -43,12 +43,15 @@
                          pattern being applied, not invented. The `title` stays as a convenience
                          for the pointer rather than as the only channel. --}}
                     <div class="flex h-[var(--wh-sparkline-height,4rem)] items-end gap-[var(--gap-wk-sm)]" role="list" aria-label="{{ __('webhooks::dashboard.a11y.latency_trend') }}">
+                        {{-- A bar is capped in width. Every bar is `flex-1`, so a window with a single hourly value
+                             stretched that one bar across the panel: one 42 ms reading drawn as a dark block the
+                             size of the whole sparkline. --}}
                         @foreach ($trend as $row)
                             @php($p95 = (float) ($row->p95 ?? 0))
                             @php($height = (int) round($p95 / $peak * 100))
                             @php($hour = \Pushery\Webhooks\Dashboard\DashboardTimezone::apply(\Illuminate\Support\Carbon::parse((string) $row->bucket))->settings(['locale' => app()->getLocale()])->translatedFormat(__('webhooks::dashboard.formats.hour_bucket')))
                             <div
-                                class="wh-dash-latency-bar min-w-[3px] flex-1 rounded-t-[var(--radius-wk-sm)] bg-[var(--color-wk-accent)]"
+                                class="wh-dash-latency-bar min-w-[3px] max-w-[var(--wh-sparkline-bar-max-width,2rem)] flex-1 rounded-t-[var(--radius-wk-sm)] bg-[var(--color-wk-accent)]"
                                 style="height: {{ max($height, $p95 > 0 ? 2 : 0) }}%"
                                 role="listitem"
                                 aria-label="{{ __('webhooks::dashboard.a11y.latency_bar', ['hour' => $hour, 'value' => \Pushery\Webhooks\Support\LocalizedNumber::format($p95, 1)]) }}"

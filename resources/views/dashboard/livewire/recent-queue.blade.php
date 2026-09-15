@@ -6,7 +6,7 @@
         <x-wirekit::card.header>
             <x-wirekit::heading :level="2" size="sm">{{ __('webhooks::dashboard.recent.title') }}</x-wirekit::heading>
         </x-wirekit::card.header>
-        <x-wirekit::card.body>
+        <x-wirekit::card.body class="@container">
             @if ($deliveries->isEmpty())
                 <x-wirekit::empty-state
                     icon="file-text"
@@ -21,9 +21,9 @@
                 >
                     <x-wirekit::table.head>
                         <x-wirekit::table.row>
-                            <x-wirekit::table.th>{{ __('webhooks::dashboard.table.status') }}</x-wirekit::table.th>
+                            <x-wirekit::table.th class="hidden @[24rem]:table-cell">{{ __('webhooks::dashboard.table.status') }}</x-wirekit::table.th>
                             <x-wirekit::table.th>{{ __('webhooks::dashboard.table.event') }}</x-wirekit::table.th>
-                            <x-wirekit::table.th>{{ __('webhooks::dashboard.table.code') }}</x-wirekit::table.th>
+                            <x-wirekit::table.th class="hidden @[24rem]:table-cell">{{ __('webhooks::dashboard.table.code') }}</x-wirekit::table.th>
                             <x-wirekit::table.th align="right">{{ __('webhooks::dashboard.table.actions') }}</x-wirekit::table.th>
                         </x-wirekit::table.row>
                     </x-wirekit::table.head>
@@ -36,14 +36,28 @@
                                  absolute format as every other surface. --}}
                             @php($when = \Pushery\Webhooks\Dashboard\DashboardTimezone::apply($delivery->created_at)->settings(['locale' => app()->getLocale()]))
                             <x-wirekit::table.row wire:key="rq-{{ $delivery->id }}">
-                                <x-wirekit::table.td>
+                                <x-wirekit::table.td class="hidden @[24rem]:table-cell">
                                     <x-wirekit::badge :intent="$intent">{{ __('webhooks::dashboard.status.'.$delivery->status->value) }}</x-wirekit::badge>
                                 </x-wirekit::table.td>
                                 {{-- The row header is the EVENT, not the first cell: this table leads with a
                                      status badge, and "Failed" does not tell a screen-reader user WHICH delivery
                                      failed. A th[scope=row] need not be the first column (WCAG 1.3.1). --}}
-                                <x-wirekit::table.th headerScope="row">{{ $delivery->event_type }}</x-wirekit::table.th>
-                                <x-wirekit::table.td>{{ $delivery->response_code ?? '—' }}</x-wirekit::table.td>
+                                <x-wirekit::table.th headerScope="row">
+                                    {{ $delivery->event_type }}
+                                    {{-- A narrow panel stacks status and code under the event. On the overview this panel
+                                         sits in the side column, where four columns needed 359 px against 331 on a desktop
+                                         and 254 on a phone, so Replay slid past the scroller's edge. Below 24rem of panel
+                                         width the Status and Code columns step aside and their values move here, leaving two
+                                         columns that fit. The event stays the first thing in the row header, so the row is
+                                         still named by what was delivered. --}}
+                                    <span class="mt-[var(--gap-wk-xs)] flex flex-col items-start gap-[var(--gap-wk-xs)] @[24rem]:hidden">
+                                        <x-wirekit::badge :intent="$intent">{{ __('webhooks::dashboard.status.'.$delivery->status->value) }}</x-wirekit::badge>
+                                        @if ($delivery->response_code !== null)
+                                            <span class="text-[length:var(--text-wk-xs)] text-[color:var(--color-wk-text-muted)]">{{ __('webhooks::dashboard.table.code') }} {{ $delivery->response_code }}</span>
+                                        @endif
+                                    </span>
+                                </x-wirekit::table.th>
+                                <x-wirekit::table.td class="hidden @[24rem]:table-cell">{{ $delivery->response_code ?? '—' }}</x-wirekit::table.td>
                                 <x-wirekit::table.td align="right">
                                     {{-- Disabled while a replay is in flight, so a double-click cannot
                                          enqueue the same delivery twice. wire:target names the method
