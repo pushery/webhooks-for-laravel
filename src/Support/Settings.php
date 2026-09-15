@@ -100,9 +100,10 @@ final class Settings
      * buttons and dropdowns is every screen. WireKit's graceful path covered the unknown alias and
      * not the resolved-alias-missing-set case.
      *
-     * That gap is closed upstream as of WireKit 2.38, which this package's `conflict` now requires,
-     * so the state is no longer broken but merely incomplete, and a message still claiming a 500
-     * would be the kind of overstatement that teaches a reader to skip the next one.
+     * That gap is closed upstream as of WireKit 2.38. The version this package enforces sits
+     * above that release, so the state is no longer broken but merely incomplete, and a message
+     * still claiming a 500 would be the kind of overstatement that teaches a reader to skip the
+     * next one.
      *
      * Both inputs are ARGUMENTS rather than reads, so every state is testable on a tree that has
      * neither package — which is this one, and every CI lane.
