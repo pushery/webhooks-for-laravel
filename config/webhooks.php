@@ -1123,6 +1123,25 @@ return [
             'transform' => 'sliders',
             'delete' => 'trash',
             'delete_confirm' => 'trash',
+
+            // The last four are the OPERATOR console's row, which drew no icons at all while the
+            // self-service list beside it drew one per action. It reads the same block on purpose:
+            // two screens of one package disagreeing about whether a row action carries a symbol is
+            // a difference a reader notices and cannot explain, and a second key set would be a
+            // second place to keep in step.
+            //
+            // 'enable' and 'disable' are two keys rather than one 'toggle', because that button is
+            // two actions wearing one position -- its visible word already switches -- and a host
+            // who wants one symbol for starting and another for stopping should not have to publish
+            // the view to say so.
+            //
+            // 'rotate_secret_confirm' follows 'rotate_secret' when unset, exactly as
+            // 'delete_confirm' follows 'delete', so a config published before these keys existed
+            // keeps both buttons of one rotation carrying the same symbol. null still drops it.
+            'enable' => 'play',
+            'disable' => 'pause',
+            'rotate_secret' => 'refresh',
+            'rotate_secret_confirm' => 'refresh',
         ],
 
         // The HTTP status a REFUSED operator action answers with. 403 is what this console

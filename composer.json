@@ -57,6 +57,7 @@
         }
     },
     "suggest": {
+        "laravel/ai": "Required only to score evals with a real judge. Not a dev dependency: it requires aws/aws-sdk-php for a provider this package never calls, which is 67 MB and 3512 files in every checkout and every CI lane.",
         "laravel/pulse": "Enables the opt-in internal-ops delivery monitor (Pushery\\Webhooks\\Pulse\\WebhookPulseServiceProvider) — a Pulse recorder and card for throughput, failure rate and latency.",
         "laravel/scout": "Enables the opt-in searchable delivery and inbound-call logs (use the ready-made Pushery\\Webhooks\\Search\\SearchableWebhookDelivery / SearchableWebhookCall models — or apply the Pushery\\Webhooks\\Search\\SearchableDelivery / SearchableCall traits to your own — and set webhooks.search.enabled).",
         "livewire/livewire": "Required to render any UI this package ships: the observability dashboard, the self-service endpoint portal, and the optional management components (Pushery\\Webhooks\\WebhooksUiServiceProvider).",

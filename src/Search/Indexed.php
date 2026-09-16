@@ -17,9 +17,9 @@ interface Indexed
 {
     /**
      * Make this model searchable — mirrors Scout's `Searchable::searchable()`. No native return
-     * type: it must stay compatible with the trait method that satisfies it.
+     * type: it must stay compatible with Scout's own method that satisfies it.
      *
      * @return void
      */
-    public function searchable();
+    public function searchable(); // @pest-ignore-type Scout's Searchable::searchable() declares no return type
 }
