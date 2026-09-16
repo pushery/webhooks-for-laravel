@@ -4,6 +4,21 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.0] - 2026-09-16
+
+### Added
+
+- **The operator console draws icons on its row actions, out of the same `ui.row_action_icons` block the self-service endpoint list already reads.** Since 3.4.0 the tenant's list has carried a symbol on every row action while the operator console beside it carried none, and there was no setting for it: a host who wanted them there could only publish the view, which is the copy that config block exists to abolish. Two screens of one package disagreeing about whether a row action carries a symbol is a difference a reader notices and cannot explain. Four keys are new — `enable` and `disable`, shipped as `play` and `pause`, and `rotate_secret` with `rotate_secret_confirm`, both `refresh`; the console's remaining three actions read `edit`, `delete` and `delete_confirm`, the entries the other screen already uses. The toggle takes two keys rather than one because it is two actions wearing one position and its visible word switches with the row's state, so a single symbol would contradict the word on every second row. A config published before these keys existed has no entry for the rotation's confirmation, and there it follows `rotate_secret`, so both buttons of one rotation keep one symbol — the same rule `delete_confirm` follows. `null` still drops an icon, and an empty map draws the label-only row this screen shipped until now.
+
+### Changed
+
+- **`laravel/ai` is a `suggest` rather than a dev dependency.** It arrived in `require-dev` alongside `laravel/boost` and `laravel/mcp`, and unlike those two it is only ever called by an eval that scores through a real judge — this package has no evals at all. It also does not travel alone: it requires `aws/aws-sdk-php` for a provider nothing here calls, which is 67 MB and 3512 files in every checkout and every CI lane. Nothing a consumer installs, calls or configures changes either way.
+
+### Fixed
+
+- **In the operator subscription table a delivery URL could not wrap, so it set the width of its column and pushed the columns beside it out of the table.** A delivery URL is one unbroken token — a Slack hook runs about a hundred characters with no space, hyphen or other break opportunity — and the row header cell therefore grew to the width of the longest one. Reported against 3.5.1 in both engines: at 1280 pixels with a single endpoint, the status column was cut mid-word and all four row actions stood outside the table, reachable only by a sideways scroll nobody expects on a desktop. The URL now breaks anywhere, and the column carrying it has a width floor, because the two only work together: without the floor the column is free to collapse instead, and a real URL becomes a dozen short lines in a row three times its proper height. This is the answer the self-service endpoint list already uses for the same string. Phone widths are unchanged — that table is wider than a phone either way, and scrolling it sideways is correct there.
+- **The four row actions in that table touched each other once the column was narrow.** They sat as inline children of the cell with no container, so the moment the column was squeezed each one broke onto its own line, right-aligned and flush against its neighbor — a staircase rather than a group. They are now a wrapping row carrying the kit's own gap spacing, the same shape the delivery log's filter row uses. Two browser arms hold both fixes, and the one over the buttons asks for a separation rather than for the absence of an overlap: touching is a gap of exactly zero, which a plain overlap check reads as correct.
+
 ## [3.5.2] - 2026-09-15
 
 ### Fixed
@@ -3124,7 +3139,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.5.2...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.6.0...HEAD
+[3.6.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.5.2...v3.6.0
 [3.5.2]: https://github.com/pushery/webhooks-for-laravel/compare/v3.5.1...v3.5.2
 [3.5.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.5.0...v3.5.1
 [3.5.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.4.0...v3.5.0
