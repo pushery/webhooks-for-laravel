@@ -45,12 +45,14 @@
                          shows the empty "inherit" entry for an endpoint that is pinned.
 
                          That is the version which introduced the behavior, and nothing more.
-                         The declared floor is 2.44, enforced through composer.json's
+                         The declared floor is 2.53, enforced through composer.json's
                          `conflict`, and it sits higher for reasons that have nothing to do
                          with this control — the seven shipped locales, the overlay geometry
                          that keeps a destructive confirmation clickable without the host's
                          Tailwind build, an icon whose set is not registered degrading to
-                         a placeholder instead of taking the page down, and — this one belongs
+                         a placeholder instead of taking the page down, a pager that turns
+                         its pages inside the component instead of reloading the document
+                         out from under a filtered table, and — this one belongs
                          to the preview below — a code block becoming a landmark only when the
                          caller names it, without which the two JSON blocks down there are two
                          regions of one name and an axe run over your application reports

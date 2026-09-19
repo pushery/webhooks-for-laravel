@@ -15,6 +15,7 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use Pushery\Webhooks\Dashboard\DashboardScope;
 use Pushery\Webhooks\Dashboard\Livewire\Concerns\InteractsWithDashboard;
+use Pushery\Webhooks\Support\UiVariant;
 
 /**
  * The full delivery table on the Webhooks tab: tenant-scoped, sortable, paginated
@@ -112,13 +113,17 @@ final class DeliveriesTable extends Component
     }
 
     /**
-     * Page the table with the package's own pagination control rather than Livewire's
-     * built-in one, whose markup paints a raw color palette no design token reaches and
-     * whose landmark carries a hardcoded English accessible name.
+     * Page the table with a design-system control rather than Livewire's built-in one, whose markup
+     * paints a raw color palette no design token reaches and whose landmark carries a hardcoded
+     * English accessible name.
+     *
+     * The dashboard is rendered from WireKit components throughout, so the chooser answers with
+     * WireKit's own pager here — {@see UiVariant::paginationView()}. Only this seam is set because
+     * the table builds a length-aware paginator.
      */
     public function paginationView(): string
     {
-        return 'webhooks::pagination';
+        return UiVariant::paginationView();
     }
 
     public function placeholder(): View

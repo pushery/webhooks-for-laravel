@@ -27,6 +27,7 @@ use Pushery\Webhooks\Platform\Support\SubscriptionScope;
 use Pushery\Webhooks\Server\Exceptions\DeliveryRefused;
 use Pushery\Webhooks\Support\CalendarDay;
 use Pushery\Webhooks\Support\TenantIdentity;
+use Pushery\Webhooks\Support\UiVariant;
 
 /**
  * The tenant's own delivery log: what was sent to their endpoints, when, and what came
@@ -376,9 +377,14 @@ final class EndpointDeliveries extends Component
         }
     }
 
+    /**
+     * Page the panel with a design-system control rather than Livewire's built-in one, whose markup
+     * paints a raw color palette no design token reaches and whose landmark carries a hardcoded
+     * English accessible name. {@see UiVariant::paginationView()} decides which.
+     */
     public function paginationView(): string
     {
-        return 'webhooks::pagination';
+        return UiVariant::paginationView();
     }
 
     public function render(): View

@@ -16,6 +16,7 @@ use Pushery\Webhooks\Facades\Webhooks;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
 use Pushery\Webhooks\Platform\Support\PortalRoutes;
+use Pushery\Webhooks\Support\UiVariant;
 
 /**
  * The tenant's own endpoint list: each row shows the URL, an active toggle, a cached
@@ -205,13 +206,20 @@ final class EndpointList extends Component
     }
 
     /**
-     * Page the list with the package's own pagination control rather than Livewire's
-     * built-in one, whose markup paints a raw color palette no design token reaches and
-     * whose landmark carries a hardcoded English accessible name.
+     * Page the list with a design-system control rather than Livewire's built-in one, whose markup
+     * paints a raw color palette no design token reaches and whose landmark carries a hardcoded
+     * English accessible name.
+     *
+     * This screen is rendered from WireKit components throughout, so in practice the chooser
+     * answers with WireKit's own pager — {@see UiVariant::paginationView()}. It is still asked
+     * rather than hardcoded: the answer stays right if this screen ever grows a neutral rendering,
+     * and a host that forces `webhooks.ui.variant` to plain gets a pager instead of an unresolvable
+     * view name. Only paginationView() is set here because this list builds a length-aware
+     * paginator; paginationSimpleView() would answer a question nothing asks.
      */
     public function paginationView(): string
     {
-        return 'webhooks::pagination';
+        return UiVariant::paginationView();
     }
 
     public function placeholder(): View

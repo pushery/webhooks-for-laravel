@@ -1,9 +1,18 @@
-{{-- The package's own pagination control. Every paginating shipped component points
-     Livewire's paginationView() at it, so the one control under the tables is styled
-     with the same design tokens as the tables themselves and speaks the reader's
-     language. Livewire's built-in view is deliberately not used: it paints a raw color
-     palette (bg-white / text-gray-700 / dark: variants) that no token reaches, and its
-     landmark carries a hardcoded English accessible name.
+{{-- The pagination control for the NEUTRAL rendering. Livewire's built-in view is deliberately
+     not used: it paints a raw color palette (bg-white / text-gray-700 / dark: variants) that no
+     token reaches, and its landmark carries a hardcoded English accessible name.
+
+     It used to be the only one, and what narrowed is the scope rather than the file. Every
+     paginating component now asks `UiVariant` which control to render, and on the WireKit
+     rendering the answer is WireKit's own pager — it grew a Livewire mode in 2.51, so keeping a
+     second copy here would be the package re-implementing what its dependency ships. That is the
+     thing a package exists to take OFF a consumer.
+
+     What keeps this file is the other side of the same seam: WireKit is optional here
+     (`require-dev` and `conflict`, never `require`), so the neutral screens have to render where
+     no `<x-wirekit::…>` tag resolves at all. This markup does, because it is written against
+     design TOKENS — CSS custom properties, which need no package. Pointing the neutral rendering
+     at a `wirekit::` view would make an optional dependency mandatory for anything that paginates.
 
      The Livewire paging semantics are kept exactly: previousPage / nextPage / gotoPage
      are called with the paginator's own page name, so several paginators can live on

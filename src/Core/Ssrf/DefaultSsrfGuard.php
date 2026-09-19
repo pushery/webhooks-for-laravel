@@ -81,6 +81,29 @@ final readonly class DefaultSsrfGuard implements SsrfGuard
             return new PinnedEndpoint($url, $host, $port, $scheme, []);
         }
 
+        // A host that is already an address is classified here, before any resolver sees it.
+        //
+        // Without this the whole defense against `http://[::1]/`, `http://169.254.169.254/` and
+        // every IPv6 literal carrying a v4 address inside it lives in the resolver: the guard
+        // hands it the literal, SystemHostResolver echoes it back, and the loop below classifies
+        // it. That works, and it works by accident of one implementation.
+        //
+        // The interface promises only "resolves a hostname to its IP addresses", and the class
+        // docblock invites replacing it -- "abstracted so the SSRF guard can be tested against a
+        // fake resolver". A consumer who supplies a caching resolver, one backed by an upstream
+        // API, or one that returns [] for anything that is not a name loses the protection
+        // silently and keeps a guard that still looks like a guard. Measured: with a resolver
+        // answering one public address for every host, ten literal forms went straight through.
+        //
+        // So the obligation is discharged where it belongs rather than documented onto every
+        // implementor. This does not cover the alternate encodings (`2130706433`, `0x7f000001`,
+        // `0177.0.0.1`): those are not addresses to filter_var, they are names, and decoding them
+        // is genuinely the resolver's job. SystemHostResolver does it, and the catalog test
+        // says so rather than implying the guard handles it.
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false && $this->classifier->isBlocked($host)) {
+            throw BlockedDestination::privateAddress($host, $host);
+        }
+
         $ips = $this->resolver->resolve($host);
 
         if ($ips === []) {

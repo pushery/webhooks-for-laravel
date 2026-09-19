@@ -424,15 +424,16 @@ class SubscriptionManager extends Component
     }
 
     /**
-     * Page the list with the package's own pagination control rather than Livewire's
-     * built-in one, whose markup paints a raw color palette no design token reaches and
+     * Page the list with whichever control matches the rendering this component is in, never with
+     * Livewire's built-in one, whose markup paints a raw color palette no design token reaches and
      * whose landmark carries a hardcoded English accessible name. Publishing the views
-     * (webhooks-views) publishes this control alongside them, so a host on another design
-     * system restyles it in place. Same control, same reasoning as the delivery log beside it.
+     * (webhooks-views) publishes the neutral control alongside them, so a host on another design
+     * system restyles it in place. Same chooser, same reasoning as the delivery log beside it —
+     * {@see UiVariant::paginationView()}.
      */
     public function paginationView(): string
     {
-        return 'webhooks::pagination';
+        return UiVariant::paginationView();
     }
 
     /**
@@ -443,11 +444,11 @@ class SubscriptionManager extends Component
      * and a simple paginator reads only the second. Overriding just the first left this
      * screen on livewire::simple-tailwind -- Livewire's own markup, with a hardcoded
      * English landmark and the raw palette the docblock above says is deliberately not
-     * used. The package view carries both types.
+     * used. Both seams are therefore set, and both go through the same chooser.
      */
     public function paginationSimpleView(): string
     {
-        return 'webhooks::pagination';
+        return UiVariant::simplePaginationView();
     }
 
     public function render(): View
