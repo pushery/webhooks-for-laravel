@@ -268,15 +268,19 @@ class DeliveryLog extends Component
     }
 
     /**
-     * Page the log with the package's own pagination control rather than Livewire's
-     * built-in one, whose markup paints a raw color palette no design token reaches and
-     * whose landmark carries a hardcoded English accessible name. Publishing the views
-     * (webhooks-views) publishes this control alongside them, so a host on another design
+     * Page the log with whichever control matches the rendering this component is in, never with
+     * Livewire's built-in one, whose markup paints a raw color palette no design token reaches and
+     * whose landmark carries a hardcoded English accessible name.
+     *
+     * {@see UiVariant::paginationView()} for which of the two it is and why the choice is made
+     * there rather than here: it is the same question as which markup this component renders, and
+     * asking it in two places is how the two answers drift apart. Publishing the views
+     * (webhooks-views) publishes the neutral control alongside them, so a host on another design
      * system restyles it in place.
      */
     public function paginationView(): string
     {
-        return 'webhooks::pagination';
+        return UiVariant::paginationView();
     }
 
     /**
@@ -287,11 +291,11 @@ class DeliveryLog extends Component
      * and a simple paginator reads only the second. Overriding just the first left this
      * screen on livewire::simple-tailwind -- Livewire's own markup, with a hardcoded
      * English landmark and the raw palette the docblock above says is deliberately not
-     * used. The package view carries both types.
+     * used. Both seams are therefore set, and both go through the same chooser.
      */
     public function paginationSimpleView(): string
     {
-        return 'webhooks::pagination';
+        return UiVariant::simplePaginationView();
     }
 
     public function render(): View

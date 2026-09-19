@@ -4,6 +4,18 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.0] - 2026-09-19
+
+### Security
+
+- **An IP address written straight into a webhook URL is now refused by the guard itself, not by whichever resolver happens to be installed.** `DefaultSsrfGuard` classified only what the resolver handed back, so the defense against `http://[::1]/`, `http://169.254.169.254/` and every IPv6 literal that carries a v4 address inside it rested on `SystemHostResolver` echoing a literal unchanged — true of the shipped one, and nowhere stated in the `HostResolver` contract, which promises only to resolve a hostname and whose class comment invites replacing it. Measured with a resolver that answers one public address for every host: ten literal forms went straight through, and the guard still looked like a guard. It now classifies a host that is already an address before resolution, so a caching resolver, one backed by an upstream API, or one written for a test cannot silently take the protection with it. **Nothing changes for a host that is a name**, which is still resolved and pinned exactly as before, and nothing changes in production behavior — the shipped resolver was already refusing these. What changes is where the obligation lives. The alternate *encodings* — `http://2130706433/`, `http://0x7f000001/`, `http://0177.0.0.1/` — are deliberately **not** covered here: to `filter_var` they are names rather than addresses, decoding them is genuinely resolution, and `SystemHostResolver` does it. The new `BypassVectorCatalogTest` keeps the two layers apart on purpose: under a resolver that answers one public address for every host the literals are refused and the encodings are not, which is exactly what "the guard decodes one and not the other" means — and it holds without a lookup, so the arm reports on the code rather than on whether the runner has DNS.
+
+### Changed
+
+- **Three packages the shipped code imports directly are now declared in `require`: `guzzlehttp/promises`, `nesbot/carbon` and `symfony/http-foundation`.** They arrived transitively through the illuminate split packages, so nothing about the resolved tree changes and no consumer installs anything new. What changes is who promises their version: an undeclared import is one Composer may resolve below what this code calls, and the failure then surfaces as a missing method in a class nobody here names. Each floor is the **base of its major** -- `^2.0 || ^3.0`, `^3.0`, `^7.0 || ^8.0` -- not the tighter constraint `laravel/framework` happens to carry today, because a floor decides who may install this package and a later minor would shut out an application the code runs on perfectly well. The classes actually imported are old enough for those bases: `Carbon\CarbonImmutable`, `CarbonInterface` and `CarbonInterval` predate Carbon 3, `GuzzleHttp\Promise\PromiseInterface` predates promises 2, and `Symfony\Component\HttpFoundation\Response` and `BinaryFileResponse` predate Symfony 7. The new `PackageDependencyContractTest` keeps the manifest and the imports answerable to each other from here on.
+
+- **On the WireKit rendering the pagination control now comes from WireKit instead of from this package, and the enforced WireKit floor moves to 2.53.** The package drew its own pager because neither alternative worked: Livewire's built-in view paints a raw palette no design token reaches and names its landmark in hardcoded English, and WireKit's `pagination` could only page by *navigating* — every control was a real link, so a click reloaded the document and discarded any component state that was not in the URL, which on a filtered table meant page two came back unfiltered. WireKit 2.51 closed that and ships the two views Livewire's `paginationView()` and `paginationSimpleView()` point at, so keeping a second copy here would be this package re-implementing what it consumes. Nothing about how you page changes: the control still turns pages inside the component, still passes the paginator's own page name so several paginators on one screen do not collide, still marks the current page and still speaks the reader's language — WireKit's wording rather than ours, from its locale files. It also gains something the old control did not have, because WireKit renders each page as an anchor with a real address: the numbered pages are links you can open in a new tab. **The floor is 2.53 rather than 2.51**, and the two versions apart are the reason this is worth reading: until 2.53 WireKit's pager dimmed its inert boundary control with an `opacity` on top of an already-muted pair, and opacity applies to the element, so text and background composite against the page together and a 4.5:1 pair reads at about 1.6:1. This package had removed exactly that line from its own control after measuring it, so adopting at 2.51 would have handed the property back. **A host on another UI kit is unaffected**: `pushery/wirekit` is optional here and the neutral screens keep the package's own control, which is written against design tokens and needs no package to render. `webhooks::pagination` therefore still ships and still publishes with the views.
+
 ## [3.6.0] - 2026-09-16
 
 ### Added
@@ -2611,7 +2623,7 @@ Both stubs default `eventTypes`, `canRedeliver` and `canPing` when they are abse
   ability to restore access.
 - **The self-service health matrix and payload-transform editor now scope at the query.** They loaded
   a subscription by id and authorized only afterwards; a foreign or tampered id is now filtered out at
-  the query and fails not-found before any action runs — defence in depth, so a single policy
+  the query and fails not-found before any action runs — defense in depth, so a single policy
   regression can no longer be the only guard.
 
 ### Added
@@ -3139,7 +3151,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.6.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.7.0...HEAD
+[3.7.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.6.0...v3.7.0
 [3.6.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.5.2...v3.6.0
 [3.5.2]: https://github.com/pushery/webhooks-for-laravel/compare/v3.5.1...v3.5.2
 [3.5.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.5.0...v3.5.1
