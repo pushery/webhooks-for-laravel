@@ -31,7 +31,8 @@ use Spatie\Health\Checks\Result;
  * between two attempts counts as failed until it resolves, which is where the score puts it.
  *
  * The read is bounded below on `created_at`, so on PostgreSQL only the monthly partitions the
- * window reaches are scanned. The result carries counts, never a payload, a URL or an error text.
+ * window reaches are scanned. Of the deliveries the result carries counts, never a payload, a URL or
+ * an error text. The one sentence in it the package did not write is the remedy a host names.
  */
 final class DeliveryEngineCheck extends Check
 {
@@ -44,6 +45,8 @@ final class DeliveryEngineCheck extends Check
     private int $minimumDeliveries = 1;
 
     private bool $warnOnDisabledEndpoints = true;
+
+    private ?string $disabledEndpointRemedy = null;
 
     /**
      * How far back the check looks, in hours. 24 by default.
@@ -96,6 +99,19 @@ final class DeliveryEngineCheck extends Check
         return $this;
     }
 
+    /**
+     * A sentence that tells the reader of the disabled-endpoint warning where an endpoint is switched
+     * back on, appended to the warning. Only the application knows its own screens, so there is no
+     * default, and the count and the state in the message stay the package's. Off by default.
+     */
+    public function remedyForDisabledEndpoints(string $sentence): self
+    {
+        $sentence = trim($sentence);
+        $this->disabledEndpointRemedy = $sentence === '' ? null : $sentence;
+
+        return $this;
+    }
+
     public function run(): Result
     {
         $result = Result::make();
@@ -137,10 +153,12 @@ final class DeliveryEngineCheck extends Check
         }
 
         if ($this->warnOnDisabledEndpoints && $disabled > 0) {
+            $message = $disabled === 1
+                ? 'One webhook endpoint is switched off and receives nothing until it is enabled again.'
+                : sprintf('%d webhook endpoints are switched off and receive nothing until they are enabled again.', $disabled);
+
             return $result->shortSummary($disabled === 1 ? '1 endpoint off' : $disabled.' endpoints off')->warning(
-                $disabled === 1
-                    ? 'One webhook endpoint is switched off and receives nothing until it is enabled again.'
-                    : sprintf('%d webhook endpoints are switched off and receive nothing until they are enabled again.', $disabled),
+                $this->disabledEndpointRemedy === null ? $message : $message.' '.$this->disabledEndpointRemedy,
             );
         }
 
