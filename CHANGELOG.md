@@ -4,6 +4,12 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.9.0] - 2026-09-22
+
+### Added
+
+- **The disabled-endpoint warning of the health check can say where an endpoint is switched back on.** `DeliveryEngineCheck::remedyForDisabledEndpoints()` takes a sentence and appends it to the warning, so it reaches the notification Laravel Health sends. The package cannot know the place: one application lets the owning customer do it from their own settings, another has an operator do it from a back office. Without the call the warning reads as before.
+
 ## [3.8.0] - 2026-09-22
 
 ### Added
@@ -3175,7 +3181,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.8.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.9.0...HEAD
+[3.9.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.8.0...v3.9.0
 [3.8.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.7.0...v3.8.0
 [3.7.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.6.0...v3.7.0
 [3.6.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.5.2...v3.6.0
