@@ -55,19 +55,15 @@ trait InteractsWithEndpoints
      * revoked. So the gate runs again before every render (the `rendering` hook below), which no
      * placeholder skips, and the render is where a tenant's rows leave the server.
      *
-     * An ACTION on that path still runs without the gate, and that is why the row-level
-     * `authorize('view'|'update'|'rotateSecret', $subscription)` calls stay. Mutation run 1419
-     * removed each of the eleven. In the five panels that are not lazy all seven survived: the
-     * gate above refuses first, and the policy adds only `ownedByCurrentTenant()`, which
-     * findOwnedEndpoint() has already enforced — scopeToCurrentOwner() answers `1 = 0` for a null
-     * tenant, so a row that loaded at all is a row the tenant owns. In EndpointList they are the
-     * only refusal on the placeholder path, and there two of the four carry weight: without
-     * `toggle`'s or `ping`'s, an action sent to an unloaded placeholder switches or pings the
-     * endpoint before the render gate refuses. `edit` and `reveal` only dispatch an event, and a
-     * refused render delivers none, so theirs survive there as well. The arm that shows it sends
-     * every row action to the placeholder. The arm that revokes the ability on a loaded list
-     * cannot, because boot() refuses first there, which is why weekly run 1452 still reported
-     * three of the four. Do not delete them.
+     * An action on that path still runs without the gate, and that is why the row-level
+     * `authorize('view'|'update'|'rotateSecret', $subscription)` calls stay. In the five panels
+     * that are not lazy they are a second line: the gate above refuses first, and the policy adds
+     * only `ownedByCurrentTenant()`, which findOwnedEndpoint() has already enforced —
+     * scopeToCurrentOwner() answers `1 = 0` for a null tenant, so a row that loaded at all is a
+     * row the tenant owns. In EndpointList they are the only refusal on the placeholder path, and
+     * there two of the four carry weight: without `toggle`'s or `ping`'s, an action sent to an
+     * unloaded placeholder switches or pings the endpoint before the render gate refuses. `edit`
+     * and `reveal` only dispatch an event, and a refused render delivers none. Do not delete them.
      *
      * `create` is the one that is genuinely reachable, and it is reachable for a structural
      * reason: there is no row yet, so the scoping cannot speak, and the policy's
@@ -98,7 +94,7 @@ trait InteractsWithEndpoints
      */
     protected function scopedQuery(): Builder
     {
-        return SubscriptionScope::scopeToCurrentOwner(WebhookSubscription::query());
+        return SubscriptionScope::scopeToCurrentOwner(WebhookSubscription::model()::query());
     }
 
     /**

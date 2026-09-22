@@ -15,6 +15,7 @@ use Illuminate\Support\Carbon;
 use Override;
 use Pushery\Webhooks\Core\Payload\PayloadStore;
 use Pushery\Webhooks\Database\Concerns\HasZonedTimestamps;
+use Pushery\Webhooks\Database\Concerns\Replaceable;
 use Pushery\Webhooks\Database\Concerns\ScopesByTimestamp;
 use Pushery\Webhooks\Database\Concerns\UsesWebhookConnection;
 use Pushery\Webhooks\Database\Factories\WebhookDeliveryFactory;
@@ -52,6 +53,7 @@ class WebhookDelivery extends Model
 
     use HasUuids;
     use HasZonedTimestamps;
+    use Replaceable;
     use ScopesByTimestamp;
     use UsesWebhookConnection;
 
@@ -133,7 +135,7 @@ class WebhookDelivery extends Model
      */
     public function subscription(): BelongsTo
     {
-        return $this->belongsTo(WebhookSubscription::class, 'subscription_id');
+        return $this->belongsTo(WebhookSubscription::model(), 'subscription_id');
     }
 
     protected static function newFactory(): WebhookDeliveryFactory

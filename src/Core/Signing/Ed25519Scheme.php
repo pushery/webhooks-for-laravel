@@ -198,10 +198,9 @@ final readonly class Ed25519Scheme implements SignatureScheme
                 continue;
             }
 
-            // The PAD LENGTH is an equivalent mutant (raising it appends a third element the
-            // destructuring never reads); the EXPLODE LIMIT is not, and is held by the arm
-            // below on a signature carrying a comma. Both are on this line, so a run reports
-            // them together.
+            // The explode limit keeps a comma inside the signature part of the signature;
+            // without it the destructuring would take only the text before that comma. The pad
+            // only guarantees a second element for an entry that carries no comma at all.
             [$version, $signature] = array_pad(explode(',', $entry, 2), 2, '');
 
             if ($version === self::VERSION && $signature !== '') {

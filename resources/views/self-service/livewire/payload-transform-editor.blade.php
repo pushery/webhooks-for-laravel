@@ -4,20 +4,23 @@
      transformer on every change, so the two code panes show the real before/after body.
      Owner-scoped and policy-authorized, WireKit-tokenized throughout. --}}
 <div class="wh-portal wh-portal-transform mx-auto flex max-w-5xl flex-col gap-[var(--padding-wk-y-lg)] p-[var(--padding-wk-x-lg)]" wire:key="transform-editor">
-    <header class="flex flex-wrap items-start justify-between gap-[var(--padding-wk-x-md)]">
-        <x-wirekit::stack gap="sm">
-            <x-wirekit::heading :level="1" size="lg">{{ __('webhooks::self-service.transform.heading') }}</x-wirekit::heading>
-            @if ($this->endpointUrl !== null)
-                <x-wirekit::text intent="muted" class="break-all">{{ $this->endpointUrl }}</x-wirekit::text>
-            @endif
-        </x-wirekit::stack>
-        {{-- Absent when this editor is embedded without the portal's own routes: there is
-             no endpoint page of ours to go back to. --}}
-        @if ($portalUrl !== null)
-            <x-wirekit::button :href="$portalUrl" wire:navigate size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" intent="neutral">
-                {{ __('webhooks::self-service.actions.back_to_endpoints') }}
-            </x-wirekit::button>
-        @endif
+    <header>
+        <x-wirekit::page-header :level="\Pushery\Webhooks\Support\UiVariant::pageHeadingLevel()" :title="__('webhooks::self-service.transform.heading')">
+            {{-- A slot rather than the prop, because a URL has no place to break: without
+                 break-all a long one runs past the edge of a phone. mount() always sets it. --}}
+            <x-slot:description><span class="break-all">{{ $this->endpointUrl }}</span></x-slot:description>
+            {{-- The condition sits inside the slot, for the reason the portal page gives: a
+                 conditional block in the default slot fills it, and the title renders empty. --}}
+            <x-slot:actions>
+                {{-- Absent when this editor is embedded without the portal's own routes: there is
+                     no endpoint page of ours to go back to. --}}
+                @if ($portalUrl !== null)
+                    <x-wirekit::button :href="$portalUrl" wire:navigate size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" intent="neutral">
+                        {{ __('webhooks::self-service.actions.back_to_endpoints') }}
+                    </x-wirekit::button>
+                @endif
+            </x-slot:actions>
+        </x-wirekit::page-header>
     </header>
 
     @unless ($versioningEnabled)

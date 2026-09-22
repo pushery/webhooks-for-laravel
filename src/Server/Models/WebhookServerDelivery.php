@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Override;
 use Pushery\Webhooks\Database\Concerns\HasZonedTimestamps;
+use Pushery\Webhooks\Database\Concerns\Replaceable;
 use Pushery\Webhooks\Database\Concerns\ScopesByTimestamp;
 use Pushery\Webhooks\Database\Concerns\UsesWebhookConnection;
 use Pushery\Webhooks\Database\Factories\WebhookServerDeliveryFactory;
@@ -50,6 +51,7 @@ class WebhookServerDelivery extends Model
 
     use HasZonedTimestamps;
     use MassPrunable;
+    use Replaceable;
     use ScopesByTimestamp;
     use UsesWebhookConnection;
 

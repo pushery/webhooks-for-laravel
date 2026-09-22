@@ -68,14 +68,13 @@ final readonly class RefreshEndpointHealthOnDelivery
         $interval = $this->config->healthRefreshMinIntervalSeconds();
         $calculatedAt = $subscription->health_calculated_at;
 
-        // Both mutants on this comparison are EQUIVALENT and reported every run. Measured: at
-        // an interval of zero the fall-through asks whether the score was calculated AFTER
-        // `now()`, which no past timestamp is — so a lowered bound answers "not fresh" too, by
-        // a longer road.
+        // At an interval of zero the comparison below would give the same answer: it asks
+        // whether the score was calculated after `now()`, which no past timestamp is, so the
+        // endpoint reads as not fresh by a longer road.
         //
-        // It stays because it says the CASE the docblock states ("a zero interval is never
-        // fresh") instead of relying on a comparison against the present, and because it is
-        // the one form that also holds if a clock skew ever puts health_calculated_at in the
+        // The guard stays because it states the case the docblock names ("a zero interval is
+        // never fresh") instead of relying on a comparison against the present, and because it
+        // is the one form that still holds if clock skew ever puts health_calculated_at in the
         // future.
         if ($interval <= 0 || $calculatedAt === null) {
             return false;

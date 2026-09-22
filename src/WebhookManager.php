@@ -26,6 +26,7 @@ use Pushery\Webhooks\Exceptions\SubscriptionNotListening;
 use Pushery\Webhooks\Exceptions\TestPingThrottled;
 use Pushery\Webhooks\Models\WebhookDelivery;
 use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Platform\AsyncApi\AsyncApiGenerator;
 use Pushery\Webhooks\Platform\Transform\PayloadTransformer;
 use Pushery\Webhooks\Platform\Transform\PayloadVersionRegistry;
 use Pushery\Webhooks\Search\SearchIndexer;
@@ -72,7 +73,7 @@ final readonly class WebhookManager
         // is not needed here — a blocked URL throws BlockedDestination.
         $this->guard->resolveAndPin($url);
 
-        $subscription = new WebhookSubscription;
+        $subscription = WebhookSubscription::resolve();
         $subscription->name = $name;
         $subscription->url = $url;
         $subscription->event_types = array_values($eventTypes);
@@ -299,7 +300,7 @@ final readonly class WebhookManager
 
         $eventId = (string) Str::uuid7();
 
-        $subscriptions = WebhookSubscription::query()
+        $subscriptions = WebhookSubscription::model()::query()
             ->active()
             ->listeningFor($eventType)
             ->forTenant($tenant)
@@ -359,7 +360,7 @@ final readonly class WebhookManager
     {
         $this->payloadValidator->validate($eventType, $payload);
 
-        $eligible = WebhookSubscription::query()
+        $eligible = WebhookSubscription::model()::query()
             ->whereKey($subscription->getKey())
             ->active()
             ->listeningFor($eventType)
@@ -375,7 +376,7 @@ final readonly class WebhookManager
             // the trip is not. The operator was then told the endpoint "does not subscribe to that
             // event type" about an endpoint subscribed to it, and sent to change event types that
             // were already right.
-            $live = WebhookSubscription::query()
+            $live = WebhookSubscription::model()::query()
                 ->whereKey($subscription->getKey())
                 ->active()
                 ->exists();
@@ -537,6 +538,26 @@ final readonly class WebhookManager
     }
 
     /**
+     * The AsyncAPI 3.0 document of the event catalog as it is configured right now — the document
+     * `php artisan webhooks:asyncapi` writes, for a caller that is not a console.
+     *
+     * This is how the catalog gets published over HTTP: return the document from a route of your
+     * own, where you decide the path, the middleware and the caching. Calling the command from a
+     * request instead fails in production, because the package registers its console commands only
+     * in the console, and it passes in tests, which run there.
+     *
+     * The array encodes to a valid document as it is. An empty channel, operation or message map is
+     * an object rather than a list, so `json_encode()` and `response()->json()` write `{}` where
+     * AsyncAPI requires one. A null title stands for the application's name.
+     *
+     * @return array<string, mixed>
+     */
+    public function asyncApi(?string $title = null, string $version = '1.0.0'): array
+    {
+        return new AsyncApiGenerator($this->config)->generate($title, $version);
+    }
+
+    /**
      * A single delivery. In a fan-out the caller precomputes the logged payload once
      * and passes it in (every endpoint logs the identical body); a one-off delivery
      * (ping/redeliver) passes null and it is computed here.
@@ -554,7 +575,7 @@ final readonly class WebhookManager
         // The tenant/identity and outcome columns are guarded, so the row is written
         // with forceFill rather than mass-assignment — the log is engine-owned, never
         // populated from host input.
-        $delivery = new WebhookDelivery;
+        $delivery = WebhookDelivery::resolve();
         $delivery->forceFill([
             'subscription_id' => $subscription->id,
             'owner_type' => $subscription->owner_type,

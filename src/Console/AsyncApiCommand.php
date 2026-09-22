@@ -5,15 +5,16 @@ declare(strict_types=1);
 namespace Pushery\Webhooks\Console;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Config;
 use Pushery\Webhooks\Platform\AsyncApi\AsyncApiGenerator;
+use Pushery\Webhooks\WebhookManager;
 use Symfony\Component\Yaml\Yaml;
 
 /**
  * Writes an AsyncAPI 3.0 document built from the webhook event catalog, either to a
  * file (the optional path argument) or to stdout. JSON by default; YAML with
  * --format=yaml when symfony/yaml is installed. Console-only, registered by the root
- * service provider.
+ * service provider — which is why a request that needs the document asks
+ * {@see WebhookManager::asyncApi()} instead of calling this command.
  *
  * @internal
  */
@@ -43,7 +44,10 @@ final class AsyncApiCommand extends Command
         $versionOption = $this->option('doc-version');
         $version = is_string($versionOption) && $versionOption !== '' ? $versionOption : '1.0.0';
 
-        $document = $generator->generate($this->resolveTitle(), $version);
+        $titleOption = $this->option('title');
+        $title = is_string($titleOption) && $titleOption !== '' ? $titleOption : null;
+
+        $document = $generator->generate($title, $version);
         $rendered = $format === 'yaml' ? $generator->toYaml($document) : $generator->toJson($document);
 
         $path = $this->argument('path');
@@ -76,14 +80,5 @@ final class AsyncApiCommand extends Command
         }
 
         return null;
-    }
-
-    private function resolveTitle(): string
-    {
-        $title = $this->option('title');
-
-        return is_string($title) && $title !== ''
-            ? $title
-            : Config::string('app.name', 'Webhooks').' Webhooks';
     }
 }

@@ -439,7 +439,7 @@ final readonly class WebhookMetrics
      */
     private function sourceModel(): WebhookDelivery
     {
-        $class = Config::string('webhooks.dashboard.source_model', WebhookDelivery::class);
+        $class = Config::string('webhooks.dashboard.source_model', WebhookDelivery::model());
         $model = Container::getInstance()->make($class);
 
         if (! $model instanceof WebhookDelivery) {

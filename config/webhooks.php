@@ -1101,6 +1101,15 @@ return [
         // every other button on the row.
         'secondary_surface' => 'ghost',
 
+        // The heading level of each full-page screen's title: the dashboard, the portal, the
+        // health board and the transform editor. 1 by default, because on a page of its own the
+        // title is the document's heading.
+        //
+        // 2 is for a host whose layout carries its own h1, visible or not; under it the screen's
+        // title is the page's first section. Any other value is ignored in favor of 1, because a
+        // title further down would sit below a heading nothing on the page provides.
+        'page_heading_level' => 1,
+
         // The icon each row action in the self-service endpoint list carries, as a semantic
         // WireKit alias. Set an entry to null to drop that one icon; set the whole key to an
         // empty array for the label-only list this package shipped before 3.4.0.
@@ -1266,6 +1275,35 @@ return [
         'ability' => null,
 
         'abilities' => [],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Replacing the package's models
+    |--------------------------------------------------------------------------
+    |
+    | A host that needs its own relations, scopes or casts on a subscription, delivery or call
+    | row subclasses the model and maps it here, keyed by the package class. The package then
+    | uses the subclass on every path: every query, every row it writes, and the relations
+    | between its models.
+    |
+    | This is the DEFAULT. The two settings that name a model for one purpose still win for that
+    | purpose: a client entry's own 'model' for the calls that entry stores, and
+    | 'dashboard.source_model' for what the dashboard reads. Two maintenance readers look past
+    | all of them and read the tables themselves — the orphaned-payload sweep and
+    | `webhooks:import-calls --dry-run` — because a scope on a subclass would hide rows from a
+    | check that has to see every one.
+    |
+    | A class that does not exist, or does not extend the package class, is ignored and the
+    | package class is used instead.
+    |
+    */
+
+    'models' => [
+        // \Pushery\Webhooks\Models\WebhookSubscription::class => \App\Models\WebhookSubscription::class,
+        // \Pushery\Webhooks\Models\WebhookDelivery::class => \App\Models\WebhookDelivery::class,
+        // \Pushery\Webhooks\Server\Models\WebhookServerDelivery::class => \App\Models\WebhookServerDelivery::class,
+        // \Pushery\Webhooks\Client\Models\WebhookCall::class => \App\Models\WebhookCall::class,
     ],
 
 ];

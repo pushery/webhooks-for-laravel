@@ -323,7 +323,10 @@ final class ImportCallsCommand extends Command
             return [0, 0];
         }
 
-        $present = WebhookCall::query()->whereIn('id', $ids)->count();
+        // The table the write below targets, read the way the write reaches it — not through a model,
+        // whose global scopes a host may have extended. A row the count cannot see would be reported
+        // as "would import" and then skipped by the idempotent insert.
+        $present = WebhookConnection::db()->table('webhook_calls')->whereIn('id', $ids)->count();
 
         return [count($ids) - $present, $present];
     }

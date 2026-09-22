@@ -34,10 +34,10 @@ final class SetupSummary extends Component
     {
         [$ownerSql, $ownerBindings] = DashboardScope::current()->condition();
 
-        $total = WebhookSubscription::query()
+        $total = WebhookSubscription::model()::query()
             ->whereRaw($ownerSql, $ownerBindings)
             ->count();
-        $active = WebhookSubscription::query()
+        $active = WebhookSubscription::model()::query()
             ->whereRaw($ownerSql, $ownerBindings)
             ->where('is_active', true)
             ->whereNull('disabled_at')

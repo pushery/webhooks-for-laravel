@@ -4,6 +4,30 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.0] - 2026-09-22
+
+### Added
+
+- **The package's models are replaceable.** Map `WebhookSubscription`, `WebhookDelivery`, `WebhookServerDelivery` or `WebhookCall` to your own subclass in the new `webhooks.models` config key, and the package uses that class on every path: every query, every row it writes, and the relations between its models. It is the default the two narrower settings fall back on: a client entry without its own `model`, and a dashboard without `source_model`, now use the class mapped here. A class that does not exist, or does not extend the package class, is ignored in favor of the package class.
+
+- **The AsyncAPI document can be served over HTTP.** `Webhooks::asyncApi()` returns the document `php artisan webhooks:asyncapi` writes, built from the catalog as it is configured at that moment, so a host can publish its catalog from a route of its own and choose the path, the middleware and the caching there. Until now the command was the only way to get the document, and it is registered only in the console: a route that called it passed every test and failed in production. The method takes an optional title, the application's name by default, and a document version.
+
+- **A health check for the delivery engine.** With `spatie/laravel-health` installed, register `Pushery\Webhooks\Health\DeliveryEngineCheck` beside your other checks. It reads the delivery log of the last 24 hours, fails when more than half of those deliveries failed and warns while an endpoint is switched off; the window, both thresholds, a minimum sample and the endpoint warning are configurable. The rate is the one the endpoint health score uses: a pending delivery has no outcome yet and a refused one was never sent, so neither counts toward it, and both are still listed in the result. The read is bounded on `created_at`, so on PostgreSQL only the partitions the window reaches are scanned, and the result carries counts and the rate, never a payload, a URL or an error text.
+
+- **`ui.page_heading_level` sets the heading level of the full-page screens' titles.** `1` by default; set `2` when your layout carries its own `h1`, and the dashboard, the portal, the health board and the transform editor title their page one level down. Any other value is ignored in favor of `1`.
+
+### Changed
+
+- **`WebhookSubscription`, `SearchableWebhookCall` and `SearchableWebhookDelivery` are no longer `final`,** so a host can extend them like the other models.
+- **The full-page screens title themselves with WireKit's `page-header`.** The dashboard, the portal, the health board and the transform editor built their title by hand, with a size and spacing of their own, beside screens of the host application that all use the component. They now draw it with `x-wirekit::page-header`: the title and its introduction on the left, the actions beside them or below them where the row runs out of room.
+- **The orphaned-payload sweep and `webhooks:import-calls --dry-run` read the tables directly** rather than through a model, so a scope on a subclass can never hide a row from them. For the sweep that matters beyond accuracy: a hidden row's payload would be deleted while the row still references it.
+
+### Fixed
+
+- **`webhooks:preflight` asks about the icon set your WireKit preset needs, not about Heroicons.** The shipped screens name WireKit icon aliases and never a set, but the icon advisory asked only whether `blade-ui-kit/blade-heroicons` was installed. On a host whose preset is lucide, phosphor or tabler, with that preset's set installed and every icon rendering, it warned that the icon pair was half installed, so a host that gates on the preflight had to learn to tolerate a warning. It now resolves every icon the shipped screens draw through your WireKit configuration and asks Blade Icons whether it can draw the result, which is the question a page answers when it renders. It names the set your preset resolves into when that set is not registered, stays quiet when you ship the glyphs yourself under the preset's prefix, and names a row action icon that no preset defines rather than sending you to Composer. The `suggest` entries for the two icon packages now say the same.
+- **On a phone, a delivery error in the portal gets a column wide enough to read.** With `platform.deliveries.show_errors` on, the error column of the delivery list collapsed to about 80px at 375px wide, one word to a line, while the table scrolled sideways anyway. It now keeps at least 16rem, the same floor the endpoint list gives its URL column.
+- **Under Laravel Octane the SSRF guard is built from the container that resolves it.** Its binding read the host resolver and the address classifier through the container the provider was registered with, so a binding a host swaps in for one request was not the one the guard used. The container now arrives as the binding's argument.
+
 ## [3.7.0] - 2026-09-19
 
 ### Security
@@ -3151,7 +3175,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.7.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.8.0...HEAD
+[3.8.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.7.0...v3.8.0
 [3.7.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.6.0...v3.7.0
 [3.6.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.5.2...v3.6.0
 [3.5.2]: https://github.com/pushery/webhooks-for-laravel/compare/v3.5.1...v3.5.2

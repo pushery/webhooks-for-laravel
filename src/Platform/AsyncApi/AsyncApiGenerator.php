@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Platform\AsyncApi;
 
+use Illuminate\Support\Facades\Config;
 use Pushery\Webhooks\Support\Settings;
 use stdClass;
 use Symfony\Component\Yaml\Yaml;
@@ -28,10 +29,15 @@ final readonly class AsyncApiGenerator
      * rendered as JSON objects rather than arrays, so the output stays a valid
      * AsyncAPI document even with no event types declared.
      *
+     * A null title stands for the application's name, which is what the command has always
+     * used, so the console and the public method describe one catalog under one name.
+     *
      * @return array<string, mixed>
      */
-    public function generate(string $title, string $version): array
+    public function generate(?string $title, string $version): array
     {
+        $title ??= Config::string('app.name', 'Webhooks').' Webhooks';
+
         $channels = [];
         $operations = [];
         $messages = [];

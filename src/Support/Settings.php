@@ -86,49 +86,6 @@ final class Settings
     }
 
     /**
-     * The advisory for a half-installed icon stack, or null when the pair is coherent.
-     *
-     * `blade-icons` renders and `blade-heroicons` is the set the shipped screens ask for. With
-     * either one missing, WireKit draws its inert placeholder where an icon belongs: the screens
-     * render, they are simply without iconography. Both directions therefore cost the same, and
-     * the message says which half to install rather than how bad it is.
-     *
-     * This used to say the renderer-alone case answers 500, and it did. An alias like `inbox`
-     * resolves cleanly through a static preset table that never checks whether the SVG behind it
-     * exists, so with `blade-icons` present and `blade-heroicons` absent the lookup reached a set
-     * nobody registered and threw, taking down every screen that draws an icon — which through
-     * buttons and dropdowns is every screen. WireKit's graceful path covered the unknown alias and
-     * not the resolved-alias-missing-set case.
-     *
-     * That gap is closed upstream as of WireKit 2.38. The version this package enforces sits
-     * above that release, so the state is no longer broken but merely incomplete, and a message
-     * still claiming a 500 would be the kind of overstatement that teaches a reader to skip the
-     * next one.
-     *
-     * Both inputs are ARGUMENTS rather than reads, so every state is testable on a tree that has
-     * neither package — which is this one, and every CI lane.
-     */
-    public function iconPairingAdvisory(bool $rendererInstalled, bool $heroiconSetInstalled): ?string
-    {
-        if ($rendererInstalled === $heroiconSetInstalled) {
-            return null;
-        }
-
-        // Named rather than left to the reader: told only that "the pair is incomplete", someone
-        // reaches for the package the message mentions first, and on a host that already uses
-        // blade-icons for its own set that is the one they already have.
-        $missing = $rendererInstalled ? 'blade-ui-kit/blade-heroicons' : 'blade-ui-kit/blade-icons';
-
-        return sprintf(
-            'The icon pair is half installed: %s is missing, so the shipped screens draw '
-            .'WireKit\'s inert placeholder where an icon belongs. They render — they are simply '
-            .'without iconography. Install it: composer require %s.',
-            $missing,
-            $missing,
-        );
-    }
-
-    /**
      * The 4xx status codes that stay retryable while `no_retry_on_4xx` is on.
      *
      * Values are read leniently on purpose. The only realistic way a string reaches this list is

@@ -59,10 +59,9 @@ final class DashboardTimezone
     {
         $configured = Config::get('webhooks.dashboard.timezone');
 
-        // The `=== ''` half is an EQUIVALENT mutant and is reported every run: measured, an
-        // empty zone reaches `validated()`, `new DateTimeZone('')` throws
-        // DateInvalidTimeZoneException, and the catch answers null — the same answer, three
-        // calls later.
+        // Without the `=== ''` half the answer would be the same: an empty zone reaches
+        // `validated()`, `new DateTimeZone('')` throws DateInvalidTimeZoneException, and the
+        // catch answers null, three calls later.
         //
         // It stays because an unset env var arrives here as '' rather than as null, which
         // makes this the ordinary shape of "no zone configured" and not an edge case.

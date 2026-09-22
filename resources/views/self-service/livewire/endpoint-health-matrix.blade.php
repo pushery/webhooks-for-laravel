@@ -3,25 +3,25 @@
      sample size. The Status and Score headers sort the board; per-row and all-at-once
      Recompute drive the shared health engine. Owner-scoped, WireKit-tokenized throughout. --}}
 <div class="wh-portal wh-portal-health mx-auto flex max-w-5xl flex-col gap-[var(--padding-wk-y-lg)] p-[var(--padding-wk-x-lg)]" wire:key="health-matrix">
-    <header class="flex flex-wrap items-start justify-between gap-[var(--padding-wk-x-md)]">
-        <x-wirekit::stack gap="sm">
-            <x-wirekit::heading :level="1" size="lg">{{ __('webhooks::self-service.health_page.heading') }}</x-wirekit::heading>
-            <x-wirekit::text intent="muted">{{ __('webhooks::self-service.health_page.intro') }}</x-wirekit::text>
-        </x-wirekit::stack>
-        <div class="flex items-center gap-[var(--gap-wk-sm)]">
-            {{-- Absent when this board is embedded without the portal's own routes: there
-                 is no endpoint page of ours to go back to. --}}
-            @if ($portalUrl !== null)
-                <x-wirekit::button :href="$portalUrl" wire:navigate size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" intent="neutral">
-                    {{ __('webhooks::self-service.actions.back_to_endpoints') }}
-                </x-wirekit::button>
-            @endif
-            @if (! $endpoints->isEmpty())
-                <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" wire:click="recomputeAll" wire:loading.attr="disabled" wire:target="recomputeAll">
-                    {{ __('webhooks::self-service.health_page.recompute_all') }}
-                </x-wirekit::button>
-            @endif
-        </div>
+    <header>
+        <x-wirekit::page-header :level="\Pushery\Webhooks\Support\UiVariant::pageHeadingLevel()" :title="__('webhooks::self-service.health_page.heading')" :description="__('webhooks::self-service.health_page.intro')">
+            {{-- The conditions sit inside the slot, for the reason the portal page gives: a
+                 conditional block in the default slot fills it, and the title renders empty. --}}
+            <x-slot:actions>
+                {{-- Absent when this board is embedded without the portal's own routes: there
+                     is no endpoint page of ours to go back to. --}}
+                @if ($portalUrl !== null)
+                    <x-wirekit::button :href="$portalUrl" wire:navigate size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" intent="neutral">
+                        {{ __('webhooks::self-service.actions.back_to_endpoints') }}
+                    </x-wirekit::button>
+                @endif
+                @if (! $endpoints->isEmpty())
+                    <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" wire:click="recomputeAll" wire:loading.attr="disabled" wire:target="recomputeAll">
+                        {{ __('webhooks::self-service.health_page.recompute_all') }}
+                    </x-wirekit::button>
+                @endif
+            </x-slot:actions>
+        </x-wirekit::page-header>
     </header>
 
     @if ($message !== '')

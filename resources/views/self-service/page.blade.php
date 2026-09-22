@@ -16,17 +16,20 @@
      full-page routes at max-w-5xl; the portal sitting below both of them was the
      inconsistency. EndpointTableFitsItsPageTest holds the result as geometry. --}}
 <div class="wh-portal mx-auto flex max-w-6xl flex-col gap-[var(--padding-wk-y-lg)] p-[var(--padding-wk-x-lg)]">
-    <header class="flex flex-wrap items-start justify-between gap-[var(--padding-wk-x-md)]">
-        <div class="flex flex-col gap-[var(--padding-wk-y-sm)]">
-            <x-wirekit::heading :level="1" size="lg">{{ __('webhooks::self-service.page.heading') }}</x-wirekit::heading>
-            <x-wirekit::text intent="muted">{{ __('webhooks::self-service.page.intro') }}</x-wirekit::text>
-        </div>
-        {{-- Absent when this shell is embedded without the portal's own routes. --}}
-        @if ($healthBoardUrl !== null)
-            <x-wirekit::button :href="$healthBoardUrl" wire:navigate size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" intent="neutral">
-                {{ __('webhooks::self-service.page.health_link') }}
-            </x-wirekit::button>
-        @endif
+    <header>
+        <x-wirekit::page-header :level="\Pushery\Webhooks\Support\UiVariant::pageHeadingLevel()" :title="__('webhooks::self-service.page.heading')" :description="__('webhooks::self-service.page.intro')">
+            {{-- The condition sits INSIDE the slot. Livewire marks every conditional block in its
+                 views with comments, and a block left in the default slot fills it: the page-header
+                 then draws that slot instead of the title, and the heading renders empty. --}}
+            <x-slot:actions>
+                {{-- Absent when this shell is embedded without the portal's own routes. --}}
+                @if ($healthBoardUrl !== null)
+                    <x-wirekit::button :href="$healthBoardUrl" wire:navigate size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" intent="neutral">
+                        {{ __('webhooks::self-service.page.health_link') }}
+                    </x-wirekit::button>
+                @endif
+            </x-slot:actions>
+        </x-wirekit::page-header>
     </header>
 
     <livewire:webhooks.self-service.endpoint-form wire:key="portal-form" />

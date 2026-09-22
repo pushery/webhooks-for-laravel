@@ -34,7 +34,7 @@ final class SubscriptionDeliveryGate implements DeliveryGate
             return null;
         }
 
-        $subscription = WebhookSubscription::query()->find($subscriptionId);
+        $subscription = WebhookSubscription::model()::query()->find($subscriptionId);
 
         if (! $subscription instanceof WebhookSubscription) {
             return 'The endpoint was deleted while this delivery was queued; it was not sent.';

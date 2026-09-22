@@ -795,7 +795,7 @@ final class WebhookConfig
             undeterminedStatus: is_int($entry['undetermined_status'] ?? null) ? $entry['undetermined_status'] : null,
             profileClass: self::classOr($name, 'profile', $entry['profile'] ?? null, WebhookProfile::class, ProcessEverythingWebhookProfile::class),
             responseClass: self::classOr($name, 'response', $entry['response'] ?? null, RespondsToWebhook::class, DefaultRespondsTo::class),
-            modelClass: self::classOr($name, 'model', $entry['model'] ?? null, WebhookCall::class, WebhookCall::class),
+            modelClass: self::classOr($name, 'model', $entry['model'] ?? null, WebhookCall::class, WebhookCall::model()),
             process: self::resolveProcess($name, $entry['process'] ?? null),
             redact: self::stringList($entry['redact'] ?? null, ['Authorization', 'Cookie']),
             storeHeaders: self::resolveStoreHeaders($entry['store_headers'] ?? null),

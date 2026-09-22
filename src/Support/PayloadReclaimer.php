@@ -6,8 +6,6 @@ namespace Pushery\Webhooks\Support;
 
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
-use Pushery\Webhooks\Client\Models\WebhookCall;
-use Pushery\Webhooks\Models\WebhookDelivery;
 
 /**
  * Deletes offloaded payload objects on a Storage disk that no log row still points at.
@@ -124,12 +122,20 @@ final class PayloadReclaimer
         // adding one would cost the delivery log's hot insert path for a sweep that is manual,
         // unscheduled and meant to run off-peak. That trade is named in the command's docblock
         // instead of being made quietly here.
+        // The tables, not the models: this is the one reader in the package that must not go through
+        // `webhooks.models`. What is built here is the set of paths something still
+        // references, and every object outside it is deleted. A host's subclass may carry a global
+        // scope — a tenant, a soft delete — and read through it, the rows the scope hides would drop
+        // out of the set and their payloads would be deleted while those rows still point at them.
+        // The package class is no better: the host configured its own because it wants its class,
+        // and naming ours here is the bypass the model guard exists for. The rows are the answer,
+        // whichever class a host reads them with.
         if ($schema->hasTable('webhook_deliveries')) {
-            WebhookDelivery::query()
+            WebhookConnection::db()->table('webhook_deliveries')
                 ->where('payload_disk', $disk)
                 ->select(['id', 'payload_path'])
                 ->lazyById(self::CHUNK)
-                ->each(function (WebhookDelivery $row) use (&$referenced): void {
+                ->each(function (object $row) use (&$referenced): void {
                     if (is_string($row->payload_path)) {
                         $referenced[$row->payload_path] = true;
                     }
@@ -137,11 +143,11 @@ final class PayloadReclaimer
         }
 
         if ($schema->hasTable('webhook_calls')) {
-            WebhookCall::query()
+            WebhookConnection::db()->table('webhook_calls')
                 ->where('payload_disk', $disk)
                 ->select(['id', 'payload_path'])
                 ->lazyById(self::CHUNK)
-                ->each(function (WebhookCall $row) use (&$referenced): void {
+                ->each(function (object $row) use (&$referenced): void {
                     if (is_string($row->payload_path)) {
                         $referenced[$row->payload_path] = true;
                     }

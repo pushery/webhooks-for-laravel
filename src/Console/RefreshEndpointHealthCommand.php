@@ -33,7 +33,7 @@ final class RefreshEndpointHealthCommand extends Command
         // over a cursor ends at its first bad row, and the endpoints ordered after it keep the
         // score the last delivery left them with -- which is precisely what this command exists
         // to stop.
-        foreach (WebhookSubscription::query()->active()->cursor() as $subscription) {
+        foreach (WebhookSubscription::model()::query()->active()->cursor() as $subscription) {
             try {
                 $health->refresh($subscription);
                 $count++;

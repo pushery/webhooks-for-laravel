@@ -190,12 +190,10 @@
                              endpoint is not a problem, and coloring it as one trains the
                              reader to ignore the color. --}}
                         @php
-                            // ONE ladder producing both halves, not two ladders in step. Written
-                            // as two, the intent and the label can disagree — a red badge saying
-                            // "Disabled", or "Failing" in success green — and that is not
-                            // hypothetical: the first version here WAS two ladders, and the
-                            // mutant that dropped the off-arm from only one of them survived the
-                            // arm that was supposed to catch it.
+                            // One ladder produces both halves, not two ladders kept in step.
+                            // Written as two, the intent and the label can disagree — a red badge
+                            // saying "Disabled", or "Failing" in success green — and an arm
+                            // dropped from one of them leaves the other looking correct.
                             [$healthIntent, $healthLabel] = match (true) {
                                 ! $subscription->is_active => ['neutral', __('webhooks::management.subscription.disabled')],
                                 $subscription->health_status === 'failing' => ['danger', __('webhooks::management.subscription.failing')],

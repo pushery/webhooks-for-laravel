@@ -17,6 +17,7 @@ use Pushery\Webhooks\Client\Exceptions\CorruptRawBody;
 use Pushery\Webhooks\Client\WebhookCallStatus;
 use Pushery\Webhooks\Core\Payload\PayloadStore;
 use Pushery\Webhooks\Database\Concerns\HasZonedTimestamps;
+use Pushery\Webhooks\Database\Concerns\Replaceable;
 use Pushery\Webhooks\Database\Concerns\ScopesByTimestamp;
 use Pushery\Webhooks\Database\Concerns\UsesWebhookConnection;
 use Pushery\Webhooks\Database\Factories\WebhookCallFactory;
@@ -49,6 +50,7 @@ class WebhookCall extends Model
     use HasUuids;
     use HasZonedTimestamps;
     use MassPrunable;
+    use Replaceable;
     use ScopesByTimestamp;
     use UsesWebhookConnection;
 

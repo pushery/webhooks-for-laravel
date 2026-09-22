@@ -8,7 +8,7 @@ namespace Pushery\Webhooks\Support;
  * Lays a host's published configuration OVER the shipped defaults, all the way down.
  *
  * Laravel's `mergeConfigFrom()` is an `array_merge` at the top level only. This package
- * ships twelve top-level keys and every one of them is a deep tree, so a host that
+ * ships thirteen top-level keys and twelve of them are deep trees, so a host that
  * publishes the file and keeps only the block it cares about replaces that entire layer:
  * every sibling key it trimmed away becomes undefined, and every key a later release adds
  * to that layer never reaches it. Nothing reports either — a new safety default simply
@@ -18,7 +18,8 @@ namespace Pushery\Webhooks\Support;
  * arrays BY INDEX, so a host narrowing `dashboard.windows` to `['7d']` gets back
  * `['7d', '7d', '30d']` — two windows it never asked for, one of them a value it removed
  * on purpose. A list is the value an operator SETS, not a container to descend into, so a
- * list is replaced whole and never merged. There are twelve of them in the shipped file, and
+ * list is replaced whole and never merged. There are thirteen of them in the shipped file —
+ * `models` counts, because an empty array is a leaf, as the paragraph after next explains — and
  * `core.ssrf.allowed_hosts` is the one where getting this wrong is a security question
  * rather than a cosmetic one.
  *

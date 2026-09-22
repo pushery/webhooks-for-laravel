@@ -158,7 +158,11 @@
                     <x-wirekit::table.th>{{ __('webhooks::self-service.deliveries.outcome') }}</x-wirekit::table.th>
                     <x-wirekit::table.th>{{ __('webhooks::self-service.deliveries.response_code') }}</x-wirekit::table.th>
                     @if ($showsErrors)
-                        <x-wirekit::table.th>{{ __('webhooks::self-service.deliveries.error') }}</x-wirekit::table.th>
+                        {{-- A floor on this column, for the reason the endpoint list gives its URL
+                             one: the table scrolls sideways on a narrow screen, and a column free to
+                             collapse takes the squeeze. This one carries the text the reader came
+                             for, and at 375px it got 80px, one word to a line. --}}
+                        <x-wirekit::table.th class="min-w-64">{{ __('webhooks::self-service.deliveries.error') }}</x-wirekit::table.th>
                     @endif
                     <x-wirekit::table.th align="right">{{ __('webhooks::self-service.deliveries.when') }}</x-wirekit::table.th>
                     <x-wirekit::table.th align="right"><span class="sr-only">{{ __('webhooks::self-service.deliveries.replay') }}</span></x-wirekit::table.th>

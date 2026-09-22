@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Console;
 
-use BladeUI\Heroicons\BladeHeroiconsServiceProvider;
 use Illuminate\Console\Command;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Config;
@@ -17,6 +16,7 @@ use Pushery\Webhooks\Database\DatabaseRequirement;
 use Pushery\Webhooks\Database\OwnerKeyDeclaration;
 use Pushery\Webhooks\Server\Jobs\JobTimeoutBudget;
 use Pushery\Webhooks\Support\Settings;
+use Pushery\Webhooks\Support\ShippedIcons;
 use RuntimeException;
 
 /**
@@ -156,35 +156,24 @@ final class PreflightCommand extends Command
             }
         }
 
-        // The half-installed icon stack, named at the one moment a host is looking. The inputs
-        // are the two things that actually decide it at render time: blade-icons publishes the
-        // global svg() helper, and blade-heroicons is what registers the heroicon set the shipped
-        // screens ask for. Neither is a dependency of this package, so both are asked about
-        // rather than required.
+        // The shipped screens' icons, named at the one moment a host is looking. The question is
+        // the one a page answers when it renders -- does each alias the screens draw resolve, under
+        // this host's WireKit preset, into something Blade Icons can draw -- and not whether one
+        // particular icon package is installed. The screens name aliases and never a set, so the set
+        // a host needs is whichever its own preset resolves into.
         //
-        // It joins the register below instead of getting an `if` of its own, and that is about
-        // what can be proven. Both inputs are properties of the installation rather than of the
-        // configuration, so on any one tree the branch is either always taken or never — and this
-        // tree has neither package, which is the "never" half. A conditional no run can enter is a
-        // line nobody has ever executed, and it would sit here looking tested.
-        //
-        // The second register below is config-driven, so it is entered on demand; filtering a
-        // null out of one list costs nothing and leaves no unreachable line behind.
-        // The filter cannot be exercised from this tree: it drops a null, and the advisory below
-        // only returns one when BOTH icon packages are installed -- which this test environment
-        // does not have, so nothing is ever filtered here. Measured, the suite is green without
-        // it. Removing it anyway would hand a null to warn() on the consumer installations that
-        // DO have both, which is the ordinary case rather than the exotic one.
-        $warnings = array_filter([
-            new Settings()->iconPairingAdvisory(
-                function_exists('svg'),
-                class_exists(BladeHeroiconsServiceProvider::class),
-            ),
+        // Both halves join the register below instead of getting an `if` of their own. The icon half
+        // is a property of the installation rather than of the configuration, so on any one tree it
+        // is either always entered or never; a conditional no run can enter is a line nobody has
+        // ever executed, and it would sit here looking tested. A list spread into a list has no such
+        // line.
+        $warnings = [
+            ...ShippedIcons::advisories(ShippedIcons::unresolved()),
             // Same register as the client-side advisories above, and for the same reason: a list
             // that survived as nothing is a host typo, not a state the package can refuse to boot
             // over. What it must not be is invisible — the config file still shows three codes.
             ...new Settings()->retryable4xxFaults(),
-        ]);
+        ];
 
         foreach ($warnings as $message) {
             $this->components->warn($message);

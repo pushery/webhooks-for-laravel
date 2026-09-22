@@ -98,7 +98,7 @@ final class SubscriptionScope
      */
     public static function forOwner(string $ownerType, int|string $ownerId): Builder
     {
-        return self::constrain(WebhookSubscription::query(), new TenantIdentity($ownerType, $ownerId));
+        return self::constrain(WebhookSubscription::model()::query(), new TenantIdentity($ownerType, $ownerId));
     }
 
     /**

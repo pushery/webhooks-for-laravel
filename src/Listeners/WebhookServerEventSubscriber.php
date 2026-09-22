@@ -160,7 +160,7 @@ final readonly class WebhookServerEventSubscriber
         // Atomic transition — a conditional UPDATE gated on is_active=true means only
         // the worker that actually flips the flag fires the event, even when several
         // deliveries of the same subscription exhaust concurrently.
-        $flipped = WebhookSubscription::query()
+        $flipped = WebhookSubscription::model()::query()
             ->whereKey($subscription->id)
             ->where('is_active', true)
             ->update(['is_active' => false, 'disabled_at' => now()]);
@@ -206,7 +206,7 @@ final readonly class WebhookServerEventSubscriber
         // the engine's hot path, and worse every month the log survives. The delivery
         // carries its own partition key, so the planner goes straight to the one
         // partition that can hold the row.
-        $query = WebhookDelivery::query()->whereKey($deliveryId);
+        $query = WebhookDelivery::model()::query()->whereKey($deliveryId);
 
         if (is_string($createdAt)) {
             $query->where('created_at', $createdAt);

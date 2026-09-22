@@ -14,6 +14,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Override;
 use Pushery\Webhooks\Database\Concerns\HasZonedTimestamps;
+use Pushery\Webhooks\Database\Concerns\Replaceable;
 use Pushery\Webhooks\Database\Concerns\ScopesByTimestamp;
 use Pushery\Webhooks\Database\Concerns\UsesWebhookConnection;
 use Pushery\Webhooks\Database\Factories\WebhookSubscriptionFactory;
@@ -48,12 +49,13 @@ use Pushery\Webhooks\WebhookManager;
  * @property-read Model|null $owner
  * @property-read Collection<int, WebhookDelivery> $deliveries
  */
-final class WebhookSubscription extends Model
+class WebhookSubscription extends Model
 {
     /** @use HasFactory<WebhookSubscriptionFactory> */
     use HasFactory;
 
     use HasZonedTimestamps;
+    use Replaceable;
 
     /**
      * Timestamp scopes, exactly as on the three log models. This table carries columns a
@@ -160,7 +162,7 @@ final class WebhookSubscription extends Model
      */
     public function deliveries(): HasMany
     {
-        return $this->hasMany(WebhookDelivery::class, 'subscription_id');
+        return $this->hasMany(WebhookDelivery::model(), 'subscription_id');
     }
 
     /**
