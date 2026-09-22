@@ -8,6 +8,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Config;
 use Pushery\Webhooks\Database\Dialect\Sql\ConditionalCount;
 use Pushery\Webhooks\Enums\DeliveryStatus;
+use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Support\LocalizedNumber;
 use Pushery\Webhooks\Support\Timestamp;
 use Pushery\Webhooks\Support\WebhookConnection;
@@ -30,9 +31,14 @@ use Spatie\Health\Checks\Result;
  * destination and is left out too, which is the same call the circuit breaker makes. A delivery
  * between two attempts counts as failed until it resolves, which is where the score puts it.
  *
- * The read is bounded below on `created_at`, so on PostgreSQL only the monthly partitions the
- * window reaches are scanned. Of the deliveries the result carries counts, never a payload, a URL or
- * an error text. The one sentence in it the package did not write is the remedy a host names.
+ * A rate cannot see the engine stop. Without a worker there are no outcomes, so there are no
+ * failures either, and the rate of a dead engine reads like a quiet night. Two limits say so
+ * instead, both off until a host sets them: a delivery that has waited too long to be sent at all,
+ * and a delivery to a live endpoint whose next attempt never came.
+ *
+ * Every read is bounded below on `created_at`, so on PostgreSQL only the monthly partitions it
+ * reaches are scanned. Of the deliveries the result carries counts, never a payload, a URL or an
+ * error text. The one sentence in it the package did not write is the remedy a host names.
  */
 final class DeliveryEngineCheck extends Check
 {
@@ -46,7 +52,13 @@ final class DeliveryEngineCheck extends Check
 
     private bool $warnOnDisabledEndpoints = true;
 
+    private bool $warnOnlyAboutBreakerDisabledEndpoints = false;
+
     private ?string $disabledEndpointRemedy = null;
+
+    private ?int $pendingLimitMinutes = null;
+
+    private ?int $retryLimitMinutes = null;
 
     /**
      * How far back the check looks, in hours. 24 by default.
@@ -112,6 +124,49 @@ final class DeliveryEngineCheck extends Check
         return $this;
     }
 
+    /**
+     * Warn only about endpoints the circuit breaker switched off. An endpoint switched off by hand
+     * is somebody's decision rather than news, and the warning then leaves it out. Both kinds stay
+     * in the count the result carries.
+     */
+    public function warnOnlyAboutEndpointsTheBreakerDisabled(): self
+    {
+        $this->warnOnDisabledEndpoints = true;
+        $this->warnOnlyAboutBreakerDisabledEndpoints = true;
+
+        return $this;
+    }
+
+    /**
+     * Fail when a delivery has waited longer than this to be sent at all, in minutes: nothing is
+     * taking work off the queue. Off by default.
+     *
+     * A delivery to an endpoint over its outbound rate limit waits as pending until its window
+     * opens, so choose a limit longer than the longest such wait you expect.
+     */
+    public function failWhenADeliveryIsPendingLongerThan(int $minutes): self
+    {
+        $this->pendingLimitMinutes = max(1, $minutes);
+
+        return $this;
+    }
+
+    /**
+     * Fail when a delivery to an endpoint that is switched on has waited longer than this for its
+     * next attempt, in minutes: the attempt never ran, which is what a worker that stopped between
+     * two attempts leaves behind. Off by default.
+     *
+     * The age is counted from the delivery's creation, so choose a limit beyond the whole retry
+     * schedule, every backoff and every honored `Retry-After` included. A delivery that is only
+     * between two attempts must not reach it.
+     */
+    public function failWhenARetryIsOverdueAfter(int $minutes): self
+    {
+        $this->retryLimitMinutes = max(1, $minutes);
+
+        return $this;
+    }
+
     public function run(): Result
     {
         $result = Result::make();
@@ -127,6 +182,9 @@ final class DeliveryEngineCheck extends Check
 
         $counts = $this->deliveryCounts();
         $disabled = $this->disabledEndpoints();
+        $stalledPending = $this->pendingLimitMinutes === null ? null : $this->stalledPending($this->pendingLimitMinutes);
+        $overdueRetries = $this->retryLimitMinutes === null ? null : $this->overdueRetries($this->retryLimitMinutes);
+        $breakerDisabled = $this->warnOnlyAboutBreakerDisabledEndpoints ? $this->breakerDisabledEndpoints() : null;
 
         $settled = $counts['succeeded'] + $counts['failed'] + $counts['exhausted'];
         $rate = $settled > 0 ? round(($counts['failed'] + $counts['exhausted']) / $settled * 100, 1) : null;
@@ -138,7 +196,33 @@ final class DeliveryEngineCheck extends Check
             ...$counts,
             ...($rate === null ? [] : ['failure_rate_percent' => $this->machinePercent($rate)]),
             'disabled_endpoints' => $disabled,
+            // Present only where a host asked for the measurement, so a check configured as before
+            // keeps the meta it had.
+            ...($breakerDisabled === null ? [] : ['breaker_disabled_endpoints' => $breakerDisabled]),
+            ...($stalledPending === null ? [] : ['stalled_pending' => $stalledPending]),
+            ...($overdueRetries === null ? [] : ['overdue_retries' => $overdueRetries]),
         ]);
+
+        // A stopped engine outranks a failure rate: it produces no outcomes, so no rate reports it.
+        if ($stalledPending !== null && $stalledPending > 0) {
+            $message = $stalledPending === 1
+                ? sprintf('One webhook delivery has waited more than %d minutes to be sent.', $this->pendingLimitMinutes)
+                : sprintf('%d webhook deliveries have waited more than %d minutes to be sent.', $stalledPending, $this->pendingLimitMinutes);
+
+            return $result->shortSummary('Queue stalled')->failed(
+                $message.' Check that a worker is taking jobs off the queue the webhooks are sent from.',
+            );
+        }
+
+        if ($overdueRetries !== null && $overdueRetries > 0) {
+            $message = $overdueRetries === 1
+                ? sprintf('One webhook delivery has waited more than %d minutes for its next attempt.', $this->retryLimitMinutes)
+                : sprintf('%d webhook deliveries have waited more than %d minutes for their next attempt.', $overdueRetries, $this->retryLimitMinutes);
+
+            return $result->shortSummary('Retries stalled')->failed(
+                $message.' Check that a worker is taking jobs off the queue, then read the failed jobs for one that stops it.',
+            );
+        }
 
         if ($rate !== null && $settled >= $this->minimumDeliveries) {
             $message = sprintf('%s%% of the %d deliveries in the last %d hours failed.', $this->percent($rate), $settled, $this->windowHours);
@@ -152,7 +236,17 @@ final class DeliveryEngineCheck extends Check
             }
         }
 
-        if ($this->warnOnDisabledEndpoints && $disabled > 0) {
+        if ($breakerDisabled !== null) {
+            if ($breakerDisabled > 0) {
+                $message = $breakerDisabled === 1
+                    ? 'The circuit breaker switched one webhook endpoint off, and it receives nothing until it is enabled again.'
+                    : sprintf('The circuit breaker switched %d webhook endpoints off, and they receive nothing until they are enabled again.', $breakerDisabled);
+
+                return $result->shortSummary($breakerDisabled === 1 ? '1 endpoint off' : $breakerDisabled.' endpoints off')->warning(
+                    $this->disabledEndpointRemedy === null ? $message : $message.' '.$this->disabledEndpointRemedy,
+                );
+            }
+        } elseif ($this->warnOnDisabledEndpoints && $disabled > 0) {
             $message = $disabled === 1
                 ? 'One webhook endpoint is switched off and receives nothing until it is enabled again.'
                 : sprintf('%d webhook endpoints are switched off and receive nothing until they are enabled again.', $disabled);
@@ -223,6 +317,76 @@ final class DeliveryEngineCheck extends Check
     {
         return WebhookConnection::db()->table('webhook_subscriptions')
             ->where(static fn (Builder $query): Builder => $query->where('is_active', false)->orWhereNotNull('disabled_at'))
+            ->count();
+    }
+
+    /**
+     * Deliveries still pending although they were created more than the limit ago.
+     *
+     * The read covers one window's worth of creation times, ending at the limit, so it stays bounded
+     * on both sides whatever the limit is and can never be an empty range.
+     */
+    private function stalledPending(int $limitMinutes): int
+    {
+        [$from, $until] = $this->agedRange($limitMinutes);
+
+        return WebhookConnection::db()->table('webhook_deliveries')
+            ->where('status', DeliveryStatus::Pending->value)
+            ->where('created_at', '>=', $from)
+            ->where('created_at', '<', $until)
+            ->count();
+    }
+
+    /**
+     * Deliveries still waiting between two attempts although they were created more than the limit
+     * ago, to an endpoint that is switched on. The retries of a switched-off endpoint stopped on
+     * purpose, and the disabled-endpoint warning is the one that reports it.
+     */
+    private function overdueRetries(int $limitMinutes): int
+    {
+        [$from, $until] = $this->agedRange($limitMinutes);
+
+        return WebhookConnection::db()->table('webhook_deliveries')
+            ->join('webhook_subscriptions', 'webhook_subscriptions.id', '=', 'webhook_deliveries.subscription_id')
+            ->where('webhook_deliveries.status', DeliveryStatus::Failed->value)
+            ->where('webhook_deliveries.created_at', '>=', $from)
+            ->where('webhook_deliveries.created_at', '<', $until)
+            ->where('webhook_subscriptions.is_active', true)
+            ->whereNull('webhook_subscriptions.disabled_at')
+            ->count();
+    }
+
+    /**
+     * The creation times a delivery older than the limit can have: one window's worth, ending at the
+     * limit, each bound written for the engine that holds the table.
+     *
+     * @return array{string, string}
+     */
+    private function agedRange(int $limitMinutes): array
+    {
+        $dialect = WebhookConnection::dialect();
+        $until = now()->subMinutes($limitMinutes);
+
+        return [
+            Timestamp::forDialect($dialect, $until->copy()->subHours($this->windowHours)),
+            Timestamp::forDialect($dialect, $until),
+        ];
+    }
+
+    /**
+     * Endpoints the circuit breaker switched off, told apart from one switched off by hand by the
+     * model's own rule rather than a second copy of it here. The set is the switched-off endpoints,
+     * which is small by construction.
+     */
+    private function breakerDisabledEndpoints(): int
+    {
+        $rows = WebhookConnection::db()->table('webhook_subscriptions')
+            ->where(static fn (Builder $query): Builder => $query->where('is_active', false)->orWhereNotNull('disabled_at'))
+            ->get()
+            ->all();
+
+        return WebhookSubscription::model()::hydrate($rows)
+            ->filter(static fn (WebhookSubscription $subscription): bool => $subscription->wasAutoDisabled())
             ->count();
     }
 

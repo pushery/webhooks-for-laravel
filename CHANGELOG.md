@@ -4,6 +4,13 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.10.0] - 2026-09-22
+
+### Added
+
+- **The health check can tell a stopped delivery engine from a quiet one.** A failure rate cannot see a dead worker: with no outcomes there are no failures, so the rate of a stopped queue reads like a quiet night. `DeliveryEngineCheck::failWhenADeliveryIsPendingLongerThan()` fails when a delivery has waited longer than the limit to be sent at all, and `failWhenARetryIsOverdueAfter()` fails when a delivery to a switched-on endpoint is still waiting for its next attempt after the limit, which is what a worker that stopped between two attempts leaves behind. Both are off until you set them, and their counts join the result only then.
+- **The disabled-endpoint warning can leave out endpoints switched off by hand.** `DeliveryEngineCheck::warnOnlyAboutEndpointsTheBreakerDisabled()` warns only about endpoints the circuit breaker switched off; the result still counts both kinds, and adds the breaker's count beside them.
+
 ## [3.9.0] - 2026-09-22
 
 ### Added
@@ -3181,7 +3188,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.9.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.10.0...HEAD
+[3.10.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.9.0...v3.10.0
 [3.9.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.8.0...v3.9.0
 [3.8.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.7.0...v3.8.0
 [3.7.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.6.0...v3.7.0
