@@ -3,40 +3,42 @@
      changing it remounts them. Each panel is a lazy, independently-polling Livewire
      component. --}}
 <div class="wh-dash mx-auto flex max-w-6xl flex-col gap-[var(--padding-wk-y-lg)] p-[var(--padding-wk-x-lg)]">
-    <header class="flex flex-wrap items-center justify-between gap-[var(--padding-wk-x-md)]">
-        <x-wirekit::heading :level="1" size="lg">{{ __('webhooks::dashboard.heading') }}</x-wirekit::heading>
+    <header>
+        <x-wirekit::page-header :level="\Pushery\Webhooks\Support\UiVariant::pageHeadingLevel()" :title="__('webhooks::dashboard.heading')">
+            <x-slot:actions>
+                {{-- WireKit's segmented-control, driven optimistically through selectWindow()
+                     rather than by a wire:model.
 
-        {{-- WireKit's segmented-control, driven optimistically through selectWindow()
-             rather than by a wire:model.
+                     A hand-rolled button group stood here, and its stated reason — "the component
+                     forwards only a bare `wire:model` to its hidden input" — was fixed upstream in
+                     WireKit v2.12.0 and is unreachable below the 2.53 floor this package enforces.
+                     It was a rebuild of a component we ship.
 
-             A hand-rolled button group stood here, and its stated reason — "the component
-             forwards only a bare `wire:model` to its hidden input" — was fixed upstream in
-             WireKit v2.12.0 and is unreachable below the 2.53 floor this package enforces.
-             It was a rebuild of a component we ship.
+                     No `optimistic` prop, and that is measured rather than chosen. The optimistic layer
+                     lives in a separate WireKit bundle (dist/wirekit-optimistic.js) that these screens do
+                     not load; with the prop set, a real browser reports `wirekitOptimistic is not defined`
+                     and four more before the page finishes. Using it would make a second asset a
+                     requirement for every consumer, to move a three-option control a round trip sooner.
 
-             No `optimistic` prop, and that is measured rather than chosen. The optimistic layer
-             lives in a separate WireKit bundle (dist/wirekit-optimistic.js) that these screens do
-             not load; with the prop set, a real browser reports `wirekitOptimistic is not defined`
-             and four more before the page finishes. Using it would make a second asset a
-             requirement for every consumer, to move a three-option control a round trip sooner.
-
-             The binding needs `updatedWindow()`, and without it this would be a regression.
-             `$window` carries `#[Url]`, so it is client input; mount() screens it against the
-             configured set, and mount() runs once. The hand-rolled group this replaced went through
-             the allowlisted `selectWindow()` on every click. A binding writes the property directly
-             instead, so the same screening now sits in the update hook — see the component. --}}
-        <x-wirekit::segmented-control
-            class="wh-dash-windows"
-            {{-- Named because it is live-bound: the hidden input a wire:model writes through is
-                 what a form would submit, and LiveBoundFieldsAreNamedTest holds every shipped
-                 control to that. --}}
-            name="window"
-            size="sm"
-            :label="__('webhooks::dashboard.a11y.time_window')"
-            :options="array_combine($windows, $windows)"
-            :value="$window"
-            wire:model.live="window"
-        />
+                     The binding needs `updatedWindow()`, and without it this would be a regression.
+                     `$window` carries `#[Url]`, so it is client input; mount() screens it against the
+                     configured set, and mount() runs once. The hand-rolled group this replaced went through
+                     the allowlisted `selectWindow()` on every click. A binding writes the property directly
+                     instead, so the same screening now sits in the update hook — see the component. --}}
+                <x-wirekit::segmented-control
+                    class="wh-dash-windows"
+                    {{-- Named because it is live-bound: the hidden input a wire:model writes through is
+                         what a form would submit, and LiveBoundFieldsAreNamedTest holds every shipped
+                         control to that. --}}
+                    name="window"
+                    size="sm"
+                    :label="__('webhooks::dashboard.a11y.time_window')"
+                    :options="array_combine($windows, $windows)"
+                    :value="$window"
+                    wire:model.live="window"
+                />
+            </x-slot:actions>
+        </x-wirekit::page-header>
     </header>
 
     <nav class="wh-dash-tabs flex flex-wrap gap-[var(--padding-wk-x-md)] border-b-[length:var(--border-wk-width)] border-[color:var(--color-wk-border)]" aria-label="{{ __('webhooks::dashboard.a11y.sections') }}">

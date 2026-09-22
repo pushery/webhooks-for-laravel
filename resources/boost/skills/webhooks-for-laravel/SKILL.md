@@ -340,6 +340,10 @@ the tables and keep the sender.
   read with no lower bound on `created_at` visits every partition there is. Raise the
   config key if the application needs a longer window, or set it to `0` to remove the
   bound entirely.
+- Do not publish the AsyncAPI document by calling `Artisan::call('webhooks:asyncapi')`
+  from a route. The package registers its commands only in the console, so that route
+  passes every test and fails in production. Return `Webhooks::asyncApi()` from the
+  route instead; it builds the same document from the catalog.
 - Do not document package internals here; keep this skill focused on adoption in
   Laravel applications, and link the deeper reference material instead.
 

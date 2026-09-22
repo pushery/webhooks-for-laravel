@@ -111,7 +111,7 @@ final class PersistServerDelivery
      */
     private function record(WebhookDeliveryData $data, DeliveryStatus $status, array $attributes = [], bool $retry = true): void
     {
-        $delivery = WebhookServerDelivery::query()->firstOrNew(['message_id' => $data->messageId]);
+        $delivery = WebhookServerDelivery::model()::query()->firstOrNew(['message_id' => $data->messageId]);
 
         if ($delivery->exists && in_array($delivery->status, [DeliveryStatus::Succeeded, DeliveryStatus::Exhausted, DeliveryStatus::Refused], true)) {
             return;

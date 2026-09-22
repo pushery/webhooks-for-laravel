@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Core;
 
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\ServiceProvider;
 use Override;
@@ -39,9 +40,12 @@ final class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(HttpTransport::class);
         $this->app->singleton(JwksKeySet::class);
 
-        $this->app->singleton(SsrfGuard::class, fn (): SsrfGuard => new DefaultSsrfGuard(
-            $this->app->make(HostResolver::class),
-            $this->app->make(AddressClassifier::class),
+        // The container arrives as the closure's argument rather than through $this->app, so a
+        // long-running worker that resets the container between requests builds the guard from
+        // the one it is resolving in, not from the one the provider was registered with.
+        $this->app->singleton(SsrfGuard::class, fn (Application $app): SsrfGuard => new DefaultSsrfGuard(
+            $app->make(HostResolver::class),
+            $app->make(AddressClassifier::class),
             Config::boolean('webhooks.core.ssrf.https_only', true),
             Config::boolean('webhooks.core.ssrf.block_private_networks', true),
             $this->stringList('webhooks.core.ssrf.allowed_hosts'),

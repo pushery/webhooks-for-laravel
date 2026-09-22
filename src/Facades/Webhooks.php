@@ -14,8 +14,9 @@ use Pushery\Webhooks\WebhookManager;
 
 /**
  * The Platform layer's public API: register endpoints, fan an event out to every
- * matching subscription, and run an endpoint's lifecycle (enable / disable / remove,
- * rotate its secret, ping it, replay one of its deliveries).
+ * matching subscription, run an endpoint's lifecycle (enable / disable / remove,
+ * rotate its secret, ping it, replay one of its deliveries), and describe the event
+ * catalog as an AsyncAPI document.
  *
  * @method static WebhookSubscription subscribe(Model|TenantIdentity|null $owner, string $url, array<array-key, string> $eventTypes, ?string $name = null)
  * @method static void unsubscribe(WebhookSubscription $subscription)
@@ -27,6 +28,7 @@ use Pushery\Webhooks\WebhookManager;
  * @method static string rotateSecret(WebhookSubscription $subscription)
  * @method static bool revokeExpiredSecret(WebhookSubscription $subscription)
  * @method static WebhookDelivery redeliver(WebhookDelivery $delivery)
+ * @method static array<string, mixed> asyncApi(?string $title = null, string $version = '1.0.0')
  *
  * @see WebhookManager
  */

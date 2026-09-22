@@ -37,7 +37,7 @@ final class SearchIndexer
             return;
         }
 
-        $model = Config::get('webhooks.dashboard.source_model', WebhookDelivery::class);
+        $model = Config::get('webhooks.dashboard.source_model', WebhookDelivery::model());
 
         if (! is_string($model) || ! is_a($model, Model::class, true)) {
             return;

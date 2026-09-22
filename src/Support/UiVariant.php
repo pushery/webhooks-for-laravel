@@ -29,6 +29,14 @@ final class UiVariant
 {
     /**
      * The view name for one of the two operator components.
+     *
+     * The two components are the whole set, and naming them is what lets the analyser see the
+     * result as a view name. The return is a `@phpstan-return` rather than a `@return` because
+     * Rector does not know Larastan's pseudo-type and removes a `@return` it cannot read.
+     *
+     * @param  'delivery-log'|'subscription-manager'  $component
+     *
+     * @phpstan-return view-string
      */
     public static function view(string $component): string
     {
@@ -45,6 +53,22 @@ final class UiVariant
         }
 
         return self::rendersWireKit() ? 'webhooks::wirekit.'.$component : $neutral;
+    }
+
+    /**
+     * The heading level of a full-page screen's title: 1, or 2 under a host layout that carries
+     * its own h1. Anything else is ignored in favor of 1, so a typo cannot push the title below a
+     * heading the page does not have.
+     */
+    public static function pageHeadingLevel(): int
+    {
+        $configured = Config::get('webhooks.ui.page_heading_level');
+
+        if ($configured === 2 || $configured === '2') {
+            return 2;
+        }
+
+        return 1;
     }
 
     /**

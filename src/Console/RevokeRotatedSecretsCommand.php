@@ -32,7 +32,7 @@ final class RevokeRotatedSecretsCommand extends Command
         /** @var list<string> $failed */
         $failed = [];
 
-        WebhookSubscription::query()
+        WebhookSubscription::model()::query()
             ->whereNotNull('previous_secret')
             // Per row, because one unreadable row used to end the whole sweep -- and end it
             // again every hour. `previous_secret` is an `encrypted` cast, so it is decrypted on

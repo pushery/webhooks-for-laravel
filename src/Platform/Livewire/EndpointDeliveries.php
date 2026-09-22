@@ -340,7 +340,7 @@ final class EndpointDeliveries extends Component
         // through the READ scope, so an endpoint declared replayable but not readable never gets
         // this far. The policy below re-asks anyway; this decides which row it is asked about.
         $endpoint = ReplayableEndpoints::allows($delivery->subscription_id)
-            ? WebhookSubscription::query()->findOrFail($delivery->subscription_id)
+            ? WebhookSubscription::model()::query()->findOrFail($delivery->subscription_id)
             : $this->findOwnedEndpoint($delivery->subscription_id);
 
         // Redundant with the boot gate, and deliberately kept: {@see InteractsWithEndpoints}
@@ -444,9 +444,9 @@ final class EndpointDeliveries extends Component
 
         // The early return changes no row. Without it the query further down runs with an empty
         // list, `orWhereIn('id', [])` compiles to `or 0 = 1`, and what is left is the same owner's
-        // endpoints, ordered by the same column under the same limit. Weekly mutation run 1452
-        // removed it and the suite stayed green. It stays so that a host that declared nothing
-        // runs the query it always ran, not its owner scope wrapped in a subquery.
+        // endpoints, ordered by the same column under the same limit. It stays so that a host
+        // that declared nothing runs the query it always ran, not its owner scope wrapped in a
+        // subquery.
         if ($readable === []) {
             return $this->scopedQuery()
                 ->select(['id', 'url', 'name'])
@@ -455,7 +455,7 @@ final class EndpointDeliveries extends Component
                 ->get();
         }
 
-        return WebhookSubscription::query()
+        return WebhookSubscription::model()::query()
             ->select(['id', 'url', 'name'])
             ->where(fn (Builder $scope): Builder => $scope
                 ->whereIn('id', $this->scopedQuery()->select('id'))
@@ -516,7 +516,7 @@ final class EndpointDeliveries extends Component
             $columns[] = 'error';
         }
 
-        $query = WebhookDelivery::query()->select($columns);
+        $query = WebhookDelivery::model()::query()->select($columns);
         $owner = SubscriptionScope::currentOwner();
         $readable = ReadableEndpoints::ids();
 

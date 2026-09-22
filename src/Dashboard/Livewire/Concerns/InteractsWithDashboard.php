@@ -88,7 +88,7 @@ trait InteractsWithDashboard
      */
     protected function sourceModel(): WebhookDelivery
     {
-        $class = config('webhooks.dashboard.source_model', WebhookDelivery::class);
+        $class = config('webhooks.dashboard.source_model', WebhookDelivery::model());
 
         if (! is_string($class)) {
             throw new RuntimeException('The webhooks.dashboard.source_model must be a class-string.');

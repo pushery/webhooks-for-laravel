@@ -14,7 +14,7 @@ use Pushery\Webhooks\Models\WebhookDelivery;
  * writing any code. It shares the webhook_deliveries table, so it indexes exactly
  * the rows the engine writes.
  */
-final class SearchableWebhookDelivery extends WebhookDelivery implements Indexed
+class SearchableWebhookDelivery extends WebhookDelivery implements Indexed
 {
     use SearchableDelivery;
 }

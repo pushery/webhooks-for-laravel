@@ -139,8 +139,7 @@ class DeliveryLog extends Component
         // mount() runs, so this is the one place that sees what was handed in.
         //
         // The `!== ''` half of each condition decides nothing: without it the copy also runs
-        // when both names are empty, and writes an empty string over an empty string. Weekly
-        // mutation run 1452 made each half always true and the suite stayed green. It stays
+        // when both names are empty, and writes an empty string over an empty string. It stays
         // because it says which name is the source.
         if ($this->subscriptionId !== '' && $this->endpointId === '') {
             $this->endpointId = $this->subscriptionId;
@@ -233,7 +232,7 @@ class DeliveryLog extends Component
 
         // Same partition-key bound the table above already carries, on the single-row lookup
         // the redeliver action makes. Without it this one read visits every partition.
-        $delivery = WebhookDelivery::query()->withinRetention()->findOrFail($id);
+        $delivery = WebhookDelivery::model()::query()->withinRetention()->findOrFail($id);
 
         if (! $delivery->subscription->is_active) {
             $this->message = __('webhooks::management.messages.endpoint_disabled');
@@ -256,7 +255,7 @@ class DeliveryLog extends Component
 
         $this->message = '';
 
-        $subscription = WebhookSubscription::query()->findOrFail($subscriptionId);
+        $subscription = WebhookSubscription::model()::query()->findOrFail($subscriptionId);
 
         try {
             Webhooks::ping($subscription);
@@ -307,7 +306,7 @@ class DeliveryLog extends Component
         $from = CalendarDay::start($this->from);
         $until = CalendarDay::endExclusive($this->until);
 
-        $endpoints = WebhookSubscription::query()
+        $endpoints = WebhookSubscription::model()::query()
             ->select(['id', 'name', 'url'])
             ->orderBy('id')
             // One more than are shown, purely to learn whether there ARE more.
@@ -319,7 +318,7 @@ class DeliveryLog extends Component
 
         $truncated = $endpoints->count() > self::ENDPOINT_OPTIONS;
 
-        $query = WebhookDelivery::query()
+        $query = WebhookDelivery::model()::query()
             // Eagerly, and with three columns rather than the row: every rendered delivery names
             // its endpoint now -- in the column and in both action names -- so the lazy read this
             // view has always done in its aria-labels was already 25 queries a page. It simply

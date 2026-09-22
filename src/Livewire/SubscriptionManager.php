@@ -147,7 +147,7 @@ class SubscriptionManager extends Component
     {
         $this->authorizeAction('edit');
 
-        $subscription = WebhookSubscription::query()->findOrFail($id);
+        $subscription = WebhookSubscription::model()::query()->findOrFail($id);
 
         $this->editingId = $subscription->id;
         $this->name = $subscription->name ?? '';
@@ -267,7 +267,7 @@ class SubscriptionManager extends Component
     {
         $this->authorizeAction('toggle');
 
-        $subscription = WebhookSubscription::query()->findOrFail($id);
+        $subscription = WebhookSubscription::model()::query()->findOrFail($id);
 
         $subscription->is_active
             ? Webhooks::disable($subscription)
@@ -286,7 +286,7 @@ class SubscriptionManager extends Component
     {
         $this->authorizeAction('rotate');
 
-        $subscription = WebhookSubscription::query()->findOrFail($id);
+        $subscription = WebhookSubscription::model()::query()->findOrFail($id);
 
         $this->newSecret = Webhooks::rotateSecret($subscription);
         $this->rotated = true;
@@ -306,7 +306,7 @@ class SubscriptionManager extends Component
     {
         $this->authorizeAction('delete');
 
-        Webhooks::unsubscribe(WebhookSubscription::query()->findOrFail($id));
+        Webhooks::unsubscribe(WebhookSubscription::model()::query()->findOrFail($id));
 
         // The list and the form share one screen, so deleting the row that is open for
         // editing is an ordinary thing to do. Leaving the id standing would make every
@@ -361,7 +361,7 @@ class SubscriptionManager extends Component
         // The (int) cast cannot fail: editingId is a typed ?int and the null case cannot reach
         // here, because update() is only called with one open. It is kept as the boundary that
         // makes the argument an int rather than a nullable one.
-        $subscription = WebhookSubscription::query()->findOrFail((int) $this->editingId);
+        $subscription = WebhookSubscription::model()::query()->findOrFail((int) $this->editingId);
 
         try {
             // Re-vet the (possibly changed) destination before repointing the endpoint.
@@ -410,7 +410,7 @@ class SubscriptionManager extends Component
             return [];
         }
 
-        $subscription = WebhookSubscription::query()->find($this->editingId);
+        $subscription = WebhookSubscription::model()::query()->find($this->editingId);
 
         if ($subscription instanceof WebhookSubscription) {
             // Through the accessor, not the raw column: what the row holds is spread into
@@ -474,7 +474,7 @@ class SubscriptionManager extends Component
             // paginated read is several queries: where two rows tie, the database may order them
             // differently per query, so a reader sees one endpoint twice and another never, on the
             // same screen whose whole point is that the list outgrows a page.
-            'subscriptions' => WebhookSubscription::query()->latest()->orderByDesc('id')->simplePaginate(25),
+            'subscriptions' => WebhookSubscription::model()::query()->latest()->orderByDesc('id')->simplePaginate(25),
             // The catalog, plus anything the OPENED ROW already holds that the catalog no
             // longer declares. Without the second half the stale value has no checkbox, so
             // it can be neither kept nor dropped — Livewire's checkbox binding only ever
