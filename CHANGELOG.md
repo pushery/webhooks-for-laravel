@@ -4,6 +4,12 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.10.1] - 2026-09-24
+
+### Fixed
+
+- **Recompute all on the health board asks the same permission as recomputing one endpoint.** A single row's recompute refused a reader the endpoint policy denies `update`, while recomputing every row did not ask at all, so that reader could recompute the whole board but not one row of it. The board now asks `update` of every row before it recomputes any, a refused pass changes no row and spends nothing of the recompute limit, and a reader who may only look at the board can do neither. A host whose roles hold `update` on their own endpoints sees no change.
+
 ## [3.10.0] - 2026-09-22
 
 ### Added
@@ -3188,7 +3194,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.10.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.10.1...HEAD
+[3.10.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.10.0...v3.10.1
 [3.10.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.9.0...v3.10.0
 [3.9.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.8.0...v3.9.0
 [3.8.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.7.0...v3.8.0

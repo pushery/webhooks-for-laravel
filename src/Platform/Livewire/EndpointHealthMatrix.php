@@ -111,10 +111,21 @@ final class EndpointHealthMatrix extends Component
 
     /**
      * Recompute every endpoint the tenant owns in one pass. Scoped, so it can only ever
-     * touch the acting tenant's own endpoints.
+     * touch the acting tenant's own endpoints, and authorized row by row against the same
+     * policy as a single recompute, before any row is recomputed.
      */
     public function recomputeAll(): void
     {
+        $rows = $this->boardQuery()->get();
+
+        // The question recompute() asks of one row, asked of every row this pass would touch. A
+        // reader the policy refuses an update was refused one row and could still recompute them
+        // all. Asked before anything else, so a refused pass changes no row and spends nothing
+        // of the brake below.
+        foreach ($rows as $subscription) {
+            $this->authorize('update', $subscription);
+        }
+
         // The brake the other three tenant actions have had all along. This one is the most
         // expensive of them by a wide margin — two queries per endpoint, synchronously, in the
         // web request — and it was the one with nothing in front of it. The button is only
@@ -127,7 +138,7 @@ final class EndpointHealthMatrix extends Component
 
         $this->message = '';
 
-        foreach ($this->boardQuery()->get() as $subscription) {
+        foreach ($rows as $subscription) {
             $this->refreshRow($subscription);
         }
 
