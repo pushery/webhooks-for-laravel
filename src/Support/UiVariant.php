@@ -30,7 +30,7 @@ final class UiVariant
     /**
      * The view name for one of the two operator components.
      *
-     * The two components are the whole set, and naming them is what lets the analyser see the
+     * The two components are the whole set, and naming them is what lets the analyzer see the
      * result as a view name. The return is a `@phpstan-return` rather than a `@return` because
      * Rector does not know Larastan's pseudo-type and removes a `@return` it cannot read.
      *

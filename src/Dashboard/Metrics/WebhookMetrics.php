@@ -152,7 +152,7 @@ final readonly class WebhookMetrics
      * has not.
      *
      * The dashboard shows two kinds of number on one screen, and only one of them can go stale. The
-     * counts are summed from the materialised rollup, which only `webhooks:refresh-metrics`
+     * counts are summed from the materialized rollup, which only `webhooks:refresh-metrics`
      * advances; the latency percentiles and the endpoint counts are computed live. Let the refresh
      * stop — a crashed cron, a mutex left behind by a hard kill, a thrown exception — and frozen
      * delivery counts sit next to current percentiles that make them look plausible. Nothing on the
