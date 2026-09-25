@@ -1259,6 +1259,18 @@ return [
     | ignored rather than denying — a half-written map must not become a console that
     | refuses everything, which is the failure this seam exists to end.
     |
+    | 'view' is the one entry the map answers for READING, and only by name: neither '*' nor
+    | 'ability' reaches it, because both were only ever asked about actions and a host may hold
+    | operators who read and never act. Named, the console asks it on EVERY request, the first
+    | render and each filter, page turn and refresh after it, so a reader whose capability was
+    | revoked is refused on the next one instead of reading on in the open tab:
+    |
+    |     'abilities' => ['view' => 'view webhooks', '*' => 'manage webhooks'],
+    |
+    | Your page gate cannot do that unless Livewire re-applies it. Only persistent middleware runs
+    | on Livewire's own endpoint, which by default means `auth` and `can:`. Gate the page with
+    | `can:`, or register your own middleware with Livewire::addPersistentMiddleware().
+    |
     | Both keys may be set: the map answers where it names an action (or has '*'), and
     | 'ability' answers everywhere else, with its argument and its behavior unchanged.
     |

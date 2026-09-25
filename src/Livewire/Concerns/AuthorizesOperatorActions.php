@@ -77,6 +77,39 @@ use Illuminate\Support\Facades\Gate;
 trait AuthorizesOperatorActions
 {
     /**
+     * Check reading on EVERY request, where the host named an ability for it.
+     *
+     * Livewire runs a trait's boot hook on the first render and on every update after it, so this is the
+     * one place that sees a filter, a page turn and a refresh as well as an action. It asks only when
+     * webhooks.admin.abilities names `view` itself. Neither the catch-all nor the single-ability key
+     * reaches it: both were only ever asked about actions, and a host whose gate answers per action can
+     * hold operators who read and never act. Asked through either of them, those operators would lose the
+     * console on the day the host upgraded.
+     *
+     * Why a host names it: Livewire re-applies only PERSISTENT middleware on its own endpoint, and by
+     * default that is `Authenticate` and `Authorize` (`can:`). A page guarded by a middleware of the host's
+     * own is guarded at its first render and no longer after it, so a reader whose capability was revoked
+     * keeps reading every tenant's deliveries in the open tab. `can:` on the route, or the host's middleware
+     * registered with `Livewire::addPersistentMiddleware()`, closes that at the page; this closes it in the
+     * component.
+     */
+    public function bootAuthorizesOperatorActions(): void
+    {
+        $map = Config::get('webhooks.admin.abilities');
+        $ability = is_array($map) ? ($map['view'] ?? null) : null;
+
+        if (! is_string($ability) || $ability === '') {
+            return;
+        }
+
+        try {
+            $this->authorize($ability);
+        } catch (AuthorizationException $exception) {
+            $this->refuseAction($exception);
+        }
+    }
+
+    /**
      * Assert that the current user may take one operator action, named by the action.
      *
      * The map wins when it names this action, and an ability that comes from it is
