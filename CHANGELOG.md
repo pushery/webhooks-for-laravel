@@ -4,6 +4,12 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.12.0] - 2026-09-25
+
+### Added
+
+- **The operator console can check reading on every request.** Name `view` in `webhooks.admin.abilities` and both components ask it at the first render and on every filter, page turn and refresh after it, so an operator whose capability was revoked is refused on the next request instead of going on reading every tenant's deliveries in the open tab. Neither `*` nor `webhooks.admin.ability` covers reading, so nothing changes for a host that names no `view`. The operator console page now says that a page gate reaches Livewire's own endpoint only as persistent middleware, which `can:` is and a middleware of your own is not until you register it.
+
 ## [3.11.0] - 2026-09-25
 
 ### Added
@@ -3201,7 +3207,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.11.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.12.0...HEAD
+[3.12.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.11.0...v3.12.0
 [3.11.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.10.1...v3.11.0
 [3.10.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.10.0...v3.10.1
 [3.10.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.9.0...v3.10.0
