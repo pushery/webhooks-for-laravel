@@ -14,7 +14,7 @@ use JsonException;
  *
  * Signing the exact bytes you send is already correct without this; it exists
  * only for producers who additionally want an order-independent body (e.g. to
- * match a receiver that re-canonicalises). It is never applied automatically.
+ * match a receiver that re-canonicalizes). It is never applied automatically.
  *
  * @internal
  */
