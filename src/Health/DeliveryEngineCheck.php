@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Config;
 use Pushery\Webhooks\Database\Dialect\Sql\ConditionalCount;
 use Pushery\Webhooks\Enums\DeliveryStatus;
 use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Platform\Health\HealthStatus;
 use Pushery\Webhooks\Support\LocalizedNumber;
 use Pushery\Webhooks\Support\Timestamp;
 use Pushery\Webhooks\Support\WebhookConnection;
@@ -59,6 +60,10 @@ final class DeliveryEngineCheck extends Check
     private ?int $pendingLimitMinutes = null;
 
     private ?int $retryLimitMinutes = null;
+
+    private ?int $stallLookBackHours = null;
+
+    private bool $warnOnFailingEndpoints = false;
 
     /**
      * How far back the check looks, in hours. 24 by default.
@@ -167,6 +172,35 @@ final class DeliveryEngineCheck extends Check
         return $this;
     }
 
+    /**
+     * How far back the two limits above look for a delivery that is still waiting, in hours, counted
+     * back from the limit. One window by default.
+     *
+     * A worker that stopped leaves its last deliveries waiting, and once no new ones arrive they age
+     * out of a look-back of one window: the check turns green over a jam nobody cleared. A longer
+     * look-back keeps reporting it, at the cost of reading further back into the delivery log.
+     */
+    public function lookForStallsBack(int $hours): self
+    {
+        $this->stallLookBackHours = max(1, $hours);
+
+        return $this;
+    }
+
+    /**
+     * Warn while an endpoint that is switched on has a failing health score. Off by default.
+     *
+     * One endpoint that fails while the others deliver keeps the rate of the whole engine low, so the
+     * rate does not see it, and the circuit breaker, where it is on, switches it off without a warning
+     * beforehand. The score is written by endpoint health scoring, so this needs that switched on.
+     */
+    public function warnWhileAnEndpointIsFailing(): self
+    {
+        $this->warnOnFailingEndpoints = true;
+
+        return $this;
+    }
+
     public function run(): Result
     {
         $result = Result::make();
@@ -185,6 +219,7 @@ final class DeliveryEngineCheck extends Check
         $stalledPending = $this->pendingLimitMinutes === null ? null : $this->stalledPending($this->pendingLimitMinutes);
         $overdueRetries = $this->retryLimitMinutes === null ? null : $this->overdueRetries($this->retryLimitMinutes);
         $breakerDisabled = $this->warnOnlyAboutBreakerDisabledEndpoints ? $this->breakerDisabledEndpoints() : null;
+        $failing = $this->warnOnFailingEndpoints ? $this->failingEndpoints() : null;
 
         $settled = $counts['succeeded'] + $counts['failed'] + $counts['exhausted'];
         $rate = $settled > 0 ? round(($counts['failed'] + $counts['exhausted']) / $settled * 100, 1) : null;
@@ -201,6 +236,7 @@ final class DeliveryEngineCheck extends Check
             ...($breakerDisabled === null ? [] : ['breaker_disabled_endpoints' => $breakerDisabled]),
             ...($stalledPending === null ? [] : ['stalled_pending' => $stalledPending]),
             ...($overdueRetries === null ? [] : ['overdue_retries' => $overdueRetries]),
+            ...($failing === null ? [] : ['failing_endpoints' => $failing]),
         ]);
 
         // A stopped engine outranks a failure rate: it produces no outcomes, so no rate reports it.
@@ -254,6 +290,16 @@ final class DeliveryEngineCheck extends Check
             return $result->shortSummary($disabled === 1 ? '1 endpoint off' : $disabled.' endpoints off')->warning(
                 $this->disabledEndpointRemedy === null ? $message : $message.' '.$this->disabledEndpointRemedy,
             );
+        }
+
+        // After the switched-off endpoints: one that is off already receives nothing, one that is
+        // failing still receives its deliveries.
+        if ($failing !== null && $failing > 0) {
+            $message = $failing === 1
+                ? 'One webhook endpoint that is switched on has a failing health score.'
+                : sprintf('%d webhook endpoints that are switched on have a failing health score.', $failing);
+
+            return $result->shortSummary($failing === 1 ? '1 endpoint failing' : $failing.' endpoints failing')->warning($message);
         }
 
         return $result->shortSummary($rate === null ? 'No deliveries' : $this->percent($rate).'% failed')->ok();
@@ -357,8 +403,9 @@ final class DeliveryEngineCheck extends Check
     }
 
     /**
-     * The creation times a delivery older than the limit can have: one window's worth, ending at the
-     * limit, each bound written for the engine that holds the table.
+     * The creation times a delivery older than the limit can have: one look-back's worth, ending at
+     * the limit, each bound written for the engine that holds the table. The look-back is one window
+     * unless a host asked for a longer one.
      *
      * @return array{string, string}
      */
@@ -368,7 +415,7 @@ final class DeliveryEngineCheck extends Check
         $until = now()->subMinutes($limitMinutes);
 
         return [
-            Timestamp::forDialect($dialect, $until->copy()->subHours($this->windowHours)),
+            Timestamp::forDialect($dialect, $until->copy()->subHours($this->stallLookBackHours ?? $this->windowHours)),
             Timestamp::forDialect($dialect, $until),
         ];
     }
@@ -387,6 +434,19 @@ final class DeliveryEngineCheck extends Check
 
         return WebhookSubscription::model()::hydrate($rows)
             ->filter(static fn (WebhookSubscription $subscription): bool => $subscription->wasAutoDisabled())
+            ->count();
+    }
+
+    /**
+     * Endpoints that are switched on and whose cached health status is failing. Endpoint health
+     * scoring writes the status, and an endpoint it never scored has none, so it is not counted.
+     */
+    private function failingEndpoints(): int
+    {
+        return WebhookConnection::db()->table('webhook_subscriptions')
+            ->where('is_active', true)
+            ->whereNull('disabled_at')
+            ->where('health_status', HealthStatus::Failing->value)
             ->count();
     }
 

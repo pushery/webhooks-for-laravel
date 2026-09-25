@@ -44,7 +44,7 @@ final class HttpTransport
             ->withMiddleware(TransportExceptionNormalizer::wrap(...))
             ->withHeaders($headers)
             ->withBody($rawBody, $options->contentType)
-            // Uppercased here, at the wire, and nowhere else. The package canonicalises every verb
+            // Uppercased here, at the wire, and nowhere else. The package canonicalizes every verb
             // to lowercase on the way in — PendingWebhook::useHttpVerb(), Settings::httpVerb(), the
             // config default — because that is the form it stores and displays. RFC 9110 methods
             // are case-sensitive, so lowercase is not a spelling of the method, it is a different
