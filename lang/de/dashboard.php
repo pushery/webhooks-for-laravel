@@ -55,6 +55,7 @@ return [
     'latency' => [
         'title' => 'Latenz (ms)',
         'p95_trend' => 'P95-Verlauf',
+        'trend_per_tenant' => 'Den stündlichen P95-Verlauf gibt es nur für einen einzelnen Mandanten. Über alle Mandanten hinweg hat eine Stunde kein einzelnes P95.',
     ],
 
     'top_events' => [
@@ -158,6 +159,7 @@ return [
     'toast' => [
         'redelivery_queued' => 'Erneute Zustellung eingereiht.',
         'endpoint_disabled' => 'Dieser Endpunkt ist deaktiviert. Aktiviere ihn wieder, bevor du eine Zustellung erneut sendest.',
+        'replay_throttled' => 'Du hast gerade viel erneut gesendet. Warte eine Minute und versuch es noch einmal.',
     ],
 
     // Beschriftungen, die nur eine Vorlesesoftware ankündigt. Ein nicht übersetzter

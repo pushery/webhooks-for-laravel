@@ -55,6 +55,7 @@ return [
     'latency' => [
         'title' => 'Latencia (ms)',
         'p95_trend' => 'Tendencia P95',
+        'trend_per_tenant' => 'La tendencia P95 por hora solo se muestra para un inquilino a la vez. Entre varios inquilinos, una hora no tiene un único P95.',
     ],
 
     'top_events' => [
@@ -168,6 +169,7 @@ return [
     'toast' => [
         'redelivery_queued' => 'Reenvío añadido a la cola.',
         'endpoint_disabled' => 'Este endpoint está desactivado. Vuelve a activarlo antes de reenviarle una entrega.',
+        'replay_throttled' => 'Has reenviado mucho en poco tiempo. Espera un minuto e inténtalo otra vez.',
     ],
 
     // Strings a reader never sees but a screen reader always announces. An

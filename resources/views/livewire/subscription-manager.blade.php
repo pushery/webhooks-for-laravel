@@ -86,7 +86,7 @@
 
                  An input fixes the selection rather than the copying: focus it and Ctrl/Cmd-A
                  selects the FIELD instead of the page, and the value comes back as one string
-                 with no wrap artefacts. It is also reachable by keyboard, which a <code> is not.
+                 with no wrap artifacts. It is also reachable by keyboard, which a <code> is not.
 
                  And it carries no `onfocus="this.select()"`, which is the obvious addition and the
                  one this package must not make. An inline handler is script under `script-src

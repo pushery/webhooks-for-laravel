@@ -102,6 +102,11 @@ final class DeclarativePayloadTransformer implements PayloadTransformer
      * there is no trace to find afterwards. Refusing leaves the field where it was, which is
      * the outcome a reader can see and correct.
      *
+     * A target that is itself a source is free only while its own rename goes ahead. So the
+     * refusals are settled together rather than rule by rule: in `['a' => 'b', 'b' => 'c']`
+     * over a payload that already carries `c`, refusing `b` keeps `b` where it is, and that
+     * refuses `a` in turn.
+     *
      * @param  array<array-key, mixed>  $payload
      * @return array<array-key, mixed>
      */
@@ -112,7 +117,6 @@ final class DeclarativePayloadTransformer implements PayloadTransformer
         }
 
         $moved = [];
-        $taken = [];
 
         foreach ($map as $from => $to) {
             if (! is_string($to) || $to === '') {
@@ -122,23 +126,33 @@ final class DeclarativePayloadTransformer implements PayloadTransformer
                 continue;
             }
 
-            // The target is occupied by something this rename would destroy: a key the payload
-            // still carries and is not itself being moved away, or a target a previous rename
-            // already claimed.
-            $occupied = array_key_exists($to, $taken)
-                || (array_key_exists($to, $payload) && ! array_key_exists($to, $map));
-
-            if ($occupied) {
-                continue;
-            }
-
-            // Neither of these two lines can be told apart from its obvious alternative, and
-            // both stay for the declared types rather than for the behavior. PHP normalizes a
-            // numeric string key to an int, so casting $from or not produces the same key --
-            // and $taken is read with array_key_exists(), which does not look at the value.
+            // The cast stays for the declared types rather than for the behavior: PHP normalizes
+            // a numeric string key to an int, so casting $from or not produces the same key.
             $moved[(string) $from] = $to;
-            $taken[$to] = true;
         }
+
+        // Settle the refusals until nothing changes. A target is occupied by something this
+        // rename would destroy: a key the payload carries that is not itself moving away under a
+        // rename still accepted, or a target an earlier accepted rename already claimed. Each
+        // pass only ever removes renames, so it ends.
+        do {
+            $refused = false;
+            $taken = [];
+
+            foreach ($moved as $from => $to) {
+                $occupied = array_key_exists($to, $taken)
+                    || (array_key_exists($to, $payload) && ! array_key_exists($to, $moved));
+
+                if ($occupied) {
+                    unset($moved[$from]);
+                    $refused = true;
+
+                    continue;
+                }
+
+                $taken[$to] = true;
+            }
+        } while ($refused);
 
         // The renamed fields are APPENDED, in the map's order, and the rest keep their places.
         // That is what the previous implementation produced for every input it got right, so

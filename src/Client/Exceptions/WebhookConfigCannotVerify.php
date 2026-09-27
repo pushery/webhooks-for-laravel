@@ -69,6 +69,25 @@ final class WebhookConfigCannotVerify extends InvalidArgumentException
     }
 
     /**
+     * The keys are public, and the configured scheme would use them as a shared secret.
+     *
+     * A 'jwks' document and a `whpk_` token carry Ed25519 public keys, which anyone can read.
+     * Ed25519 verifies a signature with such a key; every other scheme computes an HMAC with it,
+     * and an HMAC under a key everyone knows is a signature everyone can produce. An entry that
+     * names no scheme gets Ed25519, so this refusal only meets an entry that names another one.
+     */
+    public static function publicKeyAsSharedSecret(string $name, int $status): self
+    {
+        return new self(
+            $name,
+            $status,
+            "The webhook client config [{$name}] verifies with a public key, from a 'jwks' url or a 'whpk_' "
+            .'token, under a scheme that uses it as a shared secret, so anyone who can read the key could '
+            ."sign a delivery it accepts. Set 'scheme' to Ed25519Scheme, or remove the 'scheme' key.",
+        );
+    }
+
+    /**
      * There is no entry of that name at all, which is the same fact carried further.
      *
      * The route does not vanish with the entry. It hangs on the macro, and the macro on

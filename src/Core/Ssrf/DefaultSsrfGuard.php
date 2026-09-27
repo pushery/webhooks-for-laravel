@@ -71,7 +71,11 @@ final readonly class DefaultSsrfGuard implements SsrfGuard
         // the two disagree, so an ordinary URL reaches curl exactly as its caller wrote it.
         $url = $this->canonicalize($url, $parts, $host);
 
-        if ($this->matchesHostList($host, $this->blockedHosts)) {
+        // A blocked NAME is matched as a name. A blocked ADDRESS is matched as an address, in
+        // whatever spelling the URL carries it (`[::ffff:93.184.216.34]` is 93.184.216.34), and
+        // again below against everything the host resolves to, which is where a decimal or hex
+        // spelling such as `1572395042` turns into the address it names.
+        if ($this->matchesHostList($host, $this->blockedHosts) || $this->isBlockedAddress($host)) {
             throw BlockedDestination::blockedHost($host);
         }
 
@@ -117,6 +121,10 @@ final readonly class DefaultSsrfGuard implements SsrfGuard
         }
 
         foreach ($ips as $ip) {
+            if ($this->isBlockedAddress($ip)) {
+                throw BlockedDestination::blockedHost($host);
+            }
+
             if ($this->classifier->isBlocked($ip)) {
                 throw BlockedDestination::privateAddress($host, $ip);
             }
@@ -161,6 +169,22 @@ final readonly class DefaultSsrfGuard implements SsrfGuard
             .($parts['path'] ?? '')
             .(isset($parts['query']) ? '?'.$parts['query'] : '')
             .(isset($parts['fragment']) ? '#'.$parts['fragment'] : '');
+    }
+
+    /**
+     * Whether an address is one the blocked-host list names as an address, compared in the
+     * classifier's canonical spelling on both sides. A name is never an address, and a list
+     * entry that is a name blocks that name only, which matchesHostList() answers.
+     */
+    private function isBlockedAddress(string $candidate): bool
+    {
+        $address = $this->classifier->canonical($candidate);
+
+        if ($address === null) {
+            return false;
+        }
+
+        return array_any($this->blockedHosts, fn (string $entry): bool => $this->classifier->canonical($entry) === $address);
     }
 
     /**

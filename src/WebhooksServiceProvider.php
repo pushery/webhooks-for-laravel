@@ -90,6 +90,15 @@ final class WebhooksServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->registerPublishing();
             $this->reportOwnerKeyDeclarationDriftAfterMigrating();
+
+            // Two commands serve a host without the Platform layer as much as one with it: a
+            // receive-only host that offloads inbound bodies reclaims them with the prune
+            // command, and a send-only host behind an egress proxy publishes its addresses with
+            // the other. Neither reads anything the Platform layer owns.
+            $this->commands([
+                PruneOrphanedPayloadsCommand::class,
+                EgressIpsCommand::class,
+            ]);
         }
 
         if (! $this->shouldBoot()) {
@@ -215,9 +224,7 @@ final class WebhooksServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 PartitionMaintenanceCommand::class,
-                PruneOrphanedPayloadsCommand::class,
                 AsyncApiCommand::class,
-                EgressIpsCommand::class,
                 RefreshEndpointHealthCommand::class,
                 RevokeRotatedSecretsCommand::class,
             ]);
@@ -307,10 +314,12 @@ final class WebhooksServiceProvider extends ServiceProvider
         //  - The two UI variants. `webhooks-ui` and `webhooks-ui-wirekit` write to the SAME
         //    destination on purpose — a host picks exactly one — so publishing both would
         //    resolve to whichever ran last. An umbrella that produces an order-dependent
-        //    result is worse than no umbrella.
+        //    result is worse than no umbrella. For the same reason `webhooks-views` leaves
+        //    both variants out: a published view always wins, so a neutral copy published with
+        //    everything else would hold a WireKit host's console at the neutral rendering.
         //
-        // `webhooks-views` already carries the whole resources/views tree, so the narrower
-        // dashboard and self-service view tags need no umbrella entry to be reachable.
+        // `webhooks-views` carries every other view directory, so the narrower dashboard and
+        // self-service view tags need no umbrella entry to be reachable.
         $this->publishes([
             __DIR__.'/../config/webhooks.php' => config_path('webhooks.php'),
         ], ['webhooks', 'webhooks-config']);
@@ -348,13 +357,34 @@ final class WebhooksServiceProvider extends ServiceProvider
         $this->publishesMigrations($this->migrationsIn('server'), 'webhooks-server-migrations');
         $this->publishesMigrations($this->migrationsIn('dashboard'), 'webhooks-dashboard-migrations');
 
-        $this->publishes([
-            __DIR__.'/../resources/views' => resource_path('views/vendor/webhooks'),
-        ], ['webhooks', 'webhooks-views']);
+        $this->publishes($this->sharedViews(), ['webhooks', 'webhooks-views']);
 
         $this->publishes([
             __DIR__.'/../lang' => lang_path('vendor/webhooks'),
         ], ['webhooks', 'webhooks-lang']);
+    }
+
+    /**
+     * Every entry of resources/views except the operator console's two variants, each mapped to
+     * its place under views/vendor/webhooks. The variants have tags of their own, and a host
+     * publishes at most one of them.
+     *
+     * @return array<string, string>
+     */
+    private function sharedViews(): array
+    {
+        $root = __DIR__.'/../resources/views';
+        $paths = [];
+
+        foreach (scandir($root) ?: [] as $entry) {
+            if (in_array($entry, ['.', '..', 'livewire', 'wirekit'], true)) {
+                continue;
+            }
+
+            $paths[$root.'/'.$entry] = resource_path('views/vendor/webhooks/'.$entry);
+        }
+
+        return $paths;
     }
 
     /**

@@ -59,18 +59,20 @@
                                 </x-wirekit::table.th>
                                 <x-wirekit::table.td class="hidden @[24rem]:table-cell">{{ $delivery->response_code ?? '—' }}</x-wirekit::table.td>
                                 <x-wirekit::table.td align="right">
-                                    {{-- Disabled while a replay is in flight, so a double-click cannot
-                                         enqueue the same delivery twice. wire:target names the method
-                                         explicitly: this panel polls, and a poll must never gray the
-                                         replay buttons out. --}}
-                                    <x-wirekit::button
-                                        size="sm"
-                                        surface="ghost"
-                                        wire:click="redeliver('{{ $delivery->id }}')"
-                                        wire:loading.attr="disabled"
-                                        wire:target="redeliver"
-                                        :aria-label="__('webhooks::dashboard.a11y.replay_delivery', ['label' => __('webhooks::dashboard.table.replay'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat(__('webhooks::dashboard.formats.precise'))])"
-                                    >{{ __('webhooks::dashboard.table.replay') }}</x-wirekit::button>
+                                    @can('redeliver', $delivery)
+                                        {{-- Disabled while a replay is in flight, so a double-click cannot
+                                             enqueue the same delivery twice. wire:target names the method
+                                             explicitly: this panel polls, and a poll must never gray the
+                                             replay buttons out. --}}
+                                        <x-wirekit::button
+                                            size="sm"
+                                            surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}"
+                                            wire:click="redeliver('{{ $delivery->id }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="redeliver"
+                                            :aria-label="__('webhooks::dashboard.a11y.replay_delivery', ['label' => __('webhooks::dashboard.table.replay'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat(__('webhooks::dashboard.formats.precise'))])"
+                                        >{{ __('webhooks::dashboard.table.replay') }}</x-wirekit::button>
+                                    @endcan
                                 </x-wirekit::table.td>
                             </x-wirekit::table.row>
                         @endforeach

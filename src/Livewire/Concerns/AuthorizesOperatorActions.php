@@ -247,9 +247,12 @@ trait AuthorizesOperatorActions
      * hold everything at one capability and lift `delete` to a stricter one without
      * enumerating the rest. The same precedence the client's `process` map uses, on purpose.
      *
-     * A non-string or empty entry falls through to the single-ability key rather than
-     * denying: a half-written map must not turn into a console that refuses everything,
-     * which is the failure mode this whole seam exists to end.
+     * An entry that is not a non-empty string is ignored, as if it were not there. An unusable
+     * exact entry leaves the action under '*', and an unusable '*' falls through to the
+     * single-ability key rather than denying: a half-written map must neither turn into a
+     * console that refuses everything, which is the failure mode this whole seam exists to
+     * end, nor lift the check the catch-all holds. An env-fed entry whose variable is missing
+     * is exactly such an entry, and it used to leave its action with no check at all.
      */
     private function mappedAbility(string $action): ?string
     {
@@ -259,12 +262,14 @@ trait AuthorizesOperatorActions
             return null;
         }
 
-        $ability = $map[$action] ?? $map['*'] ?? null;
+        foreach ([$action, '*'] as $key) {
+            $ability = $map[$key] ?? null;
 
-        if (! is_string($ability) || $ability === '') {
-            return null;
+            if (is_string($ability) && $ability !== '') {
+                return $ability;
+            }
         }
 
-        return $ability;
+        return null;
     }
 }

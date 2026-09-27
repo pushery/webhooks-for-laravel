@@ -15,7 +15,8 @@ use Pushery\Webhooks\Core\Ssrf\PinnedEndpoint;
  * keeps TLS verification on, and pins curl to the guard's vetted IPs (anti-rebind)
  * on a DIRECT connection — the pin does not reach through an egress proxy, which
  * resolves the host itself, so a proxied delivery relies on the operator's proxy to
- * enforce egress control. It applies separate connect/total timeouts, an optional
+ * enforce egress control. Without a configured egress proxy the connection IS direct:
+ * a proxy the worker's environment names is bypassed rather than inherited. It applies separate connect/total timeouts, an optional
  * egress proxy and mutual TLS, and captures the response up to a byte cap without ever
  * buffering an unbounded body: the response is neither decoded nor kept beyond the cap
  * ({@see CappedSink}), so a tenant-supplied endpoint cannot answer a delivery with a
@@ -127,9 +128,12 @@ final class HttpTransport
             'sink' => new CappedSink($options->responseCaptureBytes),
         ];
 
-        if ($options->proxy !== null) {
-            $guzzle['proxy'] = $options->proxy;
-        }
+        // An unset egress proxy has to be said, not left out. Without a proxy option the
+        // HTTP client falls back to the worker's environment (HTTPS_PROXY, and HTTP_PROXY on
+        // the command line a queue worker runs on), and that proxy resolves the host itself:
+        // the pin below would never reach the connection, and a proxy inside the network
+        // reaches what the guard refuses. A bypass that covers every host keeps it direct.
+        $guzzle['proxy'] = $options->proxy ?? ['no' => ['*']];
 
         if ($options->clientCert !== null) {
             $guzzle['cert'] = $options->clientCertPassphrase !== null

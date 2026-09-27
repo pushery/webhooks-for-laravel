@@ -77,6 +77,7 @@ return [
     'latency' => [
         'title' => 'Latency (ms)',
         'p95_trend' => 'P95 trend',
+        'trend_per_tenant' => 'The hourly P95 trend is shown for one tenant at a time. Across tenants, an hour has no single P95.',
     ],
 
     'top_events' => [
@@ -183,6 +184,7 @@ return [
     'toast' => [
         'redelivery_queued' => 'Redelivery queued.',
         'endpoint_disabled' => 'This endpoint is disabled. Re-enable it before replaying a delivery to it.',
+        'replay_throttled' => 'You have sent a lot of replays just now. Give it a minute and try again.',
     ],
 
     // Strings a reader never sees but a screen reader always announces. An

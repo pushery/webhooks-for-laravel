@@ -309,7 +309,8 @@ final class Settings
      *
      * Null and a non-positive value mean the same thing on purpose: a "limit" of zero
      * would refuse every ping, which is a way to break the feature by typo rather than a
-     * setting anyone wants. Switching the brake off is spelled null.
+     * setting anyone wants. Switching the brake off is spelled null. A digit string, as
+     * env() returns it, is the number it spells ({@see PerMinuteBrake}).
      *
      * The shipped default is repeated here rather than left to the merge, and only because
      * of what an ABSENT key costs: it reads as null, which switches the brake off entirely.
@@ -319,13 +320,7 @@ final class Settings
      */
     public function testPingPerMinute(): ?int
     {
-        $max = Config::get('webhooks.platform.test_ping.max_per_minute', 5);
-
-        if (is_int($max) && $max > 0) {
-            return $max;
-        }
-
-        return null;
+        return PerMinuteBrake::read(Config::get('webhooks.platform.test_ping.max_per_minute', 5), 5);
     }
 
     /**

@@ -6,7 +6,7 @@ namespace Pushery\Webhooks\Database;
 
 use Illuminate\Database\MySqlConnection;
 use Illuminate\Support\Facades\DB;
-use PDO;
+use Pdo\Mysql as PdoMysql;
 use RuntimeException;
 
 /**
@@ -29,7 +29,7 @@ use RuntimeException;
  *    supported floor.)
  *  - Strict SQL mode must be on, or an over-long webhook body is silently truncated and its
  *    stored SHA-256 no longer matches the bytes.
- *  - PDO::MYSQL_ATTR_FOUND_ROWS must be off, or an upsert reports a matched row as affected
+ *  - Pdo\Mysql::ATTR_FOUND_ROWS must be off, or an upsert reports a matched row as affected
  *    and the inbound de-duplication dispatches a duplicate for every producer retry.
  *
  * Part of the supported public API: published migrations call it, so a host's own copy would
@@ -103,9 +103,9 @@ final class DatabaseRequirement
         }
 
         if ($foundRows) {
-            return 'PDO::MYSQL_ATTR_FOUND_ROWS is enabled on the connection, which makes an upsert report a '
-                .'matched row as affected — the inbound de-duplication would then dispatch a duplicate for '
-                .'every producer retry. Remove that option from the connection.';
+            return 'Pdo\\Mysql::ATTR_FOUND_ROWS (formerly PDO::MYSQL_ATTR_FOUND_ROWS) is enabled on the connection, '
+                .'which makes an upsert report a matched row as affected — the inbound de-duplication would '
+                .'then dispatch a duplicate for every producer retry. Remove that option from the connection.';
         }
 
         return null;
@@ -151,6 +151,9 @@ final class DatabaseRequirement
         /** @var array<int|string, mixed> $options */
         $options = $connection->getConfig('options') ?? [];
 
-        return (bool) ($options[PDO::MYSQL_ATTR_FOUND_ROWS] ?? false);
+        // The driver class constant, not PDO::MYSQL_ATTR_FOUND_ROWS, which PHP 8.5 reports as
+        // deprecated on every read. Both carry the same value, so a host config that still
+        // writes the old name is read the same.
+        return (bool) ($options[PdoMysql::ATTR_FOUND_ROWS] ?? false);
     }
 }

@@ -10,6 +10,8 @@ use Pushery\Webhooks\Dashboard\Events\WebhookRedeliveryRequested;
 use Pushery\Webhooks\Dashboard\Metrics\WebhookMetrics;
 use Pushery\Webhooks\Dashboard\WindowResolver;
 use Pushery\Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Support\ReplayAllowance;
+use Pushery\Webhooks\Support\TenantIdentity;
 use RuntimeException;
 
 /**
@@ -25,6 +27,8 @@ use RuntimeException;
  */
 trait InteractsWithDashboard
 {
+    use AuthorizesDashboardReads;
+
     /**
      * The metrics query object for the acting tenant over the given window token.
      */
@@ -44,6 +48,10 @@ trait InteractsWithDashboard
      * A replay to a DISABLED endpoint is refused where the operator can see why: the
      * endpoint was switched off, by its tenant or by the circuit breaker, and replaying
      * into it would send data to somewhere that is meant to be receiving none.
+     *
+     * A tenant's replays spend the same allowance as in the self-service portal, so the two
+     * surfaces cannot be played against each other. The operator scopes act for no single
+     * tenant and spend nothing, like the operator console.
      */
     public function redeliver(string $deliveryId): void
     {
@@ -53,6 +61,14 @@ trait InteractsWithDashboard
 
         if (! $delivery->subscription->is_active) {
             $this->dispatch('wirekit-toast', variant: 'warning', message: __('webhooks::dashboard.toast.endpoint_disabled'));
+
+            return;
+        }
+
+        $tenant = DashboardScope::current()->tenant();
+
+        if ($tenant instanceof TenantIdentity && ! ReplayAllowance::spend($tenant)) {
+            $this->dispatch('wirekit-toast', variant: 'warning', message: __('webhooks::dashboard.toast.replay_throttled'));
 
             return;
         }

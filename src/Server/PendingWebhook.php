@@ -109,7 +109,8 @@ final class PendingWebhook
     /**
      * A call seeded with the engine's configured defaults — the signing dialect, the
      * HTTP verb, the timeouts, the try count, TLS verification, canonicalization, the
-     * Retry-After policy, the retry schedule and the egress proxy. Config is the
+     * Retry-After policy, the retry schedule, the egress proxy, and the queue and
+     * connection its job is pushed onto. Config is the
      * default for EVERY delivery; the builder below overrides it per call. Seeding
      * here (rather than only where the Platform layer fans out) is what makes a
      * host's webhooks.server settings hold for a directly-driven call too.
@@ -137,6 +138,8 @@ final class PendingWebhook
         $call->responseCaptureBytes = $config->responseCaptureBytes();
         $call->backoff = $config->backoffStrategy();
         $call->proxy = $config->egressProxy();
+        $call->queue = $config->queue();
+        $call->connection = $config->connection();
 
         // Asymmetric mode signs with the Server's OWN Ed25519 key, so the key travels
         // with the call from here; no per-endpoint shared secret is involved.

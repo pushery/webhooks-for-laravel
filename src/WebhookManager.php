@@ -6,9 +6,13 @@ namespace Pushery\Webhooks;
 
 use DateTimeInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -426,11 +430,12 @@ final readonly class WebhookManager
     }
 
     /**
-     * Refuse a test ping once the endpoint has had its allowance for the current minute.
+     * Refuse a test ping once the endpoint, or its destination, has had its allowance for
+     * the current minute.
      *
      * Refused, not deferred: a real event that arrives two minutes late still means what
      * it meant, while a test ping that does has already failed at the only thing it was
-     * for. The bucket is only hit once the ping is allowed through, so a refusal does not
+     * for. The buckets are only hit once the ping is allowed through, so a refusal does not
      * push the next opening further out — an over-eager caller stops making it worse for
      * itself the moment it stops.
      *
@@ -444,13 +449,43 @@ final readonly class WebhookManager
             return;
         }
 
-        $key = "webhooks:test-ping:{$subscription->id}";
+        $keys = $this->testPingKeys($subscription);
 
-        if (RateLimiter::tooManyAttempts($key, $max)) {
-            throw new TestPingThrottled($subscription, RateLimiter::availableIn($key));
+        foreach ($keys as $key) {
+            if (RateLimiter::tooManyAttempts($key, $max)) {
+                throw new TestPingThrottled($subscription, RateLimiter::availableIn($key));
+            }
         }
 
-        RateLimiter::hit($key, self::RATE_LIMIT_WINDOW);
+        foreach ($keys as $key) {
+            RateLimiter::hit($key, self::RATE_LIMIT_WINDOW);
+        }
+    }
+
+    /**
+     * The buckets one test ping spends: the endpoint's own, and one for its destination
+     * host within the endpoint's owner.
+     *
+     * An endpoint URL is not unique, so a bucket per endpoint alone let one owner multiply
+     * its pings to a single destination by registering that destination again and again.
+     * The destination bucket is kept per owner rather than across the installation: a
+     * receiver many tenants share must not be pinged dry for everyone by one of them. The
+     * key is hashed because it carries a morph type, whose backslashes some cache stores
+     * mangle.
+     *
+     * @return list<string>
+     */
+    private function testPingKeys(WebhookSubscription $subscription): array
+    {
+        $keys = ["webhooks:test-ping:{$subscription->id}"];
+        $host = parse_url((string) $subscription->url, PHP_URL_HOST);
+
+        if (is_string($host) && $host !== '') {
+            $owner = $subscription->owner_type.':'.$subscription->owner_id;
+            $keys[] = 'webhooks:test-ping:destination:'.hash('sha256', $owner.'|'.rtrim(strtolower($host), '.'));
+        }
+
+        return $keys;
     }
 
     /**
@@ -682,16 +717,15 @@ final readonly class WebhookManager
         // The scheme sets the webhook-id/timestamp/signature headers at send time.
         //
         // The engine's configured defaults — signing dialect, verb, timeouts, tries,
-        // TLS verification, canonicalization, retry schedule, Retry-After policy and
-        // the egress proxy — are already seeded by PendingWebhook::create(), so fan-out
-        // adds only what is specific to THIS event and endpoint.
+        // TLS verification, canonicalization, retry schedule, Retry-After policy, the
+        // egress proxy, and the queue and connection — are already seeded by
+        // PendingWebhook::create(), so fan-out adds only what is specific to THIS event
+        // and endpoint.
         $call = PendingWebhook::create()
             ->url($subscription->url)
             ->payload($envelope)
             ->useMessageId($eventId)
             ->forEventType($eventType)
-            ->onQueue($this->config->queue())
-            ->onConnection($this->config->connection())
             ->meta([
                 'delivery_id' => $delivery->id,
                 // The log is range-partitioned by created_at and its primary key is
@@ -751,12 +785,15 @@ final readonly class WebhookManager
      * How long THIS delivery must wait before it may be sent, in seconds — zero while
      * the endpoint is inside its allowance.
      *
-     * Over the allowance, the delivery is deferred rather than dropped: it waits out the
-     * current window, and each further over-limit delivery in the same window is pushed
-     * one window further, so a burst of a thousand events is spread across the following
-     * minutes at exactly max_per_minute instead of being thrown away. Dropping them —
-     * with no row, no event and no log line — leaves an operator with nothing to look at
-     * but a customer reporting a webhook that never arrived.
+     * Over the allowance, the delivery is deferred rather than dropped. The schedule is cut
+     * into one-minute windows from the first delivery to a quiet endpoint, and a delivery
+     * takes the earliest window that still has room. A window counts what is scheduled INTO
+     * it, not what arrives while it is current, so load that keeps coming faster than the
+     * allowance waits longer instead of raising the rate: no minute of the schedule carries
+     * more than max_per_minute, whether the excess came as one burst or keeps arriving. The
+     * windows start afresh once the last one scheduled has passed. Dropping the excess
+     * instead — with no row, no event and no log line — leaves an operator with nothing to
+     * look at but a customer reporting a webhook that never arrived.
      */
     private function rateLimitDelayFor(WebhookSubscription $subscription): int
     {
@@ -768,20 +805,57 @@ final readonly class WebhookManager
             return 0;
         }
 
-        $key = "webhooks:dispatch:{$subscription->id}";
         $limit = max(1, $this->config->rateLimitPerMinute());
+        $store = $this->throttleStore();
+        $key = "webhooks:dispatch:{$subscription->id}";
+        $now = Date::now()->getTimestamp();
 
-        // The bucket is hit for every delivery, over the limit or not, so the overflow
-        // keeps counting and each excess delivery lands in a later window than the last.
-        $hits = RateLimiter::hit($key, self::RATE_LIMIT_WINDOW);
+        // The first delivery to a quiet endpoint opens window zero. The anchor is then kept for as
+        // long as a window scheduled from it lies ahead, and the pointer names the first window that
+        // may still have room.
+        $store->add("{$key}:anchor", $now, self::RATE_LIMIT_WINDOW);
+        $anchor = $this->storedInt($store->get("{$key}:anchor"), $now);
+        $nextKey = "{$key}:{$anchor}:next";
+        $next = $this->storedInt($store->get($nextKey), 0);
+        $window = max(intdiv($now - $anchor, self::RATE_LIMIT_WINDOW), $next);
+        $taken = 0;
 
-        if ($hits <= $limit) {
-            return 0;
+        for (; ; $window++) {
+            $slot = "{$key}:{$anchor}:{$window}";
+            $store->add($slot, 0, $anchor + ($window + 1) * self::RATE_LIMIT_WINDOW - $now);
+            $taken = $this->storedInt($store->increment($slot), 0);
+
+            if ($taken <= $limit) {
+                break;
+            }
         }
 
-        $overflow = $hits - $limit;
+        $next = max($next, $taken >= $limit ? $window + 1 : $window);
+        $ttl = $anchor + ($next + 1) * self::RATE_LIMIT_WINDOW - $now;
+        $store->put("{$key}:anchor", $anchor, $ttl);
+        $store->put($nextKey, $next, $ttl);
 
-        return RateLimiter::availableIn($key) + intdiv($overflow - 1, $limit) * self::RATE_LIMIT_WINDOW;
+        return max(0, $anchor + $window * self::RATE_LIMIT_WINDOW - $now);
+    }
+
+    /**
+     * The store the dispatch schedule lives in: the limiter store, resolved the way Laravel's
+     * own RateLimiter resolves it, which is the default store unless a host names another.
+     */
+    private function throttleStore(): Repository
+    {
+        $store = Config::get('cache.limiter');
+
+        return Cache::store(is_string($store) ? $store : null);
+    }
+
+    /**
+     * A number read back from the cache. Some stores, Redis among them, hand a stored integer back
+     * as a string, so a type check alone would read a real value as missing.
+     */
+    private function storedInt(mixed $value, int $default): int
+    {
+        return is_numeric($value) ? (int) $value : $default;
     }
 
     /**

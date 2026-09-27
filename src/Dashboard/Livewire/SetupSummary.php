@@ -10,6 +10,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Lazy;
 use Livewire\Component;
 use Pushery\Webhooks\Dashboard\DashboardScope;
+use Pushery\Webhooks\Dashboard\Livewire\Concerns\AuthorizesDashboardReads;
 use Pushery\Webhooks\Models\WebhookSubscription;
 
 /**
@@ -26,6 +27,8 @@ use Pushery\Webhooks\Models\WebhookSubscription;
 #[Lazy(isolate: false)]
 final class SetupSummary extends Component
 {
+    use AuthorizesDashboardReads;
+
     /**
      * @return array{total: int, active: int, disabled: int}
      */
