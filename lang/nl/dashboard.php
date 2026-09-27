@@ -55,6 +55,7 @@ return [
     'latency' => [
         'title' => 'Latentie (ms)',
         'p95_trend' => 'P95-trend',
+        'trend_per_tenant' => 'De P95-trend per uur zie je voor één tenant tegelijk. Over meerdere tenants heeft een uur geen eenduidige P95.',
     ],
 
     'top_events' => [
@@ -161,6 +162,7 @@ return [
     'toast' => [
         'redelivery_queued' => 'Herlevering in de wachtrij geplaatst.',
         'endpoint_disabled' => 'Dit endpoint is uitgeschakeld. Schakel het weer in voordat je een levering opnieuw verstuurt.',
+        'replay_throttled' => 'Je hebt zojuist veel opnieuw verstuurd. Wacht een minuut en probeer het nog eens.',
     ],
 
     // Strings a reader never sees but a screen reader always announces. An

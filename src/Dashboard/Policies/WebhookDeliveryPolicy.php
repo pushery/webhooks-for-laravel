@@ -18,19 +18,27 @@ use Pushery\Webhooks\Models\WebhookDelivery;
  * host has defined a finer-grained 'webhooks.manage' ability — that ability passes.
  * With no such ability defined, tenant ownership alone authorizes, so the dashboard
  * is usable turnkey while a host can still tighten it.
+ *
+ * Across tenants that default is reversed. The ability that opens the cross-tenant scope
+ * is a READ ability, granted to support staff so they can see what was sent, and a replay
+ * sends it again to another customer's endpoint. So there 'webhooks.manage' must be
+ * defined and pass; left undefined, the replay is refused rather than inherited from the
+ * right to read.
  */
 final class WebhookDeliveryPolicy
 {
     public function redeliver(Authenticatable $user, WebhookDelivery $delivery): bool
     {
-        return DashboardScope::current()->includes($delivery->owner_type, $delivery->owner_id)
-            && $this->hasManageAbility($user);
+        $scope = DashboardScope::current();
+
+        return $scope->includes($delivery->owner_type, $delivery->owner_id)
+            && $this->hasManageAbility($user, $scope->coversAllTenants());
     }
 
-    private function hasManageAbility(Authenticatable $user): bool
+    private function hasManageAbility(Authenticatable $user, bool $acrossTenants): bool
     {
         if (! Gate::has('webhooks.manage')) {
-            return true;
+            return ! $acrossTenants;
         }
 
         return Gate::forUser($user)->allows('webhooks.manage');

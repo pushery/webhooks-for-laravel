@@ -60,7 +60,6 @@
         }
     },
     "suggest": {
-        "laravel/ai": "Required only to score evals with a real judge. Not a dev dependency: it requires aws/aws-sdk-php for a provider this package never calls, which is 67 MB and 3512 files in every checkout and every CI lane.",
         "laravel/pulse": "Enables the opt-in internal-ops delivery monitor (Pushery\\Webhooks\\Pulse\\WebhookPulseServiceProvider) — a Pulse recorder and card for throughput, failure rate and latency.",
         "laravel/scout": "Enables the opt-in searchable delivery and inbound-call logs (use the ready-made Pushery\\Webhooks\\Search\\SearchableWebhookDelivery / SearchableWebhookCall models — or apply the Pushery\\Webhooks\\Search\\SearchableDelivery / SearchableCall traits to your own — and set webhooks.search.enabled).",
         "livewire/livewire": "Required to render any UI this package ships: the observability dashboard, the self-service endpoint portal, and the optional management components (Pushery\\Webhooks\\WebhooksUiServiceProvider).",
@@ -69,7 +68,5 @@
         "blade-ui-kit/blade-heroicons": "The icon set of WireKit's default preset, which the shipped screens are drawn against unless you configured another one. On a lucide, phosphor or tabler preset, install that preset's set instead; this one is then not needed.",
         "spatie/laravel-health": "Runs `Pushery\\Webhooks\\Health\\DeliveryEngineCheck`, a health check over the delivery log: it fails above a failure rate and warns while an endpoint is switched off.",
         "symfony/yaml": "Enables `--format=yaml` on `webhooks:asyncapi`. The command defaults to JSON and reports a clear error when this package is absent, so it stays entirely optional."
-    },
-    "minimum-stability": "stable",
-    "prefer-stable": true
+    }
 }

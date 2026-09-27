@@ -15,6 +15,8 @@ use Pushery\Webhooks\Core\Ssrf\SsrfGuard;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Platform\Support\PortalRefusal;
 use Pushery\Webhooks\Platform\Support\SubscriptionScope;
+use Pushery\Webhooks\Support\PerMinuteBrake;
+use Pushery\Webhooks\Support\ReplayAllowance;
 use Pushery\Webhooks\Support\TenantIdentity;
 
 /**
@@ -193,7 +195,8 @@ trait InteractsWithEndpoints
      *
      * A non-positive value reads as no brake rather than as "none allowed": a limit of
      * zero would refuse every registration, which is a way to disable the portal by typo
-     * rather than a setting anyone wants.
+     * rather than a setting anyone wants. A digit string, as env() returns it, is the number
+     * it spells ({@see PerMinuteBrake}).
      *
      * The shipped default is repeated here for the same reason as the test-ping brake: an
      * absent key reads as null and switches the brake off, and a host on a config cache
@@ -202,13 +205,7 @@ trait InteractsWithEndpoints
      */
     protected function maxRegistrationsPerMinute(): ?int
     {
-        $max = Config::get('webhooks.platform.self_service.registrations_per_minute', 10);
-
-        if (is_int($max) && $max > 0) {
-            return $max;
-        }
-
-        return null;
+        return PerMinuteBrake::read(Config::get('webhooks.platform.self_service.registrations_per_minute', 10), 10);
     }
 
     /**
@@ -250,33 +247,12 @@ trait InteractsWithEndpoints
     /**
      * How many deliveries one tenant may replay per minute, or null for no brake.
      *
-     * This brake is not decoration, and it is the one thing the operator console's copy of
-     * the same action does not need. Replaying makes the SERVER issue an HTTP request to a
-     * URL the reader registered, on a SELF-SERVICE surface — so unbraked it is an amplifier
-     * one customer can point wherever they like simply by holding the button down. The SSRF
-     * guard decides WHERE a request may go; nothing else decides HOW MANY.
-     *
-     * A non-positive value reads as no brake rather than as "none allowed", the same way the
-     * registration brake does: a limit of zero would refuse every replay, which is a way to
-     * disable a feature by typo rather than a setting anyone wants. The shipped default is
-     * repeated here because an absent key reads as null and null switches the brake off, and
-     * a host on a config cache built before this version still has the old, trimmed layer —
-     * ConfigDefaultsAreInSyncTest holds the two numbers together.
+     * The allowance itself, with its reasons, is {@see ReplayAllowance}: the per-tenant dashboard
+     * spends the same budget, so the portal reads it from there rather than keeping a copy.
      */
     protected function maxReplaysPerMinute(): ?int
     {
-        $max = Config::get('webhooks.platform.self_service.replays_per_minute', 10);
-
-        // Two statements rather than one ternary, and that is a measured rule rather than a
-        // style: pcov credits the whole expression to every line it spans, so a one-line
-        // ternary counts as covered the first time EITHER arm runs — and the fallback can then
-        // go unexecuted for years under a green 100% floor. Its sibling above has the same
-        // shape for the same reason, and ConstantFallbackVisibilityTest holds both.
-        if (is_int($max) && $max > 0) {
-            return $max;
-        }
-
-        return null;
+        return ReplayAllowance::perMinute();
     }
 
     /**
@@ -287,22 +263,13 @@ trait InteractsWithEndpoints
      */
     protected function replayRateExceeded(): bool
     {
-        $max = $this->maxReplaysPerMinute();
         $owner = SubscriptionScope::currentOwner();
 
-        if ($max === null || ! $owner instanceof TenantIdentity) {
+        if (! $owner instanceof TenantIdentity) {
             return false;
         }
 
-        $key = $this->replayRateKey($owner);
-
-        if (RateLimiter::tooManyAttempts($key, $max)) {
-            return true;
-        }
-
-        RateLimiter::hit($key, self::REGISTRATION_RATE_WINDOW);
-
-        return false;
+        return ! ReplayAllowance::spend($owner);
     }
 
     /**
@@ -325,14 +292,7 @@ trait InteractsWithEndpoints
      */
     protected function maxRecomputesPerMinute(): ?int
     {
-        $max = Config::get('webhooks.platform.self_service.recomputes_per_minute', 2);
-
-        // Two statements rather than a ternary, for the coverage reason its siblings state.
-        if (is_int($max) && $max > 0) {
-            return $max;
-        }
-
-        return null;
+        return PerMinuteBrake::read(Config::get('webhooks.platform.self_service.recomputes_per_minute', 2), 2);
     }
 
     /**
@@ -379,7 +339,7 @@ trait InteractsWithEndpoints
      */
     protected function replayRateKey(TenantIdentity $owner): string
     {
-        return 'webhooks:delivery-replay-rate:'.str_replace('\\', '.', $owner->type).':'.$owner->id;
+        return ReplayAllowance::key($owner);
     }
 
     /**

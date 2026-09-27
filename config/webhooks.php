@@ -76,7 +76,11 @@ return [
         //                          cloud-metadata (169.254.169.254) destinations all
         //                          become reachable, and no IP is pinned. Leave true.
         //   blocked_hosts          The RESTRICTIVE list — a host named here is always
-        //                          refused. This is the one to add to.
+        //                          refused. This is the one to add to. An IP address
+        //                          here is refused however the URL spells it and
+        //                          whatever name resolves to it; a name here is refused
+        //                          as that name, and a different name for the same
+        //                          server is not.
         //   allowed_hosts          A DANGEROUS OPT-OUT, not an allowlist. A host named
         //                          here skips DNS resolution, skips the private /
         //                          loopback / metadata IP classification AND skips IP
@@ -320,7 +324,9 @@ return [
         // Shapes a single endpoint's traffic — it does not throw messages away. A
         // subscription over its per-minute allowance still gets its delivery-log row and
         // its delivery; the delivery is simply enqueued with a delay, so a burst is spread
-        // across the following minutes at max_per_minute instead of arriving at once. A
+        // across the following minutes at max_per_minute instead of arriving at once. Each
+        // minute of that schedule counts what is scheduled into it, so traffic that keeps
+        // arriving faster than the allowance waits longer rather than raising the rate. A
         // Pushery\Webhooks\Events\WebhookDeliveryRateLimited event fires for every delivery that
         // is deferred this way, so the shaping is visible rather than a silent gap.
         'rate_limit' => [
@@ -337,11 +343,15 @@ return [
         //
         // Counted per ENDPOINT rather than per account, because that is the bound the
         // destination cares about — how often IT is hit, not how many pings one account
-        // made across all of its endpoints. Over the allowance the ping is REFUSED
+        // made across all of its endpoints. And counted per destination host within the
+        // endpoint's owner as well, because endpoint URLs are not unique: without it, one
+        // owner could multiply its pings to one host by registering it again and again.
+        // Over the allowance the ping is REFUSED
         // (Pushery\Webhooks\Exceptions\TestPingThrottled), not deferred: a test send that arrives
         // two minutes later has already failed at the only thing it was for.
         //
-        // Set to null to remove the brake. On by default — a deliberate behavior change.
+        // Set to null to remove the brake. On by default — a deliberate behavior change. A
+        // value set through env() arrives as a digit string and is read as the number.
         'test_ping' => [
             'max_per_minute' => 5,
         ],
@@ -381,7 +391,8 @@ return [
         // The cap bounds how many it ends up with; this bounds how fast it gets there, which
         // is a different question and the one an automated client asks. Counted per tenant,
         // over attempts that reach the write path — validation and authorization run first,
-        // so a rejected form costs nothing against it. Set to null to remove the brake.
+        // so a rejected form costs nothing against it. Set to null to remove the brake. The
+        // brakes here read a digit string from env() as the number it spells.
         //
         // It is ON by default, and that is a deliberate behavior change: a host doing a bulk
         // import through the portal will meet it. Bulk registration belongs on the manager
@@ -551,6 +562,10 @@ return [
     | Standard Webhooks producer — including this package's own Server layer — out
     | of the box. Set 'scheme' => 'auto' to state that first-party intent
     | explicitly; it resolves to the same default scheme with no extra plumbing.
+    | An entry whose keys are public, a 'jwks' url or a whpk_ public key as its
+    | 'secret', defaults to Ed25519 instead, the one scheme that verifies with a
+    | public key. Naming any other scheme for such an entry is refused, because an
+    | HMAC under a key anyone can read is a signature anyone can make.
     |
     | An invalid signature responds with 'invalid_status' (401 by default), never
     | 500: a request that can never verify must not tell the sender to retry. A
@@ -660,6 +675,8 @@ return [
             //     // Asymmetric verification: set the scheme to Ed25519Scheme and supply
             //     // the producer's public key either as a static base64 'secret'
             //     // (whpk_… / raw base64), or via a JWKS endpoint of OKP/Ed25519 keys.
+            //     // A whpk_ secret or a 'jwks' url selects Ed25519 when 'scheme' is left
+            //     // out. A raw base64 key does not, so name the scheme for one.
             //     // The JWKS document is fetched through the SSRF guard and cached for
             //     // 'cache_ttl' seconds. 'kid' pins one key exactly; without it the FIRST TWO
             //     // keys of the document are tried, in the order the document publishes them.
@@ -861,6 +878,10 @@ return [
         // shows every customer's, behind an ability a per-tenant dashboard grants broadly. To
         // deliberately run with no second gate, define it as always-true — explicit and
         // greppable, unlike an absence.
+        //
+        // It opens READING only. Replaying a delivery in this mode sends it again to another
+        // customer's endpoint, so it needs the 'webhooks.manage' ability defined and granted;
+        // left undefined, the replay is refused here, where the per-tenant dashboard allows it.
         'all_tenants_ability' => env('WEBHOOKS_DASHBOARD_ALL_TENANTS_ABILITY', 'view-all-tenant-webhooks'),
         // The delivery BODY, which is a different permission level from the delivery log.
         // The drawer renders the stored request body, and in a real integration that body is
@@ -1079,8 +1100,8 @@ return [
         'csp_nonce' => null,
 
         // The WireKit surface every shipped screen draws its SECONDARY actions with -- the two
-        // operator screens and the self-service panels alike. 'ghost' is what they have always
-        // used, so leaving this alone changes nothing.
+        // operator screens, the self-service panels and the dashboard alike. 'ghost' is what
+        // they have always used, so leaving this alone changes nothing.
         //
         // It exists because a design system usually settles on one secondary style, and a
         // borderless untinted button next to a tinted one reads as a THIRD rank where there are
@@ -1256,8 +1277,10 @@ return [
     | '*' is the catch-all and the exact action wins over it, so you can hold the console
     | at one capability and lift just the destructive one. The actions are: create, edit,
     | toggle, rotate, delete, redeliver, ping. An entry that is not a non-empty string is
-    | ignored rather than denying — a half-written map must not become a console that
-    | refuses everything, which is the failure this seam exists to end.
+    | ignored, as if it were not there: an unusable exact entry leaves its action under '*',
+    | and an unusable '*' falls through to 'ability' rather than denying. A half-written map
+    | must not become a console that refuses everything, which is the failure this seam
+    | exists to end, and it must not lift the check '*' holds either.
     |
     | 'view' is the one entry the map answers for READING, and only by name: neither '*' nor
     | 'ability' reaches it, because both were only ever asked about actions and a host may hold

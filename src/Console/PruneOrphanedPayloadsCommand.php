@@ -78,11 +78,12 @@ final class PruneOrphanedPayloadsCommand extends Command
             $totalBytes += $result['bytes'];
 
             $this->line(sprintf(
-                '  %s: %d scanned, %d orphaned%s.',
+                '  %s: %d scanned, %d orphaned%s%s.',
                 $disk,
                 $result['scanned'],
                 $result['orphaned'],
                 $dryRun ? '' : sprintf(', %d deleted', $result['deleted']),
+                $result['foreign'] > 0 ? sprintf(', %d other file(s) under webhooks/ left alone', $result['foreign']) : '',
             ));
         }
 

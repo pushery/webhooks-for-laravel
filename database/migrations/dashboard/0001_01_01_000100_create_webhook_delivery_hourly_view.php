@@ -134,11 +134,19 @@ return new class extends Migration
         // so the column inherited the right thing here and the wrong thing everywhere else.
         // `webhooks:preflight` reads it from the live schema now, which is the check that does
         // not depend on how this file happens to be run.
+        //
+        // owner_id is the second column of that index, and under a uuid or ulid owner key it is a
+        // CHAR column that inherited the same way. It declares the same collation for the same
+        // reason; a bigint owner id has no collation to declare.
         $cs = 'utf8mb4_0900_as_cs';
 
         Schema::create('webhook_delivery_hourly', function (Blueprint $table) use ($cs, $ownerKeyType): void {
             $table->string('owner_type')->collation($cs)->default('');
-            $ownerKeyType->blueprintColumn($table, 'owner_id')->default($ownerKeyType->sentinelId());
+            $ownerId = $ownerKeyType->blueprintColumn($table, 'owner_id')->default($ownerKeyType->sentinelId());
+
+            if ($ownerKeyType !== OwnerKeyType::Bigint) {
+                $ownerId->collation($cs);
+            }
             $table->dateTime('bucket', 6);
             $table->unsignedBigInteger('total')->default(0);
             $table->unsignedBigInteger('delivered')->default(0);

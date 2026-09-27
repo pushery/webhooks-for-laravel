@@ -55,7 +55,10 @@ final class AddressClassifier
         // IPv6
         '::/128',             // unspecified
         '::1/128',            // loopback
-        '64:ff9b::/96',       // NAT64
+        '64:ff9b::/96',       // NAT64 well-known prefix (RFC 6052)
+        // The local-use NAT64 prefix embeds an IPv4 address the same way, and a network that
+        // translates on it connects `64:ff9b:1::a9fe:a9fe` to 169.254.169.254.
+        '64:ff9b:1::/48',     // NAT64 local-use prefix (RFC 8215)
         '100::/64',           // discard-only
         // The IPv6 transition prefixes, and the reason they are here is not tidiness.
         // 6to4 and Teredo EMBED an IPv4 address, and neither puts it in the low 32 bits —
@@ -64,10 +67,12 @@ final class AddressClassifier
         // 12-byte prefix. Blocking the whole prefix is the answer that does not depend on
         // enumerating every encoding.
         '2001::/32',          // Teredo (RFC 4380) — embeds the server's IPv4
+        '2001:2::/48',        // benchmarking (RFC 5180), the IPv6 twin of 198.18.0.0/15
         '2001:10::/28',       // ORCHID, expired (RFC 4843)
         '2001:20::/28',       // ORCHIDv2 (RFC 7343)
         '2001:db8::/32',      // documentation
         '2002::/16',          // 6to4 (RFC 3056) — embeds an IPv4 in bits 16-47
+        '3fff::/20',          // documentation (RFC 9637), the second block beside 2001:db8::/32
         'fc00::/7',           // ULA (incl. fd00:ec2::254 cloud metadata)
         'fe80::/10',          // link-local
         // Site-local. Deprecated in favor of ULA (RFC 3879), but private BY INTENT and
@@ -86,6 +91,27 @@ final class AddressClassifier
         }
 
         return array_any(self::BLOCKED_CIDRS, fn (string $cidr): bool => $this->inCidr($ip, $cidr));
+    }
+
+    /**
+     * The one spelling of an address, so two spellings of it compare equal: an IPv6 literal
+     * that embeds an IPv4 address unwraps to that address, and every IPv6 address takes its
+     * compressed form. Null for anything that is not an address, such as a host name.
+     */
+    public function canonical(string $address): ?string
+    {
+        $address = trim($address, '[]');
+
+        if (filter_var($address, FILTER_VALIDATE_IP) === false) {
+            return null;
+        }
+
+        // A validated address always packs and a packed address always prints, so neither
+        // false arm below can be taken: they answer the declared `string|false` returns.
+        $packed = inet_pton($this->unwrapMappedIp($address));
+        $text = $packed === false ? false : inet_ntop($packed);
+
+        return $text === false ? null : $text;
     }
 
     /**

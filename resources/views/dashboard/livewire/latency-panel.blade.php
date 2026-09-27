@@ -62,6 +62,10 @@
                     </div>
                     </div>
                 </div>
+            @elseif ($this->trendAcrossTenants)
+                <div class="wh-dash-latency-trend mt-[var(--space-wk-sm)]">
+                    <x-wirekit::text size="sm" intent="muted">{{ __('webhooks::dashboard.latency.trend_per_tenant') }}</x-wirekit::text>
+                </div>
             @endif
         </x-wirekit::card.body>
     </x-wirekit::card>

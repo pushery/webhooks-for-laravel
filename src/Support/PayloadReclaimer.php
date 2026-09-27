@@ -18,6 +18,10 @@ use Illuminate\Support\Facades\Storage;
  * webhook_deliveries (the delivery log) and webhook_calls (the inbound call log); the
  * standalone server-delivery log does not offload, so it is not consulted.
  *
+ * Only a key in the exact shape the package writes is a candidate. The prefix is a plain
+ * word a host can use on the same disk, so a file of any other shape under it is somebody
+ * else's: it is counted as foreign and never deleted.
+ *
  * The full set of still-referenced object keys for the disk is read once, then the disk is
  * walked and every key not in that set is deleted. It assumes offload writes are quiesced for
  * the run (schedule it off-peak): a body offloaded AFTER the reference set was read but BEFORE
@@ -30,6 +34,9 @@ final class PayloadReclaimer
 {
     /** Every offloaded object key is `webhooks/{ab}/{sha256}` (see PayloadStore::pathFor). */
     private const string PREFIX = 'webhooks';
+
+    /** That key exactly: the directory is the first two hex digits of the hash that follows it. */
+    private const string OBJECT_KEY = '#\Awebhooks/([0-9a-f]{2})/\1[0-9a-f]{62}\z#';
 
     /**
      * Rows per round trip while building the reference set.
@@ -44,13 +51,14 @@ final class PayloadReclaimer
      * Sweep one disk. Returns the tally; when $dryRun is true nothing is deleted but the
      * orphans (and the bytes they hold) are still counted, so an operator can preview the run.
      *
-     * @return array{scanned: int, orphaned: int, deleted: int, bytes: int}
+     * @return array{scanned: int, orphaned: int, deleted: int, bytes: int, foreign: int}
      */
     public function reclaim(string $disk, bool $dryRun): array
     {
         $filesystem = Storage::disk($disk);
         $referenced = $this->referencedPaths($disk);
 
+        $foreign = 0;
         $scanned = 0;
         $orphaned = 0;
         $deleted = 0;
@@ -63,6 +71,12 @@ final class PayloadReclaimer
         // stays because the guarantee it makes is a type guarantee, and the operations below are
         // typed for a string.
         foreach (array_filter($filesystem->allFiles(self::PREFIX), is_string(...)) as $path) {
+            if (preg_match(self::OBJECT_KEY, $path) !== 1) {
+                $foreign++;
+
+                continue;
+            }
+
             $scanned++;
 
             if (isset($referenced[$path])) {
@@ -78,7 +92,7 @@ final class PayloadReclaimer
             }
         }
 
-        return ['scanned' => $scanned, 'orphaned' => $orphaned, 'deleted' => $deleted, 'bytes' => $bytes];
+        return ['scanned' => $scanned, 'orphaned' => $orphaned, 'deleted' => $deleted, 'bytes' => $bytes, 'foreign' => $foreign];
     }
 
     /**

@@ -131,8 +131,13 @@ final readonly class WebhookMetrics
     }
 
     /**
-     * The hourly rollup rows in the window, oldest first — the stacked-activity
+     * The hourly rollup rows in the window, oldest first, one per hour: the stacked-activity
      * bars and the latency-trend line.
+     *
+     * The rollup keeps one row per owner and hour. Across tenants the counts of an hour are
+     * therefore summed, and its p50 and p95 are null: a percentile of per-tenant percentiles is
+     * not the percentile of the hour. The window percentiles are computed live and are right
+     * in every scope.
      *
      * @return Collection<int, stdClass>
      */
@@ -140,11 +145,19 @@ final readonly class WebhookMetrics
     {
         [$ownerSql, $ownerBindings] = $this->tenant->rollupCondition(WebhookConnection::dialect());
 
-        return $this->db()->table(self::HOURLY_VIEW)
+        $query = $this->db()->table(self::HOURLY_VIEW)
             ->whereRaw($ownerSql, $ownerBindings)
             ->where('bucket', '>=', $this->since())
-            ->orderBy('bucket')
-            ->get(['bucket', 'total', 'delivered', 'pending', 'failed', 'retried', 'p50', 'p95']);
+            ->orderBy('bucket');
+
+        if (! $this->tenant->coversAllTenants()) {
+            return $query->get(['bucket', 'total', 'delivered', 'pending', 'failed', 'retried', 'p50', 'p95']);
+        }
+
+        return $query->groupBy('bucket')
+            ->selectRaw('bucket, SUM(total) AS total, SUM(delivered) AS delivered, SUM(pending) AS pending, '
+                .'SUM(failed) AS failed, SUM(retried) AS retried, NULL AS p50, NULL AS p95')
+            ->get();
     }
 
     /**

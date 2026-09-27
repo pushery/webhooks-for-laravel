@@ -12,6 +12,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Pushery\Webhooks\Core\Http\Exceptions\BlockedDestination;
+use Pushery\Webhooks\Core\Http\Exceptions\HostUnresolvable;
 use Pushery\Webhooks\Core\Ssrf\SsrfGuard;
 use Pushery\Webhooks\Facades\Webhooks;
 use Pushery\Webhooks\Livewire\Concerns\AuthorizesOperatorActions;
@@ -338,10 +339,11 @@ class SubscriptionManager extends Component
     {
         try {
             $subscription = Webhooks::subscribe(null, $this->url, array_values($this->eventTypes), $this->name ?: null);
-        } catch (BlockedDestination) {
+        } catch (BlockedDestination|HostUnresolvable) {
             // The guard's own message stays out of the form: it is an operator
             // diagnostic for the log, and it would tell a stranger which hosts resolve
-            // where. The reader gets a translated sentence they can act on.
+            // where. The reader gets a translated sentence they can act on, the same one
+            // for a host that resolves to nothing, so the form cannot tell the two apart.
             $this->addError('url', __('webhooks::management.validation.url.blocked'));
 
             return;
@@ -369,7 +371,7 @@ class SubscriptionManager extends Component
             // registration: register a public URL, then quietly move the row to an
             // internal one.
             Container::getInstance()->make(SsrfGuard::class)->resolveAndPin($this->url);
-        } catch (BlockedDestination) {
+        } catch (BlockedDestination|HostUnresolvable) {
             $this->addError('url', __('webhooks::management.validation.url.blocked'));
 
             return;

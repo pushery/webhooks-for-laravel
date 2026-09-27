@@ -753,7 +753,9 @@ final class WebhookConfig
             throw WebhookConfigCannotVerify::for($name, self::intOr($entry['invalid_status'] ?? null, 401));
         }
 
-        $scheme = self::resolveScheme($name, $entry['scheme'] ?? StandardWebhooksScheme::class);
+        // A 'jwks' document and a `whpk_` token hold public keys, and Ed25519 is the one scheme that
+        // verifies with a public key. An entry that names no scheme, or 'auto', gets that one.
+        $scheme = self::resolveScheme($name, $entry['scheme'] ?? 'auto', $jwks !== null || self::isPublicKeyToken($secret));
 
         // Non-empty is not the same as usable, and the branch above only knows the first. Standard
         // Webhooks derives its key by base64-decoding the secret, so a value with no base64
@@ -770,6 +772,14 @@ final class WebhookConfig
         }
 
         $previous = $entry['previous_secret'] ?? null;
+
+        // Every scheme other than Ed25519 uses its key material as a shared HMAC secret. Handed a
+        // public key, it verifies a signature that anyone who can read the key is able to compute,
+        // so an entry that names such a scheme for public keys is refused rather than built.
+        if ($verifier === null && ! is_a($scheme, Ed25519Scheme::class, true)
+            && ($jwks !== null || self::isPublicKeyToken($secret) || self::isPublicKeyToken($previous))) {
+            throw WebhookConfigCannotVerify::publicKeyAsSharedSecret($name, self::intOr($entry['invalid_status'] ?? null, 401));
+        }
 
         $headers = is_array($entry['signature_headers'] ?? null) ? $entry['signature_headers'] : [];
 
@@ -877,12 +887,15 @@ final class WebhookConfig
     }
 
     /**
+     * 'auto' resolves to the scheme the entry's key material can verify with: Ed25519 for
+     * public keys, Standard Webhooks for a shared secret.
+     *
      * @return class-string<SignatureScheme>
      */
-    private static function resolveScheme(string $name, mixed $scheme): string
+    private static function resolveScheme(string $name, mixed $scheme, bool $publicKeys): string
     {
         if ($scheme === 'auto') {
-            return StandardWebhooksScheme::class;
+            return $publicKeys ? Ed25519Scheme::class : StandardWebhooksScheme::class;
         }
 
         if (is_string($scheme) && is_a($scheme, SignatureScheme::class, true)) {
@@ -890,6 +903,15 @@ final class WebhookConfig
         }
 
         throw new InvalidArgumentException("The webhook client config [{$name}] has an invalid 'scheme'; expected 'auto' or a SignatureScheme class-string.");
+    }
+
+    /**
+     * Whether a configured secret is an Ed25519 public key in the `whpk_` form that
+     * `webhooks:ed25519-keygen` prints.
+     */
+    private static function isPublicKeyToken(mixed $secret): bool
+    {
+        return is_string($secret) && str_starts_with(ltrim($secret), Ed25519Scheme::PUBLIC_PREFIX);
     }
 
     /**

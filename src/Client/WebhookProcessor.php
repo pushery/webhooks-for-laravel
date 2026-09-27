@@ -29,6 +29,7 @@ use Pushery\Webhooks\Database\Dialect\Sql\DedupeInsert;
 use Pushery\Webhooks\Search\SearchIndexer;
 use Pushery\Webhooks\Support\Timestamp;
 use Pushery\Webhooks\Support\WebhookConnection;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
@@ -208,6 +209,12 @@ final readonly class WebhookProcessor
             // channel through the very check above.
             $this->countAgainstRateLimit();
 
+            // And marked, like a stored one, so a replay of the same delivery is answered by the
+            // fast path above instead of spending another token. Unmarked, one captured filtered
+            // delivery replayed inside the tolerance emptied the source's bucket, and the real
+            // producer's next deliveries were refused with 429.
+            $this->markSeen($fastPathDedupe, $webhookId);
+
             return $this->respond();
         }
 
@@ -287,6 +294,8 @@ final readonly class WebhookProcessor
         // round-trip.
         $this->markSeen($fastPathDedupe, $webhookId);
 
+        $this->indexForSearch($call);
+
         // And spend the token here rather than at the check, for the same reason: this is the
         // point at which the delivery is known to be new AND to have cost a row and a job. A
         // dispatch that threw took the row with it above and never reaches this line, so a queue
@@ -361,9 +370,9 @@ final readonly class WebhookProcessor
     }
 
     /**
-     * Arm the fast-path "seen" marker for a durably-stored id, held until the replay
-     * tolerance elapses (plus a buffer). A no-op when the source has no fast-path
-     * dedupe or the delivery carried no id.
+     * Arm the fast-path "seen" marker for a durably-stored id, or for a filtered one whose
+     * token is spent, held until the replay tolerance elapses (plus a buffer). A no-op when
+     * the source has no fast-path dedupe or the delivery carried no id.
      */
     private function markSeen(bool $fastPathDedupe, ?string $webhookId): void
     {
@@ -480,14 +489,41 @@ final readonly class WebhookProcessor
 
         $model = $this->config->model();
 
-        $call = new $model()->newQuery()->find($id);
+        // The insert has decided that the row is new, and this read must not decide it again: the
+        // caller takes a null for a duplicate, answers it 200 and never processes it. So the row is
+        // read from the write connection, which a replica without `sticky` cannot answer for, and
+        // past the configured model's global scopes, which can hide a row that exists.
+        $call = new $model()->newQueryWithoutScopes()->useWritePdo()->find($id);
 
-        // The row was written by a raw SQL upsert, which fires no Eloquent event, so Scout's
-        // observer never sees it. Index it explicitly — a no-op unless search is on and the
-        // configured model is a searchable one — so an external engine actually gets the call.
-        SearchIndexer::indexModel($call);
+        if (! $call instanceof WebhookCall) {
+            // Only a row removed between the insert and this read ends up here. It is taken out
+            // again and the request fails, so the producer's retry stores it anew instead of
+            // meeting it as a duplicate.
+            $this->db()->table(new $model()->getTable())->where('id', $id)->delete();
+
+            throw new RuntimeException("The inbound call [{$id}] was stored but could not be read back, so it was removed again for the producer's retry to store.");
+        }
 
         return $call;
+    }
+
+    /**
+     * Push the stored call into the search index.
+     *
+     * The row was written by a raw SQL upsert, which fires no Eloquent event, so Scout's observer
+     * never sees it and it is indexed explicitly: a no-op unless search is on and the configured
+     * model is a searchable one. It runs once the call is stored and queued, and a failure is
+     * reported rather than raised. The index is derived from the row and can be rebuilt; a 500
+     * here would send the producer's retry into the duplicate path, which answers it without
+     * processing anything.
+     */
+    private function indexForSearch(WebhookCall $call): void
+    {
+        try {
+            SearchIndexer::indexModel($call);
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 
     /**

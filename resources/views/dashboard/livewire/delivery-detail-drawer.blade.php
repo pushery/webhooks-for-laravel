@@ -65,7 +65,7 @@
             <div x-ref="panel" tabindex="-1" class="relative flex h-full w-full max-w-md flex-col overflow-y-auto bg-[var(--color-wk-bg-elevated)] p-[var(--padding-wk-x-lg)] shadow-[var(--shadow-wk-lg)]">
                 <div class="mb-[var(--space-wk-sm)] flex items-start justify-between gap-[var(--padding-wk-x-md)]">
                     <x-wirekit::heading :level="2" size="md">{{ $delivery->event_type }}</x-wirekit::heading>
-                    <x-wirekit::button size="sm" surface="ghost" wire:click="close" :aria-label="__('webhooks::dashboard.a11y.close_details')">{{ __('webhooks::dashboard.drawer.close') }}</x-wirekit::button>
+                    <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" wire:click="close" :aria-label="__('webhooks::dashboard.a11y.close_details')">{{ __('webhooks::dashboard.drawer.close') }}</x-wirekit::button>
                 </div>
 
 @php($intent = $delivery->status->intent())
@@ -138,16 +138,20 @@
                     >{{ $this->payloadJson }}</x-wirekit::code-block>
                 @endif
 
-                <div class="mt-[var(--space-wk-sm)]">
-                    {{-- Disabled while the replay is in flight, so a double-click cannot enqueue
-                         the same delivery twice. --}}
-                    <x-wirekit::button
-                        wire:click="redeliver('{{ $delivery->id }}')"
-                        wire:loading.attr="disabled"
-                        wire:target="redeliver"
-                        :aria-label="__('webhooks::dashboard.a11y.replay_delivery', ['label' => __('webhooks::dashboard.drawer.replay'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $zone($delivery->created_at)->settings($locale)->isoFormat(__('webhooks::dashboard.formats.precise'))])"
-                    >{{ __('webhooks::dashboard.drawer.replay') }}</x-wirekit::button>
-                </div>
+                {{-- Offered only where the delivery policy allows the replay; across tenants that
+                     takes the manage ability. --}}
+                @can('redeliver', $delivery)
+                    <div class="mt-[var(--space-wk-sm)]">
+                        {{-- Disabled while the replay is in flight, so a double-click cannot enqueue
+                             the same delivery twice. --}}
+                        <x-wirekit::button
+                            wire:click="redeliver('{{ $delivery->id }}')"
+                            wire:loading.attr="disabled"
+                            wire:target="redeliver"
+                            :aria-label="__('webhooks::dashboard.a11y.replay_delivery', ['label' => __('webhooks::dashboard.drawer.replay'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $zone($delivery->created_at)->settings($locale)->isoFormat(__('webhooks::dashboard.formats.precise'))])"
+                        >{{ __('webhooks::dashboard.drawer.replay') }}</x-wirekit::button>
+                    </div>
+                @endcan
             </div>
         </div>
     @endif

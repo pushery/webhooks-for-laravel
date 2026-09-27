@@ -104,6 +104,19 @@ final readonly class DashboardTenant
     }
 
     /**
+     * The tenant a per-tenant scope acts for, or null for the operator scopes, which observe
+     * many tenants or none and act on no single tenant's behalf.
+     */
+    public function tenant(): ?TenantIdentity
+    {
+        if ($this->kind === DashboardScopeKind::Tenant) {
+            return $this->identity;
+        }
+
+        return null;
+    }
+
+    /**
      * The owner-scoping SQL fragment and its bindings against the RAW delivery/subscription
      * tables, to `whereRaw()` onto any builder or splice into a raw query. There a global
      * owner is genuinely NULL on both columns, so global mode is `IS NULL` (no bindings);
@@ -179,8 +192,9 @@ final readonly class DashboardTenant
         }
 
         // All-tenants covers every row by definition, so the per-row guard admits them all.
-        // The ACTION behind that guard is still gated separately (the delivery policy also
-        // requires the manage ability) — this says what the scope can SEE, not what it may do.
+        // The ACTION behind that guard is gated separately: in this scope the delivery policy
+        // requires the manage ability to be defined AND granted, because the ability that
+        // opened the scope only reads. This says what the scope can SEE, not what it may do.
         // The untenanted scope covers nothing, so the per-row guard admits nothing. Reaching the
         // owner-less test below it would make an untenanted reader see exactly the rows an
         // OPERATOR sees, which is the confusion the separate case exists to prevent.

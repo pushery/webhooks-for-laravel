@@ -11,6 +11,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
+use Pushery\Webhooks\Dashboard\DashboardScope;
 use Pushery\Webhooks\Dashboard\Data\KpiSet;
 use Pushery\Webhooks\Dashboard\Livewire\Concerns\InteractsWithDashboard;
 use stdClass;
@@ -59,7 +60,23 @@ final class LatencyPanel extends Component
     #[Computed]
     public function trend(): Collection
     {
+        // Across tenants the rollup has no percentile of an hour to draw, and bars of nothing
+        // would read as no latency. The window tiles above are computed live and stay.
+        if ($this->trendAcrossTenants()) {
+            return new Collection;
+        }
+
         return $this->metricsFor($this->window)->hourly();
+    }
+
+    /**
+     * Whether the dashboard reads across tenants, where the per-hour trend is left out and the
+     * panel says why.
+     */
+    #[Computed]
+    public function trendAcrossTenants(): bool
+    {
+        return DashboardScope::current()->coversAllTenants();
     }
 
     /**

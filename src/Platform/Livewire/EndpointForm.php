@@ -12,6 +12,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Pushery\Webhooks\Core\Http\Exceptions\BlockedDestination;
+use Pushery\Webhooks\Core\Http\Exceptions\HostUnresolvable;
 use Pushery\Webhooks\Facades\Webhooks;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
@@ -255,7 +256,7 @@ final class EndpointForm extends Component
                         array_values($this->eventTypes),
                         $this->name !== '' ? $this->name : null,
                     );
-                } catch (BlockedDestination) {
+                } catch (BlockedDestination|HostUnresolvable) {
                     $this->addError('url', $this->blockedUrlMessage());
 
                     return null;
@@ -298,7 +299,7 @@ final class EndpointForm extends Component
         try {
             // Re-vet the (possibly changed) URL before repointing the endpoint.
             $this->ssrfGuard()->resolveAndPin($this->url);
-        } catch (BlockedDestination) {
+        } catch (BlockedDestination|HostUnresolvable) {
             $this->addError('url', $this->blockedUrlMessage());
 
             return;
@@ -329,6 +330,10 @@ final class EndpointForm extends Component
      * form into a probe oracle; the tenant is told the one thing it can act on — the
      * endpoint must be a publicly reachable https URL — in its own language. The
      * guard's precise reason still reaches the operator through the exception itself.
+     *
+     * A host that resolves to nothing gets the same sentence. Told apart, the two answers
+     * would say which internal names exist: one that resolves to a private address is
+     * refused as blocked, one that does not resolve would be refused differently.
      */
     private function blockedUrlMessage(): string
     {

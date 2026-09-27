@@ -732,13 +732,17 @@ final class EndpointDeliveries extends Component
      * The window lengths offered to the reader: the shipped steps that fit under the host's
      * ceiling, plus the ceiling itself, so the widest choice is always reachable.
      *
+     * Built against the ceiling, never against the reader's own choice. Built against the
+     * narrowed window, the list offered only that window, and a reader who had picked seven
+     * days could not widen back out without reloading the page.
+     *
      * @return list<int>
      */
     private function windowChoices(): array
     {
-        $ceiling = $this->effectiveWindowDays();
+        $ceiling = Config::integer('webhooks.platform.deliveries.window_days', self::WINDOW_DAYS);
 
-        if ($ceiling === null) {
+        if ($ceiling <= 0) {
             return [];
         }
 
