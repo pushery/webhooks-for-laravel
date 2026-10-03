@@ -33,6 +33,12 @@ use Pushery\Webhooks\Database\Dialect\Dialect;
  */
 final class ImportInsert
 {
+    /**
+     * The table both statements below write to. They name it literally; the import command
+     * compares its source against this name so that it never reads the table it writes.
+     */
+    public const string TABLE = 'webhook_calls';
+
     public static function calls(Dialect $dialect): string
     {
         return match ($dialect) {

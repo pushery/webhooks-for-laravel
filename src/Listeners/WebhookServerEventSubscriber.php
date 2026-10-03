@@ -160,10 +160,15 @@ final readonly class WebhookServerEventSubscriber
         // Atomic transition — a conditional UPDATE gated on is_active=true means only
         // the worker that actually flips the flag fires the event, even when several
         // deliveries of the same subscription exhaust concurrently.
+        //
+        // disabled_at goes through the model's own conversion, as in WebhookManager::disable()
+        // for the same column. An Eloquent builder update hands its values to the query builder
+        // as they are, which binds a timestamp as a naive literal in the application zone, an
+        // engine's offset away from the instant meant; only the updated_at it adds is converted.
         $flipped = WebhookSubscription::model()::query()
             ->whereKey($subscription->id)
             ->where('is_active', true)
-            ->update(['is_active' => false, 'disabled_at' => now()]);
+            ->update(['is_active' => false, 'disabled_at' => $subscription->fromDateTime(now())]);
 
         if ($flipped === 1) {
             Event::dispatch(new WebhookEndpointAutoDisabled($subscription->refresh()));

@@ -8,7 +8,13 @@ namespace Pushery\Webhooks\Core\Ssrf;
  * Classifies a resolved IP address as safe (public) or blocked. Blocked covers
  * every private, loopback, link-local, ULA, carrier-grade-NAT, multicast,
  * documentation, benchmarking, transition and cloud-metadata range for BOTH IPv4
- * and IPv6.
+ * and IPv6, and every block the IANA special-purpose address registries list as not
+ * globally reachable. A few blocks those registries call reachable are refused too,
+ * where they hold service addresses no webhook receiver lives at.
+ *
+ * IPv6 outside the global unicast space `2000::/3` is refused as a whole: IANA assigns
+ * routable IPv6 from that block only, and the rest is reserved. The list below therefore
+ * decides only inside `2000::/3`. Its entries outside it stay, each for what it says.
  *
  * The classification is done with an explicit CIDR list rather than PHP's
  * `FILTER_FLAG_NO_PRIV_RANGE|FILTER_FLAG_NO_RES_RANGE`, because that filter reports
@@ -34,6 +40,8 @@ namespace Pushery\Webhooks\Core\Ssrf;
  */
 final class AddressClassifier
 {
+    private const string GLOBAL_UNICAST_IPV6 = '2000::/3';
+
     /** @var list<string> */
     private const array BLOCKED_CIDRS = [
         // IPv4
@@ -60,6 +68,13 @@ final class AddressClassifier
         // translates on it connects `64:ff9b:1::a9fe:a9fe` to 169.254.169.254.
         '64:ff9b:1::/48',     // NAT64 local-use prefix (RFC 8215)
         '100::/64',           // discard-only
+        '100:0:0:1::/64',     // dummy prefix (RFC 9780), directly above the discard-only block
+        // IETF protocol assignments (RFC 2928): not globally reachable unless a more specific
+        // allocation says otherwise, and the ones that do are anycast service addresses, AMT
+        // relays, AS112 sinks and drone identifiers, none of them a webhook receiver. Refused
+        // whole for the same reason as 192.0.0.0/24 above. The narrower entries inside it stay,
+        // each for what it says about its own range.
+        '2001::/23',
         // The IPv6 transition prefixes, and the reason they are here is not tidiness.
         // 6to4 and Teredo EMBED an IPv4 address, and neither puts it in the low 32 bits —
         // 6to4 carries it in bits 16-47, so `2002:7f00:0001::` addresses 127.0.0.1 and
@@ -73,6 +88,7 @@ final class AddressClassifier
         '2001:db8::/32',      // documentation
         '2002::/16',          // 6to4 (RFC 3056) — embeds an IPv4 in bits 16-47
         '3fff::/20',          // documentation (RFC 9637), the second block beside 2001:db8::/32
+        '5f00::/16',          // SRv6 segment identifiers (RFC 9602), routed inside an operator's network
         'fc00::/7',           // ULA (incl. fd00:ec2::254 cloud metadata)
         'fe80::/10',          // link-local
         // Site-local. Deprecated in favor of ULA (RFC 3879), but private BY INTENT and
@@ -87,6 +103,11 @@ final class AddressClassifier
         $ip = $this->unwrapMappedIp($ip);
 
         if (filter_var($ip, FILTER_VALIDATE_IP) === false) {
+            return true;
+        }
+
+        // An address that embeds an IPv4 one was unwrapped above and is judged as that IPv4.
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false && ! $this->inCidr($ip, self::GLOBAL_UNICAST_IPV6)) {
             return true;
         }
 

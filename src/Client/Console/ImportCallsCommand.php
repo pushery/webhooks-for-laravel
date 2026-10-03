@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Client\Console;
 
+use DateTimeZone;
+use Exception;
 use Illuminate\Console\Command;
+use Illuminate\Database\Connection;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -89,6 +93,7 @@ final class ImportCallsCommand extends Command
         {--from-payload=payload : The source column holding the decoded JSON body.}
         {--from-headers=headers : The source column holding the request headers as JSON. Missing or empty imports as no headers.}
         {--from-error=exception : The source column that records a handling failure. Its PRESENCE marks the imported row failed; its text is not carried.}
+        {--from-timezone= : The time zone a source timestamp without an offset was written in. Defaults to app.timezone, the zone Eloquent\'s timestamps() write in; pass UTC for a table that stores UTC.}
         {--chunk=1000 : How many source rows to read per batch (bounds memory on a large backlog).}
         {--dry-run : Report what would be imported without writing anything.}';
 
@@ -112,8 +117,36 @@ final class ImportCallsCommand extends Command
         // places — the cast is where "mixed" stops.
         $dryRun = (bool) $this->option('dry-run');
 
+        // The zone a source timestamp without an offset is read in. Eloquent's timestamps() write
+        // the application's wall-clock time with no offset, so that is the default; a value that
+        // carries its own offset keeps it whatever this says.
+        $zone = $this->stringOption('from-timezone') ?? $this->applicationTimezone();
+
+        try {
+            new DateTimeZone($zone);
+        } catch (Exception) {
+            $this->error(sprintf('"%s" is not a time zone; pass an identifier such as UTC or Europe/Berlin.', $zone));
+
+            return self::FAILURE;
+        }
+
         if (! Schema::connection($fromConnection)->hasTable($fromTable)) {
             $this->error(sprintf('Source table "%s" was not found on connection "%s".', $fromTable, $fromConnection ?? 'default'));
+
+            return self::FAILURE;
+        }
+
+        // The default source table has the name of the table this command writes to, so on an
+        // installation with one connection the import would read its own calls and copy each one
+        // into itself under a new id, and a dry run would announce them as calls to import.
+        if ($this->readsTheTableItWrites($fromConnection, $fromTable)) {
+            $this->error(sprintf(
+                'The source table "%s" on connection "%s" is the table this command writes the imported calls to, '
+                .'so the import would copy every call into itself. Name the table you are importing from with '
+                .'--from-table, and its connection with --from-connection if it lives on another one.',
+                $fromTable,
+                $fromConnection ?? 'default',
+            ));
 
             return self::FAILURE;
         }
@@ -132,7 +165,7 @@ final class ImportCallsCommand extends Command
         // need not have -- and the whole point of the map is that it need not.
         DB::connection($fromConnection)->table($fromTable)->orderBy($columns->id)->chunkById(
             $chunk,
-            function (Collection $rows) use ($override, $columns, $dialect, $sql, $dryRun, &$imported, &$skipped, &$errored, &$errors): void {
+            function (Collection $rows) use ($override, $columns, $dialect, $zone, $sql, $dryRun, &$imported, &$skipped, &$errored, &$errors): void {
                 /** @var array<string, list<mixed>> $pending id => bindings */
                 $pending = [];
 
@@ -140,7 +173,7 @@ final class ImportCallsCommand extends Command
                     try {
                         $source = $this->resolveSource($row, $columns, $override);
                         $id = DeterministicUuid::v5(self::IMPORT_NAMESPACE, sprintf('%s:%s:%s', self::IMPORT_KEY, $source, $this->sourceRowId($row, $columns)));
-                        $pending[$id] = $this->bindings($row, $columns, $source, $id, $dialect);
+                        $pending[$id] = $this->bindings($row, $columns, $source, $id, $dialect, $zone);
                     } catch (JsonException $e) {
                         $errored++;
 
@@ -210,7 +243,7 @@ final class ImportCallsCommand extends Command
      *
      * @throws JsonException when the source payload or headers are not valid JSON
      */
-    private function bindings(stdClass $row, LegacyCallColumns $columns, string $source, string $id, Dialect $dialect): array
+    private function bindings(stdClass $row, LegacyCallColumns $columns, string $source, string $id, Dialect $dialect, string $zone): array
     {
         // The payload column is typically json and nullable: a null or empty payload is a bodyless
         // call, imported as an empty object rather than an error. Genuinely INVALID JSON (only
@@ -244,8 +277,8 @@ final class ImportCallsCommand extends Command
             hash('sha256', $body),
             $this->headersJson($row, $columns),
             $status->value,
-            $this->timestamp($row->created_at ?? null, $dialect),
-            $this->timestamp($row->updated_at ?? null, $dialect),
+            $this->timestamp($row->created_at ?? null, $dialect, $zone),
+            $this->timestamp($row->updated_at ?? null, $dialect, $zone),
         ];
     }
 
@@ -277,10 +310,12 @@ final class ImportCallsCommand extends Command
     }
 
     /**
-     * A source timestamp rendered for the target engine, preserving the original instant. Such a
-     * table stores UTC, so a naive value is read as UTC; a missing one falls back to now().
+     * A source timestamp rendered for the target engine, preserving the original instant. A value
+     * with an offset keeps it; one without is read in the zone it was written in, which is
+     * app.timezone for a table Eloquent's timestamps() wrote, or whatever --from-timezone names. A
+     * missing one falls back to now().
      */
-    private function timestamp(mixed $value, Dialect $dialect): string
+    private function timestamp(mixed $value, Dialect $dialect, string $zone): string
     {
         // The `!== ''` clause changes no answer: Carbon reads Date::parse('') as now, which is
         // exactly what the fallback beside it produces, so no input separates the two. The
@@ -290,7 +325,7 @@ final class ImportCallsCommand extends Command
         //
         // Kept rather than deleted: it states at the point of reading that an empty value has no
         // timestamp in it, instead of leaning on a convenience of the date library.
-        $moment = is_string($value) && $value !== '' ? Date::parse($value, 'UTC') : Date::now();
+        $moment = is_string($value) && $value !== '' ? Date::parse($value, $zone) : Date::now();
 
         return Timestamp::forDialect($dialect, $moment);
     }
@@ -358,5 +393,48 @@ final class ImportCallsCommand extends Command
         }
 
         return null;
+    }
+
+    /**
+     * Whether the source is the table the import writes to: the table the insert names, on a
+     * connection that reaches the same database as the package's own.
+     */
+    private function readsTheTableItWrites(?string $fromConnection, string $fromTable): bool
+    {
+        if ($fromTable !== ImportInsert::TABLE) {
+            return false;
+        }
+
+        $source = Schema::connection($fromConnection)->getConnection();
+        $target = Schema::connection(WebhookConnection::name())->getConnection();
+
+        return $source->getName() === $target->getName()
+            || $this->databaseOf($source) === $this->databaseOf($target);
+    }
+
+    /**
+     * What tells two connections apart as databases: the engine, the server and the database name.
+     *
+     * @return list<mixed>
+     */
+    private function databaseOf(Connection $connection): array
+    {
+        return [
+            $connection->getDriverName(),
+            $connection->getConfig('host'),
+            $connection->getConfig('port'),
+            $connection->getDatabaseName(),
+        ];
+    }
+
+    /**
+     * The zone this application writes its timestamps in, which is the zone a table written by
+     * Eloquent's timestamps() holds its naive values in.
+     */
+    private function applicationTimezone(): string
+    {
+        $zone = Config::get('app.timezone');
+
+        return is_string($zone) && $zone !== '' ? $zone : 'UTC';
     }
 }

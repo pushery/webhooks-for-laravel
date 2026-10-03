@@ -8,6 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Jobs\SyncJob;
 use Illuminate\Queue\QueueManager;
+use Illuminate\Queue\SqsQueue;
 use Illuminate\Queue\SyncQueue;
 use Pushery\Webhooks\Core\Http\TransportResponse;
 use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
@@ -245,10 +246,23 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
      * The code two branches up already warns about exactly this shape for a zero cap and
      * excludes it. The same thing happens on `sync` at ANY cap, because there the delay is not
      * short — it is not honored at all.
+     *
+     * An SQS queue whose name ends in `.fifo` cannot hold it back either. A FIFO queue takes a
+     * delay only for the whole queue, never per message, so `SqsQueue` leaves `DelaySeconds` off
+     * the send rather than have AWS refuse it, and the deferred job waits for the queue's own
+     * delay at most, not for the cap. AWS requires that suffix on every FIFO queue name, and it is
+     * what Laravel reads before it drops the delay. A release still waits on such a queue,
+     * because it changes the visibility of the message instead.
      */
     private function queueCanDelay(): bool
     {
-        return ! app(QueueManager::class)->connection($this->connection) instanceof SyncQueue;
+        $connection = app(QueueManager::class)->connection($this->connection);
+
+        if ($connection instanceof SyncQueue) {
+            return false;
+        }
+
+        return ! $connection instanceof SqsQueue || ! str_ends_with($connection->getQueue($this->queue), '.fifo');
     }
 
     /**

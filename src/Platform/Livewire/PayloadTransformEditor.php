@@ -8,6 +8,7 @@ use Illuminate\Container\Container;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\View as ViewFactory;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -166,7 +167,7 @@ final class PayloadTransformEditor extends Component
         // 1406 error. Past 20 characters this is a 500 (Postgres 22001, MySQL 1406) where the
         // reader should be getting a field message. And a rule list is a public ARRAY: Livewire
         // enforces the array, never its elements, so an entry that is not a string reached
-        // trim() under strict_types and raised there.
+        // the trim under strict_types and raised there.
         //
         // Deliberately NOT Rule::in over the declared versions. PayloadVersionRegistry says in
         // its own words that an unknown version is a supported state — "a version may exist
@@ -178,7 +179,7 @@ final class PayloadTransformEditor extends Component
         // `string` and `array`, so PHP makes those two rules true before validation reads them,
         // whatever the caller. What is genuinely enforced here is everything under a `.*`:
         // nothing checks the type of an array ELEMENT, which is the shape that used to reach
-        // trim() and raise there.
+        // the trim and raise there.
         //
         // They stay because the set is read as a whole -- somebody looking for what
         // `includeFields` accepts should find a line about `includeFields` rather than have to
@@ -298,13 +299,13 @@ final class PayloadTransformEditor extends Component
         $rename = [];
         foreach ($this->renamePairs as $pair) {
             // Same read-path reasoning as cleanList(), plus the keys: a pair the browser sends
-            // without a `from` raised "Undefined array key" before it ever reached trim().
+            // without a `from` raised "Undefined array key" before it ever reached the trim.
             if (! is_array($pair) || ! is_string($pair['from'] ?? null) || ! is_string($pair['to'] ?? null)) {
                 continue;
             }
 
-            $from = trim($pair['from']);
-            $to = trim($pair['to']);
+            $from = Str::trim($pair['from']);
+            $to = Str::trim($pair['to']);
             if ($from !== '' && $to !== '') {
                 $rename[$from] = $to;
             }
@@ -313,7 +314,7 @@ final class PayloadTransformEditor extends Component
             $rules['rename'] = $rename;
         }
 
-        $rewrap = trim($this->rewrapKey);
+        $rewrap = Str::trim($this->rewrapKey);
         if ($rewrap !== '') {
             $rules['rewrap'] = $rewrap;
         }
@@ -417,7 +418,7 @@ final class PayloadTransformEditor extends Component
                 continue;
             }
 
-            $trimmed = trim($value);
+            $trimmed = Str::trim($value);
             if ($trimmed !== '') {
                 $clean[] = $trimmed;
             }
