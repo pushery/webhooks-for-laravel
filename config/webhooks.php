@@ -15,8 +15,8 @@ return [
     | connection to keep the package's tables somewhere other than the app database —
     | the common case being a MySQL application that keeps these PostgreSQL-shaped
     | tables on a PostgreSQL side-car. The named connection must be one the package
-    | supports (PostgreSQL or MySQL 8.4+); run `php artisan webhooks:preflight
-    | --connection=<name>` to check it.
+    | supports (PostgreSQL or MySQL 8.4+); `php artisan webhooks:preflight` checks
+    | it, and reads this connection unless `--connection` names another.
     |
     */
 
@@ -195,6 +195,12 @@ return [
         // half an hour earlier. Raise retry_after_cap on a queue that can hold longer
         // delays (Redis, database) to obey such a hint exactly.
         //
+        // The deferral needs a connection that can hold a dispatched job back. An SQS queue
+        // whose name ends in .fifo cannot, because a FIFO queue takes a delay only for the
+        // whole queue, never per message: there the hint is clamped to the cap and charged as
+        // an ordinary retry, which the queue does wait for, and the delivery may be exhausted
+        // before the window elapses.
+        //
         // A cap of 0 switches the hint OFF rather than shortening it to nothing: the delay
         // comes from the jittered schedule, exactly as if the endpoint had sent no header,
         // and nothing is deferred. Read the other way it would answer 'Retry-After: 60'
@@ -329,6 +335,11 @@ return [
         // arriving faster than the allowance waits longer rather than raising the rate. A
         // Pushery\Webhooks\Events\WebhookDeliveryRateLimited event fires for every delivery that
         // is deferred this way, so the shaping is visible rather than a silent gap.
+        //
+        // The delay is the queue's to keep. The sync connection ignores it, and an SQS queue
+        // whose name ends in .fifo takes a delay only for the whole queue, never per message:
+        // on either, the delivery does not wait for its slot, and the event still fires with
+        // the delay it should have had.
         'rate_limit' => [
             'enabled' => true,
             'max_per_minute' => 60,

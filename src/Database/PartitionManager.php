@@ -50,6 +50,17 @@ final class PartitionManager
         return WebhookConnection::db();
     }
 
+    /**
+     * A column name read from the catalog, quoted for PostgreSQL. The names are read from
+     * pg_attribute so that the drain carries every column, including one a host's own migration
+     * added, and such a column may be a reserved word or carry capitals; unquoted it breaks the
+     * statement, and the maintenance run with it, every day it is retried.
+     */
+    private static function quoteIdentifier(string $name): string
+    {
+        return '"'.str_replace('"', '""', $name).'"';
+    }
+
     public function partitionName(CarbonInterface $month): string
     {
         return self::TABLE.'_'.$this->monthStart($month)->format('Y_m');
@@ -340,7 +351,7 @@ final class PartitionManager
      */
     private function drainDefaultPartitionInto(string $name, CarbonImmutable $start, CarbonImmutable $end): void
     {
-        $columns = implode(', ', $this->insertableColumns());
+        $columns = implode(', ', array_map(self::quoteIdentifier(...), $this->insertableColumns()));
         $from = Timestamp::sql($start);
         $to = Timestamp::sql($end);
         $lower = $this->quoteTimestamp($start);
@@ -400,12 +411,16 @@ final class PartitionManager
             // resolvable first column and an unresolvable pair, and a per-column check would
             // keep it and then fail the ADD CONSTRAINT below.
             $notNull = implode(' AND ', array_map(
-                static fn (string $column): string => sprintf('t.%s IS NOT NULL', $column),
+                static fn (string $column): string => sprintf('t.%s IS NOT NULL', self::quoteIdentifier($column)),
                 $key['columns'],
             ));
 
             $match = implode(' AND ', array_map(
-                static fn (int $i): string => sprintf('r.%s = t.%s', $key['referenced_columns'][$i], $key['columns'][$i]),
+                static fn (int $i): string => sprintf(
+                    'r.%s = t.%s',
+                    self::quoteIdentifier($key['referenced_columns'][$i]),
+                    self::quoteIdentifier($key['columns'][$i]),
+                ),
                 array_keys($key['columns']),
             ));
 

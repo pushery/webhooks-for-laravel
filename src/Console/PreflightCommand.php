@@ -17,6 +17,7 @@ use Pushery\Webhooks\Database\OwnerKeyDeclaration;
 use Pushery\Webhooks\Server\Jobs\JobTimeoutBudget;
 use Pushery\Webhooks\Support\Settings;
 use Pushery\Webhooks\Support\ShippedIcons;
+use Pushery\Webhooks\Support\WebhookConnection;
 use RuntimeException;
 
 /**
@@ -48,7 +49,7 @@ use RuntimeException;
 final class PreflightCommand extends Command
 {
     protected $signature = 'webhooks:preflight
-        {--connection= : The database connection to check (defaults to the application default)}';
+        {--connection= : The database connection to check (defaults to the one the package stores its tables on: webhooks.database.connection, else the application default)}';
 
     protected $description = 'Check that the database the persistent layers store their tables in is supported, that the schema agrees with the configuration, and that every inbound client config can verify a delivery.';
 
@@ -56,18 +57,17 @@ final class PreflightCommand extends Command
     {
         $option = $this->option('connection');
 
-        // Neither half of this guard can change what an operator observes: flipping `&&` to `||`,
-        // or comparing against a non-empty string, gives the same answer.
-        // `DatabaseManager::connection()` opens with `enum_value($name) ?:
-        // $this->getDefaultConnection()` (DatabaseManager.php:96), so an empty name already
-        // resolves to the default, and the resolved connection reports the default name back, which
-        // is what the closing sentence prints.
+        // Without the option, every check below reads the connection the package stores its tables
+        // on: webhooks.database.connection when a host keeps them on a side-car, otherwise the
+        // application default. A null name would not do that. `DB::connection(null)` resolves to
+        // the application default whatever the package is configured to use, so a host with a
+        // side-car would have its engine and collation read on one database and its owner key
+        // declaration on another, and be told the install passed.
         //
-        // It stays because it says the intent at the place the intent is formed. Reaching the same
-        // answer through a falsy coercion three layers down in the framework is a fact about this
-        // Laravel, not a decision this command made, and `--connection=` is exactly the shape a
-        // shell hands over when a variable is unset.
-        $name = is_string($option) && $option !== '' ? $option : null;
+        // A blank option counts as no option, because `--connection=` is the shape a shell hands
+        // over when a variable is unset. Passed on as a name it would resolve to the application
+        // default too, and skip the side-car the same way.
+        $name = is_string($option) && $option !== '' ? $option : WebhookConnection::name();
 
         try {
             DatabaseRequirement::ensure($name);

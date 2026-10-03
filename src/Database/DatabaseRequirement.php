@@ -51,6 +51,14 @@ final class DatabaseRequirement
         $name = $resolved->getName() ?? 'default';
         $driver = $resolved->getDriverName();
 
+        // A table prefix is refused rather than half applied. The schema builder and Eloquent add
+        // it; the package's own SQL (the migrations' indexes and partitions, the rollup, the
+        // delivery engine) names its tables as they are. On a prefixed connection the first
+        // migration creates the prefixed table and then fails on the unprefixed name.
+        if ($resolved->getTablePrefix() !== '') {
+            throw self::prefixRejected($name, $resolved->getTablePrefix());
+        }
+
         if ($driver === 'pgsql') {
             // The same floor the PostgreSQL-only guard applies, read from one place. Until this
             // line existed, pgsql passed both guards with no version read at all while MySQL was
@@ -109,6 +117,17 @@ final class DatabaseRequirement
         }
 
         return null;
+    }
+
+    private static function prefixRejected(string $name, string $prefix): RuntimeException
+    {
+        return new RuntimeException(sprintf(
+            'The [%s] connection sets the table prefix [%s], which webhooks-for-laravel does not support: '
+            .'its migrations and its delivery engine run SQL against the table names as they are. Point '
+            .'the package at a connection without a prefix (WEBHOOKS_DB_CONNECTION), or remove the prefix.',
+            $name,
+            $prefix,
+        ));
     }
 
     private static function unsupportedDriver(string $name, string $driver): RuntimeException

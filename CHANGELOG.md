@@ -4,6 +4,24 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.14.0] - 2026-10-03
+
+### Fixed
+
+- **A connection with a table prefix is refused with a message instead of failing mid-migration.** The schema builder and Eloquent add the prefix, the package's own SQL names its tables as they are, so the first migration created the prefixed table and then failed on the unprefixed name. The connection check now refuses a prefixed connection before anything runs, and names the prefix and the way out.
+- **The default-partition drain carries a column a host added under a reserved or capitalized name.** The drain reads the table's columns from the catalog, so that it moves every column including one a host's own migration added, and it spliced those names into its statements as they were. A column named `order` or `TenantId` broke the statement, and the daily maintenance run with it, on every retry. The names are quoted now.
+- **`webhooks:preflight` without `--connection` checks the connection the package stores its tables on.** It read the engine and the collation of the application's default connection and the owner key declaration of `webhooks.database.connection`, so a host that keeps the tables on a side-car could be told the install passed while the side-car's engine and collation were never read. Without the option every check now reads `webhooks.database.connection`, or the application default when that is not set, and a blank `--connection=` counts as no option.
+- **The circuit breaker stores the instant it switched an endpoint off.** It wrote `disabled_at` through a builder update, which binds a timestamp as a naive literal in the application's time zone, so outside UTC the column held an instant an offset away from the real one. `WebhookEndpointAutoDisabled` handed listeners that time, and a host query for the endpoints disabled in the last day missed breaker rows or took in others. The value now goes through the model's conversion, as it does in `Webhooks::disable()`.
+- **`webhooks:import-calls` reads a timestamp without an offset in the application's time zone.** It read such values as UTC, while a table written by Eloquent's `timestamps()` holds the application's wall-clock time, so outside UTC every imported call landed an offset away from its real time, and a second run could not correct it because the import skips the ids it already wrote. A source table that really stores UTC takes the new `--from-timezone=UTC`; a value that carries its own offset keeps it either way.
+- **`webhooks:import-calls` refuses to read the table it writes to.** Without `--from-table` its source is `webhook_calls`, and on an installation with one connection that is the package's own table: the import copied every call into itself under a new id, and a dry run announced the copies as calls to import. It now fails with a message naming the options to use, also when a second connection name reaches the same database.
+- **The payload transform editor trims the invisible characters a copied field name brings along.** The include and exclude lists, both halves of a rename and the rewrap key went through PHP's `trim()`, which removes ASCII whitespace only, so a name copied with a no-break space, a zero-width space or a byte order mark saved a rule that matched no key and changed nothing on any delivery. They now go through `Str::trim()`.
+- **A delivery on an SQS FIFO queue is no longer deferred onto that queue.** A FIFO queue takes no delay per message, so a deferred job came back on the next poll, and an endpoint's `Retry-After` longer than the cap was answered once per remaining deferral without the pause it asked for. On such a queue the hint is now clamped to the cap and counted as an ordinary retry, which a FIFO queue does wait for. A rate-limited delivery on the sync connection or a FIFO queue does not wait for its slot, a FIFO queue holding it for at most its own configured delay, and `WebhookDeliveryRateLimited` still fires with the delay. The configuration says so.
+
+### Security
+
+- **The SSRF guard refuses every IPv6 block IANA lists as not globally reachable.** `5f00::/16`, which holds the segment routing identifiers an operator routes inside its own network, and the dummy prefix `100:0:0:1::/64` passed as public, and so did the unassigned part of the IETF protocol assignments block `2001::/23`. All three are refused now. `2001::/23` is refused whole, like its IPv4 counterpart `192.0.0.0/24`: the addresses in it that IANA does list as reachable are anycast services, AMT relays, AS112 sinks and drone identifiers, none of them a webhook receiver.
+- **The SSRF guard refuses IPv6 outside the global unicast space `2000::/3`.** IANA assigns routable IPv6 from that block only and keeps the rest reserved, but the guard judged an address there by its list of blocked ranges, so every reserved address the list did not name passed as public, such as `4000::1` or `::2:3:4:5`. Such an address is refused now. An IPv6 literal that embeds an IPv4 address is still judged as that IPv4 address.
+
 ## [3.13.0] - 2026-09-27
 
 ### Changed
@@ -3245,7 +3263,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.13.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.14.0...HEAD
+[3.14.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.13.0...v3.14.0
 [3.13.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.12.0...v3.13.0
 [3.12.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.11.0...v3.12.0
 [3.11.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.10.1...v3.11.0
