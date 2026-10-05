@@ -79,7 +79,10 @@ final class PartitionMaintenanceCommand extends Command
             $cutoff->format('Y-m'),
         ));
 
-        return self::SUCCESS;
+        // Healed, and still reported through the exit code: the scheduler discards a command's
+        // output by default, so a non-zero exit is the one channel a host's onFailure() hook
+        // reads, and rows in the default partition mean the schedule had a gap.
+        return $stranded > 0 ? self::FAILURE : self::SUCCESS;
     }
 
     /**

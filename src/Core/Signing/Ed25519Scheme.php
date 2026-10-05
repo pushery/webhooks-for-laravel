@@ -57,14 +57,13 @@ final readonly class Ed25519Scheme implements SignatureScheme
 
     public function sign(WebhookMessage $message, SecretSet $secrets): SignatureHeaders
     {
-        $toSign = $this->signedContent($message->id, $message->timestamp, $message->rawBody);
+        $toSign = $this->signedContent($message->id, (string) $message->timestamp, $message->rawBody);
 
         $signatures = array_map(
             fn (string $secret): string => self::VERSION.','.base64_encode(sodium_crypto_sign_detached($toSign, $this->secretKey($secret))),
-            // EQUIVALENT, and reported every run. `all()` is keyed 'current'/'previous', so
-            // dropping this really does hand array_map a differently-keyed array — array_map
-            // preserves keys when it is given exactly one — but the result is only ever
-            // imploded, and implode does not look at keys.
+            // The array_values() changes no signature. `all()` is keyed 'current'/'previous', and
+            // array_map preserves keys when it is given exactly one array, but the result is only
+            // ever imploded, and implode does not look at keys.
             //
             // Kept because the keys are meaningless to the signer and carrying them makes the
             // next reader ask whether the order is by key. It is not: it is rotation order.
@@ -101,7 +100,9 @@ final readonly class Ed25519Scheme implements SignatureScheme
             return VerificationResult::malformed();
         }
 
-        $toSign = $this->signedContent($id, $timestampValue, $rawBody);
+        // The header as RECEIVED, not the integer it was normalized to for the window check
+        // above, as {@see StandardWebhooksScheme} reads it.
+        $toSign = $this->signedContent($id, $timestamp, $rawBody);
 
         foreach ($secrets->all() as $keyId => $secret) {
             $publicKey = $this->publicKey($secret);
@@ -121,7 +122,14 @@ final readonly class Ed25519Scheme implements SignatureScheme
         return VerificationResult::invalid();
     }
 
-    private function signedContent(string $id, int $timestamp, string $rawBody): string
+    /**
+     * The bytes the signature is taken over: `{id}.{timestamp}.{body}`, with the timestamp as the
+     * header carries it. Normalized to an integer first, a producer that signed `0<ts>` as sent
+     * was refused, and a delivery signed canonically stayed valid with its header rewritten to
+     * `0<ts>`; {@see StandardWebhooksScheme} made the same correction for its own content. A
+     * delivery this package signed is unaffected: the signer writes a plain decimal.
+     */
+    private function signedContent(string $id, string $timestamp, string $rawBody): string
     {
         return $id.'.'.$timestamp.'.'.$rawBody;
     }
@@ -175,7 +183,9 @@ final readonly class Ed25519Scheme implements SignatureScheme
      * The raw signature bytes carried by the `v1a,` entries of the header, ignoring
      * every other version (e.g. a symmetric `v1,`), space-separated per the spec.
      * The base64 payload is decoded to raw bytes here; a length mismatch is left in
-     * the list to be rejected as non-matching by the constant-time verify.
+     * the list for verify()'s length check, which is what makes it a non-match:
+     * sodium_crypto_sign_verify_detached() throws a SodiumException for a signature
+     * that is not SODIUM_CRYPTO_SIGN_BYTES long.
      *
      * @return list<string>
      */
@@ -186,10 +196,9 @@ final readonly class Ed25519Scheme implements SignatureScheme
         foreach (explode(' ', $header) as $entry) {
             $entry = trim($entry);
 
-            // EQUIVALENT, and reported every run. An empty entry — which a header with two
-            // spaces in it produces — falls through to `explode(',', '', 2)` = `['']`, pads to
-            // `['', '']`, and is then dropped by the version check below. Same outcome, one
-            // more round through the loop body.
+            // Skipping an empty entry here changes no verdict. Such an entry, which a header with
+            // two spaces in it produces, would fall through to `explode(',', '', 2)` = `['']`, pad
+            // to `['', '']`, and be dropped by the version check below.
             //
             // Kept because it states the case at the top rather than relying on the version
             // check to absorb it, and because it is what makes the base64 decode below

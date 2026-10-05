@@ -92,12 +92,8 @@ final readonly class WebhookMetrics
             ->whereRaw($ownerSql, $ownerBindings)
             ->where('bucket', '>=', $this->since())
             // Reordering this list changes nothing: the row is read back by column name below, so a
-            // SELECT list in a different order returns the same KpiSet. There is no assertion that
-            // could tell two orders apart, and none should be invented.
-            //
-            // The surface itself is covered, which is the half worth checking before believing
-            // the paragraph above: DROP any one of these five aggregates and the metrics suite
-            // goes red (measured). Only the reordering is free.
+            // SELECT list in a different order returns the same KpiSet. Each of the five aggregates
+            // is read there, so none of them may go.
             ->selectRaw(
                 'coalesce(sum(total), 0)     as total, '
                 .'coalesce(sum(delivered), 0) as delivered, '
@@ -109,11 +105,7 @@ final readonly class WebhookMetrics
 
         // The five `?? 0` defaults below cannot be reached. The SELECT above wraps every aggregate
         // in coalesce(..., 0), so the row always carries the key and never carries null, and `??`
-        // fires on null. All five moved to `?? 1` at once left the dashboard suites green.
-        //
-        // The control is the surface itself, one method up: drop any one of those five aggregates
-        // from the SELECT and the suite goes red. This is a statement about the defaults, not about
-        // an unmeasured KpiSet.
+        // fires on null.
         //
         // They stay because KpiSet's constructor takes ints and this is the boundary where
         // that becomes true, rather than one call further in.
@@ -196,7 +188,10 @@ final readonly class WebhookMetrics
             return null;
         }
 
-        $rowAt = CarbonImmutable::parse($newestRow);
+        // Read for the engine that wrote them: on MySQL both values are naive UTC, and parsed in
+        // app.timezone the empty-rollup branch below reported the host's offset as lag.
+        $dialect = WebhookConnection::dialect();
+        $rowAt = Timestamp::read($dialect, $newestRow);
 
         // Nothing in the rollup at all while rows exist: the whole lag is the age of the oldest
         // thing it should have seen, and the newest row is the cheapest honest floor for that.
@@ -207,7 +202,7 @@ final readonly class WebhookMetrics
             return (int) max(0, CarbonImmutable::now()->diffInSeconds($rowAt, absolute: true));
         }
 
-        $bucketAt = CarbonImmutable::parse($newestBucket);
+        $bucketAt = Timestamp::read($dialect, $newestBucket);
 
         // The rollup buckets by hour, so it is up to an hour behind the newest row BY DESIGN.
         // Reporting that as lag would make a healthy installation warn once an hour.
@@ -360,12 +355,6 @@ final readonly class WebhookMetrics
      * that merges digests is declared `CREATE AGGREGATE tdigest(tdigest)` with `SFUNC =
      * tdigest_add_digest`. That is read out of the extension's own installation SQL rather
      * than inferred from its name.
-     *
-     * The mistake survived because the query had never run. The extension is not part of the
-     * postgres image, so the end-to-end test skipped in every lane and on every developer
-     * machine, and the driver's shape was asserted only against a stubbed connection - which
-     * pins what the driver asks for and cannot notice that no such function exists. Installing
-     * the extension in CI is what made it run, and it failed on its first real execution.
      *
      * @return array{p50: float, p90: float, p95: float, p99: float}
      */

@@ -27,7 +27,8 @@ return [
     'metrics' => [
         'throughput' => 'Rendimiento',
         'failure_rate' => 'Tasa de fallos',
-        'failed' => ':count fallidos',
+        'failed' => '{0} :count fallidas|{1} :count fallida|[2,*] :count fallidas',
+        'refused' => '{0} :count rechazadas|{1} :count rechazada|[2,*] :count rechazadas',
         'avg_latency' => 'Latencia media',
         'max_latency' => 'Latencia máx.',
     ],

@@ -27,7 +27,8 @@ return [
     'metrics' => [
         'throughput' => 'Durchsatz',
         'failure_rate' => 'Fehlerquote',
-        'failed' => ':count fehlgeschlagen',
+        'failed' => '{0} :count fehlgeschlagen|{1} :count fehlgeschlagen|[2,*] :count fehlgeschlagen',
+        'refused' => '{0} :count abgelehnt|{1} :count abgelehnt|[2,*] :count abgelehnt',
         'avg_latency' => 'Ø Latenz',
         'max_latency' => 'Max. Latenz',
     ],

@@ -44,9 +44,8 @@ return [
         'absolute' => 'LLL z',
 
         // 'precise' exists because 'absolute' cannot separate two rows, and the accessible names
-        // need it to. `LLL` carries no seconds in any of the seven shipped locales — measured
-        // against the vendored Carbon on two deliveries 37 seconds apart, identical in all seven —
-        // and `redeliver()` writes a new row on every replay, same event type, same endpoint. So a
+        // need it to. `LLL` carries no seconds in any of the seven shipped locales, and
+        // `redeliver()` writes a new row on every replay, same event type, same endpoint. So a
         // tenant pressing Send again twice inside a minute produces two rows whose control names
         // agree in every part, which is the state the names were widened to prevent.
         //

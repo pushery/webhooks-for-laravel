@@ -64,14 +64,18 @@ final class PayloadVisibility
      */
     public static function current(): string
     {
-        $ability = Config::string('webhooks.dashboard.payload.ability', 'view-webhook-payload');
+        // Read null-safe for the reason UiVariant::rendersWireKit() gives: env() hands an ability
+        // switched off as `false` through as the boolean false, and the typed getter would throw on
+        // the screen that opens a delivery. A name that is not a string names no ability, so it
+        // lands on the fallback like one the host never defined.
+        $ability = Config::get('webhooks.dashboard.payload.ability', 'view-webhook-payload');
 
-        // The `!== ''` half is EQUIVALENT and reported every run, for the same reason as its
+        // The `!== ''` half decides nothing on its own, for the same reason as its
         // twin in DashboardScope: `Gate::has('')` is false, so an empty ability already fails
         // the conjunction. It is written out because this branch decides whether a PAYLOAD is
         // shown, and a guard that reads as three independent conditions is the one that stays
         // correct when someone reorders it.
-        if ($ability !== '' && Gate::has($ability) && Gate::allows($ability)) {
+        if (is_string($ability) && $ability !== '' && Gate::has($ability) && Gate::allows($ability)) {
             return self::MODE_FULL;
         }
 
@@ -82,11 +86,12 @@ final class PayloadVisibility
      * What a denied read falls back to. Anything other than the two supported tokens is
      * treated as the stricter one: a typo in a security setting must not be the permissive
      * reading, because a misspelled 'redacted' would otherwise open the body it was meant
-     * to close.
+     * to close. A value that is not a string at all, the false or null env() makes of `false`
+     * or `null` in the environment, is read the same way instead of being thrown on.
      */
     public static function fallback(): string
     {
-        return Config::string('webhooks.dashboard.payload.denied', self::MODE_REDACTED) === self::MODE_REDACTED
+        return Config::get('webhooks.dashboard.payload.denied', self::MODE_REDACTED) === self::MODE_REDACTED
             ? self::MODE_REDACTED
             : self::MODE_HIDDEN;
     }
@@ -94,17 +99,28 @@ final class PayloadVisibility
     /**
      * Replace every scalar leaf with its type while keeping the structure intact.
      *
-     * Keys are kept — they are the shape, and the shape is the point. Null is kept as null
-     * rather than labeled: a null carries no value to leak, and collapsing it into a marker
-     * would hide the one distinction an operator most often needs, "the field was there but
-     * empty" versus "the field was never sent".
+     * An object's keys are kept while they read as field names — they are the shape, and the
+     * shape is the point. A key that does not is the body's data spelled as a key, as in a map
+     * keyed by email address, account number or customer number, and it is replaced by
+     * `[key 1]`, `[key 2]`, … in order, so every entry stays countable and none overwrites
+     * another. A list keeps its positions, which carry nothing.
+     *
+     * Null is kept as null rather than labeled: a null carries no value to leak, and collapsing
+     * it into a marker would hide the one distinction an operator most often needs, "the field
+     * was there but empty" versus "the field was never sent".
      */
     public static function redact(mixed $payload): mixed
     {
         if (is_array($payload)) {
+            $list = array_is_list($payload);
             $redacted = [];
+            $hidden = 0;
 
             foreach ($payload as $key => $value) {
+                if (! $list && ! self::readsAsFieldName((string) $key)) {
+                    $key = '[key '.++$hidden.']';
+                }
+
                 $redacted[$key] = self::redact($value);
             }
 
@@ -119,5 +135,17 @@ final class PayloadVisibility
             is_string($payload) => '[string]',
             default => '[redacted]',
         };
+    }
+
+    /**
+     * Whether an object key reads as the name of a field rather than as data: a letter or an
+     * underscore, then letters, digits, `_`, `.` or `-`, at most 64 characters, optionally behind
+     * one leading `@` as in `@type`, and never four digits in a row. An address, a phrase, a
+     * number or an account identifier fails at least one of those.
+     */
+    private static function readsAsFieldName(string $key): bool
+    {
+        return preg_match('/\A@?[A-Za-z_][A-Za-z0-9_.\-]{0,63}\z/', $key) === 1
+            && preg_match('/\d{4}/', $key) !== 1;
     }
 }

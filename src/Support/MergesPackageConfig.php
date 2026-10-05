@@ -19,10 +19,10 @@ use Illuminate\Support\ServiceProvider;
  * checks, so it is gone — the rule is stated instead, and ProviderConfigMergeTest holds every
  * provider to it by reading the tree rather than a list.
  *
- * The path is resolved once here rather than six times at the call sites. `__DIR__` inside
- * a trait resolves to the directory of the trait file, not of the class using it, so
- * `dirname(__DIR__, 2)` is the package root for every one of them — where the six call
- * sites previously carried two different relative depths between them.
+ * The path is resolved once here rather than at every call site. `__DIR__` inside a trait
+ * resolves to the directory of the trait file, not of the class using it, so
+ * `dirname(__DIR__, 2)` is the package root for every one of them — where the call sites
+ * previously carried two different relative depths between them.
  *
  * The cached-configuration guard is the one from Laravel's own ServiceProvider and has to
  * stay: with a cached config there is nothing to merge into, and writing would silently

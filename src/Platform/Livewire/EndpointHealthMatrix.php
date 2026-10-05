@@ -86,7 +86,8 @@ final class EndpointHealthMatrix extends Component
     /**
      * Recompute and persist the health of one owned endpoint from its recent history,
      * then surface the live metrics for its row. Authorized against the row-level
-     * policy, so recomputing a foreign endpoint is refused.
+     * policy, so recomputing a foreign endpoint is refused, and braked per tenant like the
+     * full pass, on an allowance of its own.
      */
     public function recompute(int $id): void
     {
@@ -94,15 +95,21 @@ final class EndpointHealthMatrix extends Component
         // nothing and fails not-found before any action runs — the row-level policy below is the
         // second, defense-in-depth guard, not the only one.
         $subscription = $this->findOwnedEndpoint($id);
-        // This authorize() call cannot be the sole refusal — InteractsWithEndpoints spells out why
-        // in full: the boot gate reads the same ability, and findOwnedEndpoint() has already
-        // enforced the ownership this policy would add. That docblock ends "Do not 'kill' them by
-        // deleting them", and this is one of the five it means.
         // Redundant with the boot gate, and deliberately kept: {@see InteractsWithEndpoints}
         // states the rule and its measurement -- the gate reads the same ability this policy
         // consults, and the ownership it adds is already enforced by the scoped lookup. This is
         // what still refuses if a future caller reaches the action without that lookup.
         $this->authorize('update', $subscription);
+
+        // After both refusals above, so a foreign or unauthorized id spends nothing of the
+        // allowance.
+        if ($this->rowRecomputeRateExceeded()) {
+            $this->message = __('webhooks::self-service.health_page.recompute_throttled');
+
+            return;
+        }
+
+        $this->message = '';
 
         $this->refreshRow($subscription);
 
@@ -116,7 +123,10 @@ final class EndpointHealthMatrix extends Component
      */
     public function recomputeAll(): void
     {
-        $rows = $this->boardQuery()->get();
+        // The board query asks for one row beyond the cap so render() can tell it truncated, and
+        // render() drops that row. The pass asks for the cap alone: it recomputes what the board
+        // shows.
+        $rows = $this->boardQuery()->limit(self::MAX_ROWS)->get();
 
         // The question recompute() asks of one row, asked of every row this pass would touch. A
         // reader the policy refuses an update was refused one row and could still recompute them
@@ -215,7 +225,7 @@ final class EndpointHealthMatrix extends Component
 
         // Three of the entries below are redundant: `reports`, `sortField` and `sortDirection` are
         // public properties of this component, and Livewire hands every public property to the view
-        // already. Removing them changes nothing, measured one at a time with the suite green.
+        // already, so listing them changes nothing.
         //
         // They stay because the view reads them by those names and this list is where a reader
         // looks to see what it is given. `endpoints` and `portalUrl` are not redundant: neither is

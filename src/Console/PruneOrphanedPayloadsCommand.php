@@ -59,13 +59,10 @@ final class PruneOrphanedPayloadsCommand extends Command
             return self::SUCCESS;
         }
 
-        // The cast is EQUIVALENT and reported every run: `--dry-run` is declared with no
-        // value, so Symfony hands back a real bool and there is nothing to convert. It stays
-        // for the type checker — `option()` is `mixed`, and without the cast the flag reaches
-        // every branch below as an unnarrowed value.
-        // The cast answers the declared option type, not the value: a flag option is already
-        // true or null, and both readings reach the same branch. Measured -- the suite is green
-        // without it.
+        // The cast changes no branch: `--dry-run` is declared with no value, so a flag option is
+        // already true or null and both readings reach the same branch. It stays for the type
+        // checker: `option()` is `mixed`, and without the cast the flag reaches every branch
+        // below as an unnarrowed value.
         $dryRun = (bool) $this->option('dry-run');
         $totalOrphaned = 0;
         $totalDeleted = 0;
@@ -88,9 +85,9 @@ final class PruneOrphanedPayloadsCommand extends Command
         }
 
         // NOT Number::fileSize(): it reaches Illuminate\Support\Number::format(), which throws
-        // without ext-intl — an extension this package does not require. This command is
-        // SCHEDULED, and the call sits AFTER the deletion loop, so on such a host every run
-        // ended in a fatal error with the operator unable to tell whether the prune had run.
+        // without ext-intl — an extension this package does not require. The call sits AFTER the
+        // deletion loop, so on such a host a run, scheduled by the host or started by hand, would
+        // delete and then die without reporting what it had deleted.
         $size = LocalizedNumber::fileSize($totalBytes);
 
         $this->info($dryRun
@@ -149,7 +146,7 @@ final class PruneOrphanedPayloadsCommand extends Command
         // double a scan the reclaimer already documents as unindexed.
         // array_unique keeps the keys it had, so deduplicating two entries onto one disk leaves
         // a hole -- and the only reader is a foreach, which does not care. The re-index is for
-        // the declared list type; dropping it changes no sweep. Measured.
+        // the declared list type; dropping it changes no sweep.
         return array_values(array_unique($disks));
     }
 }

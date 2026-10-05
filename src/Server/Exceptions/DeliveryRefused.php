@@ -8,9 +8,9 @@ use Pushery\Webhooks\Core\Http\Exceptions\NonRetryable;
 use RuntimeException;
 
 /**
- * A queued delivery was refused before it went out — its endpoint was switched off or
- * deleted while the delivery sat in the queue. It is non-retryable by definition: the
- * decision not to send is the outcome, not a transport failure to try again.
+ * A queued delivery was refused before it went out — its endpoint was switched off, deleted
+ * or given another URL while the delivery sat in the queue. It is non-retryable by
+ * definition: the decision not to send is the outcome, not a transport failure to try again.
  */
 final class DeliveryRefused extends RuntimeException implements NonRetryable
 {

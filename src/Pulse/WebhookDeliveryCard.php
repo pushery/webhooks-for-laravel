@@ -13,9 +13,10 @@ use Livewire\Attributes\Lazy;
 
 /**
  * The internal-ops Pulse card: outbound webhook throughput, failure rate and latency
- * for the selected Pulse period, with a per-event-type breakdown. It reads the three
+ * for the selected Pulse period, with a per-event-type breakdown. It reads the four
  * entry types the {@see WebhookDeliveryRecorder} writes and derives the failure rate as
- * failure-count over throughput-count. Registered only by the opt-in
+ * failure-count over throughput-count. A delivery refused before it was sent is shown as its
+ * own count beside the rate and stays out of it. Registered only by the opt-in
  * {@see WebhookPulseServiceProvider}, so it never loads without Pulse and pulse.enabled.
  *
  * Aggregates are read straight from Pulse's bucket storage on each render rather than
@@ -32,12 +33,11 @@ final class WebhookDeliveryCard extends Card
 
         $throughput = (int) $this->total(WebhookDeliveryRecorder::THROUGHPUT, 'count');
         $failures = (int) $this->total(WebhookDeliveryRecorder::FAILURE, 'count');
+        $refused = (int) $this->total(WebhookDeliveryRecorder::REFUSED, 'count');
 
         $events = $this->eventBreakdown();
 
-        // EQUIVALENT, and reported every run: the divisor is a nanoseconds-to-milliseconds
-        // conversion, and moving it by one changes the rendered figure by a millionth — below
-        // anything a card displays or a test could assert without pinning noise.
+        // Nanoseconds to milliseconds, the unit the card reports its own render time in.
         $time = (hrtime(true) - $startedAt) / 1_000_000;
 
         return View::make('webhooks::pulse.webhook-deliveries', [
@@ -46,6 +46,7 @@ final class WebhookDeliveryCard extends Card
             'throughput' => $throughput,
             'failures' => $failures,
             'failureRate' => $throughput > 0 ? round($failures / $throughput * 100, 1) : 0.0,
+            'refused' => $refused,
             'avgLatency' => $this->total(WebhookDeliveryRecorder::LATENCY, 'avg'),
             'maxLatency' => $this->total(WebhookDeliveryRecorder::LATENCY, 'max'),
             'events' => $events,

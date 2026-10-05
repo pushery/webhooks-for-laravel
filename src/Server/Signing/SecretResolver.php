@@ -9,10 +9,11 @@ use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 
 /**
  * Resolves the signing secrets for a delivery at handle time, so the raw secret
- * never has to sit in the serialized job payload. The default
- * {@see EncryptedSecretResolver} unseals an encrypted inline secret; the Platform
- * layer binds a resolver that loads a subscription's secret by id instead, keeping
- * subscription secrets out of the queue entirely.
+ * never has to sit in the serialized job payload. The bound {@see EncryptedSecretResolver}
+ * unseals the secrets the delivery carries: the Platform layer seals an endpoint's current
+ * secret, and during a rotation its previous one, into every delivery it queues. So whoever
+ * holds both the queue and the application key can read them, and a delivery signs with the
+ * secrets it was queued with for as long as it is retried.
  *
  * @internal
  */

@@ -121,9 +121,10 @@ final class BodyDecoder
      * directly. Over `max_input_vars` it keeps the first N and RAISES a warning, which is the
      * only report there is — the handler below is what turns that report into a refusal, since
      * a payload quietly missing two thirds of a delivery is worse than one reported unread: a
-     * handler acts on it. Past its nesting ceiling it drops the field silently, and there the
-     * package can only see the case where nothing at all survived; a body that loses one
-     * over-nested field among ordinary ones is read as those ordinary fields.
+     * handler acts on it. Past its nesting ceiling it drops the field too, and warns only while
+     * display_errors is off, which Laravel switches off everywhere except in tests. The call
+     * runs with it off, so a body that lost an over-nested field is refused like an over-long
+     * one, and the same way in every environment.
      *
      * @return array{0: PayloadFormat, 1: array<array-key, mixed>}
      */
@@ -137,9 +138,15 @@ final class BodyDecoder
             return true;
         });
 
+        $display = ini_set('display_errors', '0');
+
         try {
             parse_str($rawBody, $fields);
         } finally {
+            if ($display !== false) {
+                ini_set('display_errors', $display);
+            }
+
             restore_error_handler();
         }
 
@@ -159,13 +166,9 @@ final class BodyDecoder
         }
 
         // The limit is 2 rather than a bare `explode`, because only the part before the first `;`
-        // is wanted and splitting the rest is work nobody reads. Raising it changes nothing: `[0]`
-        // is the same at any limit above 1, measured across five inputs. Lowering it to 1 is not —
-        // that keeps the whole header including its parameters — and BodyDecoderTest holds that
-        // direction.
-        // The limit is not a decision the result can see: only element [0] is read, and the
-        // first piece before a semicolon is the same whether the rest is split once or not at
-        // all. It is a 2 because that is the cheapest split that yields it.
+        // is wanted and splitting the rest is work nobody reads. Element [0] is the same at any
+        // limit above 1, so raising it changes nothing; lowering it to 1 keeps the whole header,
+        // parameters included, and BodyDecoderTest holds that direction.
         return strtolower(trim(explode(';', $contentType, 2)[0]));
     }
 

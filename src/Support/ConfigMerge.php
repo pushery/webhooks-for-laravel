@@ -18,7 +18,7 @@ namespace Pushery\Webhooks\Support;
  * arrays BY INDEX, so a host narrowing `dashboard.windows` to `['7d']` gets back
  * `['7d', '7d', '30d']` — two windows it never asked for, one of them a value it removed
  * on purpose. A list is the value an operator SETS, not a container to descend into, so a
- * list is replaced whole and never merged. There are thirteen of them in the shipped file —
+ * list is replaced whole and never merged. There are fourteen of them in the shipped file —
  * `models` counts, because an empty array is a leaf, as the paragraph after next explains — and
  * `core.ssrf.allowed_hosts` is the one where getting this wrong is a security question
  * rather than a cosmetic one.

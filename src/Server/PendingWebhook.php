@@ -82,8 +82,6 @@ final class PendingWebhook
 
     private int $responseCaptureBytes = 65536;
 
-    private int $largePayloadThreshold = 0;
-
     private bool $respectRetryAfter = true;
 
     private int $retryAfterCap = 900;
@@ -237,14 +235,21 @@ final class PendingWebhook
         return tap(clone $this, fn (self $call): array => $call->headers = [...$call->headers, ...$headers]);
     }
 
+    /**
+     * At least one second. To the HTTP client a timeout of 0 means no timeout at all, the
+     * opposite of what a caller asking for none expects, and a negative one means nothing.
+     */
     public function timeoutInSeconds(int $timeout): self
     {
-        return tap(clone $this, fn (self $call): int => $call->timeout = $timeout);
+        return tap(clone $this, fn (self $call): int => $call->timeout = max(1, $timeout));
     }
 
+    /**
+     * At least one second, for the reason {@see self::timeoutInSeconds()} gives.
+     */
     public function connectTimeoutInSeconds(int $connectTimeout): self
     {
-        return tap(clone $this, fn (self $call): int => $call->connectTimeout = $connectTimeout);
+        return tap(clone $this, fn (self $call): int => $call->connectTimeout = max(1, $connectTimeout));
     }
 
     public function verifySsl(bool|string $verify = true): self
@@ -342,9 +347,8 @@ final class PendingWebhook
      */
     public function delayInSeconds(int $seconds): self
     {
-        // Lowering the floor is EQUIVALENT and reported every run: the dispatch reads
-        // `if ($this->delaySeconds > 0)`, so 0 and -1 both mean "queue it now". Raising it is
-        // not, and the arm on a negative hold covers that direction.
+        // The dispatch reads `if ($this->delaySeconds > 0)`, so 0 and -1 both mean "queue it
+        // now".
         //
         // The clamp stays because the PROPERTY should not carry a value the sender never
         // meant. A negative hold stored as a negative number is one refactor away from being
@@ -426,7 +430,9 @@ final class PendingWebhook
                 connectTimeout: $this->connectTimeout,
                 timeout: $this->timeout,
                 verifySsl: $this->verifySsl,
-                proxy: $this->proxy,
+                // Sealed for the same reason as the passphrase below: a proxy that authenticates
+                // carries its credentials in the userinfo of its URL, so the URL is a credential.
+                proxy: $this->proxy === null ? null : Crypt::encryptString($this->proxy),
                 clientCert: $this->clientCert,
                 clientKey: $this->clientKey,
                 // Seal the mutual-TLS passphrase like the signing secret: it must not sit in
@@ -437,7 +443,6 @@ final class PendingWebhook
                     : Crypt::encryptString($this->clientCertPassphrase),
                 contentType: $this->contentType,
                 responseCaptureBytes: $this->responseCaptureBytes,
-                largePayloadThreshold: $this->largePayloadThreshold,
                 respectRetryAfter: $this->respectRetryAfter,
                 retryAfterCap: $this->retryAfterCap,
                 retryAfterMaxDeferrals: $this->retryAfterMaxDeferrals,

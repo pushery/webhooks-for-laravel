@@ -18,9 +18,9 @@ use Pushery\Webhooks\Support\WebhookConnection;
  * database default is case-insensitive, over a column they have no way to correct from here.
  *
  * MySQL only, and only when the collation is actually wrong. On PostgreSQL the question does not
- * arise; on a host that already runs a case-sensitive or binary database default the column is
- * already right and this is a no-op, which matters because an `ALTER TABLE ... MODIFY` rewrites
- * the table and the rollup can be large.
+ * arise; on a host that already runs a case-sensitive database default, or a binary one that does
+ * not pad, the column is already right and this is a no-op, which matters because an
+ * `ALTER TABLE ... MODIFY` rewrites the table and the rollup can be large.
  *
  * The column is derived data — `webhooks:refresh-metrics` rebuilds every row — so no content is
  * at risk here. What the ALTER protects is the unique index the refresh inserts against.
@@ -50,18 +50,21 @@ return new class extends Migration
             return;
         }
 
-        /** @var list<object{collation_name: string|null}> $rows */
+        /** @var list<object{collation_name: string|null, pad_attribute: string|null}> $rows */
         $rows = $connection->select(
-            'SELECT COLLATION_NAME AS collation_name FROM information_schema.COLUMNS '
-            ."WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'webhook_delivery_hourly' AND COLUMN_NAME = 'owner_type'",
+            'SELECT c.COLLATION_NAME AS collation_name, k.PAD_ATTRIBUTE AS pad_attribute FROM information_schema.COLUMNS c '
+            .'LEFT JOIN information_schema.COLLATIONS k ON k.COLLATION_NAME = c.COLLATION_NAME '
+            ."WHERE c.TABLE_SCHEMA = DATABASE() AND c.TABLE_NAME = 'webhook_delivery_hourly' AND c.COLUMN_NAME = 'owner_type'",
         );
 
         $current = $rows[0]->collation_name ?? null;
+        $pad = $rows[0]->pad_attribute ?? null;
 
-        // Already distinguishing? Leave it. A binary collation is stricter than the shipped one,
-        // and rewriting a large table to swap one correct collation for another is cost without
-        // a result.
-        if (is_string($current) && (str_ends_with($current, '_as_cs') || str_ends_with($current, '_bin'))) {
+        // Already distinguishing? Leave it. A binary collation that does not pad, such as
+        // utf8mb4_0900_bin, tells two owners apart wherever the shipped one does, and rewriting a
+        // large table to swap one correct collation for another is cost without a result. The
+        // older binary collations such as utf8mb4_bin pad with spaces and are pinned like any other.
+        if (is_string($current) && $pad !== 'PAD SPACE' && (str_ends_with($current, '_as_cs') || str_ends_with($current, '_bin'))) {
             return;
         }
 

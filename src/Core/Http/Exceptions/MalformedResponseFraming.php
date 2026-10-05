@@ -15,9 +15,10 @@ use RuntimeException;
  * It is {@see NonRetryable}, and that is the whole decision this class carries. Guzzle 8
  * refuses such a response before it is ever visible; guzzle 7 has no such check and hands it
  * back as an ordinary 200. Retrying does not bridge that: the same endpoint answers the same
- * way every time, so a retryable classification spends the delivery's whole budget on twenty
- * identical refusals and only then gives up — while the circuit breaker counts every one of
- * them and eventually switches off an endpoint whose real defect nobody was told about.
+ * way every time, so a retryable classification spends the delivery's remaining tries (three
+ * by default) and their backoff on identical refusals and only then gives up. The circuit
+ * breaker counts the failed delivery once either way; the retries add requests and delay,
+ * not information.
  *
  * Failing final says the true thing once: this destination cannot be delivered to as it is
  * configured, and the message names why.

@@ -9,9 +9,12 @@ use Pushery\Webhooks\Platform\Livewire\PayloadTransformEditor;
 use Pushery\Webhooks\Platform\Livewire\SelfServicePortalPage;
 
 // The self-service endpoint portal routes. Loaded by the portal service provider only
-// when the layer is enabled. Both the middleware stack (which should carry the auth +
-// manage-webhook-endpoints gate) and the URL prefix are configurable, so a host mounts
-// the pages wherever its own app chrome expects them.
+// when the layer is enabled and register_routes is on. The middleware stack and the URL
+// prefix are configurable, so a host mounts the pages wherever its own app chrome expects
+// them. The shipped stack is 'web' and 'auth' and carries no gate on purpose: the panels
+// assert manage-webhook-endpoints themselves and answer a refusal as refuse_with says,
+// while a can:manage-webhook-endpoints in the stack answers 403 before they run, whatever
+// refuse_with is set to.
 Route::middleware(Config::array('webhooks.platform.self_service.middleware', ['web', 'auth']))
     ->prefix(Config::string('webhooks.platform.self_service.route_prefix', 'webhooks/endpoints'))
     ->group(function (): void {

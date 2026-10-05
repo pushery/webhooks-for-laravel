@@ -151,7 +151,7 @@ final class PreflightCommand extends Command
             // stay silent — a source with no replay boundary looks exactly like one with two,
             // because tolerance_seconds sits in the entry either way and the dedupe default is a
             // header the producer may never send.
-            foreach (WebhookConfig::replayBoundaryAdvisories() as $message) {
+            foreach ([...WebhookConfig::replayBoundaryAdvisories(), ...WebhookConfig::signingKeyAdvisories()] as $message) {
                 $this->components->warn($message);
             }
         }

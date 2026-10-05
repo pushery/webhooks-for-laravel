@@ -128,7 +128,7 @@ final class ShippedIcons
      * there would send the reader to install something that changes nothing.
      *
      * The input is an argument rather than a read, so every state is testable on a tree that has
-     * neither Blade Icons nor any set, which is this one and every CI lane.
+     * neither Blade Icons nor any set.
      *
      * @param  array<string, string>|null  $unresolved  the shape {@see self::unresolved()} returns
      * @return list<string>

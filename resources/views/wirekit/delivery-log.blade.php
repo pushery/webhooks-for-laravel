@@ -5,9 +5,9 @@
      instead with the webhooks-ui tag. --}}
 @php
     // Defaults, because this stub is rendered from two kinds of caller. The component passes
-    // all three; the package's own suite renders the file directly through `View::make()` with a
-    // hand-built array, from ten call sites across four files. Requiring the keys there would
-    // make every one of them a place to remember rather than a place to read.
+    // all three; a direct `View::make()` with a hand-built array may pass none of them, and
+    // requiring the keys would make every such call a place to remember rather than a place to
+    // read.
     //
     // The values are today's behavior exactly: an empty catalog leaves the event-type filter as
     // free text, and both actions render. The ability check is the COURTESY -- the action itself
@@ -42,9 +42,9 @@
     @endif
 
     {{-- On a narrow screen every filter takes the whole width, so the wrapped row stacks into one column
-         of equal fields. With the widths each control brings it broke into rows of different lengths,
-         a right edge somewhere else on every line (measured at 375px: 121, 279, 130, 306, 160). From
-         `sm` up the row keeps its own widths. --}}
+         of equal fields. With the widths each control brings it would break into rows of different
+         lengths, a right edge somewhere else on every line. From `sm` up the row keeps its own
+         widths. --}}
     <x-wirekit::row gap="md" class="flex-wrap items-end">
         {{-- Both filters hide their label visually, so the label reaches sighted readers
              only through assistive technology — it is translated like any other. --}}

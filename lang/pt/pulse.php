@@ -27,7 +27,8 @@ return [
     'metrics' => [
         'throughput' => 'Débito',
         'failure_rate' => 'Taxa de falhas',
-        'failed' => ':count falhadas',
+        'failed' => '{0} :count falhadas|{1} :count falhada|[2,*] :count falhadas',
+        'refused' => '{0} :count recusadas|{1} :count recusada|[2,*] :count recusadas',
         'avg_latency' => 'Latência média',
         'max_latency' => 'Latência máx.',
     ],

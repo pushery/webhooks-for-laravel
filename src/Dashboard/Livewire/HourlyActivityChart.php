@@ -25,6 +25,8 @@ use stdClass;
  * while the components they name are being replaced — which is the `__lazyLoad not found`
  * race. See {@see WebhooksDashboardPage} for the
  * whole chain, including why taking the window out of the keys would be the worse answer.
+ *
+ * @property-read Collection<int, stdClass> $hourly
  */
 #[Lazy(isolate: false)]
 final class HourlyActivityChart extends Component
@@ -62,7 +64,9 @@ final class HourlyActivityChart extends Component
     #[Computed]
     public function peak(): int
     {
-        $totals = $this->hourly()
+        // Read as the property, so the rows come from the same memo the view reads: a call to the
+        // method runs the rollup query a second time in every render.
+        $totals = $this->hourly
             ->map(static function (stdClass $row): int {
                 $total = $row->total;
 
@@ -70,7 +74,7 @@ final class HourlyActivityChart extends Component
                     return (int) $total;
                 }
 
-                // EQUIVALENT, and reported every run: the fallback is swallowed by the
+                // The value of this fallback never shows: it is swallowed by the
                 // `max(1, ...)` below, so 0, 1 and -1 all produce the same peak. It stays 0
                 // because that is what a row with no readable total contributed — reporting a
                 // 1 would be inventing a delivery.

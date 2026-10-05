@@ -22,4 +22,12 @@ interface Indexed
      * @return void
      */
     public function searchable(); // @pest-ignore-type Scout's Searchable::searchable() declares no return type
+
+    /**
+     * Take this model out of the index — mirrors Scout's `Searchable::unsearchable()`, under the
+     * same compatibility rule as the method above.
+     *
+     * @return void
+     */
+    public function unsearchable(); // @pest-ignore-type Scout's Searchable::unsearchable() declares no return type
 }

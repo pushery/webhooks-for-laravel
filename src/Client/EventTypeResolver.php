@@ -19,7 +19,10 @@ use Pushery\Webhooks\Core\Signing\SignatureHeaders;
  * configuring one, and it is honest: an empty `event_type` column says "this producer
  * does not name its events", while a made-up value says something false about them.
  *
- * Called only after the signature is verified, so the body is authentic.
+ * Called only after the signature is verified, so the body is authentic. A header is only as
+ * authentic as the dialect makes it: `GitHubScheme` and `PlainHmacScheme` sign the body alone, so
+ * a header there is the sender's to choose, and a type read from it should be confirmed against
+ * the body before it picks a handler.
  */
 interface EventTypeResolver
 {

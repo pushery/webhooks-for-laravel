@@ -94,16 +94,24 @@ final readonly class AsyncApiGenerator
      */
     public function toYaml(array $document): string
     {
-        // Round-trip through JSON so the empty-map placeholders (stdClass) collapse to
-        // plain arrays that the YAML dumper renders cleanly.
+        // Round-trip through JSON to OBJECTS, not arrays, so an empty JSON object and an empty
+        // JSON list stay apart: the dumper writes the first as a map and the second as a list.
+        // Decoded to arrays, both arrive as [] and both leave as `{}`, and an empty `required` in
+        // a catalog schema, or an empty list in an example, turns into a map in the YAML while
+        // the JSON document keeps the list.
         $encoded = json_encode($document) ?: '{}';
-        $normalized = json_decode($encoded, true);
+        $normalized = json_decode($encoded, false);
 
-        // Two integers, two verdicts. The INLINE LEVEL is equivalent in both directions and
-        // reported every run — this document nests nowhere near ten deep, so no value at or
+        // Two integers, two verdicts. The INLINE LEVEL changes nothing in either direction:
+        // this document nests nowhere near ten deep, so no value at or
         // above its actual depth changes a byte. The INDENT is not, and the published-document
         // arms hold it.
-        return Yaml::dump(is_array($normalized) ? $normalized : [], 10, 2);
+        return Yaml::dump(
+            $normalized instanceof stdClass ? $normalized : new stdClass,
+            10,
+            2,
+            Yaml::DUMP_OBJECT_AS_MAP | Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE,
+        );
     }
 
     /**

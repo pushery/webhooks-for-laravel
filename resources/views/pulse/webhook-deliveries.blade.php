@@ -35,7 +35,13 @@
                 <div class="text-xl font-bold {{ $failureRate > 0 ? 'text-red-400 dark:text-red-300' : 'text-gray-900 dark:text-gray-100' }}">
                     {{ \Pushery\Webhooks\Support\LocalizedNumber::format($failureRate, 1) }}%
                 </div>
-                <div class="text-xs text-gray-500 dark:text-gray-400">{{ __('webhooks::pulse.metrics.failed', ['count' => \Pushery\Webhooks\Support\LocalizedNumber::format($failures)]) }}</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">{{ trans_choice('webhooks::pulse.metrics.failed', $failures, ['count' => \Pushery\Webhooks\Support\LocalizedNumber::format($failures)]) }}</div>
+                {{-- A refused delivery was never sent: its endpoint was switched off while it
+                     waited in the queue. It is counted apart from the rate and shown only when
+                     there is one. `?? 0` keeps a view rendered without the key working. --}}
+                @if (($refused ?? 0) > 0)
+                    <div class="text-xs text-gray-500 dark:text-gray-400">{{ trans_choice('webhooks::pulse.metrics.refused', $refused, ['count' => \Pushery\Webhooks\Support\LocalizedNumber::format($refused)]) }}</div>
+                @endif
             </div>
             <div>
                 <div class="text-xs text-gray-500 dark:text-gray-400 uppercase">{{ __('webhooks::pulse.metrics.avg_latency') }}</div>

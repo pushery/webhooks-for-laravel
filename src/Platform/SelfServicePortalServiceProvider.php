@@ -34,8 +34,9 @@ use Pushery\Webhooks\Support\UiAssets;
  *
  * The panels and the pages are separately switchable: with
  * webhooks.platform.self_service.register_routes false this provider registers the
- * components and mounts nothing, which is what a host embedding a panel in its own
- * guarded screen wants.
+ * components and none of the portal's pages, which is what a host embedding a panel in
+ * its own guarded screen wants. The one route it registers either way is the secret
+ * panel's countdown script (see boot()).
  */
 final class SelfServicePortalServiceProvider extends ServiceProvider
 {

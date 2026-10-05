@@ -66,18 +66,20 @@ final readonly class DeliveryPipeline
         } catch (NonRetryable $exception) {
             // The one transport failure a retry cannot bridge: the endpoint answered, and
             // what it answered contradicts itself about where the body ends. The next attempt
-            // reaches the same endpoint and gets the same bytes, so retrying spends the whole
-            // budget on identical refusals and feeds the circuit breaker twenty times over an
-            // endpoint whose actual defect nobody was told about. Failing final says it once.
+            // reaches the same endpoint and gets the same bytes, so retrying would spend the
+            // remaining tries on identical refusals before failing the same way. Failing final
+            // says it once.
             return AttemptOutcome::finalFailure(null, $exception);
         } catch (Throwable $exception) {
             // EVERY OTHER way the transport can fail is a retryable delivery failure — and
-            // the net has to be this wide. Laravel marshals only curl's five connect-phase
-            // errnos into a ConnectionException; an expired, self-signed or
-            // hostname-mismatched certificate (the everyday CURLE_PEER_FAILED_VERIFICATION),
-            // a connection reset mid-response, or a partial transfer all surface as some
-            // other Guzzle RequestException instead. Catching just the one type let those
-            // escape the state machine entirely: no lifecycle event, a delivery row stuck
+            // the net has to be this wide, because the type a failure arrives as depends on the
+            // Laravel version beside this package. Up to 13.25 only Guzzle's ConnectException,
+            // curl's five connect-phase errnos, becomes a ConnectionException; an expired,
+            // self-signed or hostname-mismatched certificate (the everyday
+            // CURLE_PEER_FAILED_VERIFICATION), a connection reset mid-response, or a partial
+            // transfer surface as some other Guzzle RequestException. From 13.26 every transfer
+            // failure without a response becomes a ConnectionException. Catching one type let
+            // the others escape the state machine entirely: no lifecycle event, a delivery row stuck
             // pending for ever, a circuit breaker that never counts the failure, and a
             // queue that re-releases with no backoff at all. A returned outcome flows
             // through the events, the log, the backoff and the breaker like any other.

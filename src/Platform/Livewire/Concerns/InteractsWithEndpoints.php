@@ -6,6 +6,7 @@ namespace Pushery\Webhooks\Platform\Livewire\Concerns;
 
 use Closure;
 use Illuminate\Container\Container;
+use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Pushery\Webhooks\Core\Ssrf\SsrfGuard;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Platform\Support\PortalRefusal;
+use Pushery\Webhooks\Platform\Support\RegistrationLimit;
 use Pushery\Webhooks\Platform\Support\SubscriptionScope;
 use Pushery\Webhooks\Support\PerMinuteBrake;
 use Pushery\Webhooks\Support\ReplayAllowance;
@@ -48,14 +50,14 @@ trait InteractsWithEndpoints
      * the same answer here as from its own screens, without the gate itself changing.
      * Row-level ownership stays a separate, second guard (a foreign id fails not-found first).
      *
-     * boot() does not run on every request, and this paragraph used to say that it did. A
-     * `#[Lazy]` panel is mounted as a placeholder first, and Livewire skips the hydrate of that
-     * placeholder snapshot, boot() included, on the request that follows. That request is meant
-     * to be the `__lazyLoad` that mounts the panel for real, and nothing makes it so. Measured
-     * 2026-09-11 on EndpointList, the one lazy panel here: a `$refresh` or a `gotoPage()` sent
-     * against an unloaded placeholder rendered the tenant's list after the ability had been
-     * revoked. So the gate runs again before every render (the `rendering` hook below), which no
-     * placeholder skips, and the render is where a tenant's rows leave the server.
+     * boot() does not run on every request. A `#[Lazy]` panel is mounted as a placeholder first,
+     * and Livewire skips the hydrate of that placeholder snapshot, boot() included, on the
+     * request that follows. That request is meant to be the `__lazyLoad` that mounts the panel
+     * for real, and nothing makes it so: a `$refresh` or a `gotoPage()` sent against an unloaded
+     * placeholder of EndpointList, the one lazy panel here, would render the tenant's list after
+     * the ability had been revoked. So the gate runs again before every render (the `rendering`
+     * hook below), which no placeholder skips, and the render is where a tenant's rows leave the
+     * server.
      *
      * An action on that path still runs without the gate, and that is why the row-level
      * `authorize('view'|'update'|'rotateSecret', $subscription)` calls stay. In the five panels
@@ -124,18 +126,30 @@ trait InteractsWithEndpoints
     }
 
     /**
-     * Whether the tenant has reached its endpoint cap, so registering another is
-     * refused. An unset cap is always false.
+     * The sentence a registration is refused with right now, or null when the tenant may register
+     * one more endpoint. The configured cap answers first, in the portal's own words, which the
+     * caller passes for where it is shown; then the host's own limit, {@see RegistrationLimit},
+     * in its words or in the portal's. An unset cap with no host limit is always null.
      *
-     * Read on its own this is only ever advisory — it is what decides whether a button is
-     * drawn. The decision that MUST hold is the one inside {@see self::withRegistrationLock()},
-     * which asks the same question with the answer pinned.
+     * Read on its own this is only ever advisory — it is what decides whether a button is drawn.
+     * The decision that MUST hold is the one inside {@see self::withRegistrationLock()}, which asks
+     * the same question with the answer pinned.
      */
-    protected function endpointCapReached(): bool
+    protected function registrationRefusal(string $portalSentence): ?string
     {
         $max = $this->maxEndpointsPerTenant();
 
-        return $max !== null && $this->scopedQuery()->count() >= $max;
+        if ($max !== null && $this->scopedQuery()->count() >= $max) {
+            return $portalSentence;
+        }
+
+        $owner = SubscriptionScope::currentOwner();
+
+        if ($owner instanceof TenantIdentity) {
+            return RegistrationLimit::refusal($owner, $portalSentence);
+        }
+
+        return null;
     }
 
     /**
@@ -168,8 +182,14 @@ trait InteractsWithEndpoints
      *
      * Keyed by the WHOLE morph pair, matching the query scope exactly, so two tenants
      * never wait on each other and two tenants sharing an owner_id under different owner
-     * types are still separate. With no cap configured there is nothing to race for and no
-     * lock is taken, so an unlimited installation pays nothing for this.
+     * types are still separate. With no cap configured and no host limit registered there is
+     * nothing to race for and no lock is taken, so an unlimited installation pays nothing for
+     * this. A host limit races exactly like the cap: its answer and the insert belong together.
+     *
+     * The lock comes from the default cache store, and three of Laravel's stores cannot give one
+     * (`session`, `apc`, `storage`). There the registration runs without it: the cap still holds
+     * for registrations that arrive one after another, and two that arrive at the same moment can
+     * both pass it. Asking such a store for a lock would end every registration in an error.
      *
      * @template TValue
      *
@@ -182,7 +202,11 @@ trait InteractsWithEndpoints
     {
         $owner = SubscriptionScope::currentOwner();
 
-        if ($this->maxEndpointsPerTenant() === null || ! $owner instanceof TenantIdentity) {
+        if (($this->maxEndpointsPerTenant() === null && ! RegistrationLimit::isResolved()) || ! $owner instanceof TenantIdentity) {
+            return $register();
+        }
+
+        if (! Cache::getStore() instanceof LockProvider) {
             return $register();
         }
 
@@ -273,7 +297,8 @@ trait InteractsWithEndpoints
     }
 
     /**
-     * How many full health recomputes one tenant may run per minute, or null for no brake.
+     * How many full health recomputes one tenant may run per minute, or null for no brake. The
+     * same number bounds single-row recomputes, on an allowance of their own.
      *
      * The most expensive action the portal offers and, until 2026-08-27, the only one with no
      * brake at all — while registration, replay and the test ping each had one. Every other
@@ -319,6 +344,33 @@ trait InteractsWithEndpoints
     }
 
     /**
+     * Whether this tenant has spent its allowance for recomputing single rows this minute.
+     *
+     * The same limit as the full pass, on a bucket of its own. One row costs two queries where
+     * the pass costs two per endpoint, but the row action pressed in a loop adds up to the
+     * same pass one request at a time.
+     */
+    protected function rowRecomputeRateExceeded(): bool
+    {
+        $max = $this->maxRecomputesPerMinute();
+        $owner = SubscriptionScope::currentOwner();
+
+        if ($max === null || ! $owner instanceof TenantIdentity) {
+            return false;
+        }
+
+        $key = $this->rowRecomputeRateKey($owner);
+
+        if (RateLimiter::tooManyAttempts($key, $max)) {
+            return true;
+        }
+
+        RateLimiter::hit($key, self::REGISTRATION_RATE_WINDOW);
+
+        return false;
+    }
+
+    /**
      * The recompute allowance's cache key for one tenant. A FOURTH key beside the three
      * below, and its own for the reason the third one is: sharing a bucket would make one
      * action exhaust another, and neither reader would have any way to see why.
@@ -326,6 +378,15 @@ trait InteractsWithEndpoints
     protected function recomputeRateKey(TenantIdentity $owner): string
     {
         return 'webhooks:endpoint-health-recompute-rate:'.str_replace('\\', '.', $owner->type).':'.$owner->id;
+    }
+
+    /**
+     * The single-row recompute allowance's cache key for one tenant, apart from the full
+     * pass's for the same reason: a few row presses must not refuse the pass.
+     */
+    protected function rowRecomputeRateKey(TenantIdentity $owner): string
+    {
+        return 'webhooks:endpoint-health-row-recompute-rate:'.str_replace('\\', '.', $owner->type).':'.$owner->id;
     }
 
     /**

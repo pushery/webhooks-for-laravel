@@ -114,7 +114,7 @@ final readonly class WebhookProcessor
         }
 
         $result = match (true) {
-            $verifier instanceof InboundVerifier => $verifier->verify($this->request, $this->config),
+            $verifier instanceof InboundVerifier => $this->verifiedBy($verifier),
             $keyLookupFailed => VerificationResult::undetermined(),
             default => $this->config->scheme()->verify(
                 $rawBody,
@@ -183,10 +183,10 @@ final readonly class WebhookProcessor
         }
 
         // Throttle authentic requests per source. The refusal runs after verification, so a
-        // forged request can never exhaust a real producer's bucket, and before the store, so a
-        // limited request is neither persisted nor dispatched. What SPENDS a token is separate
-        // and happens further down, once this delivery is known not to be a repeat of one
-        // already counted — see countAgainstRateLimit().
+        // forged request can never use up a real producer's allowance, and before the store, so
+        // a limited request is neither persisted nor dispatched. What COUNTS against the window
+        // is separate and happens further down, once this delivery is known not to be a repeat
+        // of one already counted — see countAgainstRateLimit().
         $this->refuseWhenRateLimited();
 
         $webhookId = $this->config->webhookId($headers, $rawBody);
@@ -210,8 +210,8 @@ final readonly class WebhookProcessor
             $this->countAgainstRateLimit();
 
             // And marked, like a stored one, so a replay of the same delivery is answered by the
-            // fast path above instead of spending another token. Unmarked, one captured filtered
-            // delivery replayed inside the tolerance emptied the source's bucket, and the real
+            // fast path above instead of counting again. Unmarked, one captured filtered delivery
+            // replayed inside the tolerance used up the source's allowance, and the real
             // producer's next deliveries were refused with 429.
             $this->markSeen($fastPathDedupe, $webhookId);
 
@@ -247,18 +247,17 @@ final readonly class WebhookProcessor
         // parse, offload and insert, which is the retry storm this path exists to absorb.
         //
         // This branch vouches for a row somebody else may still roll back, which is why the
-        // rollback below now clears the marker as well. The marker means "stored and queued"
+        // rollback below clears the marker as well. The marker means "stored and queued"
         // everywhere else; here it can only mean "stored by someone", because whether that someone
-        // went on to queue anything is a fact this request does not have. Measured before the
-        // rollback cleared it:
+        // went on to queue anything is a fact this request does not have. Without that clearing:
         //
         //   A stores its row and has not dispatched yet
         //   B lands here, arms the marker, answers 200
         //   A's dispatch throws -> A deletes its row, leaving the id "UNSEEN" per its comment
-        //   the producer retries -> markedSeenByDuplicate=true, retryStatus=200, rowsAfterRetry=0
+        //   the producer retries -> the marker answers 200, and no row exists
         //
         // A verified delivery, acknowledged with a bare success, stored nowhere and handled by
-        // nobody — the outcome that delete exists to prevent, defeated from three lines above it.
+        // nobody — the outcome that delete exists to prevent.
         if (! $call instanceof WebhookCall) {
             $this->markSeen($fastPathDedupe, $webhookId);
 
@@ -296,10 +295,10 @@ final readonly class WebhookProcessor
 
         $this->indexForSearch($call);
 
-        // And spend the token here rather than at the check, for the same reason: this is the
-        // point at which the delivery is known to be new AND to have cost a row and a job. A
-        // dispatch that threw took the row with it above and never reaches this line, so a queue
-        // outage does not drain the producer's bucket on top of everything else.
+        // And count it here rather than at the check, for the same reason: this is the point at
+        // which the delivery is known to be new AND to have cost a row and a job. A dispatch that
+        // threw took the row with it above and never reaches this line, so a queue outage does
+        // not use up the producer's allowance on top of everything else.
         $this->countAgainstRateLimit();
 
         // A body nothing could read is the one failure this pipeline cannot answer for the
@@ -474,8 +473,7 @@ final readonly class WebhookProcessor
             // above is immune to both by accident: `affectingStatement()` always takes
             // `getPdo()` and records the modification itself.
             //
-            // Invisible in a transactional test by construction: inside a transaction
-            // `getReadPdo()` returns the write PDO, so the whole suite masks it.
+            // Invisible inside a transaction, where `getReadPdo()` returns the write PDO.
             $inserted = $connection->selectOne($sql, $bindings, false);
 
             if ($connection instanceof Connection) {
@@ -547,58 +545,35 @@ final readonly class WebhookProcessor
     }
 
     /**
-     * The compact stub kept in the payload column for an offloaded body: the envelope's OWN
-     * type when it had one, so the generated payload_type column reads the same for an
-     * offloaded row as it would have for an inline one.
+     * The compact stub kept in the payload column for an offloaded body: the body's own `type`
+     * member whenever it has one, as the body carries it.
      *
-     * It writes the body's type rather than the resolved one, and the difference is a whole
-     * column's trustworthiness. `payload_type` is `payload->>'type'` — the docs call it "a stored
-     * generated column mirroring the payload's own type field" — and this stub used to write
-     * `$message->type`, which by this point carries whatever `event_type` resolved to, including a
-     * value read from a header the body never had.
+     * `payload_type` is a stored generated column computed from the payload column, so this stub
+     * decides what it reads for an offloaded row. Keeping the body's member, whatever JSON value it
+     * holds, makes an offloaded row read exactly what the same body reads inline: the type it
+     * declares, NULL for a body without one, and on MySQL the string `null` for a JSON null. A
+     * query on the column therefore returns the same rows whatever the offload threshold is.
      *
-     * Measured on a header-typed source with offload on:
+     * The resolved event type is not written here: it may come from a header the body never had,
+     * and the column mirrors the payload.
      *
-     *   large  offloaded=true   event_type=thing.happened  payload_type=thing.happened
-     *   small  offloaded=false  event_type=thing.happened  payload_type=NULL
-     *
-     * So the column was populated for exactly the rows that cleared the size threshold. A query
-     * filtering on it silently returned a size-biased subset — not an error, not an empty
-     * result, just the large deliveries — and the bias grows with the threshold, which is the
-     * one knob an operator turns without expecting it to change what queries mean.
-     *
-     * Dropping the stub's type entirely would have inverted the asymmetry rather than removed
-     * it: for the ordinary body-typed producer, the offloaded rows would then be the NULL ones.
-     * Reading the payload's own type makes both halves agree in both cases, which is what the
-     * column's definition already claimed.
-     *
-     * @return array<string, string>
+     * @return array<string, mixed>
      */
     private function offloadStub(InboundMessage $message): array
     {
-        $bodyType = $message->payload['type'] ?? null;
-
-        // Two statements rather than a ternary, for the coverage reason ConstantFallbackVisibility
-        // holds across this package: pcov credits a one-line expression to every line it spans, so
-        // a ternary reads as covered the first time EITHER arm runs — and the arm that goes
-        // unexercised here is the one deciding whether payload_type stays empty.
-        // Only the emptiness half is observable. Widening the type check to an OR yields
-        // `['type' => null]` for a body that carries no type, and `payload->>'type'` reads NULL
-        // out of that exactly as it reads NULL out of an absent key -- so the generated column
-        // lands on the same value either way.
-        if (is_string($bodyType) && $bodyType !== '') {
-            return ['type' => $bodyType];
+        if (array_key_exists('type', $message->payload)) {
+            return ['type' => $message->payload['type']];
         }
 
         return [];
     }
 
     /**
-     * Apply the source's token bucket, when one is configured. On exhaustion the
-     * request is answered with 429 and a Retry-After hint (the seconds until the
-     * bucket refills) and nothing is stored or dispatched; a successful hit consumes
-     * one token. The cache-backed limiter is atomic, so Redis makes this correct
-     * across processes while the array store keeps it usable in tests.
+     * Refuse the request while the source's fixed window is full, when a limit is configured:
+     * 429 with a Retry-After hint (the seconds until the window closes and the whole allowance
+     * returns), and nothing stored or dispatched. This only READS the count. The request is
+     * counted later, in countAgainstRateLimit(), once it is known not to be a repeat, so the
+     * check and the count are not atomic; that method's docblock weighs what this costs.
      */
     private function refuseWhenRateLimited(): void
     {
@@ -619,16 +594,17 @@ final readonly class WebhookProcessor
     }
 
     /**
-     * Spend one token, for a delivery that was not a repeat of one already taken.
+     * Count one request against the source's window, for a delivery that was not a repeat of
+     * one already taken.
      *
      * Separated from the check above, and that separation is the fix. The two used to be one
-     * call placed before the dedupe, so a REPLAY spent a token: a captured authentic delivery
-     * verifies correctly, and replaying it enough times emptied the source's bucket and left the
-     * real producer answering 429 until the window rolled. The comment above the old call said
+     * call placed before the dedupe, so a REPLAY counted: a captured authentic delivery verifies
+     * correctly, and replaying it enough times used up the source's allowance and left the real
+     * producer answering 429 until the window rolled. The comment above the old call said
      * the ordering meant "a forged request can never exhaust a real producer's bucket", which was
      * true and was not the whole set — a replay is not forged.
      *
-     * The bucket is per SOURCE rather than per sender, so there is no address to charge instead;
+     * The window is per SOURCE rather than per sender, so there is no address to charge instead;
      * what has to change is which requests count. A delivery the fast path or the authoritative
      * insert recognized as one already taken does not, because it caused no work: no row, no
      * offload, no job. Everything else does, including a delivery the host's own profile filters
@@ -681,7 +657,7 @@ final readonly class WebhookProcessor
         }
 
         // The CONFIG side is lowered here and is load-bearing: a host writes 'X-Keep', and
-        // without this the comparison below never matches. Measured — removing it goes red.
+        // without this the comparison below never matches.
         $only = is_array($store) ? array_map(strtolower(...), $store) : null;
 
         $kept = [];
@@ -690,8 +666,7 @@ final readonly class WebhookProcessor
             // The strtolower on the name cannot change anything: Symfony's HeaderBag::all() already
             // returns every key lowercased, even for a header set as 'X-MiXeD-CaSe', so no request
             // can produce a name it would alter. Its twin on the config side, six lines up, is not
-            // in that position and goes red when removed; that asymmetry is what makes this a claim
-            // about this call rather than about an untested filter.
+            // in that position: a host writes the names in any case.
             //
             // It is kept because it says the comparison is case-insensitive at the point where a
             // reader asks, instead of making them go and check what HeaderBag guarantees.
@@ -739,11 +714,50 @@ final readonly class WebhookProcessor
 
     private function cacheKey(string $webhookId): string
     {
-        return "webhooks:seen:{$this->config->name}:{$webhookId}";
+        return self::seenKey($this->config->name, $webhookId);
+    }
+
+    /**
+     * The cache key of the fast path's "seen" marker for one delivery id of one source.
+     *
+     * The source name carries its length in front, so the key says where the name ends. A name
+     * may contain a colon, and without the length source `tenant` with id `42:evt_1` and source
+     * `tenant:42` with id `evt_1` would share one key: a delivery to the first would mark the
+     * second's as seen, and that one would be answered 200 without ever being stored.
+     *
+     * @internal The format of the key is not part of the package's API.
+     */
+    public static function seenKey(string $source, string $webhookId): string
+    {
+        return 'webhooks:seen:'.strlen($source).":{$source}:{$webhookId}";
     }
 
     private function respond(): Response
     {
         return $this->config->response()->respond($this->request);
+    }
+
+    /**
+     * The verifier's answer, or undetermined when the verifier throws.
+     *
+     * {@see InboundVerifier} asks a verifier to report a provider it could not reach as
+     * undetermined. One that lets a transport failure through instead would turn every forged
+     * POST into a 500 from an anonymous caller, on the path that promises never to answer one.
+     * Its failure is read as what it is, a verification that did not complete, and reported the
+     * way a key set that cannot be resolved is.
+     */
+    private function verifiedBy(InboundVerifier $verifier): VerificationResult
+    {
+        try {
+            return $verifier->verify($this->request, $this->config);
+        } catch (Throwable $verificationFailure) {
+            try {
+                report($verificationFailure);
+            } catch (Throwable) {
+                // Nothing above this can report, and the refusal still answers.
+            }
+
+            return VerificationResult::undetermined();
+        }
     }
 }

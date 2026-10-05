@@ -21,9 +21,18 @@ Route::middleware(Config::array('webhooks.dashboard.middleware', ['web', 'auth',
         // real gate rather than a runtime refusal. It shares this group's middleware
         // (and therefore the view-webhook-dashboard gate) with the page it mirrors.
         if (Config::boolean('webhooks.dashboard.expose_json_api', false)) {
-            Route::get(
+            $metrics = Route::get(
                 Config::string('webhooks.dashboard.api_path', 'api/metrics'),
                 WebhookMetricsController::class,
             )->name('webhooks.dashboard.metrics');
+
+            // A brake of its own, on this route alone: every request computes live percentiles
+            // over the window it asks for, and a throttle in the group's stack would brake the
+            // page's own requests as well. 0 switches it off.
+            $perMinute = Config::integer('webhooks.dashboard.api_max_per_minute', 60);
+
+            if ($perMinute > 0) {
+                $metrics->middleware('throttle:'.$perMinute.',1');
+            }
         }
     });

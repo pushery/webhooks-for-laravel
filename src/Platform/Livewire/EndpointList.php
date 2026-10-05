@@ -27,6 +27,8 @@ use Pushery\Webhooks\Support\UiVariant;
  * Actions that mutate a single endpoint re-resolve it through the owner-scoped query
  * and re-authorize the row-level policy, so the list can never act on a row the tenant
  * does not own.
+ *
+ * @property-read string|null $capNotice
  */
 #[Lazy]
 final class EndpointList extends Component
@@ -44,7 +46,7 @@ final class EndpointList extends Component
     #[On('endpoint-deleted')]
     public function refreshList(): void
     {
-        unset($this->capReached);
+        unset($this->capReached, $this->capNotice);
     }
 
     /**
@@ -54,8 +56,10 @@ final class EndpointList extends Component
     {
         $this->authorize('create', WebhookSubscription::class);
 
-        if ($this->endpointCapReached()) {
-            $this->dispatch('wirekit-toast', variant: 'warning', message: __('webhooks::self-service.limit_reached'));
+        $refusal = $this->registrationRefusal(__('webhooks::self-service.limit_reached'));
+
+        if ($refusal !== null) {
+            $this->dispatch('wirekit-toast', variant: 'warning', message: $refusal);
 
             return;
         }
@@ -160,11 +164,12 @@ final class EndpointList extends Component
      * Permanently remove one owned endpoint, gated by both the row-level policy and the
      * allow_delete switch (the policy already honors the switch).
      *
-     * NOT named `delete`, and the reason is not style. Livewire's CSP-safe build parses a
-     * `wire:click` expression itself rather than handing it to the JS engine, and `delete`
-     * is a KEYWORD in that parser — `wire:click="delete(1)"` reads as the delete OPERATOR,
-     * so the button silently does nothing. No error, no log, and an operator who clicks it
-     * concludes the endpoint is gone. CspSafeMethodNameTest holds the whole class.
+     * Not named `delete`, so the button works under a strict CSP on every Livewire 4 release.
+     * Livewire's CSP-safe build rewrites `wire:click="delete(1)"` to `$wire.delete(1)` and
+     * evaluates it with the Alpine parser it bundles. Up to Livewire 4.4.4 that parser refuses
+     * a keyword after the dot, so the button renders and does nothing: no error, no log, and an
+     * operator who clicks it concludes the endpoint is gone. Livewire 4.4.5 is the first release
+     * whose parser accepts it. CspSafeMethodNameTest holds the whole class.
      */
     public function destroy(int $id): void
     {
@@ -180,9 +185,10 @@ final class EndpointList extends Component
 
     /**
      * The pre-2.0.0 name, kept so a view published before the rename keeps working. Under a
-     * strict CSP that published copy is ALREADY broken — `delete` is a keyword in Livewire's
-     * own expression parser, so `wire:click="delete(1)"` parses as the delete OPERATOR rather
-     * than a call. Re-publish the view, or change that one line, to get the button back.
+     * strict CSP that published copy reaches this method from Livewire 4.4.5 on. On 4.4.4 and
+     * older the CSP-safe build refuses `$wire.delete(1)`, the form it rewrites
+     * `wire:click="delete(1)"` into, and the button does nothing; re-publish the view, or change
+     * that one line, to get it back there.
      *
      * Deliberately NOT tagged `@deprecated`, and that is not an oversight. On PHP 8.4 the
      * code-style pass rewrites that tag into `#[\Deprecated]`, which raises E_USER_DEPRECATED
@@ -196,13 +202,25 @@ final class EndpointList extends Component
     }
 
     /**
-     * Whether the tenant has reached its endpoint cap, so the "New endpoint" action is
-     * hidden. Cached for the request; the list view reads it while it also polls.
+     * Whether the tenant may not register another endpoint, so the "New endpoint" action is
+     * hidden. Cached for the request; refreshList() clears it when an endpoint is saved or
+     * deleted.
      */
     #[Computed]
     public function capReached(): bool
     {
-        return $this->endpointCapReached();
+        return $this->capNotice !== null;
+    }
+
+    /**
+     * The line the list shows in place of the "New endpoint" action, or null while the tenant may
+     * register one: the portal's short label for the configured cap, and for a host limit that
+     * names no sentence of its own, the host's sentence where it names one.
+     */
+    #[Computed]
+    public function capNotice(): ?string
+    {
+        return $this->registrationRefusal(__('webhooks::self-service.list.cap_reached'));
     }
 
     /**

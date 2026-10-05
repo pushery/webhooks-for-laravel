@@ -19,8 +19,9 @@ use Pushery\Webhooks\Database\OwnerKeyType;
  * created_at bounds bind the same 35-day-window start.
  *
  * The caller runs this inside a transaction after clearing the table, so readers keep seeing the
- * previous whole snapshot until it commits — the non-blocking behavior REFRESH ... CONCURRENTLY
- * gives on PostgreSQL.
+ * previous whole snapshot until it commits, and at READ COMMITTED where MySQL allows it, so the
+ * deliveries it reads take no lock and stay writable. Together that is the non-blocking behavior
+ * REFRESH ... CONCURRENTLY gives on PostgreSQL.
  *
  * @internal
  */
@@ -32,7 +33,7 @@ final class RollupRefresh
         // unquoted, a uuid/ulid nil renders as a quoted char literal. It is a fixed package
         // constant, never user input, so splicing it into the SQL is safe.
         $sentinel = OwnerKeyType::fromConfig()->sentinelId();
-        // The cast is EQUIVALENT and reported every run — PHP renders an int identically when
+        // The cast changes no byte: PHP renders an int identically when
         // it is concatenated. It stays because this value is spliced into SQL and the method
         // is declared `literal-string`: a bare int here is the one form that makes the two
         // branches of this ternary disagree about their type while producing the same bytes.

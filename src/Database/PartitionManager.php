@@ -7,6 +7,8 @@ namespace Pushery\Webhooks\Database;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\ConnectionInterface;
+use Pushery\Webhooks\Database\Dialect\Dialect;
+use Pushery\Webhooks\Models\WebhookDelivery;
 use Pushery\Webhooks\Support\Timestamp;
 use Pushery\Webhooks\Support\WebhookConnection;
 use RuntimeException;
@@ -25,9 +27,10 @@ use RuntimeException;
  * lands in it blocks the creation of the partition that should have held it
  * ("updated partition constraint for default partition would be violated by some
  * row"), which would stop partition creation AND retention pruning dead. So the
- * manager drains it: creating a month whose rows sit in the default detaches the
- * default, creates the partition, moves those rows across and re-attaches — the
- * canonical PostgreSQL drain, in one transaction.
+ * manager drains it: the month's partition is built as a freestanding table, the
+ * stranded rows move into it in chunks, and only then is it attached, so no DETACH
+ * locks the parent while rows move. {@see self::drainDefaultPartitionInto()} states
+ * the locks the attach takes and what a reader of the log sees meanwhile.
  */
 final class PartitionManager
 {
@@ -45,9 +48,34 @@ final class PartitionManager
      */
     private const int DRAIN_CHUNK = 5000;
 
+    /**
+     * How long a schema statement on the delivery log waits for its lock before it gives up, as a
+     * PostgreSQL interval.
+     *
+     * Creating, attaching and dropping a partition take locks that conflict with an open read of
+     * the log, and a statement waiting for such a lock makes every later read and write of the
+     * log wait behind it, not only itself. Bounded, the statement gives up instead and the log's
+     * traffic waits at most this long; webhooks:partition-maintenance then fails with PostgreSQL's
+     * lock timeout, and its next run tries again. The window is provisioned months ahead, and a
+     * drain that gave up before its ATTACH is resumed, so one run that gave up costs nothing.
+     */
+    public const string LOCK_TIMEOUT = '2s';
+
     private function db(): ConnectionInterface
     {
         return WebhookConnection::db();
+    }
+
+    /**
+     * Run one schema statement with {@see self::LOCK_TIMEOUT}, in a transaction of its own, so the
+     * setting ends with the statement, also when the statement gives up.
+     */
+    private function ddl(string $sql): void
+    {
+        $this->db()->transaction(function () use ($sql): void {
+            $this->db()->statement("set local lock_timeout = '".self::LOCK_TIMEOUT."'");
+            $this->db()->statement($sql);
+        });
     }
 
     /**
@@ -80,11 +108,9 @@ final class PartitionManager
         // the difference is the whole failure mode. The drain below creates its target freestanding
         // and attaches it at the end, so anything that interrupts it between those two steps (a
         // killed command, an OOM, a deploy restart, a chunk that threw) leaves a table with exactly
-        // this name that is nobody's partition. Asked by name, the next run saw it, returned early
-        // and reported success, while the month's rows kept landing in the default and the
-        // partition was never attached. Every subsequent run did the same. Measured against
-        // PostgreSQL: `partitionBefore=false partitionAfter=false strandedInDefault=1`, over a run
-        // that returned the partition name as though it had done its job.
+        // this name that is nobody's partition. Asked by name, every later run would see it, return
+        // early and report success, while the month's rows kept landing in the default and the
+        // partition was never attached.
         if ($this->partitionExists($name)) {
             return $name;
         }
@@ -92,22 +118,72 @@ final class PartitionManager
         // A leftover of that kind is resumed rather than worked around: the drain is written to
         // be re-enterable, so it moves whatever is still in the default and performs the ATTACH
         // that did not happen. The second condition is the ordinary case — rows the default is
-        // holding for a month whose partition was never created at all.
-        if ($this->tableExists($name) || $this->defaultPartitionCount($start, $end) > 0) {
+        // holding for a month whose partition was never created at all. The third is the same
+        // case, seen only by the count the CREATE makes under its own lock.
+        if ($this->tableExists($name) || $this->defaultPartitionCount($start, $end) > 0 || ! $this->createPartition($name, $start, $end)) {
             $this->drainDefaultPartitionInto($name, $start, $end);
-
-            return $name;
         }
 
-        $this->db()->statement(sprintf(
-            'CREATE TABLE IF NOT EXISTS %s PARTITION OF %s FOR VALUES FROM (%s) TO (%s)',
-            $name,
-            self::TABLE,
-            $this->quoteTimestamp($start),
-            $this->quoteTimestamp($end),
-        ));
-
         return $name;
+    }
+
+    /**
+     * Create the month's partition, unless the default holds rows of its range; then nothing is
+     * created, and false leaves those rows to the drain.
+     *
+     * The count and the CREATE share one transaction, which first takes the lock the CREATE needs
+     * anyway, ACCESS EXCLUSIVE on the parent. A write to the log waits for it before its row is
+     * routed, so no delivery of the month can reach the default between the count and the CREATE.
+     * Counted apart, one could, and the CREATE would then refuse the month ("updated partition
+     * constraint for default partition would be violated by some row").
+     */
+    private function createPartition(string $name, CarbonImmutable $start, CarbonImmutable $end): bool
+    {
+        return $this->db()->transaction(function () use ($name, $start, $end): bool {
+            $this->db()->statement("set local lock_timeout = '".self::LOCK_TIMEOUT."'");
+            $this->db()->statement(sprintf('lock table only %s in access exclusive mode', self::TABLE));
+
+            if ($this->defaultPartitionCount($start, $end) > 0) {
+                return false;
+            }
+
+            $this->db()->statement(sprintf(
+                'CREATE TABLE IF NOT EXISTS %s PARTITION OF %s FOR VALUES FROM (%s) TO (%s)',
+                $name,
+                self::TABLE,
+                $this->quoteTimestamp($start),
+                $this->quoteTimestamp($end),
+            ));
+
+            return true;
+        });
+    }
+
+    /**
+     * The delivery a drain has moved into a target it has not attached yet, or null.
+     *
+     * Until the ATTACH, a moved row sits in a table that is not part of the log, so a lookup on
+     * the parent cannot see it: for the length of the drain, and for good when a drain died
+     * before its ATTACH and no run has resumed it yet. A caller that found nothing on the parent
+     * asks here before it treats the delivery as gone. Written back through the returned model,
+     * an update lands in that table, which is the month's partition after the ATTACH.
+     *
+     * Read without global scopes, because the question is where the row is, not who may see it.
+     * Null on MySQL, where the log has no partitions.
+     */
+    public function movedDelivery(int|string $id, string $createdAt): ?WebhookDelivery
+    {
+        $dialect = WebhookConnection::dialect();
+        $name = $this->partitionName(Timestamp::read($dialect, $createdAt));
+
+        if ($dialect !== Dialect::Pgsql || $this->partitionExists($name) || ! $this->tableExists($name)) {
+            return null;
+        }
+
+        $model = WebhookDelivery::resolve();
+        $model->setTable($name);
+
+        return $model->newQuery()->withoutGlobalScopes()->whereKey($id)->where('created_at', $createdAt)->first();
     }
 
     public function ensureWindow(CarbonInterface $from, int $months): void
@@ -122,7 +198,7 @@ final class PartitionManager
 
     public function ensureDefaultPartition(): void
     {
-        $this->db()->statement(sprintf(
+        $this->ddl(sprintf(
             'CREATE TABLE IF NOT EXISTS %s PARTITION OF %s DEFAULT',
             self::DEFAULT_PARTITION,
             self::TABLE,
@@ -188,13 +264,13 @@ final class PartitionManager
         // Anchored on the parent's oid rather than on its name, for the same reason as
         // insertableColumns() below. `p.relname = ?` matches a table of that name in every schema
         // of the database, so a second install, a tenant-per-schema layout or a
-        // staging schema in the same database made this return partitions belonging to somebody
-        // else's parent. `to_regclass` resolves exactly one relation through the search_path,
-        // and asking for ITS children cannot answer about another lineage.
+        // staging schema in the same database would make this return partitions belonging to
+        // somebody else's parent. `to_regclass` resolves exactly one relation through the
+        // search_path, and asking for ITS children cannot answer about another lineage.
         //
-        // Measured before the fix, with a second parent in `other_tenant`: the foreign
-        // partition appeared in this list, and dropPartitionsOlderThan() then dropped the
-        // CURRENT schema's same-named table instead — see the note there.
+        // The cost of that would be a wrong DROP: a foreign partition in this list would make
+        // dropPartitionsOlderThan() drop the CURRENT schema's same-named table instead — see the
+        // note there.
         return array_keys($this->partitionIdentifiers());
     }
 
@@ -252,14 +328,13 @@ final class PartitionManager
         foreach ($this->partitionIdentifiers() as $name => $qualified) {
             if (substr($name, $prefixLength) < $cutoff) {
                 // The qualified identifier, not the bare name. A bare name in DROP resolves through
-                // the search_path, so it names the current schema, while the list it came from used
-                // to be gathered by name across every schema. The two therefore answered about
-                // different relations, and the gap is a DROP: measured, with a foreign parent in
-                // another schema, the prune deleted an unrelated table of that name in the current
-                // schema, left the partition it meant to drop in place, and reported the drop as
-                // done. `oid::regclass` renders the schema only when the relation is not reachable
-                // unqualified, so this is the bare name in the ordinary install.
-                $this->db()->statement('DROP TABLE IF EXISTS '.$qualified);
+                // the search_path, so it names the current schema, while the partition may live in
+                // another. Addressed by its bare name, the prune would delete an unrelated table of
+                // that name in the current schema, leave the partition it meant to drop in place,
+                // and report the drop as done. `oid::regclass` renders the schema only when the
+                // relation is not reachable unqualified, so this is the bare name in the ordinary
+                // install.
+                $this->ddl('DROP TABLE IF EXISTS '.$qualified);
                 $dropped[] = $name;
             }
         }
@@ -318,25 +393,32 @@ final class PartitionManager
      * takes ROW EXCLUSIVE on the default alone — inserts into every other partition run
      * untouched.
      *
-     * The ATTACH's own locks, measured rather than assumed, because this paragraph used to say only
-     * "the parent is locked for the ATTACH, and nothing longer" — and that is wrong in both
-     * directions at once. Read out of `pg_locks` from a second connection while the statement held
-     * its transaction open, on PostgreSQL 18:
+     * Rows keep arriving while the drain runs when the month being drained is the current one, and
+     * the ATTACH alone takes only ShareUpdateExclusiveLock on the parent, which writes pass. With
+     * the ATTACH in a transaction of its own, two things would fail under that traffic. A write of
+     * the drained month would be routed to the default, wait there for the ATTACH, and be refused
+     * by the default's new bound once the ATTACH commits ("new row for relation
+     * webhook_deliveries_default violates partition constraint"), so the delivery would fail in
+     * the host's request. And a row that reaches the default after the last chunk would fail the
+     * ATTACH itself ("updated partition constraint for default partition would be violated by
+     * some row").
      *
+     * So the rows that arrived during the loop and the ATTACH share one transaction, which first
+     * takes ShareRowExclusiveLock on the parent. Every INSERT, UPDATE and DELETE through the parent
+     * waits for that lock before its row is routed, so no row reaches the default while the
+     * transaction runs, and a write that waited is routed after the ATTACH, into the month's
+     * partition. The locks held while that transaction is open:
+     *
+     *   the parent          ShareRowExclusiveLock, and the ATTACH's ShareUpdateExclusiveLock
      *   the new partition   AccessExclusiveLock
-     *   the DEFAULT         AccessExclusiveLock      <- unnamed here before
-     *   the parent          ShareUpdateExclusiveLock <- weaker than "locked" suggested
+     *   the default         AccessExclusiveLock, because attaching a range next to a default makes
+     *                       PostgreSQL prove that the default holds no row of it
      *
-     * The parent is NOT access-exclusive, so ordinary inserts routed to an existing partition are
-     * not blocked — the sentence was pessimistic there. But the DEFAULT is, because attaching a
-     * range next to a default forces PostgreSQL to re-prove that the default holds no row of that
-     * range. So an insert whose row would land in the default DOES wait, and that is precisely
-     * the traffic a host in this state has: the drain exists because rows are landing there.
-     *
-     * It is still bounded and still much shorter than the row move it replaced — a metadata
-     * check against a table the drain has just emptied of that range — which is why the shape
-     * stands. What changed is that the cost is now stated where an operator reading this can
-     * find it, instead of being described as a lock on a different table.
+     * Reads go on, except one that reaches the default, which waits for the ATTACH. Writes pause
+     * for the last chunk and the ATTACH, on PostgreSQL 18 about 42 ms after a drain of 200,000
+     * rows and 235 ms after one of 1,000,000, most of it the last chunk reading past the rows the
+     * drain has just deleted. A wait
+     * for one of these locks adds at most {@see self::LOCK_TIMEOUT} before the run gives up.
      *
      * The CHECK constraint is not decoration: with it, PostgreSQL can prove the target's rows all
      * belong to the range and skips scanning it during the ATTACH. It is dropped afterwards
@@ -345,6 +427,14 @@ final class PartitionManager
      * The move is chunked so a month of stranded rows is not one transaction either. Each chunk
      * is atomic on its own, and a chunk that fails leaves the rest in the default — which is the
      * state the next run is written to handle, because it is the state it started from.
+     *
+     * The price of the freestanding target is visibility. A moved row is in no partition until the
+     * ATTACH, so a query on the parent does not return it, for the length of the drain and, when a
+     * drain dies before its ATTACH, until the next run resumes it. The two lookups that must find
+     * a live delivery ask {@see self::movedDelivery()} when the parent has nothing: the lifecycle
+     * subscriber, whose status writes would otherwise be dropped, and the delivery gate, which
+     * would otherwise refuse the send as erased. A listing of the log does not, so the moved rows
+     * reappear there with the ATTACH.
      *
      * Generated columns are excluded from the column list: PostgreSQL refuses an explicit value
      * for one, so the moved rows recompute theirs on insert.
@@ -359,7 +449,7 @@ final class PartitionManager
 
         // Freestanding, not PARTITION OF: creating it as a partition is the step the default's
         // rows would block, and it is also the step that takes the parent's lock.
-        $this->db()->statement(sprintf(
+        $this->ddl(sprintf(
             'CREATE TABLE IF NOT EXISTS %s (LIKE %s INCLUDING DEFAULTS INCLUDING GENERATED INCLUDING CONSTRAINTS INCLUDING INDEXES)',
             $name,
             self::TABLE,
@@ -367,24 +457,21 @@ final class PartitionManager
 
         // The foreign keys are carried onto the target, because `LIKE … INCLUDING CONSTRAINTS` does
         // not do it: in PostgreSQL that copies CHECK and NOT NULL and leaves foreign keys behind.
-        // Measured on the shipped table, the parent carries
-        // `webhook_deliveries_subscription_id_foreign` and the LIKE copy carries no `f` constraint
-        // at all.
+        // The parent carries `webhook_deliveries_subscription_id_foreign`, and the LIKE copy
+        // carries no foreign key at all.
         //
         // Without them the moved rows sit OUTSIDE the key for the length of the drain, and the
         // key is ON DELETE CASCADE. A tenant deleting an endpoint in that window is an ordinary
         // thing to do; the cascade cannot reach these rows, because they are no longer in the
-        // partitioned table. What follows is not an orphan — it is worse. Measured end to end
-        // on a replica of this shape:
+        // partitioned table. What follows is not an orphan but a failed ATTACH:
         //
         //   row survives the cascade in the freestanding table
         //   ALTER TABLE … ATTACH PARTITION
         //     ERROR: insert or update violates foreign key constraint
         //
         // So the ATTACH fails, `webhooks:partition-maintenance` throws, and it throws again on
-        // every later run because the target and its unresolvable row persist. That is exactly
-        // the permanent, self-perpetuating outage this whole drain was written to end, let back
-        // in through a door one statement wide.
+        // every later run because the target and its unresolvable row persist: the permanent,
+        // self-perpetuating outage the drain exists to prevent.
         //
         // With the key present the cascade reaches the rows while they are here, and the ATTACH
         // then succeeds — and PostgreSQL ADOPTS the constraint as the inherited one
@@ -394,7 +481,7 @@ final class PartitionManager
             $constraint = sprintf('%s_fk_%d', $name, $index);
 
             // Same reason as the range check below: no IF NOT EXISTS, and this method reruns.
-            $this->db()->statement(sprintf('ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s', $name, $constraint));
+            $this->ddl(sprintf('ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s', $name, $constraint));
 
             // A leftover target from a run that died before this existed can hold a row whose
             // owner is gone, and ADD CONSTRAINT would validate and fail on it — the same wedge,
@@ -432,15 +519,15 @@ final class PartitionManager
                 $match,
             ));
 
-            $this->db()->statement(sprintf('ALTER TABLE %s ADD CONSTRAINT %s %s', $name, $constraint, $key['definition']));
+            $this->ddl(sprintf('ALTER TABLE %s ADD CONSTRAINT %s %s', $name, $constraint, $key['definition']));
         }
 
         // Dropped first, because ADD CONSTRAINT has no IF NOT EXISTS and this method has to be
         // re-enterable: a drain that died after this line would otherwise fail here for ever on
         // every retry, which would turn a recoverable interruption into a permanent one.
-        $this->db()->statement(sprintf('ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s_range', $name, $name));
+        $this->ddl(sprintf('ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s_range', $name, $name));
 
-        $this->db()->statement(sprintf(
+        $this->ddl(sprintf(
             'ALTER TABLE %s ADD CONSTRAINT %s_range CHECK (created_at >= %s AND created_at < %s)',
             $name,
             $name,
@@ -448,6 +535,33 @@ final class PartitionManager
             $upper,
         ));
 
+        $this->moveStrandedRows($name, $columns, $from, $to);
+
+        // The rows that landed while the loop ran, then the ATTACH, with the log's writes stopped:
+        // the paragraph on locks above says why both share this transaction.
+        $this->db()->transaction(function () use ($name, $columns, $from, $to, $lower, $upper): void {
+            $this->db()->statement("set local lock_timeout = '".self::LOCK_TIMEOUT."'");
+            $this->db()->statement(sprintf('lock table only %s in share row exclusive mode', self::TABLE));
+
+            $this->moveStrandedRows($name, $columns, $from, $to);
+
+            $this->db()->statement(sprintf(
+                'ALTER TABLE %s ATTACH PARTITION %s FOR VALUES FROM (%s) TO (%s)',
+                self::TABLE,
+                $name,
+                $lower,
+                $upper,
+            ));
+        });
+
+        $this->ddl(sprintf('ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s_range', $name, $name));
+    }
+
+    /**
+     * Move the default's rows of one month into the drain's target until a chunk finds none.
+     */
+    private function moveStrandedRows(string $name, string $columns, string $from, string $to): void
+    {
         // One chunk per transaction. ctid is the cheapest stable handle for "some rows of this
         // partition" — there is no other bound available here, and ordering by a key would cost
         // a sort over the very rows being deleted.
@@ -468,21 +582,11 @@ final class PartitionManager
                 [$from, $to],
             ));
             // The bound cannot be read wrongly: the DELETE takes at most DRAIN_CHUNK rows, so a
-            // batch that moves fewer than that has emptied the range -- and a batch of exactly
-            // one is such a batch. Raising the comparison ends the loop one turn earlier on a
-            // turn that would have moved nothing. Measured: the suite is green either way.
+            // batch that moves fewer than that has emptied the range it could see -- and a batch
+            // of exactly one is such a batch. Raising the comparison ends the loop one turn
+            // earlier, and a row that lands after it is the second call's, which runs with the
+            // log's writes stopped.
         } while ($moved > 0);
-
-        // The parent's only lock window, and it is a DDL statement rather than a row move.
-        $this->db()->statement(sprintf(
-            'ALTER TABLE %s ATTACH PARTITION %s FOR VALUES FROM (%s) TO (%s)',
-            self::TABLE,
-            $name,
-            $lower,
-            $upper,
-        ));
-
-        $this->db()->statement(sprintf('ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s_range', $name, $name));
     }
 
     /**

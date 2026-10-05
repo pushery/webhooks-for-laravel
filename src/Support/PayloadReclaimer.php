@@ -108,24 +108,17 @@ final class PayloadReclaimer
         $schema = Schema::connection(WebhookConnection::name());
         $referenced = [];
 
-        // Three shapes in this method and the loop above cannot change the outcome, and all three
-        // were measured together with the prune suite green:
+        // Two shapes in this method and the loop above cannot change the outcome:
         //
-        // `$referenced[$path] = true` moved to `false` — the read is isset(), and isset() is true
-        // for a stored false. Only null would make it false, and null is not stored here.
+        // the value stored in `$referenced[$path]` — the read is isset(), and isset() is true for
+        // any stored value but null, which is not stored here;
         //
-        // both `array_filter(..., is_string(...))` calls unwrapped — pluck() yields null for a row
-        // that offloaded nothing, and `$referenced[null]` lands under the key '' rather than
-        // matching any real path.
+        // the `is_string()` checks on the paths — a row that offloaded nothing yields null, and
+        // `$referenced[null]` lands under the key '' rather than matching any real path.
         //
-        // The controls are the suite's own arms, not something added for this note: it
-        // deletes an object nothing references, keeps one a delivery row references, keeps one a
-        // call row references, and keeps scanning past a referenced object. A reference map that
-        // did not work would fail all four.
-        //
-        // They stay, and the second one earns its keep beyond the type: on PHP 8.4 a null array
-        // offset is deprecated, so unwrapping it trades a silent no-op for a notice the day a row
-        // carries no path.
+        // They stay, and the second one earns its keep beyond the type: from PHP 8.5 a null array
+        // offset is deprecated (8.4 says nothing), so unwrapping it trades a silent no-op for a
+        // deprecation the day a row carries no path.
         // Streamed rather than pluck()->all(), and the reason is the second copy. The set below has
         // to hold every referenced key — that is what it is for, and no amount of chunking changes
         // it. What pluck()->all() added on top was a full second array of the same paths, alive at

@@ -15,9 +15,10 @@ enum DeliveryStatus: string
     case Exhausted = 'exhausted';
 
     /**
-     * Never sent, because the endpoint was disabled or deleted while this delivery sat in the
-     * queue. Terminal like {@see self::Exhausted} and deliberately not the same thing: the
-     * endpoint never answered, and nothing about it can be read from the outcome.
+     * Never sent, because the endpoint was disabled, deleted or given another URL while this
+     * delivery sat in the queue. Terminal like {@see self::Exhausted} and deliberately not the
+     * same thing: the endpoint never answered, and nothing about it can be read from the
+     * outcome.
      *
      * That distinction is what the circuit breaker has always made — it declines to charge a
      * refusal to the failure streak because refusing is "our own decision, not the endpoint's
@@ -26,6 +27,21 @@ enum DeliveryStatus: string
      * for the rest of the health window, with every delivery since then successful.
      */
     case Refused = 'refused';
+
+    /**
+     * Whether a delivery in this status is finished: delivered, given up on, or refused unsent.
+     *
+     * No later status write may land on a finished delivery, and the delivery engine asks this
+     * before every write it makes, so the answer is kept in one place rather than in a list at
+     * each place that asks.
+     */
+    public function isTerminal(): bool
+    {
+        return match ($this) {
+            self::Succeeded, self::Exhausted, self::Refused => true,
+            self::Pending, self::Failed => false,
+        };
+    }
 
     /**
      * The design-system intent a badge should carry for this status.

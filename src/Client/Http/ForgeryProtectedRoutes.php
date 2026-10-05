@@ -76,9 +76,8 @@ final class ForgeryProtectedRoutes
 
     private static function isForgeryProtected(Route $route): bool
     {
-        // No `is_string()` skip here, and that is measured rather than assumed. The obvious
-        // defensive guard was written first and the coverage floor refused it: nothing can put a
-        // non-string in this list for one of our routes. `Route::middleware()` casts every entry it
+        // No `is_string()` skip here: nothing can put a non-string in this list for one of our
+        // routes. `Route::middleware()` casts every entry it
         // is handed (Route.php:1090), `RouteRegistrar` does the same for a group — a closure there
         // throws at registration — and the only other source, controller middleware, needs a
         // controller implementing HasMiddleware. This route's action is pinned to WebhookController
@@ -90,7 +89,7 @@ final class ForgeryProtectedRoutes
             // that mostly works: the class itself, a host's subclass of it (the documented way
             // to add an exception URI), and the `web` group when the router has not expanded it
             // yet. The group is included because a route registered inside `Route::middleware('web')`
-            // reports the GROUP here, not its members — measured, and it is the ordinary case.
+            // reports the GROUP here, not its members, and that is the ordinary case.
             //
             // The `is_string()` sits INSIDE the condition rather than above it as a skip: the
             // declared type of this list is `mixed[]`, so `is_subclass_of()` needs the narrowing —

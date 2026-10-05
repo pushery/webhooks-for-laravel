@@ -148,7 +148,7 @@
                             wire:click="redeliver('{{ $delivery->id }}')"
                             wire:loading.attr="disabled"
                             wire:target="redeliver"
-                            :aria-label="__('webhooks::dashboard.a11y.replay_delivery', ['label' => __('webhooks::dashboard.drawer.replay'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $zone($delivery->created_at)->settings($locale)->isoFormat(__('webhooks::dashboard.formats.precise'))])"
+                            :aria-label="__('webhooks::dashboard.a11y.replay_delivery', ['label' => __('webhooks::dashboard.drawer.replay'), 'event' => $delivery->event_type, 'endpoint' => \Pushery\Webhooks\Dashboard\EndpointLabel::for($delivery->subscription?->name, $delivery->subscription?->url, $delivery->subscription_id), 'at' => $zone($delivery->created_at)->settings($locale)->isoFormat(__('webhooks::dashboard.formats.precise'))])"
                         >{{ __('webhooks::dashboard.drawer.replay') }}</x-wirekit::button>
                     </div>
                 @endcan

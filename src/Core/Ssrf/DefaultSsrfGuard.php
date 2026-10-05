@@ -96,8 +96,8 @@ final readonly class DefaultSsrfGuard implements SsrfGuard
         // docblock invites replacing it -- "abstracted so the SSRF guard can be tested against a
         // fake resolver". A consumer who supplies a caching resolver, one backed by an upstream
         // API, or one that returns [] for anything that is not a name loses the protection
-        // silently and keeps a guard that still looks like a guard. Measured: with a resolver
-        // answering one public address for every host, ten literal forms went straight through.
+        // silently and keeps a guard that still looks like a guard: with a resolver answering
+        // one public address for every host, every literal form above would go straight through.
         //
         // So the obligation is discharged where it belongs rather than documented onto every
         // implementor. This does not cover the alternate encodings (`2130706433`, `0x7f000001`,

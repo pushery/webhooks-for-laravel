@@ -27,7 +27,8 @@ return [
     'metrics' => [
         'throughput' => 'Débit',
         'failure_rate' => 'Taux d\'échec',
-        'failed' => ':count en échec',
+        'failed' => '{0} :count en échec|{1} :count en échec|[2,*] :count en échec',
+        'refused' => '{0} :count refusée|{1} :count refusée|[2,*] :count refusées',
         'avg_latency' => 'Latence moy.',
         'max_latency' => 'Latence max.',
     ],

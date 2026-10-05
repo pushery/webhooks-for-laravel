@@ -11,9 +11,9 @@ use Pushery\Webhooks\Server\Jobs\CallWebhookJob;
 /**
  * The immutable, queue-serializable context for one webhook delivery. Carries
  * everything the {@see CallWebhookJob} needs — but NOT the
- * raw signing secret: that travels as {@see self::$encryptedSecret} (sealed via
- * the app encrypter) or is resolved by reference from {@see self::$meta} at handle
- * time, so a signing secret is never at rest in cleartext in the queue store.
+ * raw signing secret: that travels as {@see self::$encryptedSecret}, sealed via the
+ * app encrypter and unsealed at handle time, so a signing secret is never at rest in
+ * cleartext in the queue store.
  *
  * The {@see self::$messageId} is STABLE across attempts (the Standard Webhooks
  * `webhook-id`), so a retry re-signs with the same id and the receiver dedupes.

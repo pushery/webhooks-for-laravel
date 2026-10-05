@@ -29,9 +29,8 @@ trait Replaceable
      * obeyed. Obeying it would fail in the middle of a request or a queued job, long after boot,
      * and this class loses the least.
      *
-     * The container rather than `config()`: the helper belongs to laravel/framework, which this
-     * package does not require. Outside an application, where nothing is bound, the answer is
-     * this class.
+     * The container rather than `config()`, because the helper throws where no application has
+     * booted, and this has an answer there: where nothing is bound, the answer is this class.
      *
      * The key is `static::class`, not `self::class`: a package model extending another one must
      * find its own entry, not its parent's.

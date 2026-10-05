@@ -119,12 +119,10 @@ final readonly class EndpointHealth
 
         // The two COUNT defaults on the next line cannot be reached. `??` fires on null, and a
         // COUNT never returns null — it returns 0 for a window with nothing in it — so no query
-        // result gets that far. Moved to `?? 1` one at a time, the suite stayed green for both.
+        // result gets that far.
         //
         // The p95 default beside them is a different matter and is reachable: percentile_cont over
-        // no rows returns NULL, which is exactly the empty-window case. Moving that one goes red,
-        // and it is what makes the sentence above a claim about the two counts rather than about an
-        // untested method.
+        // no rows returns NULL, which is exactly the empty-window case.
         //
         // All three stay: the tuple's declared type has no nulls in it, and the defaults are what
         // make that true at the boundary instead of one call further in.

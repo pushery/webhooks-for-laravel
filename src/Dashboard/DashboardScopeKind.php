@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Pushery\Webhooks\Dashboard;
 
 /**
- * Which of the three dashboard scopes a {@see DashboardTenant} is.
+ * Which dashboard scope a {@see DashboardTenant} is.
  *
  * It exists because two of them — global and all-tenants — carry NO tenant identity, so the
  * scope can no longer be derived from "is the identity null". Deriving it that way is what

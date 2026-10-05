@@ -53,7 +53,7 @@
                                     <span class="mt-[var(--gap-wk-xs)] flex flex-col items-start gap-[var(--gap-wk-xs)] @[24rem]:hidden">
                                         <x-wirekit::badge :intent="$intent">{{ __('webhooks::dashboard.status.'.$delivery->status->value) }}</x-wirekit::badge>
                                         @if ($delivery->response_code !== null)
-                                            <span class="text-[length:var(--text-wk-xs)] text-[color:var(--color-wk-text-muted)]">{{ __('webhooks::dashboard.table.code') }} {{ $delivery->response_code }}</span>
+                                            <x-wirekit::text as="span" size="xs" intent="muted">{{ __('webhooks::dashboard.table.code') }} {{ $delivery->response_code }}</x-wirekit::text>
                                         @endif
                                     </span>
                                 </x-wirekit::table.th>
@@ -70,7 +70,7 @@
                                             wire:click="redeliver('{{ $delivery->id }}')"
                                             wire:loading.attr="disabled"
                                             wire:target="redeliver"
-                                            :aria-label="__('webhooks::dashboard.a11y.replay_delivery', ['label' => __('webhooks::dashboard.table.replay'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat(__('webhooks::dashboard.formats.precise'))])"
+                                            :aria-label="__('webhooks::dashboard.a11y.replay_delivery', ['label' => __('webhooks::dashboard.table.replay'), 'event' => $delivery->event_type, 'endpoint' => \Pushery\Webhooks\Dashboard\EndpointLabel::for($delivery->subscription?->name, $delivery->subscription?->url, $delivery->subscription_id), 'at' => $when->isoFormat(__('webhooks::dashboard.formats.precise'))])"
                                         >{{ __('webhooks::dashboard.table.replay') }}</x-wirekit::button>
                                     @endcan
                                 </x-wirekit::table.td>

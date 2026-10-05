@@ -6,9 +6,9 @@ namespace Pushery\Webhooks\Platform\Livewire;
 
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Illuminate\Validation\Rule;
-use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Pushery\Webhooks\Core\Http\Exceptions\BlockedDestination;
@@ -16,7 +16,9 @@ use Pushery\Webhooks\Core\Http\Exceptions\HostUnresolvable;
 use Pushery\Webhooks\Facades\Webhooks;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
+use Pushery\Webhooks\Platform\Support\EventTypeAbilities;
 use Pushery\Webhooks\Platform\Support\SubscriptionScope;
+use Pushery\Webhooks\Support\EventTypeList;
 use Pushery\Webhooks\Support\Settings;
 
 /**
@@ -55,8 +57,10 @@ final class EndpointForm extends Component
         $this->authorize('create', WebhookSubscription::class);
         $this->resetForm();
 
-        if ($this->endpointCapReached()) {
-            $this->dispatch('wirekit-toast', variant: 'warning', message: __('webhooks::self-service.limit_reached'));
+        $refusal = $this->registrationRefusal(__('webhooks::self-service.limit_reached'));
+
+        if ($refusal !== null) {
+            $this->dispatch('wirekit-toast', variant: 'warning', message: $refusal);
 
             return;
         }
@@ -71,11 +75,6 @@ final class EndpointForm extends Component
     public function openForEdit(int $id): void
     {
         $subscription = $this->findOwnedEndpoint($id);
-        // This authorize() call cannot be the sole refusal: the boot gate reads the same ability,
-        // and findOwnedEndpoint() has already enforced the ownership this policy would add.
-        // InteractsWithEndpoints states that in full and ends "Do not 'kill' them by deleting
-        // them"; this is one of the five it means. The (int) cast beside it is in the same position
-        // — the value is already an int, and the cast is the boundary that makes the argument one.
         // Redundant with the boot gate, and deliberately kept: {@see InteractsWithEndpoints}
         // states the rule and its measurement -- the gate reads the same ability this policy
         // consults, and the ownership it adds is already enforced by the scoped lookup. This is
@@ -111,21 +110,22 @@ final class EndpointForm extends Component
     {
         $accepted = new Settings()->acceptedEventTypes();
 
-        if ($accepted !== null && $this->storedEventTypes() !== []) {
+        // Read once: each read loads the endpoint row again.
+        $stored = $this->storedEventTypes();
+
+        if ($accepted !== null && $stored !== []) {
             // Neither call on this line can change the outcome. The result is only ever handed to
             // Rule::in, which cares about neither duplicates nor keys, so array_unique and
-            // array_values are tidiness rather than behavior. Removing each in turn leaves the
-            // portal suite green both times.
+            // array_values are tidiness rather than behavior.
             //
             // They stay because the value reads as a list everywhere it is passed on, and a
             // duplicated or gap-keyed one would be a surprise waiting for whoever next uses it for
             // something that does care.
-            $accepted = array_values(array_unique([...$accepted, ...$this->storedEventTypes()]));
+            $accepted = array_values(array_unique([...$accepted, ...$stored]));
         }
 
         $this->validate(
-            // Four items in this list are redundant against the property declarations, each
-            // measured by removing the item and running the portal suite:
+            // Four items in this list are redundant against the property declarations:
             //
             // 'name' => 'nullable' $name is a typed string property; never null 'name' => 'string'
             // same, the type already enforces it 'eventTypes' => 'array' $eventTypes is a typed
@@ -136,9 +136,7 @@ final class EndpointForm extends Component
             // written contract, and a subclass widening a property's type walks straight into the
             // case the type stops covering.
             //
-            // 'required', 'url', 'max:2048' and 'max:255' are reachable and every one of them goes
-            // red when removed, which is what makes the four above a statement about those four
-            // rather than about an untested validate() call.
+            // 'required', 'url', 'max:2048' and 'max:255' are reachable, each by an input of its own.
             [
                 'name' => ['nullable', 'string', 'max:255'],
                 // Bound the URL length so it stores identically on every supported
@@ -168,8 +166,13 @@ final class EndpointForm extends Component
                 // never offered — a typo like `user.registred` produced an endpoint that
                 // looked configured, stayed silent, and was indistinguishable from a correct
                 // registration until someone noticed weeks of nothing arriving.
-                'eventTypes' => ['required', 'array', 'min:1'],
-                'eventTypes.*' => $accepted === null ? ['string'] : ['string', Rule::in($accepted)],
+                //
+                // Bounded either way. Without a catalog nothing else limits what a hand-written
+                // request stores per endpoint, and MySQL refuses a type longer than its index.
+                'eventTypes' => ['required', 'array', 'min:1', 'max:'.EventTypeList::maxCount($accepted, $stored)],
+                'eventTypes.*' => $accepted === null
+                    ? ['string', 'max:'.EventTypeList::MAX_LENGTH]
+                    : ['string', Rule::in($accepted)],
             ],
             [
                 'name.max' => __('webhooks::self-service.validation.name.max'),
@@ -178,6 +181,7 @@ final class EndpointForm extends Component
                 'url.max' => __('webhooks::self-service.validation.url.max'),
                 'eventTypes.required' => __('webhooks::self-service.validation.event_types.required'),
                 'eventTypes.min' => __('webhooks::self-service.validation.event_types.min'),
+                'eventTypes.max' => __('webhooks::self-service.validation.event_types.max'),
                 // Named explicitly, like every other message here, so a refused save does not
                 // fall back to the framework's untranslated ":attribute is invalid".
                 //
@@ -191,10 +195,10 @@ final class EndpointForm extends Component
                 // See the note beside them.
                 'eventTypes.*.string' => __('webhooks::self-service.validation.event_types.string'),
                 'eventTypes.*.in' => __('webhooks::self-service.validation.event_types.in'),
+                'eventTypes.*.max' => __('webhooks::self-service.validation.event_types.length'),
             ],
-            // These three are inert today, and that is worth knowing rather than trusting. Every
-            // message above is written without `:attribute`, so no label is ever interpolated;
-            // removing each in turn leaves the suite green.
+            // These three are inert today: every message above is written without `:attribute`, so
+            // no label is ever interpolated.
             //
             // They are kept, not deleted, because the set of messages above is what makes
             // them inert, and that set is edited: the moment a rule here loses its own message, the
@@ -207,6 +211,20 @@ final class EndpointForm extends Component
                 'eventTypes' => __('webhooks::self-service.form.event_types_label'),
             ],
         );
+
+        // Before the registration brake and the lock, so a refused topic costs the tenant nothing.
+        // Only the types this save ADDS: one the endpoint already carries stays through an edit by
+        // somebody without the ability, and removing it asks nothing.
+        $refused = new EventTypeAbilities()->refused(
+            array_values(array_diff($this->eventTypes, $stored)),
+            Auth::user(),
+        );
+
+        if ($refused !== []) {
+            $this->addError('eventTypes', __('webhooks::self-service.validation.event_types.ability', ['types' => implode(', ', $refused)]));
+
+            return;
+        }
 
         if ($this->endpointId === null) {
             $this->createEndpoint();
@@ -238,8 +256,10 @@ final class EndpointForm extends Component
             // the caller only has to distinguish "registered" from "did not" — and the two
             // reasons cannot be confused for one another on the way out.
             $subscription = $this->withRegistrationLock(function (): ?WebhookSubscription {
-                if ($this->endpointCapReached()) {
-                    $this->addError('url', __('webhooks::self-service.limit_reached'));
+                $refusal = $this->registrationRefusal(__('webhooks::self-service.limit_reached'));
+
+                if ($refusal !== null) {
+                    $this->addError('url', $refusal);
 
                     return null;
                 }
@@ -370,7 +390,6 @@ final class EndpointForm extends Component
      *
      * @return list<string>
      */
-    #[Computed]
     private function storedEventTypes(): array
     {
         if ($this->endpointId === null) {
@@ -396,10 +415,26 @@ final class EndpointForm extends Component
             // The array_values here cannot change what a reader sees, because the view iterates and
             // never reads a key. Its neighbor array_unique is not in that position. Both stay: the
             // value is handed on as a list, and a gap-keyed one would surprise the next reader.
+            //
+            // A type whose catalog entry names an ability the reader lacks is not offered. One the
+            // endpoint already carries still is, so the reader can keep it or remove it.
             'availableEventTypes' => array_values(array_unique([
-                ...new Settings()->eventTypes(),
+                ...$this->offeredEventTypes(),
                 ...$this->storedEventTypes(),
             ])),
         ]);
+    }
+
+    /**
+     * The catalog's event types the acting reader may subscribe an endpoint to.
+     *
+     * @return list<string>
+     */
+    private function offeredEventTypes(): array
+    {
+        $types = new Settings()->eventTypes();
+        $refused = new EventTypeAbilities()->refused($types, Auth::user());
+
+        return array_values(array_diff($types, $refused));
     }
 }

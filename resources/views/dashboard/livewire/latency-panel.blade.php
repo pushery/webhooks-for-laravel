@@ -25,7 +25,7 @@
                     {{-- Same fix as the activity chart, same reason: fixed gaps plus a zero
                          flex-basis collapse every bar to 0px once the gaps outgrow the plot,
                          and the card's overflow-hidden means no scrollbar appears to say so.
-                         See that view for the measured thresholds. --}}
+                         See that view for where it starts. --}}
                     <div
                         class="wh-dash-latency-plot mt-[var(--padding-wk-y-sm)] overflow-x-auto"
                         tabindex="0"

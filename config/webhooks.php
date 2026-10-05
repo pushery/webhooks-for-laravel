@@ -3,6 +3,8 @@
 declare(strict_types=1);
 use Pushery\Webhooks\Core\Signing\StandardWebhooksScheme;
 use Pushery\Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Support\EnvFlag;
+use Pushery\Webhooks\Support\EnvLimit;
 
 return [
 
@@ -70,7 +72,8 @@ return [
         // The egress policy. Read this before changing it: two of the four keys
         // WEAKEN the guard rather than tighten it.
         //
-        //   https_only             Refuse a plaintext http:// endpoint.
+        //   https_only             Refuse a plaintext http:// endpoint. An empty
+        //                          WEBHOOKS_HTTPS_ONLY= counts as unset and keeps it on.
         //   block_private_networks The guard itself. Set to false and NOTHING is
         //                          classified: private, loopback, link-local and
         //                          cloud-metadata (169.254.169.254) destinations all
@@ -91,7 +94,7 @@ return [
         //                          way to "tighten" egress. Empty means nothing bypasses
         //                          the guard, which is what you want.
         'ssrf' => [
-            'https_only' => filter_var(env('WEBHOOKS_HTTPS_ONLY', true), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true,
+            'https_only' => EnvFlag::protection(env('WEBHOOKS_HTTPS_ONLY', true), true),
             'block_private_networks' => true,
             'allowed_hosts' => [],
             'blocked_hosts' => [],
@@ -163,8 +166,8 @@ return [
         // Webhooks HMAC (core.signing.scheme) stays the default; generate a keypair with
         // `php artisan webhooks:ed25519-keygen`.
         //
-        // canonicalize applies a deterministic, sorted-key JSON serialization (an
-        // RFC 8785-style canonical form) to the delivered body before it is signed,
+        // canonicalize applies a deterministic JSON serialization, keys sorted by their
+        // bytes (an RFC 8785-style canonical form), to the delivered body before it is signed,
         // so a receiver that re-canonicalizes reproduces the exact signed bytes
         // regardless of key order. Off by default: signing the exact bytes you send
         // is already correct, and turning this on changes the wire body, so a
@@ -178,22 +181,25 @@ return [
         ],
 
         'http_verb' => 'post',
-        'connect_timeout' => 3,
-        'timeout' => 5,
+        'connect_timeout' => EnvLimit::ceiling(env('WEBHOOKS_SERVER_CONNECT_TIMEOUT'), 3),
+        'timeout' => EnvLimit::ceiling(env('WEBHOOKS_SERVER_TIMEOUT'), 5),
         'tries' => 3,
 
-        // The retry schedule. 'base' and 'cap' bound the jittered exponential delay; the
-        // cap's default keeps a released job under an SQS visibility timeout.
+        // The retry schedule. 'base' and 'cap' bound the jittered exponential delay. A retry
+        // is a released job, which even SQS holds back for up to 12 hours, so the cap is the
+        // schedule's choice rather than a limit of the queue.
         //
         // retry_after_cap is a SEPARATE ceiling, and deliberately so: it is the longest
-        // wait this queue can hold a job for, while an endpoint's rate-limit window
-        // (429/503 + Retry-After) is routinely much longer than any visibility timeout.
+        // wait this queue can hold a newly dispatched job for (on SQS a message delay of at
+        // most 15 minutes, which is the default's 900 seconds), while an endpoint's rate-limit
+        // window (429/503 + Retry-After) is routinely much longer than that.
         // When an endpoint asks for longer than the cap, the delivery comes back at the
         // cap and that wait is NOT charged against 'tries' — up to retry_after_max_deferrals
         // times — so an endpoint answering "Retry-After: 3600" is still there to receive
         // the webhook when its window elapses, instead of the delivery being exhausted
         // half an hour earlier. Raise retry_after_cap on a queue that can hold longer
-        // delays (Redis, database) to obey such a hint exactly.
+        // delays (Redis, database) to obey such a hint exactly. On SQS a deferral waits
+        // 900 seconds at most whatever the cap says, because AWS refuses a longer delay.
         //
         // The deferral needs a connection that can hold a dispatched job back. An SQS queue
         // whose name ends in .fifo cannot, because a FIFO queue takes a delay only for the
@@ -212,7 +218,7 @@ return [
             'cap' => 900,
             'respect_retry_after' => true,
             'retry_after_cap' => 900,
-            'retry_after_max_deferrals' => 6,
+            'retry_after_max_deferrals' => EnvLimit::ceiling(env('WEBHOOKS_SERVER_RETRY_AFTER_MAX_DEFERRALS'), 6, zeroSwitchesOff: true),
         ],
         'no_retry_on_4xx' => true,
         // Which 4xx stay retryable while the switch above is on. Digit strings are read as
@@ -244,9 +250,19 @@ return [
             'prune_after_days' => 30,
         ],
 
+        // A payload larger than 'threshold' bytes is written to 'disk', and the delivery log keeps
+        // a stub and a pointer instead. The queued job still carries the whole body it signs and
+        // sends; the sending guide says what that means on SQS.
         'large_payload' => ['enabled' => false, 'threshold' => 262144, 'disk' => 's3'],
         'verify_ssl' => true,
         'horizon_tags' => true,
+
+        // Request options of your own, added to every delivery. For keys a middleware of
+        // yours reads off the request, such as the purpose an egress policy asks every
+        // outbound call for: Laravel's HTTP client hands them on untouched. A key Guzzle
+        // reads itself is refused, because the transport owns redirects, TLS, the response
+        // sink, the timeouts, the proxy and the IP pin.
+        'request_options' => [],
     ],
 
     /*
@@ -310,6 +326,10 @@ return [
             //         ],
             //         'additionalProperties' => false,
             //     ],
+            //     // Optional: the ability subscribing an endpoint to this type takes, on top of
+            //     // what the portal or the console asks. Without it the type is not offered, and
+            //     // a save that adds it is refused. A prefix wildcard covering it takes it too.
+            //     'ability' => 'subscribe-to-invoice-events',
             // ],
         ],
 
@@ -341,8 +361,8 @@ return [
         // on either, the delivery does not wait for its slot, and the event still fires with
         // the delay it should have had.
         'rate_limit' => [
-            'enabled' => true,
-            'max_per_minute' => 60,
+            'enabled' => EnvFlag::protection(env('WEBHOOKS_PLATFORM_RATE_LIMIT_ENABLED', true), true),
+            'max_per_minute' => EnvLimit::ceiling(env('WEBHOOKS_PLATFORM_RATE_LIMIT_MAX_PER_MINUTE'), 60),
         ],
 
         // A brake on the MANUAL test ping (Webhooks::ping), which the shaping above
@@ -364,7 +384,7 @@ return [
         // Set to null to remove the brake. On by default — a deliberate behavior change. A
         // value set through env() arrives as a digit string and is read as the number.
         'test_ping' => [
-            'max_per_minute' => 5,
+            'max_per_minute' => EnvLimit::ceiling(env('WEBHOOKS_PLATFORM_TEST_PING_MAX_PER_MINUTE'), 5),
         ],
 
         // How long an endpoint's PREVIOUS signing secret keeps verifying after a
@@ -411,12 +431,14 @@ return [
         //
         // 'register_routes' is for a host that wants the panels but not the portal's own
         // pages. Set it to false and the provider registers the Livewire components and
-        // nothing else — no route, no prefix, no middleware stack of its own — so you can
-        // embed <livewire:webhooks.self-service.endpoint-list /> in a screen you already
-        // guard, instead of the same surface gaining a second URL beside it. The panels
-        // drop the links they can no longer resolve (the transform editor, the health
-        // board, the back link) rather than failing to render, so what you get is the
-        // list, the form and the secret panel, working.
+        // none of the portal's pages — no page route, no prefix, no middleware stack of its
+        // own — so you can embed <livewire:webhooks.self-service.endpoint-list /> in a
+        // screen you already guard, instead of the same surface gaining a second URL beside
+        // it. One route stays either way: /_webhooks/webhooks-ui.js, the script the secret
+        // panel's countdown runs on, which an embedded panel needs as much as the portal
+        // does. The panels drop the links they can no longer resolve (the transform editor,
+        // the health board, the back link) rather than failing to render, so what you get is
+        // the list, the form and the secret panel, working.
         'self_service' => [
             'enabled' => filter_var(env('WEBHOOKS_SELF_SERVICE_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
             'middleware' => ['web', 'auth'],
@@ -461,9 +483,9 @@ return [
             // again buys nothing the next tick would not. A non-positive value switches the
             // brake off rather than refusing every recompute.
             'recomputes_per_minute' => 2,
-            'secret_reveal_ttl' => 60,
+            'secret_reveal_ttl' => EnvLimit::ceiling(env('WEBHOOKS_SELF_SERVICE_SECRET_REVEAL_TTL'), 60),
             'allow_delete' => true,
-            'max_endpoints_per_tenant' => null,
+            'max_endpoints_per_tenant' => EnvLimit::optionalCeiling(env('WEBHOOKS_SELF_SERVICE_MAX_ENDPOINTS_PER_TENANT'), null, floor: 0),
         ],
 
         // The tenant-facing delivery list in the self-service portal.
@@ -525,7 +547,7 @@ return [
             // debounces that: the recompute is skipped when the cached score is younger
             // than this many seconds, leaning on the scheduled command for freshness.
             // Set to 0 to recompute on every finished delivery.
-            'refresh_min_interval_seconds' => 60,
+            'refresh_min_interval_seconds' => EnvLimit::ceiling(env('WEBHOOKS_HEALTH_REFRESH_MIN_INTERVAL_SECONDS'), 60, zeroSwitchesOff: true),
             'weights' => [
                 'success' => 0.7,
                 'latency' => 0.15,
@@ -579,9 +601,10 @@ return [
     | HMAC under a key anyone can read is a signature anyone can make.
     |
     | An invalid signature responds with 'invalid_status' (401 by default), never
-    | 500: a request that can never verify must not tell the sender to retry. A
-    | 'verifier' has one outcome a scheme does not — the provider callback did not
-    | answer, so authenticity was never established either way. That is still a
+    | 500: a request that can never verify must not tell the sender to retry. Two
+    | sources have an outcome a signature over a key at hand never has: a 'verifier'
+    | whose provider callback did not answer, and a 'jwks' key set that could not be
+    | fetched. Either way authenticity was never established. That is still a
     | refusal (nothing is stored), but it is the only one a retry could resolve, so
     | 'undetermined_status' can answer it separately; unset, it stays identical to
     | 'invalid_status'. The signed timestamp is checked against
@@ -595,17 +618,19 @@ return [
     | 'store_headers' controls which request headers are persisted ('*' for all, a
     | list of names, or [] for none); the names in 'redact' (plus Authorization,
     | Cookie, Proxy-Authorization and the PHP_AUTH_* pair Symfony synthesizes from a
-    | Basic line, always) are masked. That last group is the one worth knowing about:
-    | they are not headers the producer sent, so masking Authorization alone used to
-    | leave the same password in clear text beside it. Formerly: Authorization and
-    | Cookie always) are masked before storage. Stored calls are pruned after
-    | 'delete_after_days' days by the scheduled model:prune command.
+    | Basic line, always) are masked before storage. That last group is the one worth
+    | knowing about: they are not headers the producer sent, so masking Authorization
+    | alone used to leave the same password in clear text beside it. Stored calls are
+    | pruned after 'delete_after_days' days by the scheduled model:prune command.
     |
-    | 'rate_limit' throttles a single source with a token bucket
-    | (['max_attempts' => 60, 'decay_seconds' => 60]); an authentic request over the
-    | limit is answered 429 with a Retry-After header and is neither stored nor
-    | dispatched, while a forged one never counts (verification runs first). Omit the
-    | key (or leave it null) to receive without limit. 'large_payload' offloads a body
+    | 'rate_limit' throttles a single source with a fixed window
+    | (['max_attempts' => 60, 'decay_seconds' => 60]): the first counted request opens a
+    | window of 'decay_seconds', at most 'max_attempts' are accepted inside it, and the
+    | whole allowance returns when it closes, so up to twice the limit can arrive across
+    | a window boundary. An authentic request over the limit is answered 429 with a
+    | Retry-After header and is neither stored nor dispatched, while a forged one never
+    | counts (verification runs first). Omit the key (or leave it null) to receive
+    | without limit. 'large_payload' offloads a body
     | larger than 'threshold' bytes to the 'disk' Storage disk, keeping only a pointer
     | plus the body sha256 in the row; rehydrate the full bytes with $call->body().
     | Offloaded objects are content-addressed and are NOT deleted by 'delete_after_days'
@@ -717,11 +742,12 @@ return [
             //     ],
             //     'tolerance_seconds' => 300,
             //     'invalid_status' => 401,
-            //     // Only reachable through a 'verifier': a signature scheme always
-            //     // reaches a verdict, a provider callback can time out. Unset, such a
-            //     // delivery is answered exactly like a rejected one. Set it (503 is the
-            //     // usual choice) to tell the sender to try again instead of to give up —
-            //     // the one refusal a retry can actually resolve.
+            //     // Reached by a 'verifier' whose provider callback did not answer,
+            //     // and by a 'jwks' key set that could not be fetched: a signature over
+            //     // a key at hand always reaches a verdict. Unset, such a delivery is
+            //     // answered exactly like a rejected one. Set it (503 is the usual
+            //     // choice) to tell the sender to try again instead of to give up — the
+            //     // one refusal a retry can actually resolve.
             //     'undetermined_status' => 503,
             //     // Three swappable seams, each defaulting to the class shown. 'profile'
             //     // decides which calls are processed and stored at all (filter out the
@@ -744,6 +770,12 @@ return [
             //     // the body carrying only `action`, so without it every delivery is logged
             //     // with an EMPTY type and per-type routing falls to '*' every time. Same
             //     // grammar as 'dedupe_id' below.
+            //     //
+            //     // The header is not covered by the signature on this dialect either, so the
+            //     // sender chooses the type: a captured authentic delivery resent under another
+            //     // X-GitHub-Event reaches another handler in 'process'. A handler picked this way
+            //     // confirms the type against the body it receives. 'webhooks:preflight' names
+            //     // every source that routes on such a header.
             //     'event_type' => 'header:X-GitHub-Event',
             //     // GitHub again, and for the same reason: its delivery id is
             //     // X-GitHub-Delivery, not the 'webhook-id' header the default below reads.
@@ -827,10 +859,11 @@ return [
     | accurate on stock PostgreSQL to low millions of rows per tenant and needing no
     | extension. 'tdigest' (Tier 2) is the high-volume path: it stores a per-bucket
     | latency t-digest in the hourly rollup and merges those digests across the window
-    | with rollup() in O(buckets). It requires the PostgreSQL tdigest extension —
-    | install it once (CREATE EXTENSION tdigest;) and re-run the dashboard migrations
-    | so the rollup gains its latency_digest column; selecting 'tdigest' without the
-    | extension raises one clear, actionable error rather than a cryptic SQL failure.
+    | with the extension's tdigest(tdigest) aggregate in O(buckets). It requires the
+    | PostgreSQL tdigest extension — install it once (CREATE EXTENSION tdigest;) and
+    | re-run the dashboard migrations so the rollup gains its latency_digest column;
+    | selecting 'tdigest' without the extension raises one clear, actionable error
+    | rather than a cryptic SQL failure.
     | 'metrics.refresh' is the materialized-view refresh cadence.
     |
     | 'expose_json_api' (default false) adds a read-only JSON metrics endpoint serving
@@ -843,6 +876,13 @@ return [
     | the KPI counts, the retry rate, the latency percentiles, the hourly buckets and the
     | busiest event types. No delivery rows, payloads, headers or secrets are exposed.
     | While the flag is false the route is not registered at all.
+    |
+    | Every request computes live percentiles over the window it asks for, up to 30 days
+    | of raw rows, so the endpoint carries a brake of its own: 'api_max_per_minute'
+    | requests per minute and caller (default 60, WEBHOOKS_DASHBOARD_API_MAX_PER_MINUTE).
+    | It sits on the endpoint's route rather than in 'middleware', where a throttle would
+    | brake the panels' own requests as well. 0 switches it off, for a host that throttles
+    | the path itself.
     |
     */
 
@@ -909,8 +949,10 @@ return [
         // an absence.
         //
         // 'denied' is what a denied read shows: 'redacted' (default) keeps the structure and
-        // replaces every value with its type, which is what debugging actually needs; 'hidden'
-        // shows nothing but the notice. Either way the drawer says WHY, because a panel that
+        // replaces every value with its type, which is what debugging actually needs. A key
+        // stays while it reads as a field name and becomes [key 1], [key 2], … when it reads as
+        // data, such as an email address or an account number. 'hidden' shows nothing but the
+        // notice. Either way the drawer says WHY, because a panel that
         // simply stops after its heading reads as a bug and invites the guard's removal.
         // Anything other than those two tokens is read as 'hidden' — a typo in a security
         // setting must not be the permissive reading.
@@ -947,11 +989,16 @@ return [
         'percentiles' => [
             'driver' => 'live',
         ],
+        // How often webhooks:refresh-metrics rebuilds the hourly rollup, as a schedule-frequency
+        // token. Each run recomputes the full 35 days the dashboard reads, so its cost grows with
+        // the deliveries in that window rather than with what changed since the last run. The
+        // dashboard guide lists what a run costs; a slower token trades freshness for load.
         'metrics' => [
             'refresh' => 'everyFiveMinutes',
         ],
         'expose_json_api' => false,
         'api_path' => 'api/metrics',
+        'api_max_per_minute' => EnvLimit::ceiling(env('WEBHOOKS_DASHBOARD_API_MAX_PER_MINUTE'), 60, zeroSwitchesOff: true),
     ],
 
     /*
@@ -994,10 +1041,11 @@ return [
     | false, so no row is ever written to an index.
     |
     | Only queryable, non-sensitive fields are indexed — the event type, the
-    | endpoint URL (outbound) or source (inbound), the status, the owner/tenant id,
-    | the timestamp, and a short payload excerpt capped at 'payload_excerpt_chars'
-    | characters. A payload offloaded to a Storage disk is never indexed verbatim;
-    | its excerpt is left empty so the large body is never copied into the index.
+    | endpoint URL without its userinfo and query (outbound) or source (inbound),
+    | the status, the owner/tenant id, the timestamp, and a short payload excerpt
+    | capped at 'payload_excerpt_chars' characters. A payload offloaded to a
+    | Storage disk is never indexed verbatim; its excerpt is left empty so the
+    | large body is never copied into the index.
     |
     | The search ENGINE is Scout's own setting, not one of ours: pick it in
     | config/scout.php ('database' needs no extra service; 'meilisearch' needs a running
@@ -1077,11 +1125,13 @@ return [
     | a closure in config makes `php artisan config:cache` throw.
     |
     | The Tailwind utilities these screens are built from are compiled by YOUR app's
-    | build — see the README's "Styling the UI" section for the two source globs it
-    | needs. The package ships no compiled stylesheet. If your app has its own Vite
-    | pipeline, point 'assets' at a Blade partial that emits it (e.g. @vite([...])) and
-    | the package layouts @include it in <head> — so the shipped screens load YOUR
-    | compiled CSS/JS without you having to publish and fork the layout.
+    | build — the "Styling the UI" guide at
+    | https://docs.pushery.com/webhooks-for-laravel/guides/styling-the-ui names the two
+    | source globs it needs. The package ships no compiled stylesheet. If your app has
+    | its own Vite pipeline, point 'assets' at a Blade partial that emits it (e.g.
+    | @vite([...])) and the package layouts @include it in <head> — so the shipped
+    | screens load YOUR compiled CSS/JS without you having to publish and fork the
+    | layout.
     |
     */
 
@@ -1154,16 +1204,17 @@ return [
         //
         // 'delete_confirm' is the button that confirms the deletion inside the dialog, the one
         // action on the list that cannot be taken back. It drew no icon at all while the button
-        // that only opens the dialog drew one. A config published before this key existed has no
-        // entry for it, and there it follows 'delete', so both buttons of one deletion keep
-        // carrying the same symbol; null drops it.
+        // that only opens the dialog drew one. It is deliberately not set below: unset, it
+        // follows 'delete', so both buttons of one deletion carry the same symbol whatever the
+        // row uses. A value shipped here would be merged into every published config that lacks
+        // the key and win over the 'delete' it names. Add it to give the confirmation a symbol
+        // of its own; null drops it.
         'row_action_icons' => [
             'ping' => 'send',
             'secret' => 'key',
             'edit' => 'edit',
             'transform' => 'sliders',
             'delete' => 'trash',
-            'delete_confirm' => 'trash',
 
             // The last four are the OPERATOR console's row, which drew no icons at all while the
             // self-service list beside it drew one per action. It reads the same block on purpose:
@@ -1176,13 +1227,12 @@ return [
             // who wants one symbol for starting and another for stopping should not have to publish
             // the view to say so.
             //
-            // 'rotate_secret_confirm' follows 'rotate_secret' when unset, exactly as
-            // 'delete_confirm' follows 'delete', so a config published before these keys existed
-            // keeps both buttons of one rotation carrying the same symbol. null still drops it.
+            // 'rotate_secret_confirm' is not set either, for the same reason, and follows
+            // 'rotate_secret' exactly as 'delete_confirm' follows 'delete', so both buttons of
+            // one rotation carry the same symbol. Add it for a symbol of its own; null drops it.
             'enable' => 'play',
             'disable' => 'pause',
             'rotate_secret' => 'refresh',
-            'rotate_secret_confirm' => 'refresh',
         ],
 
         // The HTTP status a REFUSED operator action answers with. 403 is what this console
@@ -1302,8 +1352,9 @@ return [
     |     'abilities' => ['view' => 'view webhooks', '*' => 'manage webhooks'],
     |
     | Your page gate cannot do that unless Livewire re-applies it. Only persistent middleware runs
-    | on Livewire's own endpoint, which by default means `auth` and `can:`. Gate the page with
-    | `can:`, or register your own middleware with Livewire::addPersistentMiddleware().
+    | on Livewire's own endpoint. Its default list holds `auth` and `can:` beside a few
+    | authentication middlewares of other packages, and no gate middleware you write. Gate the
+    | page with `can:`, or register your own middleware with Livewire::addPersistentMiddleware().
     |
     | Both keys may be set: the map answers where it names an action (or has '*'), and
     | 'ability' answers everywhere else, with its argument and its behavior unchanged.

@@ -15,10 +15,10 @@ use RuntimeException;
  * short capability check; everything else is refused with one clear, actionable message
  * instead of a cryptic failure deep inside a raw statement.
  *
- * This is the cross-engine successor to {@see PostgresRequirement}. Both exist during the
- * MySQL rollout: a migration whose table has a MySQL shape calls this guard, one that is
- * still PostgreSQL-only keeps calling PostgresRequirement. A default-deny architecture
- * test asserts every migration calls exactly one of the two.
+ * This is the cross-engine successor to {@see PostgresRequirement}. Every migration this
+ * package ships calls this guard, which uses PostgresRequirement's version check for a
+ * PostgreSQL connection. PostgresRequirement::ensure() stays public for a host guarding a
+ * PostgreSQL-only table of its own.
  *
  * MySQL is held to real requirements, not a version label:
  *  - MariaDB is rejected. It reports itself as the `mysql` driver, but its JSON type is a
@@ -60,10 +60,13 @@ final class DatabaseRequirement
         }
 
         if ($driver === 'pgsql') {
-            // The same floor the PostgreSQL-only guard applies, read from one place. Until this
-            // line existed, pgsql passed both guards with no version read at all while MySQL was
-            // checked four ways — the asymmetry is documented on PostgresRequirement::MIN_VERSION.
+            // The same floor the PostgreSQL-only guard applies, read from one place, so a pgsql
+            // server is checked here as a MySQL one is below — see PostgresRequirement::MIN_VERSION.
             PostgresRequirement::ensureVersion($name, $resolved->getServerVersion());
+
+            // And the server has to be PostgreSQL itself, which the version alone does not say: a
+            // compatible engine reports a version the floor accepts.
+            PostgresRequirement::ensureIdentity($name, $resolved);
 
             return;
         }
@@ -157,7 +160,7 @@ final class DatabaseRequirement
         /** @var object{sql_mode?: string}|null $row */
         $row = $connection->selectOne('SELECT @@session.sql_mode AS sql_mode');
 
-        // EQUIVALENT, and reported every run: `SELECT @@session.sql_mode` always answers one
+        // The coalesce changes no outcome: `SELECT @@session.sql_mode` always answers one
         // row on a server that got this far, so the coalesce has no reachable input. It is the
         // narrowing PHPStan needs from an optional property, and an empty mode is the safe
         // reading — it satisfies no strictness check, so an unreadable mode is refused rather

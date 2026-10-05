@@ -10,12 +10,13 @@ use Pushery\Webhooks\Server\Jobs\CallWebhookJob;
  * Exponential backoff with FULL jitter: the delay before retry N is a uniform
  * random value in `[0, min(cap, base * 2^(N-1))]`. Full jitter is the
  * thundering-herd-safe choice — many endpoints failing at once retry at spread-out
- * times instead of hammering in lockstep. The cap (default 900s) preserves the SQS
- * visibility-timeout ceiling; raise it when not on SQS.
+ * times instead of hammering in lockstep. The cap (default 900s) is the longest wait the
+ * schedule chooses between two attempts, not a limit of the queue: a retry is a release(), and
+ * SQS holds a released message back for up to 12 hours, its maximum visibility timeout.
  *
  * When a Retry-After hint is supplied it wins: a server that asked us to wait a
  * specific time is obeyed rather than jittered. It is clamped by its OWN cap, not by
- * the jitter cap — the jitter cap exists to stay under a queue's visibility timeout,
+ * the jitter cap — the jitter cap shapes the schedule of ordinary retries,
  * while an endpoint's rate-limit window is routinely longer than that, and silently
  * shortening it means coming back while it is still refusing us. What happens when a
  * hint exceeds that cap is the job's decision, not the schedule's
@@ -52,20 +53,18 @@ final readonly class ExponentialWithJitter implements BackoffStrategy
     }
 
     /**
-     * A copy whose Retry-After clamp is the given seconds, leaving the jitter cap (the
-     * queue-visibility ceiling) untouched. The delivery builder uses this so raising the
-     * Retry-After cap on a single call also raises the clamp its released delay is bound
-     * by — otherwise the defer threshold and the delay clamp, which are the SAME wait,
-     * would silently disagree and the call would come back at the old cap while the
-     * endpoint is still rate-limiting it.
+     * A copy whose Retry-After clamp is the given seconds, leaving the jitter cap untouched. The
+     * delivery builder uses this so raising the Retry-After cap on a single call also raises the
+     * clamp its released delay is bound by — otherwise the defer threshold and the delay clamp,
+     * which are the SAME wait, would silently disagree and the call would come back at the old cap
+     * while the endpoint is still rate-limiting it.
      */
     public function withRetryAfterCap(int $retryAfterCapSeconds): self
     {
-        // Lowering this floor is EQUIVALENT and reported every run: a stored -1 and a stored 0
-        // both mean "no cap to honor", so both fall through to the jitter schedule. Raising it
-        // is not equivalent, and the arm distinguishing a zero cap from a one-second one holds
-        // that direction — the two floors on this class are deliberately different, and that is
-        // the one worth guarding.
+        // A stored -1 and a stored 0 both mean "no cap to honor", so both fall through to the
+        // jitter schedule; the floor keeps the property from carrying a negative number at all.
+        // A zero cap and a one-second one are not the same, and the two floors on this class are
+        // deliberately different.
         return new self($this->baseSeconds, $this->capSeconds, max(0, $retryAfterCapSeconds));
     }
 

@@ -19,8 +19,8 @@ use Pushery\WireKit\WireKitServiceProvider;
  *
  * And the failure is an unstyled screen, which is not an error. A consumer kept those copies for
  * exactly this reason, deleted them when a release brought accessibility fixes they wanted, and the
- * screen fell back to the neutral rendering. Nothing threw, nothing logged, no test went red — a
- * view rendered, and it was the wrong one. That is why the choice belongs in config rather than in
+ * screen fell back to the neutral rendering. Nothing threw and nothing logged: a view rendered,
+ * and it was the wrong one. That is why the choice belongs in config rather than in
  * a publish.
  *
  * @internal
@@ -132,7 +132,7 @@ final class UiVariant
      * Both sides are normalized, and skipping that inverts the answer. The provider registers its
      * own views as `__DIR__.'/../resources/views'` and the finder hands that string back unchanged,
      * so a plain prefix test against the package root reads every view as an override and the whole
-     * setting silently does nothing — measured, on the first version of this.
+     * setting silently does nothing.
      *
      * The `?:` fallbacks are in assignment position on purpose: neither realpath can fail on a tree
      * that resolved a view at all, and a branch for that would be one nothing can enter.
@@ -172,10 +172,9 @@ final class UiVariant
         // switches a setting off the way one switches a flag off — `WEBHOOKS_UI_VARIANT=false` —
         // hands env() the boolean false. The typed getter then throws "must be a string, boolean
         // given" and takes both operator screens down, which is the opposite of what this method
-        // promises two lines below. Measured against the real repository: a missing key returns the
-        // default, a present non-string throws. That asymmetry is the trap — the value is not
-        // absent, it is present and of the wrong type, which is the one state a default cannot
-        // cover.
+        // promises two lines below. A missing key returns the default, a present non-string
+        // throws, and that asymmetry is the trap — the value is not absent, it is present and of
+        // the wrong type, which is the one state a default cannot cover.
         $configured = Config::get('webhooks.ui.variant', 'auto');
 
         return match (is_string($configured) ? $configured : 'auto') {

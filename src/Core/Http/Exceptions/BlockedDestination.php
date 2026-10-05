@@ -17,9 +17,15 @@ use RuntimeException;
  */
 final class BlockedDestination extends RuntimeException implements NonRetryable
 {
+    /**
+     * The URL is not quoted. One that does not parse is exactly the one the redaction of a
+     * stored error message cannot recognize as a URL, so `https:/user:password@host/?token=…`
+     * would reach the delivery log with its credentials whole. Which endpoint it was is on the
+     * delivery row already.
+     */
     public static function malformed(string $url): self
     {
-        return new self("The webhook URL is malformed: [{$url}].");
+        return new self('The webhook URL is malformed, so it is not quoted here: credentials in a URL that does not parse cannot be taken out.');
     }
 
     public static function unsupportedScheme(string $scheme): self

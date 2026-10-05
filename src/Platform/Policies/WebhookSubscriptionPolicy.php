@@ -18,10 +18,11 @@ use Pushery\Webhooks\Support\TenantIdentity;
  * is the second, defense-in-depth check on the action itself.
  *
  * Every ability is granted only when the subscription belongs to the acting tenant
- * AND — when a host has wired the manage-webhook-endpoints ability — that ability
- * passes. With the ability undefined, tenant ownership alone authorizes, so the layer
- * is usable turnkey while a host can still tighten it. Deletion additionally honors
- * the allow_delete switch.
+ * AND the manage-webhook-endpoints ability passes. The package defines that ability
+ * together with this policy, and it denies until a host defines 'webhooks.manage'. A
+ * policy that runs without the ability defined, registered by hand for instance,
+ * authorizes nothing: tenant ownership alone never opens endpoint management.
+ * Deletion additionally honors the allow_delete switch.
  */
 final class WebhookSubscriptionPolicy
 {
@@ -97,7 +98,7 @@ final class WebhookSubscriptionPolicy
     private function hasManageAbility(Authenticatable $user): bool
     {
         if (! Gate::has('manage-webhook-endpoints')) {
-            return true;
+            return false;
         }
 
         return Gate::forUser($user)->allows('manage-webhook-endpoints');

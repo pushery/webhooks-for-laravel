@@ -26,7 +26,7 @@
         <x-wirekit::heading :level="2" size="md">{{ __('webhooks::self-service.list.heading') }}</x-wirekit::heading>
 
         @if ($this->capReached)
-            <x-wirekit::text size="sm" intent="muted">{{ __('webhooks::self-service.list.cap_reached') }}</x-wirekit::text>
+            <x-wirekit::text size="sm" intent="muted">{{ $this->capNotice }}</x-wirekit::text>
         @else
             <x-wirekit::button wire:click="newEndpoint" wire:loading.attr="disabled" wire:target="newEndpoint">
                 <x-slot:iconLeft><x-wirekit::icon name="plus" size="sm" /></x-slot:iconLeft>

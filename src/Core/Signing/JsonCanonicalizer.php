@@ -9,8 +9,9 @@ use JsonException;
 /**
  * Opt-in canonical JSON serializer, applied to a payload array BEFORE it is
  * signed so that the signed bytes and the sent bytes are always identical. Keys
- * are sorted recursively and there is no insignificant whitespace, giving a
- * deterministic body regardless of the array's insertion order.
+ * are sorted recursively by their bytes and there is no insignificant whitespace,
+ * giving a deterministic body regardless of the array's insertion order. Byte
+ * order is a total order, so an id map reads "10" before "9" as RFC 8785 has it.
  *
  * Signing the exact bytes you send is already correct without this; it exists
  * only for producers who additionally want an order-independent body (e.g. to
@@ -45,7 +46,7 @@ final readonly class JsonCanonicalizer
         );
 
         if (! array_is_list($sorted)) {
-            ksort($sorted);
+            ksort($sorted, SORT_STRING);
         }
 
         return $sorted;

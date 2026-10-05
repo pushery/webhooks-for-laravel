@@ -41,6 +41,9 @@ final class PersistServerDelivery
 {
     private const string DEFAULT_ERROR = 'Webhook delivery failed.';
 
+    /** The width of the url column on MySQL, in characters. PostgreSQL stores it as text. */
+    private const int URL_LENGTH = 2048;
+
     public function subscribe(Dispatcher $events): void
     {
         $events->listen(WebhookDeliveryDispatching::class, self::onDispatching(...));
@@ -113,12 +116,14 @@ final class PersistServerDelivery
     {
         $delivery = WebhookServerDelivery::model()::query()->firstOrNew(['message_id' => $data->messageId]);
 
-        if ($delivery->exists && in_array($delivery->status, [DeliveryStatus::Succeeded, DeliveryStatus::Exhausted, DeliveryStatus::Refused], true)) {
+        if ($delivery->exists && $delivery->status->isTerminal()) {
             return;
         }
 
-        $delivery->fill([
-            'url' => $data->url,
+        // forceFill: the status and the outcome columns are the engine's, and the model keeps
+        // them out of mass assignment.
+        $delivery->forceFill([
+            'url' => $this->storableUrl($data->url),
             'event_type' => $data->eventType,
             'tags' => $data->tags,
             'status' => $status,
@@ -126,12 +131,14 @@ final class PersistServerDelivery
         ]);
 
         // An existing row is updated by primary key and can never race the unique
-        // message_id. A fresh row is inserted inside a nested transaction, so a lost
-        // insert race raises a catchable unique violation that rolls back only the
-        // savepoint — never a surrounding transaction — and is then recovered as an
-        // in-place update of the row that won the race.
+        // message_id. The check above read it a moment ago, and a second worker holding a
+        // duplicate of this job can have finished the delivery since, so the update carries
+        // that check in its WHERE and leaves a finished row as it is. A fresh row is inserted
+        // inside a nested transaction, so a lost insert race raises a catchable unique
+        // violation that rolls back only the savepoint — never a surrounding transaction — and
+        // is then recovered as an in-place update of the row that won the race.
         if ($delivery->exists) {
-            $delivery->save();
+            $delivery->saveUnlessTerminal();
 
             return;
         }
@@ -145,6 +152,25 @@ final class PersistServerDelivery
 
             $this->record($data, $status, $attributes, retry: false);
         }
+    }
+
+    /**
+     * The endpoint URL as the log stores it: without its userinfo, query and fragment, where a
+     * credential travels, by the rule the error column beside it is redacted with, and at most
+     * URL_LENGTH characters long on every engine.
+     *
+     * The row is written while dispatch() runs, before the job is queued, so a path past the MySQL
+     * column refused there would refuse the delivery in the host's request, on one engine and not
+     * the other. A longer URL is logged shortened instead, ending in `…` so a reader sees it was
+     * cut. The delivery itself goes to the whole URL.
+     */
+    private function storableUrl(string $url): string
+    {
+        $redacted = ErrorMessageRedactor::url($url);
+
+        return mb_strlen($redacted) <= self::URL_LENGTH
+            ? $redacted
+            : mb_substr($redacted, 0, self::URL_LENGTH - 1).'…';
     }
 
     /**

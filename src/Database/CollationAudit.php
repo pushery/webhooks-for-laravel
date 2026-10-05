@@ -46,7 +46,8 @@ final class CollationAudit
     ];
 
     /**
-     * One line per identity column whose collation no longer distinguishes case or accents.
+     * One line per identity column whose collation no longer distinguishes case, accents or
+     * trailing spaces.
      *
      * Empty on any engine but MySQL: PostgreSQL's default collation is deterministic, and
      * MariaDB is refused outright before a preflight gets this far.
@@ -63,16 +64,19 @@ final class CollationAudit
         // keys, so every starting key produces the same list of placeholders.
         $placeholders = implode(', ', array_fill(0, count(self::TABLES), '?'));
 
-        /** @var list<object{table_name: string, column_name: string, collation_name: string, index_name: string}> $rows */
+        /** @var list<object{table_name: string, column_name: string, collation_name: string, index_name: string, pad_attribute: string|null}> $rows */
         $rows = $connection->select(
             <<<SQL
                 SELECT DISTINCT s.TABLE_NAME AS table_name, s.COLUMN_NAME AS column_name,
-                       c.COLLATION_NAME AS collation_name, s.INDEX_NAME AS index_name
+                       c.COLLATION_NAME AS collation_name, s.INDEX_NAME AS index_name,
+                       k.PAD_ATTRIBUTE AS pad_attribute
                 FROM information_schema.STATISTICS s
                 JOIN information_schema.COLUMNS c
                   ON c.TABLE_SCHEMA = s.TABLE_SCHEMA
                  AND c.TABLE_NAME = s.TABLE_NAME
                  AND c.COLUMN_NAME = s.COLUMN_NAME
+                LEFT JOIN information_schema.COLLATIONS k
+                  ON k.COLLATION_NAME = c.COLLATION_NAME
                 WHERE s.TABLE_SCHEMA = DATABASE()
                   AND s.NON_UNIQUE = 0
                   AND s.TABLE_NAME IN ({$placeholders})
@@ -85,13 +89,15 @@ final class CollationAudit
         $faults = [];
 
         foreach ($rows as $row) {
-            if (self::distinguishes($row->collation_name)) {
+            $loss = self::loss($row->collation_name, $row->pad_attribute);
+
+            if ($loss === null) {
                 continue;
             }
 
             $faults[] = sprintf(
-                'Column %s.%s is part of the unique index [%s] but collates as [%s], which ignores '
-                .'case and accents. Two identifiers that differ only in case then compare EQUAL, so '
+                'Column %s.%s is part of the unique index [%s] but collates as [%s], which %s. '
+                .'Two identifiers that differ only %s then compare EQUAL, so '
                 .'a distinct row is treated as a duplicate: it is accepted, answered 200 and '
                 .'dropped, with nothing logged. The shipped schema declares utf8mb4_0900_as_cs '
                 .'here; restore it with ALTER TABLE %s MODIFY %s ... COLLATE utf8mb4_0900_as_cs.',
@@ -99,6 +105,8 @@ final class CollationAudit
                 $row->column_name,
                 $row->index_name,
                 $row->collation_name,
+                $loss[0],
+                $loss[1],
                 $row->table_name,
                 $row->column_name,
             );
@@ -108,16 +116,28 @@ final class CollationAudit
     }
 
     /**
-     * Whether a collation still tells two identifiers apart by case and accent.
+     * What a collation no longer tells two identifiers apart by, as the two phrases a fault
+     * names it with, or null while it tells them apart as the shipped schema does.
      *
-     * Matched on the SUFFIX rather than against a list of collation names: MySQL ships dozens,
-     * a host may pick a different character set, and `_as_cs` / `_bin` is the property the
-     * schema actually depends on. `_bin` is included because a binary collation distinguishes
-     * strictly more than `_as_cs` does — refusing it would flag a schema that is safer than the
-     * one shipped.
+     * Case and accent are matched on the SUFFIX rather than against a list of collation names:
+     * MySQL ships dozens, a host may pick a different character set, and `_as_cs` / `_bin` is the
+     * property the schema depends on. Padding is read from the server. A PAD SPACE collation
+     * compares `evt_1` and `evt_1 ` as equal, and the older binary collations such as
+     * `utf8mb4_bin` pad, while `utf8mb4_0900_bin`, like the shipped `utf8mb4_0900_as_cs`, does
+     * not.
+     *
+     * @return array{0: string, 1: string}|null
      */
-    private static function distinguishes(string $collation): bool
+    private static function loss(string $collation, ?string $pad): ?array
     {
-        return str_ends_with($collation, '_as_cs') || str_ends_with($collation, '_bin');
+        if (! str_ends_with($collation, '_as_cs') && ! str_ends_with($collation, '_bin')) {
+            return ['ignores case and accents', 'in case'];
+        }
+
+        if ($pad === 'PAD SPACE') {
+            return ['pads with spaces', 'in trailing spaces'];
+        }
+
+        return null;
     }
 }

@@ -6,6 +6,7 @@ namespace Pushery\Webhooks\Dashboard;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event as EventDispatcher;
 use Illuminate\Support\Facades\Gate;
@@ -95,6 +96,7 @@ final class WebhooksDashboardServiceProvider extends ServiceProvider
             $this->loadMigrationsFrom(__DIR__.'/../../database/migrations/dashboard');
         }
 
+        // schedule-gate-ok: a host that runs this layer's migrations itself still needs the rollup refreshed.
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
             if (! Config::boolean('webhooks.schedule.enabled', true)) {
                 return;
@@ -125,10 +127,18 @@ final class WebhooksDashboardServiceProvider extends ServiceProvider
      * Whether the dashboard still reads the Platform layer's own delivery log — i.e. the
      * host has NOT pointed dashboard.source_model at a log model it owns and migrates
      * itself, which is the documented way to run the dashboard without Platform.
+     *
+     * Decided by the table the model reads, not by its class: the package's searchable model
+     * and a host's subclass that keeps the table both read the Platform log, and only a model
+     * on a table of its own has taken it over. The Platform side is the delivery model the
+     * `webhooks.models` map resolves, which is the one the Platform layer writes.
      */
     private function readsThePlatformLog(): bool
     {
-        return Config::string('webhooks.dashboard.source_model', WebhookDelivery::class) === WebhookDelivery::class;
+        $model = Config::string('webhooks.dashboard.source_model', WebhookDelivery::class);
+
+        return is_a($model, Model::class, true)
+            && new $model()->getTable() === WebhookDelivery::resolve()->getTable();
     }
 
     /**
@@ -143,7 +153,8 @@ final class WebhooksDashboardServiceProvider extends ServiceProvider
             // Fail CLOSED: a host that registers the dashboard but never defines the 'webhooks.view'
             // ability must NOT silently expose the operator dashboard to every authenticated user.
             // With no ability defined, deny — the host grants access by defining 'webhooks.view'
-            // (see the README's dashboard authorization section).
+            // (see "Authorization is fail-closed" at
+            // https://docs.pushery.com/webhooks-for-laravel/layers/dashboard).
             if (! Gate::has('webhooks.view')) {
                 return false;
             }

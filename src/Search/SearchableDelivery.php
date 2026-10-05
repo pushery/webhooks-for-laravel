@@ -7,6 +7,7 @@ namespace Pushery\Webhooks\Search;
 use Illuminate\Support\Str;
 use Laravel\Scout\Builder;
 use Laravel\Scout\Searchable;
+use Pushery\Webhooks\Core\Http\ErrorMessageRedactor;
 use Pushery\Webhooks\Support\Settings;
 
 /**
@@ -24,12 +25,13 @@ trait SearchableDelivery
     /**
      * The queryable projection of a delivery for the search index. Only
      * filterable fields are always indexed: the event type, the endpoint
-     * URL, the status, the owner/tenant morph pair (owner_type + owner_id), the
-     * timestamp, and a short payload excerpt — never the full logged payload. The
-     * WHOLE morph pair is indexed so a tenant-scoped search can filter both columns:
-     * owner_id alone conflates two tenants that share an id under different owner
-     * types. A payload that was offloaded to a Storage disk is not read back or
-     * indexed; its excerpt is empty, so a large body is never copied into the index.
+     * URL without its userinfo and query, the status, the owner/tenant morph
+     * pair (owner_type + owner_id), the timestamp, and a short payload excerpt —
+     * never the full logged payload. The WHOLE morph pair is indexed so a
+     * tenant-scoped search can filter both columns: owner_id alone conflates two
+     * tenants that share an id under different owner types. A payload that was
+     * offloaded to a Storage disk is not read back or indexed; its excerpt is
+     * empty, so a large body is never copied into the index.
      *
      * @return array<string, scalar|null>
      */
@@ -37,11 +39,13 @@ trait SearchableDelivery
     {
         return [
             'event_type' => $this->event_type,
-            'url' => $this->subscription->url,
+            // By the rule the delivery's error text is stored with: an index is shared and kept
+            // outside the application, and a URL is where hosts put credentials.
+            'url' => ErrorMessageRedactor::url($this->subscription->url),
             'status' => $this->status->value,
             'owner_type' => $this->owner_type,
             'owner_id' => $this->owner_id,
-            // No `?->` here, and the asymmetry with SearchableCall is deliberate: measured,
+            // No `?->` here, and the asymmetry with SearchableCall is deliberate:
             // `webhook_deliveries.created_at` is NOT NULL while `webhook_calls.created_at` is
             // nullable. A nullsafe call would state that a delivery may have no timestamp,
             // which the schema forbids — and it would swallow the one case that really does
@@ -97,7 +101,7 @@ trait SearchableDelivery
             return '';
         }
 
-        // The `?: ''` is EQUIVALENT and reported every run. json_encode only answers false on
+        // The `?: ''` is never reached: json_encode only answers false on
         // INF/NAN or invalid UTF-8, neither of which survives a jsonb column, and no successful
         // encoding of an ARRAY is falsy — `[]` encodes to '[]'. So nothing reaches the fallback.
         //

@@ -93,8 +93,8 @@ final class PayloadTransformEditor extends Component
         //
         // The authorize(): it cannot be the sole refusal, which InteractsWithEndpoints spells out
         // in full — the boot gate reads the same ability, and findOwnedEndpoint() has already
-        // enforced the ownership the policy would add. That docblock ends "Do not 'kill' them by
-        // deleting them", and this is one of the five it means.
+        // enforced the ownership the policy would add. That docblock ends "Do not delete them.",
+        // and this is one of the five panels it means.
         $subscription = $this->findOwnedEndpoint((int) $subscription->id);
         $this->authorize('update', $subscription);
 
@@ -174,11 +174,10 @@ final class PayloadTransformEditor extends Component
         // purely to stamp its id with no field changes" — so constraining the field to the
         // configured set would narrow documented behavior to fix a column width. The width is
         // what is wrong here, so the width is what is bounded.
-        // Eight of these rules cannot fire, and they stay anyway -- measured one at a time, the
-        // suite is green without each of them. The five top-level properties are DECLARED
-        // `string` and `array`, so PHP makes those two rules true before validation reads them,
-        // whatever the caller. What is genuinely enforced here is everything under a `.*`:
-        // nothing checks the type of an array ELEMENT, which is the shape that used to reach
+        // Eight of these rules cannot fire, and they stay anyway. The five top-level properties
+        // are DECLARED `string` and `array`, so PHP makes those two rules true before validation
+        // reads them, whatever the caller. What is genuinely enforced here is everything under a
+        // `.*`: nothing checks the type of an array ELEMENT, which is the shape that used to reach
         // the trim and raise there.
         //
         // They stay because the set is read as a whole -- somebody looking for what
@@ -483,8 +482,8 @@ final class PayloadTransformEditor extends Component
         $versions = Config::array('webhooks.platform.payload_versioning.versions', []);
 
         // The cast on the key below changes nothing: PHP normalizes a numeric string key to an int
-        // on the way in. The cast on the value is not in that position and an existing arm goes red
-        // without it, which is what makes this a note about the key rather than about the line.
+        // on the way in. The cast on the value is not in that position: without it a numeric
+        // version would reach the select as an int.
         $versionOptions = ['' => __('webhooks::self-service.transform.version_none')];
         foreach (array_keys($versions) as $version) {
             $versionOptions[(string) $version] = (string) $version;

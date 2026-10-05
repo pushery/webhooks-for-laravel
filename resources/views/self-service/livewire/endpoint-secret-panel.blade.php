@@ -30,8 +30,8 @@
      root unconditionally -- the live region above has to be in the DOM before its text appears,
      which is the whole reason it is permanent -- and a root that renders is a flex child of the
      portal's column even with nothing visible in it. The column then sets a gap before it and a
-     gap after it. Two closed panels cost two gaps, measured at 48px between the page heading and
-     the endpoint list against 27px on a screen with one panel.
+     gap after it. Two closed panels cost two gaps: 48px between the page heading and the
+     endpoint list, against 27px on a screen with one panel.
 
      `display: contents` removes the box, not the element: the live region keeps its own box and
      its place in the accessibility tree, and Livewire keeps the single root it needs. --}}
@@ -46,37 +46,6 @@
         @if ($hidden){{ __('webhooks::self-service.secret.hidden_announcement') }}@elseif ($secret !== null){{ __('webhooks::self-service.secret.shown_announcement') }}@endif
     </x-wirekit::visually-hidden>
     @if ($secret !== null)
-        {{-- The countdown sentence and the impending-expiry cue are handed over as whole
-             translated strings, so the timer speaks the reader's language without the view
-             splitting a sentence into fragments a translator cannot reorder.
-
-             The timer lives IN the Alpine component and is cleared in destroy(), never in a
-             bare x-init: Alpine cleans up its own effects and listeners, but not a raw
-             setInterval. Clicking Hide tears this card out of the DOM, and an interval left
-             behind would keep ticking against a dead scope — calling $wire.hide() on a
-             component that no longer exists, once per second, for every reveal. --}}
-        {{-- The scope sits on our own element rather than on the card, and that is deliberate. The
-             card sets an `x-data` of its own when its slot carries visible text with no card.body —
-             a debug-only composition warning. This panel uses card.body, so that branch is not
-             taken today and both scopes coexist; measured, with app.debug on, the card root carried
-             exactly one x-data and it was ours.
-
-             But HTML keeps the FIRST of two identical attributes. If that branch is ever
-             taken — someone drops the card.body wrapper, or the component stops making the
-             warning conditional — one of the two scopes silently stops existing, and the
-             countdown that tells a reader how long the secret stays readable is the thing that
-             disappears. No error, no log line. That is the same dead surface this panel has
-             already had three times, from three different causes.
-
-             Owning the element costs a div and removes the dependency entirely. --}}
-        <div
-            x-data="webhooksSecretCountdown()"
-            data-webhooks-countdown="{{ json_encode([
-                'remaining' => $this->remainingSeconds(),
-                'countdown' => __('webhooks::self-service.secret.countdown'),
-                'warning' => __('webhooks::self-service.secret.countdown_warning'),
-            ], JSON_THROW_ON_ERROR) }}"
-        >
         <x-wirekit::card>
             <x-wirekit::card.body>
                 {{-- A plain region, NOT a live one, and that is the whole point of this line.
@@ -112,19 +81,54 @@
                         {{ __('webhooks::self-service.secret.notice') }}
                     </x-wirekit::text>
 
-                    {{-- Visible countdown. aria-hidden so the per-second tick is not
-                         announced; the impending-expiry cue is carried by the polite
-                         live region below instead. tabular-nums sits on the whole line
-                         (it only reshapes digits), so the seconds stop jittering wherever
-                         a locale's grammar puts them. --}}
-                    <x-wirekit::text
-                        size="sm"
-                        intent="muted"
-                        class="tabular-nums"
-                        aria-hidden="true"
-                        x-text="countdown.replace(':seconds', remaining)"
-                    >{{ __('webhooks::self-service.secret.countdown', ['seconds' => $this->remainingSeconds()]) }}</x-wirekit::text>
-                    <x-wirekit::visually-hidden aria-live="polite" x-text="announce" />
+                    {{-- The countdown runs in an Alpine component on this element. The sentence and
+                         the impending-expiry cue are handed over as whole translated strings, so
+                         the timer speaks the reader's language without the view splitting a
+                         sentence into fragments a translator cannot reorder.
+
+                         The timer lives in the component and is cleared in destroy(), never in a
+                         bare x-init: Alpine cleans up its own effects and listeners, but not a raw
+                         setInterval. Hiding the secret takes this element out of the DOM, and an
+                         interval left behind would keep calling $wire.hide() on a component that
+                         no longer exists, once per second, for every reveal.
+
+                         The scope sits on an element of this view rather than on the card. The
+                         card sets an `x-data` of its own when its slot carries visible text with
+                         no card.body, and HTML keeps the first of two identical attributes, so a
+                         scope written on the card can stop existing without an error.
+
+                         The key is the reveal window. Livewire patches an element whose key is
+                         unchanged, and Alpine keeps its state, so init() does not run again.
+                         Without the key, a rotation would leave the previous window's timer
+                         running, and it would hide the new secret when the previous window ends.
+                         A new window makes a new element, whose timer starts from the full window.
+                         The element holds only the two lines that read the timer, so replacing it
+                         never takes the focused Rotate button out of the DOM, and `contents` keeps
+                         both lines in the column's flex layout. --}}
+                    <div
+                        class="contents"
+                        wire:key="secret-countdown-{{ $this->expiresAt }}"
+                        x-data="webhooksSecretCountdown()"
+                        data-webhooks-countdown="{{ json_encode([
+                            'remaining' => $this->remainingSeconds(),
+                            'countdown' => __('webhooks::self-service.secret.countdown'),
+                            'warning' => __('webhooks::self-service.secret.countdown_warning'),
+                        ], JSON_THROW_ON_ERROR) }}"
+                    >
+                        {{-- Visible countdown. aria-hidden so the per-second tick is not
+                             announced; the impending-expiry cue is carried by the polite
+                             live region below instead. tabular-nums sits on the whole line
+                             (it only reshapes digits), so the seconds stop jittering wherever
+                             a locale's grammar puts them. --}}
+                        <x-wirekit::text
+                            size="sm"
+                            intent="muted"
+                            class="tabular-nums"
+                            aria-hidden="true"
+                            x-text="countdown.replace(':seconds', remaining)"
+                        >{{ __('webhooks::self-service.secret.countdown', ['seconds' => $this->remainingSeconds()]) }}</x-wirekit::text>
+                        <x-wirekit::visually-hidden aria-live="polite" x-text="announce" />
+                    </div>
 
                     <div class="flex flex-wrap items-center gap-[var(--gap-wk-sm)]">
                         <x-wirekit::code class="wh-portal-secret-value break-all">{{ $secret }}</x-wirekit::code>
@@ -153,6 +157,5 @@
                 </div>
             </x-wirekit::card.body>
         </x-wirekit::card>
-        </div>
     @endif
 </div>

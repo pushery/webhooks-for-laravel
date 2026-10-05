@@ -21,16 +21,15 @@ namespace Pushery\Webhooks\Support;
  * (illuminate, guzzle, opis)". Both halves fail on the first check. `ramsey/uuid ^4.7` is a hard
  * require of `laravel/framework`, so the library is already in every install of this package and
  * using it would add nothing to the tree. And `require` names no `illuminate/*` at all — that is
- * a deliberate decision this repo documents at length, so the parenthetical contradicted it while
+ * a deliberate decision of this package, so the parenthetical contradicted it while
  * omitting two of the five packages actually listed.
  *
  * The real reason it stays: using the library would mean declaring `ramsey/uuid` in `require`,
  * because a package declares what it uses directly rather than borrowing a transitive. That is a
  * second constraint to carry across the next framework major, for one twenty-line function whose
- * output is fixed by RFC 4122 and cannot drift. The trade is worth making the other way, and it
- * is only defensible because the equivalence is checked: the test pins this against
- * `Ramsey\Uuid\Uuid::uuid5()` as well as against the canonical python.org vector, so the day the
- * two disagree is the day the suite says so.
+ * output is fixed by RFC 4122 and cannot drift. The trade is worth making the other way because
+ * the equivalence is checked, against `Ramsey\Uuid\Uuid::uuid5()` and against the canonical
+ * python.org vector.
  *
  * @internal
  */

@@ -3,10 +3,6 @@
      at https://docs.pushery.com/webhooks-for-laravel/guides/styling-the-ui); place behind
      your own authorization. Publish the neutral variant
      instead with the webhooks-ui tag. --}}
-{{-- Pairs badly with the wirekit.delivery-log stub on the same page: its filter is a WireKit select
-     bound with wire:model.live, and that combination makes the confirm action of the delete dialogs
-     below unclickable. The dialog opens, the click never lands, nothing is logged. Reported
-     upstream; the comment in that stub carries the detail. --}}
 {{-- The row-action icons, out of the SAME config block the self-service endpoint list reads. Two
      screens of one package that disagree about whether a row action carries a symbol is a difference
      a reader notices and cannot explain -- and this screen had no seam at all, so a host who wanted
@@ -41,8 +37,20 @@
         'delete' => config('webhooks.ui.row_action_icons.delete'),
         'delete_confirm' => config('webhooks.ui.row_action_icons.delete_confirm', config('webhooks.ui.row_action_icons.delete')),
     ];
+
+    // Each control's capability, decided by the component and passed in. A direct `View::make()`
+    // with a hand-built array may pass none of them, and the defaults are today's behavior: every
+    // control renders. The check is the COURTESY -- each action still calls `authorizeAction()`
+    // and still refuses -- so defaulting to "show" cannot open anything.
+    $canCreate = $canCreate ?? true;
+    $canEdit = $canEdit ?? true;
+    $canToggle = $canToggle ?? true;
+    $canRotate = $canRotate ?? true;
+    $canDelete = $canDelete ?? true;
 @endphp
 <x-wirekit::stack gap="lg" class="wh-subscriptions">
+    {{-- The form is the create action until a row is opened, and the edit action after. --}}
+    @if ($editingId !== null ? $canEdit : $canCreate)
     <x-wirekit::card>
         <x-wirekit::card.body>
             {{-- One form for both jobs. The component decides which it is from whether an
@@ -67,7 +75,7 @@
                     <x-wirekit::field :label="__('webhooks::management.form.event_types_legend')" :error="$errors->first('eventTypes') ?: ($errors->first('eventTypes.*') ?: null)">
                         <x-wirekit::stack gap="xs">
                             @forelse ($availableEventTypes as $type)
-                                <x-wirekit::checkbox wire:model="eventTypes" value="{{ $type }}" label="{{ $type }}" />
+                                <x-wirekit::checkbox wire:key="event-type-{{ $type }}" wire:model="eventTypes" value="{{ $type }}" label="{{ $type }}" />
                             @empty
                                 {{-- The path travels through the sentence as a placeholder, so a locale
                                      can put it wherever its grammar wants it. --}}
@@ -98,6 +106,7 @@
             </x-wirekit::form>
         </x-wirekit::card.body>
     </x-wirekit::card>
+    @endif
 
     @if ($newSecret)
         {{-- A rotation says something a registration does not: the OLD secret keeps verifying
@@ -222,9 +231,10 @@
                                  out as inline children, so the moment the column narrowed each
                                  one broke onto its own line, right-aligned and TOUCHING its
                                  neighbor -- a staircase of broken buttons rather than a group.
-                                 Touching, not overlapping, which is why a rectangle-separation
-                                 arm stays green over it. The gap token is what a reader sees. --}}
+                                 Touching, not overlapping: nothing collides, the group only
+                                 loses its gaps. The gap token is what a reader sees. --}}
                             <x-wirekit::row gap="xs" class="flex-wrap justify-end">
+                                @if ($canEdit)
                                 <x-wirekit::button
                                     size="sm"
                                     surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}"
@@ -236,6 +246,7 @@
                                     @endif
                                     {{ __('webhooks::management.subscription.edit') }}
                                 </x-wirekit::button>
+                                @endif
 
                                 {{-- Named per row like its neighbors. The visible word switches with
                                      the row's state, so it is interpolated rather than described --
@@ -245,6 +256,7 @@
                                      position, and its visible word already switches. A host who wants
                                      one symbol for starting and another for stopping should not have
                                      to publish the view to say so. --}}
+                                @if ($canToggle)
                                 @php
                                     $toggleLabel = $subscription->is_active
                                         ? __('webhooks::management.subscription.disable')
@@ -260,11 +272,13 @@
                                     @endif
                                     {{ $toggleLabel }}
                                 </x-wirekit::button>
+                                @endif
 
                                 {{-- Rotating starts a clock on the old secret rather than invalidating
                                      it, but it is still a change every consumer of this endpoint has to
                                      follow — so it is confirmed through the same alert-dialog as the
                                      destructive action beside it, never a bare click. --}}
+                                @if ($canRotate)
                                 <x-wirekit::alert-dialog :name="'rotate-subscription-' . $subscription->id">
                                     <x-slot:trigger>
                                         <x-wirekit::button
@@ -295,6 +309,7 @@
                                         </x-wirekit::button>
                                     </x-wirekit::alert-dialog.actions>
                                 </x-wirekit::alert-dialog>
+                                @endif
 
                                 {{-- Deleting an endpoint is irreversible and stops a live production
                                      integration, so it is confirmed through the WireKit alert-dialog —
@@ -315,6 +330,7 @@
                                      survives, so focus returns to the trigger by itself, and
                                      declaring a target there would REPLACE that with a jump to the
                                      table — worse than doing nothing. --}}
+                                @if ($canDelete)
                                 <x-wirekit::alert-dialog
                                     :name="'delete-subscription-' . $subscription->id"
                                     focus-return-to="#wh-subscriptions-table"
@@ -355,6 +371,7 @@
                                         </x-wirekit::button>
                                     </x-wirekit::alert-dialog.actions>
                                 </x-wirekit::alert-dialog>
+                                @endif
                             </x-wirekit::row>
                         </x-wirekit::table.td>
                     </x-wirekit::table.row>

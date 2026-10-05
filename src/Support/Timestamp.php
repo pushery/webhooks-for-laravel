@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Support;
 
+use Carbon\CarbonImmutable;
 use DateTimeImmutable;
 use DateTimeInterface;
 use DateTimeZone;
@@ -13,7 +14,7 @@ use Pushery\Webhooks\Database\Dialect\Dialect;
  * Renders a moment as an UNAMBIGUOUS SQL timestamp literal: the same instant in UTC,
  * carrying its offset — "2026-07-12 10:30:00.000000+00:00".
  *
- * Every timestamp column in this package is timestamptz, and PostgreSQL resolves a
+ * On PostgreSQL every timestamp column in this package is timestamptz, and PostgreSQL resolves a
  * NAIVE literal ("2026-07-12 10:30:00") against the SESSION time zone — a database
  * setting, not an application one. A naive binding therefore means a different instant
  * depending on where it runs, and under a non-UTC application timezone the DST
@@ -66,14 +67,34 @@ final class Timestamp
      * The instant rendered for the engine it will be compared against.
      *
      * The two literals are not interchangeable, and picking the wrong one fails SILENTLY
-     * rather than loudly: an offset-bearing PostgreSQL literal matches ZERO naive rows under
-     * MySQL, so a query returns an empty set instead of an error. That choice was written out
-     * as the same ternary in five places; a dialect difference belongs in exactly one, which
-     * is what the Dialect enum exists for.
+     * rather than loudly. On MySQL the columns are UTC-naive DATETIME(6), and MySQL converts an
+     * offset-bearing literal into the session time zone before it compares (8.0.19+), so on a
+     * session that is not UTC every comparison slides by that offset: an equality finds nothing
+     * and a range loses the rows at one edge, with no error. That choice was written out as the
+     * same ternary in five places; a dialect difference belongs in exactly one, which is what
+     * the Dialect enum exists for.
      */
     public static function forDialect(Dialect $dialect, DateTimeInterface $moment): string
     {
         return $dialect === Dialect::MySql ? self::mysql($moment) : self::sql($moment);
+    }
+
+    /**
+     * The instant a timestamp read back from the engine stands for: the mirror of forDialect().
+     *
+     * PostgreSQL hands a timestamptz back with its offset, so the string names the instant.
+     * MySQL hands DATETIME(6) back naive, and it is UTC because UTC is all this package writes
+     * there. Parsed without a zone, that string resolves against PHP's default, which is
+     * app.timezone, and the instant lands off by the host's own offset: a plausible value,
+     * one or two hours beside the truth, and nothing goes red.
+     */
+    public static function read(Dialect $dialect, string $value): CarbonImmutable
+    {
+        if ($dialect === Dialect::MySql) {
+            return CarbonImmutable::parse($value, 'UTC');
+        }
+
+        return CarbonImmutable::parse($value);
     }
 
     public static function utc(DateTimeInterface $moment): DateTimeImmutable

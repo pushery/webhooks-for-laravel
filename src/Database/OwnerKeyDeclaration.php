@@ -108,13 +108,8 @@ final class OwnerKeyDeclaration
                 // Reading a schema is not this check's job to guarantee. A connection that
                 // cannot answer is the caller's problem to report, not a contradiction.
                 //
-                // This is the one `continue` in this loop with no arm on it, and it is a deliberate
-                // gap rather than an oversight. The other four are each pinned by a "keeps checking
-                // after …" test, because turning any of them into a `break` would end the scan at a
-                // skipped table and report a forked schema as sound. Reaching this one needs a
-                // connection that answers for one table and throws for the next, which is a stub of
-                // the schema builder and not a database state — a test whose subject would be
-                // the stub. Left as measured.
+                // `continue`, never `break`, like every skip in this loop: ending the scan at a
+                // table it cannot read would report a forked schema as sound.
                 continue;
             }
 

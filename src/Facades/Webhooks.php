@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Facade;
 use Pushery\Webhooks\Models\WebhookDelivery;
 use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Platform\Erasure\ForgottenEvents;
 use Pushery\Webhooks\Support\TenantIdentity;
 use Pushery\Webhooks\WebhookManager;
 
@@ -20,6 +21,7 @@ use Pushery\Webhooks\WebhookManager;
  *
  * @method static WebhookSubscription subscribe(Model|TenantIdentity|null $owner, string $url, array<array-key, string> $eventTypes, ?string $name = null)
  * @method static void unsubscribe(WebhookSubscription $subscription)
+ * @method static ForgottenEvents forgetEvents(array<array-key, string> $eventIds)
  * @method static WebhookSubscription enable(WebhookSubscription $subscription)
  * @method static WebhookSubscription disable(WebhookSubscription $subscription)
  * @method static Collection<int, WebhookDelivery> dispatch(string $eventType, array<array-key, mixed> $payload, ?Model $tenant = null)
