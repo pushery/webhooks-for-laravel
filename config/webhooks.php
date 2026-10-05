@@ -247,7 +247,7 @@ return [
         // written while disabled.
         'persistence' => [
             'enabled' => filter_var(env('WEBHOOKS_SERVER_PERSISTENCE_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
-            'prune_after_days' => 30,
+            'prune_after_days' => EnvLimit::ceiling(env('WEBHOOKS_SERVER_PERSISTENCE_PRUNE_AFTER_DAYS'), 30),
         ],
 
         // A payload larger than 'threshold' bytes is written to 'disk', and the delivery log keeps
@@ -393,9 +393,9 @@ return [
         // from the row and can never sign again. That expiry is the entire point of
         // rotating: a window that never closes revokes nothing. Set to 0 to revoke the
         // old secret the instant it is rotated away.
-        'secret_rotation_window_hours' => 24,
+        'secret_rotation_window_hours' => EnvLimit::ceiling(env('WEBHOOKS_PLATFORM_SECRET_ROTATION_WINDOW_HOURS'), 24, floor: 0),
 
-        'retention_months' => 3,
+        'retention_months' => EnvLimit::ceiling(env('WEBHOOKS_PLATFORM_RETENTION_MONTHS'), 3),
 
         'partition_months_ahead' => 3,
 
@@ -504,7 +504,7 @@ return [
             //
             // Set 0 to switch the bound off entirely, for a host that would rather pay the
             // scan than ever hide a row.
-            'window_days' => 30,
+            'window_days' => EnvLimit::ceiling(env('WEBHOOKS_PLATFORM_DELIVERIES_WINDOW_DAYS'), 30, zeroSwitchesOff: true),
 
             // Whether the list renders the stored error text of a failed delivery.
             //
@@ -826,7 +826,7 @@ return [
             // ],
         ],
 
-        'delete_after_days' => 30,
+        'delete_after_days' => EnvLimit::ceiling(env('WEBHOOKS_CLIENT_DELETE_AFTER_DAYS'), 30),
     ],
 
     /*
@@ -908,7 +908,7 @@ return [
             // webhook_deliveries is range-partitioned by month, and a read with no lower
             // bound on created_at cannot be pruned — so it visits every partition, on every
             // render of a screen that stays open all day. Set 0 to switch the bound off.
-            'window_days' => 30,
+            'window_days' => EnvLimit::ceiling(env('WEBHOOKS_DASHBOARD_DELIVERIES_WINDOW_DAYS'), 30, zeroSwitchesOff: true),
         ],
         // Cross-tenant operator mode: read EVERY delivery, owner-less and tenant-owned alike.
         // This is the support/console view — "what did we send to THIS customer's endpoint?" —
@@ -1319,10 +1319,10 @@ return [
     | granted to, and it refuses silently: nothing throws, nothing is logged, the form
     | just does nothing.
     |
-    | That failure is invisible to the obvious test, and this is the part worth keeping:
-    | a surface that denies everything looks exactly like a surface that is well guarded.
-    | Only a POSITIVE arm — asserting a permitted operator really CAN act — separates the
-    | two, and that is the arm people rarely write.
+    | That failure is invisible to the obvious test: a surface that denies everything looks
+    | exactly like a surface that is well guarded. Only a positive test, one asserting that a
+    | permitted operator really can act, tells the two apart, and that is the test people
+    | rarely write.
     |
     | 'abilities' is the way past that, and it is the key a permission-based host wants.
     | It names an ability PER ACTION, and an ability that comes from it is authorized

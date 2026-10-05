@@ -9,9 +9,9 @@
  *
  * Import this file from your app's Tailwind entrypoint so the compiler scans the
  * package's views. WireKit's own source glob stays in your entrypoint next to it — it is
- * required by every WireKit consumer, not just by this package, and hard-coding a
- * sibling package's vendor path from inside this file would break any install layout
- * that is not the default one. The "Styling the UI" guide at
+ * required by every WireKit consumer, not just by this package, and hard-coding another
+ * package's vendor path from inside this file would break any install layout that is not
+ * the default one. The "Styling the UI" guide at
  * https://docs.pushery.com/webhooks-for-laravel/guides/styling-the-ui has the exact
  * copy-pasteable block; both globs are required.
  *

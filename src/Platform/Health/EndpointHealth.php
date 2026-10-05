@@ -101,16 +101,9 @@ final readonly class EndpointHealth
             // dropping it would silently take every first-attempt give-up out too.
             .ConditionalCount::of("status IN ('succeeded', 'failed', 'exhausted')").' AS resolved, '
             .ConditionalCount::of("status = 'succeeded'").' AS succeeded, '
-            // The 0.95 here and its MySQL twin below are equivalent by construction rather than by
-            // accident: PercentileSelect::fraction() renders the fraction from a fixed set of
-            // literals so nothing interpolates into SQL, and its `default` arm collapses every
-            // unsupported value back to '0.95'. Changing this constant therefore produces the
-            // identical SQL.
-            //
-            // That fallback is deliberate, has its own test, and is already written up in
-            // EndpointHealthTest beside the arm that would otherwise look like the one to blame.
-            // Pointed at rather than restated, so there is one place to change if it ever stops
-            // being true.
+            // PercentileSelect::fraction() renders the fraction from a fixed set of literals, so
+            // nothing interpolates into SQL, and its `default` arm turns every unsupported value
+            // into '0.95'. The 0.95 here and its MySQL twin below rely on that fallback.
             .PercentileSelect::pgsqlExpression(0.95).' AS p95 '
             .'FROM webhook_deliveries '
             .'WHERE subscription_id = ? AND created_at >= ?',

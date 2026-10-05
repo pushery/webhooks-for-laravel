@@ -59,11 +59,7 @@
                          to the preview below — a code block becoming a landmark only when the
                          caller names it, without which the two JSON blocks down there are two
                          regions of one name and an axe run over your application reports
-                         `landmark-unique` against this screen. An earlier version of this comment conflated the two
-                         and pointed a reader at the lower number as the one to pin, which
-                         reinstates exactly the defect described above. WirekitFloorContractTest
-                         now reads the shipped views and not only the styling guide, which is
-                         why that went unnoticed. --}}
+                         `landmark-unique` against this screen. --}}
                     <x-wirekit::select
                         name="payloadVersion"
                         :label="__('webhooks::self-service.transform.version_label')"

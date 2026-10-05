@@ -31,8 +31,8 @@ use Pushery\Webhooks\Server\Exceptions\UnknownSignatureScheme;
  * They are not, and the reason is a different one: a host running a stale config cache is served
  * the array it cached, not a freshly merged tree. Nothing re-merges for them until they clear it.
  * So the default in each accessor is what stands between such a host and a null — and where that
- * null would switch a safety brake off rather than merely blank a value,
- * `ConfigDefaultsAreInSyncTest` holds it against the shipped file so the pair cannot drift.
+ * null would switch a safety brake off rather than merely blank a value, it matches the shipped
+ * file exactly.
  *
  * @internal
  */
@@ -332,7 +332,7 @@ final class Settings
      * of what an ABSENT key costs: it reads as null, which switches the brake off entirely.
      * A host running on a config cache built before this version upgraded still has the old
      * trimmed layer until it rebuilds, and that window should not be an unbraked one.
-     * ConfigDefaultsAreInSyncTest holds the two numbers together.
+     * It matches the shipped default in config/webhooks.php.
      */
     public function testPingPerMinute(): ?int
     {
@@ -540,11 +540,7 @@ final class Settings
     {
         $value = Config::get($key, $default);
 
-        // Two statements rather than a ternary, for the coverage reason its siblings in this file
-        // state. `ConstantFallbackVisibility` does not flag this one — its fallback is a variable
-        // rather than a literal — but the measurement behind the rule is the same either way, and
-        // the arm that would go unexercised is the one that keeps a mistyped weight from taking
-        // the health board down.
+        // The fallback keeps a mistyped weight from taking the health board down.
         if (is_numeric($value)) {
             return (float) $value;
         }

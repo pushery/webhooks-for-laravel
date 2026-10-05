@@ -105,11 +105,7 @@ final class JobTimeoutBudget
 
         $default = Config::get('queue.default');
 
-        // Two statements rather than a ternary, for the coverage reason this package states
-        // wherever a constant fallback appears: pcov credits a one-line expression to every line
-        // it spans, so the fallback would read as covered the first time the other arm ran — and
-        // this fallback is what decides whether the check runs at all on a host with no queue
-        // configured.
+        // On a host with no queue configured, this fallback decides whether the check runs at all.
         if (is_string($default) && $default !== '') {
             return $default;
         }

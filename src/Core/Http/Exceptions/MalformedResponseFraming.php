@@ -26,7 +26,6 @@ use RuntimeException;
  * A timeout is not this, even though guzzle files it under the same parent.
  * `ResponseTimeoutException` is a subclass of the exception this is built from, and it means
  * the opposite thing: a response that never finished arriving, which the very next attempt
- * may well complete. {@see TransportExceptionNormalizer} keeps
- * the two apart, and a test pins that boundary so widening the check fails rather than ships.
+ * may well complete. {@see TransportExceptionNormalizer} keeps the two apart.
  */
 final class MalformedResponseFraming extends RuntimeException implements NonRetryable {}

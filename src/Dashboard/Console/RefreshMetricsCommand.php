@@ -96,10 +96,21 @@ final class RefreshMetricsCommand extends Command
      */
     private function logsStatements(): bool
     {
-        $logging = (array) $this->db()->selectOne('SELECT @@log_bin AS log_bin, @@binlog_format AS format');
-        $format = $logging['format'] ?? null;
+        return self::logsStatementsFrom((array) $this->db()->selectOne('SELECT @@log_bin AS log_bin, @@binlog_format AS format'));
+    }
 
-        return in_array($logging['log_bin'] ?? null, [1, '1'], true)
+    /**
+     * Whether a server that reports these values of `@@log_bin` and `@@binlog_format` writes its
+     * binary log statement by statement: logging on, as the integer or the string a driver may
+     * return, and the format STATEMENT in either case.
+     *
+     * @param  array<array-key, mixed>  $variables
+     */
+    public static function logsStatementsFrom(array $variables): bool
+    {
+        $format = $variables['format'] ?? null;
+
+        return in_array($variables['log_bin'] ?? null, [1, '1'], true)
             && is_string($format)
             && strtoupper($format) === 'STATEMENT';
     }

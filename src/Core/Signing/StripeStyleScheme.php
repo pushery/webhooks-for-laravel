@@ -96,9 +96,8 @@ readonly class StripeStyleScheme implements AcceptsSignatureHeaders, SignatureSc
         $signatures = [];
 
         foreach (explode(',', $header) as $part) {
-            // Two integers, two different verdicts. The PAD LENGTH is equivalent — raising it
-            // appends an element the destructuring never reads. The EXPLODE LIMIT is not: a
-            // value containing '=' would be cut short, and the scheme tests hold that.
+            // The explode limit keeps a value that contains '=' whole, and the pad gives a part
+            // without '=' an empty value.
             [$key, $value] = array_pad(explode('=', trim($part), 2), 2, '');
 
             if ($key === 't' && preg_match('/^\d+$/', $value) === 1) {

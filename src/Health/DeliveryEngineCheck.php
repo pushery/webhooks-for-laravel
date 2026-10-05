@@ -284,8 +284,8 @@ final class DeliveryEngineCheck extends Check
         // A stopped engine outranks a failure rate: it produces no outcomes, so no rate reports it.
         if ($stalledPending !== null && $stalledPending > 0) {
             $message = $stalledPending === 1
-                ? sprintf('One webhook delivery has waited more than %d minutes to be sent.', $this->pendingLimitMinutes)
-                : sprintf('%d webhook deliveries have waited more than %d minutes to be sent.', $stalledPending, $this->pendingLimitMinutes);
+                ? sprintf('One webhook delivery has waited more than %s to be sent.', $this->counted($this->pendingLimitMinutes, 'minute', 'minutes'))
+                : sprintf('%d webhook deliveries have waited more than %s to be sent.', $stalledPending, $this->counted($this->pendingLimitMinutes, 'minute', 'minutes'));
 
             return $result->shortSummary('Queue stalled')->failed(
                 $message.' Check that a worker is taking jobs off the queue the webhooks are sent from.',
@@ -294,8 +294,8 @@ final class DeliveryEngineCheck extends Check
 
         if ($overdueRetries !== null && $overdueRetries > 0) {
             $message = $overdueRetries === 1
-                ? sprintf('One webhook delivery has waited more than %d minutes for its next attempt.', $this->retryLimitMinutes)
-                : sprintf('%d webhook deliveries have waited more than %d minutes for their next attempt.', $overdueRetries, $this->retryLimitMinutes);
+                ? sprintf('One webhook delivery has waited more than %s for its next attempt.', $this->counted($this->retryLimitMinutes, 'minute', 'minutes'))
+                : sprintf('%d webhook deliveries have waited more than %s for their next attempt.', $overdueRetries, $this->counted($this->retryLimitMinutes, 'minute', 'minutes'));
 
             return $result->shortSummary('Retries stalled')->failed(
                 $message.' Check that a worker is taking jobs off the queue, then read the failed jobs for one that stops it.',
@@ -309,7 +309,12 @@ final class DeliveryEngineCheck extends Check
         $warnings = [];
 
         if ($rate !== null && $settled >= $this->minimumDeliveries) {
-            $message = sprintf('%s%% of the %d deliveries in the last %d hours failed.', $this->percent($rate), $settled, $this->windowHours);
+            $message = sprintf(
+                '%s%% of the %s in the last %s failed.',
+                $this->percent($rate),
+                $this->counted($settled, 'delivery', 'deliveries'),
+                $this->counted($this->windowHours, 'hour', 'hours'),
+            );
 
             if ($rate > $this->failAbovePercent) {
                 return $result->shortSummary($this->percent($rate).'% failed')->failed($message);
@@ -321,7 +326,9 @@ final class DeliveryEngineCheck extends Check
         }
 
         if ($breakerDisabled !== null) {
-            if ($breakerDisabled > 0) {
+            // The switch of the disabled-endpoint warning holds in breaker-only mode as well, so the
+            // later of the two calls decides; the count stays in the meta either way.
+            if ($this->warnOnDisabledEndpoints && $breakerDisabled > 0) {
                 $message = $breakerDisabled === 1
                     ? 'The circuit breaker switched one webhook endpoint off, and it receives nothing until it is enabled again.'
                     : sprintf('The circuit breaker switched %d webhook endpoints off, and they receive nothing until they are enabled again.', $breakerDisabled);
@@ -409,6 +416,14 @@ final class DeliveryEngineCheck extends Check
     private function withRemedy(string $message, ?string $remedy): string
     {
         return $remedy === null ? $message : $message.' '.$remedy;
+    }
+
+    /**
+     * A count with its unit for a sentence, singular for one: `1 minute`, `15 minutes`.
+     */
+    private function counted(?int $count, string $one, string $many): string
+    {
+        return sprintf('%d %s', $count, $count === 1 ? $one : $many);
     }
 
     /**

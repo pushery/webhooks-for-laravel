@@ -73,8 +73,8 @@ trait InteractsWithEndpoints
      * reason: there is no row yet, so the scoping cannot speak, and the policy's
      * `currentOwner() instanceof TenantIdentity` is the only tenant check between an
      * ability-holding reader with no tenant in scope and an ownerless endpoint that receives
-     * every tenant's payloads. All three call sites are pinned (EndpointForm's two arms, and
-     * EndpointList::newEndpoint()).
+     * every tenant's payloads. There are three call sites: the two branches in EndpointForm, and
+     * EndpointList::newEndpoint().
      */
     public function bootInteractsWithEndpoints(): void
     {
@@ -225,7 +225,7 @@ trait InteractsWithEndpoints
      * The shipped default is repeated here for the same reason as the test-ping brake: an
      * absent key reads as null and switches the brake off, and a host on a config cache
      * built before this version upgraded still has the old trimmed layer until it rebuilds.
-     * ConfigDefaultsAreInSyncTest holds the two numbers together.
+     * It matches the shipped default in config/webhooks.php.
      */
     protected function maxRegistrationsPerMinute(): ?int
     {
@@ -395,8 +395,7 @@ trait InteractsWithEndpoints
      * that registered an endpoint unable to replay a delivery, and neither reader would have
      * any way to see why.
      *
-     * Named rather than inlined, so all three keys are built the same way and can be held
-     * against each other by one test.
+     * Named rather than inlined, so all three keys are built the same way.
      */
     protected function replayRateKey(TenantIdentity $owner): string
     {

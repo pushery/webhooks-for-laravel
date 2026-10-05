@@ -46,7 +46,7 @@ final class UiAssets
     /**
      * The route name the views resolve. Held as a constant because it is the one string the
      * registration and the URL builder have to agree on, and a typo in either is a
-     * RouteNotFoundException on a screen rather than a failing test.
+     * RouteNotFoundException on a screen.
      */
     public const string ROUTE = 'webhooks.ui.script';
 

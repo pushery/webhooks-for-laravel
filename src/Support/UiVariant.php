@@ -32,7 +32,8 @@ final class UiVariant
      *
      * The two components are the whole set, and naming them is what lets the analyzer see the
      * result as a view name. The return is a `@phpstan-return` rather than a `@return` because
-     * Rector does not know Larastan's pseudo-type and removes a `@return` it cannot read.
+     * `view-string` is a Larastan pseudo-type, and a tool that does not know it drops a `@return`
+     * it cannot read.
      *
      * @param  'delivery-log'|'subscription-manager'  $component
      *
@@ -126,8 +127,8 @@ final class UiVariant
      * does exactly that. Under the narrower question those hosts were told their override did not
      * count, and the package rendered its own WireKit markup straight over it.
      *
-     * The broader question also makes the arm that proves this isolatable: what matters is that the
-     * resolution is not ours, so a test may put its override anywhere.
+     * The broader question also lets an override live anywhere: what matters is that the
+     * resolution is not ours.
      *
      * Both sides are normalized, and skipping that inverts the answer. The provider registers its
      * own views as `__DIR__.'/../resources/views'` and the finder hands that string back unchanged,
@@ -159,11 +160,6 @@ final class UiVariant
      * `pushery/wirekit <2.53` outright, so a resolvable install is a tested one, and the
      * check happens where a version problem can still be fixed. A second copy of the floor
      * would drift from the constraint and would fail at render time, on a screen.
-     *
-     * The number is written out in prose here, which makes it the half that rots, and it has, more
-     * than once. `WirekitFloorContractTest` holds every statement of it to one constant, this
-     * docblock included, because the alternative is a sentence that reads as authoritative while
-     * naming a version the package stopped requiring weeks ago.
      */
     private static function rendersWireKit(): bool
     {

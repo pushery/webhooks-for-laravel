@@ -9,7 +9,7 @@ namespace Pushery\Webhooks\Support;
  * UUID, on every machine and every run. It is the RFC 4122 §4.3 construction — SHA-1
  * of the namespace's 16 bytes followed by the name, with the version and variant bits
  * fixed — so its output is byte-for-byte the value uuid.uuid5() produces in any other
- * language, which the test pins against the canonical python.org DNS vector.
+ * language, the canonical python.org DNS vector included.
  *
  * The package needs it in exactly one place: the backlog import command derives a stable
  * primary key from (source, source-row-id) so a second run of the same import re-derives

@@ -169,7 +169,7 @@ final class EndpointList extends Component
      * evaluates it with the Alpine parser it bundles. Up to Livewire 4.4.4 that parser refuses
      * a keyword after the dot, so the button renders and does nothing: no error, no log, and an
      * operator who clicks it concludes the endpoint is gone. Livewire 4.4.5 is the first release
-     * whose parser accepts it. CspSafeMethodNameTest holds the whole class.
+     * whose parser accepts it.
      */
     public function destroy(int $id): void
     {

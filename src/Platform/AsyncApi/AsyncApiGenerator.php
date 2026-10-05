@@ -102,13 +102,14 @@ final readonly class AsyncApiGenerator
         $encoded = json_encode($document) ?: '{}';
         $normalized = json_decode($encoded, false);
 
-        // Two integers, two verdicts. The INLINE LEVEL changes nothing in either direction:
-        // this document nests nowhere near ten deep, so no value at or
-        // above its actual depth changes a byte. The INDENT is not, and the published-document
-        // arms hold it.
+        // No inline level is deep enough to be safe as a number: a catalog schema sits four levels
+        // down and every nested object adds two, so a schema three objects deep already reached
+        // the tenth level and switched to inline flow style there. The document is meant to be
+        // read and diffed by a person, so it never switches, and its indent stays at two spaces
+        // from one release to the next.
         return Yaml::dump(
             $normalized instanceof stdClass ? $normalized : new stdClass,
-            10,
+            PHP_INT_MAX,
             2,
             Yaml::DUMP_OBJECT_AS_MAP | Yaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE,
         );

@@ -12,14 +12,10 @@ namespace Pushery\Webhooks\Core\Ssrf;
  * on (the SSRF guard fails closed on it).
  *
  * **Every decision this class makes is in a pure function; the live lookup carries none.**
- * That is deliberate, and it is why `merge()`, `ipv6From()` and `normalizeRecords()` are
- * static: an unqualified `dns_get_record()` is unreachable from a test, so a branch left
- * beside it is a branch nothing can exercise. The AAAA half used to be
- * `@dns_get_record($host, DNS_AAAA) ?: []` inline, and neither direction of that `?:` was
- * ever reached — no offline host has an AAAA record, and a lookup that finds no record answers
- * with an empty ARRAY rather than `false`. What it hid was not academic: negate the ternary
- * and a dual-stack destination is classified on its IPv4 addresses alone while the delivery
- * can still connect over IPv6.
+ * That is why `merge()`, `ipv6From()` and `normalizeRecords()` are static: each one decides
+ * without a DNS lookup. The AAAA half is the one that matters most. A lookup that finds no
+ * record answers with an empty array rather than `false`, and a dual-stack destination
+ * classified on its IPv4 addresses alone could still be reached over IPv6.
  *
  * @internal
  */

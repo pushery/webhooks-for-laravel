@@ -211,7 +211,7 @@ final class PayloadTransformEditor extends Component
      * The transformed body the current rules and version produce for the sample, run
      * through the exact declarative transformer the delivery path uses — so the preview
      * is the real output, never an approximation. Exposed as a plain method (not a
-     * computed) so it can also be read directly in a test.
+     * computed), so it can also be called directly.
      *
      * @return array<array-key, mixed>
      */

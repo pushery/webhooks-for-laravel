@@ -43,10 +43,10 @@ use Illuminate\Support\Facades\Gate;
  * granted to, and it refuses SILENTLY: nothing throws and nothing is logged, so the form
  * simply does nothing when submitted.
  *
- * That failure is invisible to the obvious tests, and this is the part worth remembering:
- * a surface that denies everything looks exactly like a surface that is well guarded. Only
- * a POSITIVE arm — one asserting that a permitted operator really CAN act — can tell the
- * two apart, and that is the arm people rarely write.
+ * That failure is invisible to the obvious tests: a surface that denies everything looks
+ * exactly like a surface that is well guarded. Only a positive test, one asserting that a
+ * permitted operator really can act, tells the two apart, and that is the test people rarely
+ * write.
  *
  * The way out is webhooks.admin.abilities, and it exists because of this. An ability taken from
  * that map is authorized with no positional argument at all, so nothing travels in the slot the
@@ -188,7 +188,7 @@ trait AuthorizesOperatorActions
      * Repeats the shipped default, because an absent key reads as null and a null here would
      * have to mean something -- and every meaning available is worse than the declared 403.
      * A host on a trimmed publish or a stale config cache keeps the behavior it had.
-     * ConfigDefaultsAreInSyncTest holds this number against the shipped one.
+     * It matches the shipped default in config/webhooks.php.
      *
      * Anything outside the error range collapses to 403 rather than being honored. A refusal
      * that answered 200 would read as success to every caller, which is a far worse outcome

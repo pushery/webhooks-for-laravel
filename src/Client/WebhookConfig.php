@@ -59,11 +59,9 @@ final class WebhookConfig
      * The built-in dialects whose wire format carries no timestamp, so a verification through
      * them can never return expired and `tolerance_seconds` is inert.
      *
-     * A hand-written list, and therefore held by a test that derives the same answer from
-     * BEHAVIOR rather than from this line: every built-in scheme signs a message and verifies
-     * it back with a tolerance of -1, which makes even a fresh signature expired for anything
-     * that checks a window. The ones that still return valid are exactly these two, and the
-     * test fails if a new scheme joins them or one of these grows a window.
+     * A hand-written list. Every built-in scheme that checks a window reports even a fresh
+     * signature as expired at a tolerance of -1, and these two are the ones that still return
+     * valid.
      *
      * A host's own scheme cannot be classified from here, so it is left alone rather than
      * guessed at: a warning that names someone's correct code is worse than none.
@@ -85,8 +83,8 @@ final class WebhookConfig
      * making it idempotent — inside the tolerance window the same delivery is processed as
      * often as it arrives.
      *
-     * Derived by the same test and the same way: every built-in scheme signs a message, and
-     * the ones whose headers come back without the configured id header are exactly these.
+     * Every built-in scheme signs a message, and the ones whose headers come back without the
+     * configured id header are exactly these.
      *
      * @var list<class-string<SignatureScheme>>
      */

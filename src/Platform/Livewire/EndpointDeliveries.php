@@ -101,7 +101,7 @@ final class EndpointDeliveries extends Component
      * The shipped window ceiling, repeated here because an ABSENT key reads as null and a
      * null ceiling would switch the bound off — the one direction that is expensive and
      * silent. A host on a config cache built before this version is bounded in the meantime.
-     * ConfigDefaultsAreInSyncTest holds the two numbers together.
+     * It matches the shipped default in config/webhooks.php.
      */
     private const int WINDOW_DAYS = 30;
 
@@ -144,9 +144,6 @@ final class EndpointDeliveries extends Component
      */
     public function mount(WebhookSubscription|int|null $subscription = null): void
     {
-        // One line rather than three, and that is about the coverage floor rather than taste:
-        // the else branch of a ternary written across three lines is never marked as executed,
-        // so no test can close it and a 100% floor holds the release over a branch that ran.
         $this->pinnedEndpointId = $subscription instanceof WebhookSubscription ? $subscription->id : $subscription;
     }
 

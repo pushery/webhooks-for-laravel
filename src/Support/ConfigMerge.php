@@ -23,12 +23,6 @@ namespace Pushery\Webhooks\Support;
  * `core.ssrf.allowed_hosts` is the one where getting this wrong is a security question
  * rather than a cosmetic one.
  *
- * That count is held by a test, because it said "ten" while the predicate below found
- * eleven — a sentence about a set drifts the moment the set grows, and this one names the
- * security-relevant member, so a reader who counts and finds a mismatch has reason to doubt the
- * rest of the paragraph. `ConfigMergeTest` derives the number with this very predicate and holds
- * the word against it.
- *
  * `array_is_list([])` is true, which makes an empty array a leaf as well. That is the
  * behavior you want: an empty list is a host saying "none", and descending into it could
  * only ever re-introduce what it emptied.

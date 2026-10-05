@@ -83,7 +83,7 @@ final class ForgeryProtectedRoutes
         // controller implementing HasMiddleware. This route's action is pinned to WebhookController
         // by the macro, and `isReceivingRoute()` above is what selects on it.
         //
-        // A branch no run can enter is not caution, it is a line that reads as tested for ever.
+        // So every entry here is a string, and there is no branch for anything else.
         foreach ($route->gatherMiddleware() as $middleware) {
             // Three spellings reach the same middleware and a check on one of them is a check
             // that mostly works: the class itself, a host's subclass of it (the documented way

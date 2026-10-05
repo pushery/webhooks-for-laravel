@@ -287,10 +287,8 @@ final class ImportCallsCommand extends Command
         // unreadable.
         $payload = $columns->of($row, $columns->payload);
         $json = is_string($payload) && $payload !== '' ? $payload : '{}';
-        // Moving the depth argument by one changes nothing a test should chase: reaching the
-        // difference needs a payload nested 511 levels deep, and that fixture would be a test about
-        // json_decode rather than about this import. 512 is PHP's own default, written out only so
-        // the JSON_THROW_ON_ERROR beside it can be passed at all.
+        // 512 is PHP's own default, written out only so the JSON_THROW_ON_ERROR beside it can be
+        // passed at all.
         $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
         $scrubbed = PayloadSanitizer::scrub(is_array($decoded) ? $decoded : []);
         // Decoded to an array, `{}` and `[]` are one value, so the empty case is written as the object
@@ -403,8 +401,7 @@ final class ImportCallsCommand extends Command
         // The `!== ''` clause changes no answer: Carbon reads Date::parse('') as now, which is
         // exactly what the fallback beside it produces, so no input separates the two. The
         // `is_string()` check does not share that property — without it an integer reaches
-        // Date::parse() and is turned into some instant, which is why that half is pinned by a
-        // test.
+        // Date::parse() and is turned into some instant.
         //
         // Kept rather than deleted: it states at the point of reading that an empty value has no
         // timestamp in it, instead of leaning on a convenience of the date library.

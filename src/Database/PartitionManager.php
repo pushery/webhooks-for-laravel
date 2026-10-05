@@ -492,8 +492,7 @@ final class PartitionManager
             // is a statement about today's schema, not about every key this loop can meet. A
             // RESTRICT or SET NULL key would have kept the row, and deleting it here would silently
             // do what the key forbids. The reader is deliberately general, so this is the
-            // assumption to revisit the day a second key appears, and the composite arm in
-            // DefaultPartitionDrainTest is where that day is noticed.
+            // assumption to revisit the day a second key appears.
             // The whole TUPLE, not one column at a time: for a composite key a row can have a
             // resolvable first column and an unresolvable pair, and a per-column check would
             // keep it and then fail the ADD CONSTRAINT below.

@@ -266,6 +266,7 @@ return [
             // Only reachable without a catalog. The bound is the width of the MySQL index over
             // the column, which refuses a longer value.
             'length' => 'Um tipo de evento pode ter no máximo :max caracteres.',
+            'bytes' => 'Juntos, os tipos de evento selecionados podem ter no máximo :max bytes.',
         ],
     ],
 

@@ -57,8 +57,9 @@ class WebhookCall extends Model
     protected $table = 'webhook_calls';
 
     /**
-     * The content of a received call is mass-assignable, and so is its status, because the
-     * handler a host writes is what advances a call to processed or failed. The source it arrived
+     * The content of a received call is mass-assignable, and so is its status: the package records
+     * processed or failed once the handler returns or fails for good, and a handler that decides the
+     * outcome itself can still write it, which the record then leaves alone. The source it arrived
      * on is written by the receiver alone, through a raw insert, so a stray create()/fill() from
      * host code can never move a call to another source and hand it to that source's handler.
      *

@@ -114,15 +114,15 @@ final class EndpointForm extends Component
         $stored = $this->storedEventTypes();
 
         if ($accepted !== null && $stored !== []) {
-            // Neither call on this line can change the outcome. The result is only ever handed to
-            // Rule::in, which cares about neither duplicates nor keys, so array_unique and
-            // array_values are tidiness rather than behavior.
-            //
-            // They stay because the value reads as a list everywhere it is passed on, and a
-            // duplicated or gap-keyed one would be a surprise waiting for whoever next uses it for
-            // something that does care.
+            // array_unique matters here: the list also sets the cap EventTypeList::maxCount() puts
+            // on a save, and without it a type both declared and already held would count twice,
+            // raising the cap by one for each. array_values cannot change an outcome, since
+            // neither that count nor Rule::in reads a key; it stays because the value is passed on
+            // as a list.
             $accepted = array_values(array_unique([...$accepted, ...$stored]));
         }
+
+        $maxBytes = EventTypeList::maxBytes($stored);
 
         $this->validate(
             // Four items in this list are redundant against the property declarations:
@@ -169,7 +169,19 @@ final class EndpointForm extends Component
                 //
                 // Bounded either way. Without a catalog nothing else limits what a hand-written
                 // request stores per endpoint, and MySQL refuses a type longer than its index.
-                'eventTypes' => ['required', 'array', 'min:1', 'max:'.EventTypeList::maxCount($accepted, $stored)],
+                // MySQL's index also bounds the bytes of all the types together, with or without
+                // a catalog, so on MySQL a longer selection is a field error here rather than a
+                // server error from the insert.
+                'eventTypes' => [
+                    'required',
+                    'array',
+                    'min:1',
+                    'max:'.EventTypeList::maxCount($accepted, $stored),
+                    EventTypeList::fitsTheMySqlIndex($maxBytes, (string) __(
+                        'webhooks::self-service.validation.event_types.bytes',
+                        ['max' => $maxBytes],
+                    )),
+                ],
                 'eventTypes.*' => $accepted === null
                     ? ['string', 'max:'.EventTypeList::MAX_LENGTH]
                     : ['string', Rule::in($accepted)],

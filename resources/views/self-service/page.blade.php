@@ -14,7 +14,7 @@
      The value is the dashboard's, not a new one: that is the other screen whose primary
      content is a wide table. The health board and the transform editor are separate
      full-page routes at max-w-5xl; the portal sitting below both of them was the
-     inconsistency. EndpointTableFitsItsPageTest holds the result as geometry. --}}
+     inconsistency. --}}
 <div class="wh-portal mx-auto flex max-w-6xl flex-col gap-[var(--padding-wk-y-lg)] p-[var(--padding-wk-x-lg)]">
     <header>
         <x-wirekit::page-header :level="\Pushery\Webhooks\Support\UiVariant::pageHeadingLevel()" :title="__('webhooks::self-service.page.heading')" :description="__('webhooks::self-service.page.intro')">
