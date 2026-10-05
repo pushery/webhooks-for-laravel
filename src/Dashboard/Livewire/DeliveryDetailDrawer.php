@@ -54,13 +54,15 @@ final class DeliveryDetailDrawer extends Component
     }
 
     /**
-     * The selected delivery for the acting tenant, or null when nothing is open or
-     * the id belongs to another tenant.
+     * The selected delivery for the acting tenant, or null when nothing is open, the id
+     * belongs to another tenant or the id cannot name a delivery at all.
      */
     #[Computed]
     public function delivery(): ?WebhookDelivery
     {
-        if ($this->deliveryId === null) {
+        $deliveryId = $this->deliveryId;
+
+        if ($deliveryId === null) {
             return null;
         }
 
@@ -75,7 +77,8 @@ final class DeliveryDetailDrawer extends Component
             // that grows with each month the log survives. It hides no reachable row: the bound
             // sits a month below the retention floor.
             ->withinRetention()
-            ->find($this->deliveryId);
+            ->whereSubmittedKey($deliveryId)
+            ->first();
     }
 
     /**
@@ -176,7 +179,7 @@ final class DeliveryDetailDrawer extends Component
 
         $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
-        // EQUIVALENT, and reported every run. json_encode fails on INF/NAN or invalid UTF-8,
+        // The false branch is never taken: json_encode fails on INF/NAN or invalid UTF-8,
         // and neither can come out of a jsonb column, so no input reaches the false branch.
         // It stays because the alternative is returning `false` from a `?string` method — a
         // TypeError rather than an empty drawer — the moment that assumption stops holding.

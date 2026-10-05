@@ -232,7 +232,7 @@ class DeliveryLog extends Component
 
         // Same partition-key bound the table above already carries, on the single-row lookup
         // the redeliver action makes. Without it this one read visits every partition.
-        $delivery = WebhookDelivery::model()::query()->withinRetention()->findOrFail($id);
+        $delivery = WebhookDelivery::model()::query()->withinRetention()->whereSubmittedKey($id)->firstOrFail();
 
         if (! $delivery->subscription->is_active) {
             $this->message = __('webhooks::management.messages.endpoint_disabled');
@@ -340,9 +340,9 @@ class DeliveryLog extends Component
         // about one month.
         //
         // And a bare where() binds a NAIVE literal, which PostgreSQL resolves against the
-        // database SESSION zone. Measured while building this: with the session on +01, a
-        // delivery stored at 23:59 UTC on the 20th vanished from a window whose upper bound
-        // was the 20th. No error, no warning, an answer off by the offset.
+        // database SESSION zone. With the session on +01, a delivery stored at 23:59 UTC on the
+        // 20th would vanish from a window whose upper bound is the 20th: no error, no warning,
+        // an answer off by the offset.
         // {@see \Pushery\Webhooks\Database\Concerns\ScopesByTimestamp} binds it per dialect instead.
         if ($from instanceof CarbonInterface) {
             $query->createdAfter($from);
@@ -386,11 +386,10 @@ class DeliveryLog extends Component
             'endpointsTruncated' => $truncated,
             'eventTypes' => $eventTypes,
             // Decided here and passed in, rather than asked as `$this->canAction()` from the
-            // markup. The two stubs are rendered by the package's own tests through
-            // `View::make()` with a plain data array -- there is no component instance there, so
-            // a view that reached for `$this` would work under Livewire and throw under the
-            // suite that proves the stub compiles at all. Every other decision this view needs
-            // already arrives the same way.
+            // markup. The two stubs are published, and a published view can be rendered through
+            // `View::make()` with a plain data array, where there is no component instance: a view
+            // that reached for `$this` would work under Livewire and throw there. Every other
+            // decision this view needs already arrives the same way.
             'canRedeliver' => $this->canAction('redeliver'),
             'canPing' => $this->canAction('ping'),
         ]);

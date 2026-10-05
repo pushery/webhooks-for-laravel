@@ -75,6 +75,7 @@ final class WebhookClientServiceProvider extends ServiceProvider
             $this->commands([ImportCallsCommand::class]);
         }
 
+        // schedule-gate-ok: a host that runs this layer's migrations itself still needs the call log pruned.
         $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
             if (! Config::boolean('webhooks.schedule.enabled', true)) {
                 return;
@@ -82,8 +83,8 @@ final class WebhookClientServiceProvider extends ServiceProvider
 
             // Both guards, for the reasons given at the server-side prune: the scheduler fires
             // on every application server, so onOneServer() is what keeps one deleter instead of
-            // N, and the bounded overlap guard keeps a long first run over a large call log from
-            // being joined by the next day's.
+            // N, and the bounded overlap guard keeps a second start within six hours, a manual
+            // run beside the scheduled one, from joining a prune that is still running.
             $schedule->command('model:prune', ['--model' => [WebhookCall::class]])
                 ->daily()
                 ->withoutOverlapping(360)

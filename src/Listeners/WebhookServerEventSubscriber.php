@@ -7,6 +7,7 @@ namespace Pushery\Webhooks\Listeners;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Facades\Event;
 use Pushery\Webhooks\Core\Http\ErrorMessageRedactor;
+use Pushery\Webhooks\Database\PartitionManager;
 use Pushery\Webhooks\Enums\DeliveryStatus;
 use Pushery\Webhooks\Events\WebhookDeliveryFailed;
 use Pushery\Webhooks\Events\WebhookDeliverySucceeded;
@@ -56,7 +57,7 @@ final readonly class WebhookServerEventSubscriber
         }
 
         // Outcome columns are guarded (engine-owned), so write them via forceFill.
-        $this->persist($delivery, [
+        $written = $this->persist($delivery, [
             'status' => DeliveryStatus::Succeeded,
             'attempt' => $event->attempt,
             'response_code' => $event->response->status,
@@ -64,6 +65,10 @@ final readonly class WebhookServerEventSubscriber
             'delivered_at' => now(),
             'error' => null,
         ]);
+
+        if (! $written) {
+            return;
+        }
 
         $subscription = $delivery->subscription;
 
@@ -108,7 +113,7 @@ final readonly class WebhookServerEventSubscriber
         // A refusal is not an exhaustion, and the difference is the whole reason the guard
         // below exists. Written as Exhausted it was indistinguishable afterwards, so the health
         // score counted against the endpoint what the breaker three lines down refuses to.
-        $this->persist($delivery, [
+        $written = $this->persist($delivery, [
             'status' => $event->exception instanceof DeliveryRefused
                 ? DeliveryStatus::Refused
                 : DeliveryStatus::Exhausted,
@@ -118,14 +123,19 @@ final readonly class WebhookServerEventSubscriber
             'error' => $reason,
         ]);
 
+        if (! $written) {
+            return;
+        }
+
         $subscription = $delivery->subscription;
 
-        // Only a real failure of a LIVE endpoint feeds the breaker. A delivery refused
-        // because its endpoint is already disabled (or deleted) is our own decision, not
-        // the endpoint's fault, and charging it would inflate the streak of an endpoint
-        // that is not even being called — so a re-enabled endpoint would trip the breaker
-        // again on its first hiccup.
-        if ($subscription->is_active) {
+        // Only a real failure of a LIVE endpoint feeds the breaker. A refused delivery was never
+        // sent: its endpoint was disabled, deleted or given another URL while it waited. That is
+        // our own decision, not the endpoint's fault. Charged to a disabled endpoint it would
+        // trip the breaker again on the first hiccup after a re-enable; charged to one whose URL
+        // just changed, every delivery still queued for the old address would count against the
+        // new one, and a backlog as long as the threshold would switch it off.
+        if ($subscription->is_active && ! $event->exception instanceof DeliveryRefused) {
             $subscription->increment('consecutive_failures');
             $subscription->refresh();
 
@@ -143,11 +153,19 @@ final readonly class WebhookServerEventSubscriber
      *
      * @param  array<string, mixed>  $attributes
      */
-    private function persist(WebhookDelivery $delivery, array $attributes): void
+    private function persist(WebhookDelivery $delivery, array $attributes): bool
     {
-        $delivery->forceFill($attributes)->save();
+        // The caller read the row and found it unfinished a moment ago, but a duplicate of this
+        // job on a second worker can have finished it since. The write carries the same check in
+        // its WHERE, and only a write that landed is followed by what a status change sets off:
+        // the counter reset, the breaker and the lifecycle events.
+        if (! $delivery->forceFill($attributes)->saveUnlessTerminal()) {
+            return false;
+        }
 
-        SearchIndexer::indexDelivery($delivery->id);
+        SearchIndexer::indexDelivery($delivery);
+
+        return true;
     }
 
     private function maybeAutoDisable(WebhookSubscription $subscription): void
@@ -192,7 +210,7 @@ final readonly class WebhookServerEventSubscriber
 
     private function isTerminal(WebhookDelivery $delivery): bool
     {
-        return in_array($delivery->status, [DeliveryStatus::Succeeded, DeliveryStatus::Exhausted, DeliveryStatus::Refused], true);
+        return $delivery->status->isTerminal();
     }
 
     private function resolveDelivery(WebhookDeliveryData $data): ?WebhookDelivery
@@ -217,6 +235,15 @@ final readonly class WebhookServerEventSubscriber
             $query->where('created_at', $createdAt);
         }
 
-        return $query->first();
+        $delivery = $query->first();
+
+        if ($delivery instanceof WebhookDelivery || ! is_string($createdAt)) {
+            return $delivery;
+        }
+
+        // Not on the parent: a partition drain may have moved the row into a month it has not
+        // attached yet. The attempt was made either way, and dropping the write would leave the
+        // log saying pending for good.
+        return new PartitionManager()->movedDelivery($deliveryId, $createdAt);
     }
 }

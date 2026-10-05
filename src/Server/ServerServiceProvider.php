@@ -25,8 +25,8 @@ use Pushery\Webhooks\Support\MergesPackageConfig;
 use Pushery\Webhooks\Support\Settings;
 
 /**
- * Registers the Server delivery layer: the by-reference secret resolver and the
- * response classifier configured from `webhooks.server`. The {@see Delivery\DeliveryPipeline}
+ * Registers the Server delivery layer: the resolver that unseals a delivery's secrets at
+ * send time and the response classifier configured from `webhooks.server`. The {@see Delivery\DeliveryPipeline}
  * and {@see Jobs\CallWebhookJob} auto-resolve from these plus the Core bindings, so
  * a queued delivery runs with the configured retry/no-retry-4xx policy.
  */
@@ -121,6 +121,7 @@ final class ServerServiceProvider extends ServiceProvider
                 $this->loadMigrationsFrom(__DIR__.'/../../database/migrations/server');
             }
 
+            // schedule-gate-ok: a host that runs this layer's migrations itself still needs the record pruned.
             $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
                 if (! Config::boolean('webhooks.schedule.enabled', true)) {
                     return;
@@ -131,12 +132,11 @@ final class ServerServiceProvider extends ServiceProvider
                 // N nodes delete from the same table at once -- not redundancy, just N times the
                 // delete load on a table deliveries are still being written to.
                 //
-                // withoutOverlapping(360): a first prune over a long-retained log runs for a
-                // while, and tomorrow's run starting on top of today's is the same hazard. Six
-                // hours is past any real run and well under the day between two of them, so a
-                // lock left by a hard kill costs one skipped prune rather than a permanent stop
-                // -- withoutOverlapping is a skip(), and a skipped run is not a failure, so
-                // nothing anywhere would turn red.
+                // withoutOverlapping(360): a second start within six hours, a manual prune beside
+                // the scheduled one, is skipped while the first still runs. The lock lives six
+                // hours, so it never reaches the next day's run, and one left behind by a hard
+                // kill has expired before that run starts: it costs no scheduled prune at all.
+                // withoutOverlapping is a skip(), and a skipped start is not a failure.
                 $schedule->command('model:prune', ['--model' => [WebhookServerDelivery::class]])
                     ->daily()
                     ->withoutOverlapping(360)

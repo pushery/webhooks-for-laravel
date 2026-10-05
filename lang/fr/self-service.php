@@ -134,8 +134,8 @@ return [
     // than for the screen. A replay writes a NEW delivery row — same event type, same endpoint —
     // and `platform.self_service.replays_per_minute` allows ten a minute by default, so two rows
     // that differ only in their second are the ORDINARY outcome of a tenant pressing Send again.
-    // `LLL` carries no seconds in any of the seven shipped locales (measured on two deliveries
-    // 37 seconds apart, identical in all seven), so the names agreed in every part.
+    // `LLL` carries no seconds in any of the seven shipped locales, so two such rows would get
+    // names that agree in every part.
     //
     // Translated rather than a literal for the reason the dashboard's own patterns are: the
     // ORDER differs by locale, and `z` names the clock the reader is being shown.
@@ -258,6 +258,14 @@ return [
             // A registration for a type the catalog does not declare. Only reachable
             // while the catalog is populated: an empty one places no constraint at all.
             'in' => 'Ce type d\'événement n\'est pas publié par cette application.',
+            // Only reachable for a type whose catalog entry names an ability.
+            'ability' => 'Tu n\'as pas l\'autorisation d\'abonner un endpoint à :types.',
+            // More types than one save may carry: the catalog's size, or without a catalog a
+            // fixed count. An endpoint that already holds more keeps them through an edit.
+            'max' => 'Un endpoint peut être abonné à :max types d\'événement au maximum.',
+            // Only reachable without a catalog. The bound is the width of the MySQL index over
+            // the column, which refuses a longer value.
+            'length' => 'Un type d\'événement peut compter :max caractères au maximum.',
         ],
     ],
 

@@ -6,9 +6,9 @@ namespace Pushery\Webhooks\Livewire;
 
 use Illuminate\Container\Container;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Illuminate\Validation\Rule;
-use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Pushery\Webhooks\Core\Http\Exceptions\BlockedDestination;
@@ -17,6 +17,8 @@ use Pushery\Webhooks\Core\Ssrf\SsrfGuard;
 use Pushery\Webhooks\Facades\Webhooks;
 use Pushery\Webhooks\Livewire\Concerns\AuthorizesOperatorActions;
 use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Platform\Support\EventTypeAbilities;
+use Pushery\Webhooks\Support\EventTypeList;
 use Pushery\Webhooks\Support\Settings;
 use Pushery\Webhooks\Support\UiVariant;
 
@@ -55,6 +57,10 @@ use Pushery\Webhooks\Support\UiVariant;
  * - **edit is the everyday one.** Without it, correcting a URL or an event selection means
  *   delete-and-recreate — which is not the same operation. The endpoint gets a NEW identity,
  *   and its delivery history, its health state and its active secret go with the old one.
+ *
+ * Not `final`, and deliberately so, for the same reason as {@see DeliveryLog}: a host subclasses
+ * it to override authorizeAction() for a rule no ability can express. That method is the seam;
+ * nothing else here is a contract.
  *
  * The tenant-facing surface is the self-service portal
  * (`Pushery\Webhooks\Platform\Livewire\EndpointList`), which is owner-scoped and
@@ -117,8 +123,7 @@ class SubscriptionManager extends Component
         $this->newSecret = null;
         // This line cannot change what a reader sees: the line above nulls the secret, and the
         // panel this flag heads is only rendered when there is one, so after dehydrate() the flag's
-        // value is unreachable. Set it to true and every suite stays green. The same is true of its
-        // twin in edit(). It is kept so the two fields that describe one revealed secret are always
+        // value is unreachable. The same is true of its twin in edit(). It is kept so the two fields that describe one revealed secret are always
         // cleared together, rather than leaving a stale flag for whoever next sets newSecret
         // without thinking about it.
         $this->rotated = false;
@@ -187,6 +192,9 @@ class SubscriptionManager extends Component
 
         $accepted = new Settings()->acceptedEventTypes();
 
+        // Read once: each read loads the endpoint row again.
+        $stored = $this->storedEventTypes();
+
         // What the opened row already holds stays acceptable even once the catalog stops
         // declaring it. The usual adoption order writes the catalog AFTER the endpoints
         // exist, and without this a rename would be refused over a value the operator never
@@ -194,17 +202,16 @@ class SubscriptionManager extends Component
         // type. Read from the ROW, never from component state: a public property is
         // writable from the browser, so an allowlist widened from one is an allowlist the
         // client widens.
-        if ($accepted !== null && $this->storedEventTypes() !== []) {
+        if ($accepted !== null && $stored !== []) {
             // array_unique and array_values on this line cannot change the outcome: the result only
-            // ever reaches Rule::in, which cares about neither duplicates nor keys. Each was
-            // removed in turn and the suite stayed green. The spread is a different matter and is
-            // pinned — drop the stored half and an edit is refused over a value the operator never
-            // touched, which is what makes this a note about the two helpers.
-            $accepted = array_values(array_unique([...$accepted, ...$this->storedEventTypes()]));
+            // ever reaches Rule::in, which cares about neither duplicates nor keys. The spread is
+            // a different matter: drop the stored half and an edit is refused over a value the
+            // operator never touched.
+            $accepted = array_values(array_unique([...$accepted, ...$stored]));
         }
 
         // Four of these rule items are redundant against the property declarations, and each is
-        // kept for the same reason. Removing one in turn leaves the whole Livewire suite green:
+        // kept for the same reason:
         //
         // 'name' => 'nullable' — $name is a typed string property; it is never null 'name' =>
         // 'string' — same, the type already guarantees it 'eventTypes' => 'array' — $eventTypes is
@@ -213,9 +220,9 @@ class SubscriptionManager extends Component
         //
         // The first three are the validator restating what the TYPE system enforces one layer
         // up, so no input can reach them; the fourth is redundant against its own neighbor.
-        // 'required' and 'max:255' ARE reachable and are pinned — removing either goes red.
+        // 'required' and 'max:255' ARE reachable.
         //
-        // They stay, and they are not to be "killed" by deletion. This list is the written
+        // They stay. This list is the written
         // contract of the form, read by anyone changing it, and a subclass that widens a
         // property's type (this class is not final, deliberately) walks straight into the case
         // the type no longer covers.
@@ -227,27 +234,44 @@ class SubscriptionManager extends Component
             // which checks a built-in list of over 200 schemes: ftp, file, data and chrome all pass
             // it. The narrowing has been the supported spelling since 9.44.
             //
-            // Without it a foreign scheme was refused only by the SSRF guard, which sits
-            // AFTER the registration rate limiter has already spent a token, the lock has
-            // been taken and the endpoint cap queried. So a typo cost the tenant part of
-            // their registration budget and returned the generic "cannot be used as an
-            // endpoint" instead of the field message that exists for exactly this. The
-            // guard stays the authority; the rule only takes from it the cases that never
-            // needed to reach it.
+            // Without it a foreign scheme was refused only by the SSRF guard inside
+            // Webhooks::subscribe(), with the generic "cannot be used as an endpoint" instead
+            // of the field message that exists for exactly this. The guard stays the
+            // authority; the rule only takes from it the cases that never needed to reach it.
             'url' => ['required', 'url:http,https', 'max:2048'],
-            'eventTypes' => ['required', 'array', 'min:1'],
+            // Bounded the way the portal form is: by the catalog's size, or without one by a
+            // fixed count and the length MySQL's index takes.
+            'eventTypes' => ['required', 'array', 'min:1', 'max:'.EventTypeList::maxCount($accepted, $stored)],
             // Constrained to the catalog when the host keeps one, and unconstrained when it
             // does not — the catalog ships empty. An operator registers a GLOBAL endpoint
             // here, so a typo costs every tenant's events for that type, not one tenant's.
-            'eventTypes.*' => $accepted === null ? ['string'] : ['string', Rule::in($accepted)],
+            'eventTypes.*' => $accepted === null
+                ? ['string', 'max:'.EventTypeList::MAX_LENGTH]
+                : ['string', Rule::in($accepted)],
         ], [
-            // The 'string' rule had no message, so a non-string element rendered "The eventTypes.0
-            // field must be a string.", the framework's English default, in a package that ships
-            // seven locales, carrying a raw field path. Measured on both this console and the
-            // portal form, which had the identical gap.
+            // The 'string' rule needs a message of its own. Without one, a non-string element
+            // renders "The eventTypes.0 field must be a string.", the framework's English default
+            // with a raw field path, in a package that ships seven locales. The portal form
+            // carries the same message.
             'eventTypes.*.string' => __('webhooks::management.validation.event_types.string'),
             'eventTypes.*.in' => __('webhooks::management.validation.event_types.in'),
+            'eventTypes.max' => __('webhooks::management.validation.event_types.max'),
+            'eventTypes.*.max' => __('webhooks::management.validation.event_types.length'),
         ]);
+
+        // A type whose catalog entry names an ability takes it here too, and only where this save
+        // ADDS the type: one the endpoint already carries stays through an edit, and removing it
+        // asks nothing.
+        $refused = new EventTypeAbilities()->refused(
+            array_values(array_diff($this->eventTypes, $stored)),
+            Auth::user(),
+        );
+
+        if ($refused !== []) {
+            $this->addError('eventTypes', __('webhooks::management.validation.event_types.ability', ['types' => implode(', ', $refused)]));
+
+            return;
+        }
 
         if ($this->editingId === null) {
             $this->register();
@@ -297,11 +321,12 @@ class SubscriptionManager extends Component
      * Permanently remove an endpoint (and, by FK cascade, its delivery log). To stop
      * delivering while keeping the history, toggle it off instead.
      *
-     * NOT named `delete`, and the reason is not style. Livewire's CSP-safe build parses a
-     * `wire:click` expression itself rather than handing it to the JS engine, and `delete`
-     * is a KEYWORD in that parser — `wire:click="delete(1)"` reads as the delete OPERATOR,
-     * so the button silently does nothing. No error, no log, and an operator who clicks it
-     * concludes the endpoint is gone. CspSafeMethodNameTest holds the whole class.
+     * Not named `delete`, so the button works under a strict CSP on every Livewire 4 release.
+     * Livewire's CSP-safe build rewrites `wire:click="delete(1)"` to `$wire.delete(1)` and
+     * evaluates it with the Alpine parser it bundles. Up to Livewire 4.4.4 that parser refuses
+     * a keyword after the dot, so the button renders and does nothing: no error, no log, and an
+     * operator who clicks it concludes the endpoint is gone. Livewire 4.4.5 is the first release
+     * whose parser accepts it. CspSafeMethodNameTest holds the whole class.
      */
     public function destroy(int $id): void
     {
@@ -320,9 +345,10 @@ class SubscriptionManager extends Component
 
     /**
      * The pre-2.0.0 name, kept so a view published before the rename keeps working. Under a
-     * strict CSP that published copy is ALREADY broken — `delete` is a keyword in Livewire's
-     * own expression parser, so `wire:click="delete(1)"` parses as the delete OPERATOR rather
-     * than a call. Re-publish the view, or change that one line, to get the button back.
+     * strict CSP that published copy reaches this method from Livewire 4.4.5 on. On 4.4.4 and
+     * older the CSP-safe build refuses `$wire.delete(1)`, the form it rewrites
+     * `wire:click="delete(1)"` into, and the button does nothing; re-publish the view, or change
+     * that one line, to get it back there.
      *
      * Deliberately NOT tagged `@deprecated`, and that is not an oversight. On PHP 8.4 the
      * code-style pass rewrites that tag into `#[\Deprecated]`, which raises E_USER_DEPRECATED
@@ -405,7 +431,6 @@ class SubscriptionManager extends Component
      *
      * @return list<string>
      */
-    #[Computed]
     private function storedEventTypes(): array
     {
         if ($this->editingId === null) {
@@ -453,6 +478,19 @@ class SubscriptionManager extends Component
         return UiVariant::simplePaginationView();
     }
 
+    /**
+     * Its own page name, so this list pages on `?subscriptions=` in the URL.
+     *
+     * Livewire binds every paginator to `?page=` unless the component names its own, and the
+     * console is documented as this list and the delivery log on one page. With one key between
+     * them, paging the log paged this list too: a log on page 2 reloaded an empty endpoint
+     * list, and the browser's back button moved both. The log keeps `?page=`.
+     */
+    public function getPageName(): string
+    {
+        return 'subscriptions';
+    }
+
     public function render(): View
     {
         return ViewFactory::make(UiVariant::view('subscription-manager'), [
@@ -476,18 +514,43 @@ class SubscriptionManager extends Component
             // paginated read is several queries: where two rows tie, the database may order them
             // differently per query, so a reader sees one endpoint twice and another never, on the
             // same screen whose whole point is that the list outgrows a page.
-            'subscriptions' => WebhookSubscription::model()::query()->latest()->orderByDesc('id')->simplePaginate(25),
+            'subscriptions' => WebhookSubscription::model()::query()->latest()->orderByDesc('id')->simplePaginate(25, pageName: $this->getPageName()),
             // The catalog, plus anything the OPENED ROW already holds that the catalog no
             // longer declares. Without the second half the stale value has no checkbox, so
             // it can be neither kept nor dropped — Livewire's checkbox binding only ever
             // adds or removes its OWN value.
             // The array_values here cannot change the outcome (the view iterates, keys unread)
-            // while its neighbor array_unique can — remove that one and an arm goes red. Both
+            // while its neighbor array_unique can: without it the opened row's types repeat. Both
             // stay.
+            //
+            // A type whose catalog entry names an ability the operator lacks is not offered. One the
+            // opened row already carries still is, so it can be kept or removed.
             'availableEventTypes' => array_values(array_unique([
-                ...new Settings()->eventTypes(),
+                ...$this->offeredEventTypes(),
                 ...$this->storedEventTypes(),
             ])),
+            // Decided here and passed in, the way the delivery log passes its two: a published
+            // view rendered through `View::make()` has no component to ask. A host that holds the
+            // console at one ability and lifts only `delete` would otherwise offer every operator
+            // a delete dialog that ends in a refusal.
+            'canCreate' => $this->canAction('create'),
+            'canEdit' => $this->canAction('edit'),
+            'canToggle' => $this->canAction('toggle'),
+            'canRotate' => $this->canAction('rotate'),
+            'canDelete' => $this->canAction('delete'),
         ]);
+    }
+
+    /**
+     * The catalog's event types the acting operator may subscribe an endpoint to.
+     *
+     * @return list<string>
+     */
+    private function offeredEventTypes(): array
+    {
+        $types = new Settings()->eventTypes();
+        $refused = new EventTypeAbilities()->refused($types, Auth::user());
+
+        return array_values(array_diff($types, $refused));
     }
 }

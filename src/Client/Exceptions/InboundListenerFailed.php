@@ -11,9 +11,10 @@ use RuntimeException;
 use Throwable;
 
 /**
- * A listener on an inbound event threw, and the delivery it was announcing was authentic and
- * already safe. This wraps whatever the listener threw and is handed to `report()`; nothing in
- * the package catches it.
+ * A listener on an inbound event threw after the outcome it announces was settled: the delivery
+ * had been verified and stored, found unreadable, or refused as not authentic, and a failing
+ * listener changes none of that. This wraps whatever the listener threw and is handed to
+ * `report()`; nothing in the package catches it.
  *
  * It exists because handing the ORIGINAL exception to `report()` is not the same as reporting
  * it. Laravel's handler skips a documented set outright — a listener that ran `firstOrFail()`,

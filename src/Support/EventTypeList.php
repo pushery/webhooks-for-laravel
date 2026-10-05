@@ -35,11 +35,54 @@ use Pushery\Webhooks\Models\WebhookSubscription;
 final class EventTypeList
 {
     /**
-     * @param  array<array-key, mixed>  $stored
+     * The longest event type the two forms register an endpoint for, in characters. It is the
+     * width of the MySQL index over the column, which refuses a longer value outright, so a
+     * name the forms accept stores on every supported engine.
+     */
+    public const int MAX_LENGTH = 255;
+
+    /**
+     * How many event types the two forms register one endpoint for while the application
+     * declares no catalog. Without a catalog the forms offer no type to select, so only a
+     * request written by hand reaches this.
+     */
+    public const int MAX_UNCATALOGED = 100;
+
+    /**
+     * A scalar where the list belongs, a single name written without its brackets, reads as a
+     * list of that one value, the same as it would inside a list. Anything else that is not an
+     * array, a JSON null, reads as no types. Both are what the column's cast hands back for a
+     * row a host wrote outside the forms, and a type error on either would take down the whole
+     * list of endpoints, not only the row.
+     *
      * @return list<string>
      */
-    public static function fromStorage(array $stored): array
+    public static function fromStorage(mixed $stored): array
     {
+        if (is_scalar($stored)) {
+            $stored = [$stored];
+        }
+
+        if (! is_array($stored)) {
+            return [];
+        }
+
         return array_values(array_map(strval(...), array_filter($stored, is_scalar(...))));
+    }
+
+    /**
+     * How many event types one save may register an endpoint for.
+     *
+     * With a catalog it is the number of types the form accepts, so every type it offers can
+     * be selected at once and only a list padded with repeats goes past it. Without one it is
+     * {@see self::MAX_UNCATALOGED}. Either way an endpoint that already holds more keeps them
+     * through an edit: a save is not refused over types nobody touched.
+     *
+     * @param  list<string>|null  $accepted  what the form accepts, null without a catalog
+     * @param  list<string>  $stored  what the endpoint holds now, empty for a new one
+     */
+    public static function maxCount(?array $accepted, array $stored): int
+    {
+        return max($accepted === null ? self::MAX_UNCATALOGED : count($accepted), count($stored));
     }
 }

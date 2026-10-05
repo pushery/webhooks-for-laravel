@@ -64,6 +64,12 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
      */
     public const int MINIMUM_TIMEOUT = 30;
 
+    /**
+     * The longest message timer SQS accepts, in seconds. AWS refuses a longer `DelaySeconds`, and
+     * Laravel's `SqsQueue` hands a job's delay to it unchanged.
+     */
+    private const int SQS_MAX_DELAY_SECONDS = 900;
+
     public int $tries;
 
     public int $timeout;
@@ -238,10 +244,10 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
      * fresh job, so the question is what the target connection does with a delay, and
      * `SyncQueue::later()` ignores its `$delay` argument outright and calls `push()`.
      *
-     * Without this, a 429 asking for longer than the cap re-ran the delivery immediately, and
-     * did so once per remaining deferral. Measured on the sync connection with the shipped
-     * defaults and a `Retry-After: 3600`: SEVEN real requests, in milliseconds, at the endpoint
-     * that had just asked for an hour of quiet — the initial attempt plus all six deferrals.
+     * Without this, a 429 asking for longer than the cap re-runs the delivery immediately, once
+     * per remaining deferral. On the sync connection with the shipped defaults and a
+     * `Retry-After: 3600`, that is seven requests within milliseconds at the endpoint that has
+     * just asked for an hour of quiet — the initial attempt plus all six deferrals.
      *
      * The code two branches up already warns about exactly this shape for a zero cap and
      * excludes it. The same thing happens on `sync` at ANY cap, because there the delay is not
@@ -266,13 +272,28 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
     }
 
     /**
+     * How long a deferral holds the job back: the Retry-After cap, and on SQS no longer than its
+     * message timer accepts. A cap above that would make the send throw instead of waiting; held
+     * at the timer's limit, the job comes back sooner and defers again while the endpoint still
+     * asks for more, each time counted against `retryAfterMaxDeferrals`.
+     */
+    private function deferralDelay(): int
+    {
+        $cap = $this->data->options->retryAfterCap;
+
+        return app(QueueManager::class)->connection($this->connection) instanceof SqsQueue
+            ? min($cap, self::SQS_MAX_DELAY_SECONDS)
+            : $cap;
+    }
+
+    /**
      * Continue the delivery in a fresh job after the Retry-After cap, carrying the
      * attempts made so far and one more deferral. A release() cannot be used: it
      * re-pushes the ORIGINAL payload, so the counters would be lost.
      */
     private function defer(int $attempt, int $requested): void
     {
-        $delay = $this->data->options->retryAfterCap;
+        $delay = $this->deferralDelay();
 
         event(new WebhookAttemptDeferred($this->data, $attempt, $delay, $requested));
 

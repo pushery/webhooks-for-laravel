@@ -57,7 +57,7 @@ final class RevokeRotatedSecretsCommand extends Command
 
                     // The cast is for the declared list type, not for the output: the only reader
                     // is the implode() below, which renders an int identically. Dropping it changes
-                    // no message -- measured.
+                    // no message.
                     $failed[] = is_scalar($key) ? (string) $key : 'unknown';
 
                     report($failure);

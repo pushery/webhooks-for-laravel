@@ -25,7 +25,7 @@
      * button on click: it focuses the nearest focusable ancestor instead, which on the deliveries
      * table is the table's scroll region. A drawer that remembered the active element remembered
      * that region and gave focus back to it on close. Blink and Linux WebKit focus the button itself,
-     * which is why the lane stayed green while the same arm was red on every Mac.
+     * so the difference shows on macOS alone.
      *
      * So the pressed control wins when nothing else has focus, when focus sits on an element that
      * CONTAINS the pressed control, or when the press is the newer of the two events. A keyboard

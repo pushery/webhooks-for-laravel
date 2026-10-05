@@ -1,6 +1,19 @@
 {{-- Published stub: restyle with your design system (WireKit recommended) and
      place behind your own authorization. --}}
+@php
+    // Each control's capability, decided by the component and passed in. A direct `View::make()`
+    // with a hand-built array may pass none of them, and the defaults are today's behavior: every
+    // control renders. The check is the COURTESY -- each action still calls `authorizeAction()`
+    // and still refuses -- so defaulting to "show" cannot open anything.
+    $canCreate = $canCreate ?? true;
+    $canEdit = $canEdit ?? true;
+    $canToggle = $canToggle ?? true;
+    $canRotate = $canRotate ?? true;
+    $canDelete = $canDelete ?? true;
+@endphp
 <div class="wh-subscriptions space-y-8">
+    {{-- The form is the create action until a row is opened, and the edit action after. --}}
+    @if ($editingId !== null ? $canEdit : $canCreate)
     {{-- One form for both jobs. The component decides which it is from whether an endpoint
          is open for editing, so a save can never register a duplicate of the row it meant
          to correct. --}}
@@ -36,7 +49,7 @@
         <fieldset @error('eventTypes') aria-invalid="true" aria-describedby="wh-event-types-error" @enderror @error('eventTypes.*') aria-invalid="true" aria-describedby="wh-event-types-item-error" @enderror>
             <legend class="text-sm font-medium">{{ __('webhooks::management.form.event_types_legend') }}</legend>
             @forelse ($availableEventTypes as $type)
-                <label class="flex items-center gap-2">
+                <label class="flex items-center gap-2" wire:key="event-type-{{ $type }}">
                     <input type="checkbox" wire:model="eventTypes" value="{{ $type }}"> {{ $type }}
                 </label>
             @empty
@@ -70,6 +83,7 @@
             @endif
         </div>
     </form>
+    @endif
 
     @if ($newSecret)
         <div class="wh-new-secret rounded border border-green-300 bg-green-50 p-4">
@@ -127,8 +141,13 @@
          reachable by keyboard (WCAG 2.1.1), and an unfocusable overflow div is exactly the
          failure this attribute prevents. role and name come with it so the region announces as
          something rather than as an unlabeled group -- WireKit's own table wraps itself in the
-         identical four attributes, which is why its twin of this screen never had the problem. --}}
-    <div class="w-full min-w-0 overflow-x-auto" tabindex="0" role="region" aria-label="{{ __('webhooks::management.a11y.subscriptions_table') }}">
+         identical four attributes, which is why its twin of this screen never had the problem.
+
+         `relative` makes the region the containing block of the `sr-only` column header. An
+         overflow container clips an absolutely positioned element only when it is that
+         element's containing block, so without it the header stays where its column lands and
+         widens the document whenever the table is wider than the screen. --}}
+    <div class="relative w-full min-w-0 overflow-x-auto" tabindex="0" role="region" aria-label="{{ __('webhooks::management.a11y.subscriptions_table') }}">
     <table class="w-full text-left text-sm" aria-label="{{ __('webhooks::management.a11y.subscriptions_table') }}">
         <thead>
             <tr>
@@ -169,21 +188,26 @@
                         @endif
                     </td>
                     <td class="px-3 py-2 text-right">
+                        @if ($canEdit)
                         <button
                             type="button"
                             wire:click="edit({{ $subscription->id }})"
                             aria-label="{{ __('webhooks::management.a11y.edit_subscription', ['url' => $subscription->url]) }}"
                             class="text-indigo-600"
                         >{{ __('webhooks::management.subscription.edit') }}</button>
+                        @endif
                         {{-- Named per row like its neighbors; the visible word switches with the
                              row's state, so it is interpolated rather than described. --}}
+                        @if ($canToggle)
                         @php($toggleLabel = $subscription->is_active ? __('webhooks::management.subscription.disable') : __('webhooks::management.subscription.enable'))
                         <button type="button" wire:click="toggle({{ $subscription->id }})" class="ml-3 text-indigo-600" aria-label="{{ __('webhooks::management.a11y.toggle_subscription', ['label' => $toggleLabel, 'url' => $subscription->url]) }}">
                             {{ $toggleLabel }}
                         </button>
+                        @endif
                         {{-- Rotating starts a clock on the old secret rather than invalidating it,
                              but it is still a change every consumer of this endpoint has to follow,
                              so it is confirmed like the destructive action next to it. --}}
+                        @if ($canRotate)
                         <button
                             type="button"
                             wire:click="rotate({{ $subscription->id }})"
@@ -191,12 +215,14 @@
                             aria-label="{{ __('webhooks::management.a11y.rotate_subscription', ['label' => __('webhooks::management.subscription.rotate'), 'url' => $subscription->url]) }}"
                             class="ml-3 text-indigo-600"
                         >{{ __('webhooks::management.subscription.rotate') }}</button>
+                        @endif
                         {{-- Deleting an endpoint is irreversible and stops a live production
                              integration, so it is never a bare one-click destroy. This neutral stub
                              uses the browser confirm because it deliberately depends on no design
                              system; the WireKit variant (publish tag webhooks-ui-wirekit) confirms
                              with a real alert-dialog, which is the pattern to copy when you restyle
                              this view. --}}
+                        @if ($canDelete)
                         <button
                             type="button"
                             wire:click="destroy({{ $subscription->id }})"
@@ -204,6 +230,7 @@
                             aria-label="{{ __('webhooks::management.a11y.delete_subscription', ['url' => $subscription->url]) }}"
                             class="ml-3 text-red-600"
                         >{{ __('webhooks::management.subscription.delete') }}</button>
+                        @endif
                     </td>
                 </tr>
             @endforeach

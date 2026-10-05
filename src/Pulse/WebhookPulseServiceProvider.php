@@ -54,11 +54,27 @@ final class WebhookPulseServiceProvider extends ServiceProvider
 
         // Wire the recorder to the Server delivery events directly — the same events
         // it exposes via its $listen array — so the host need not edit pulse.recorders.
-        Event::listen(
-            [WebhookAttemptSucceeded::class, WebhookAttemptsExhausted::class],
-            [WebhookDeliveryRecorder::class, 'record'],
-        );
+        // A host that lists it there anyway has Pulse wire it to the same events, and a
+        // second listener here would record every delivery twice. Listed, it is Pulse's to
+        // wire, including an 'enabled' => false that switches it off.
+        if (! $this->listedInPulseRecorders()) {
+            Event::listen(
+                [WebhookAttemptSucceeded::class, WebhookAttemptsExhausted::class],
+                [WebhookDeliveryRecorder::class, 'record'],
+            );
+        }
 
         Livewire::component('webhooks.pulse.deliveries', WebhookDeliveryCard::class);
+    }
+
+    /**
+     * Whether the host lists the recorder in Pulse's own config, keyed by its class the way
+     * Pulse registers every recorder.
+     */
+    private function listedInPulseRecorders(): bool
+    {
+        $recorders = Config::get('pulse.recorders');
+
+        return is_array($recorders) && array_key_exists(WebhookDeliveryRecorder::class, $recorders);
     }
 }

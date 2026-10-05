@@ -16,8 +16,8 @@ namespace Pushery\Webhooks\Core\Ssrf;
  * static: an unqualified `dns_get_record()` is unreachable from a test, so a branch left
  * beside it is a branch nothing can exercise. The AAAA half used to be
  * `@dns_get_record($host, DNS_AAAA) ?: []` inline, and neither direction of that `?:` was
- * ever reached — no offline host has an AAAA record, and the two hosts the suite uses answer
- * with an empty ARRAY, never with `false`. What it hid was not academic: negate the ternary
+ * ever reached — no offline host has an AAAA record, and a lookup that finds no record answers
+ * with an empty ARRAY rather than `false`. What it hid was not academic: negate the ternary
  * and a dual-stack destination is classified on its IPv4 addresses alone while the delivery
  * can still connect over IPv6.
  *

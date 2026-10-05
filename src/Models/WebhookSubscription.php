@@ -211,7 +211,7 @@ class WebhookSubscription extends Model
      *
      * Every lookup here depends on `event_types` being a JSON list, and that is an invariant the
      * writers hold rather than one the column enforces. `whereJsonContains` looks for a member of
-     * an array; against an object it matches nothing — measured, a row stored as
+     * an array; against an object it matches nothing: a row stored as
      * `{"5":"invoice.paid"}` is invisible to `listeningFor('invoice.paid')` while looking perfectly
      * configured in both consoles, with no error, no empty state and no log line.
      *

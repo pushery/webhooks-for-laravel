@@ -69,10 +69,9 @@ final class HttpTransport
         // The same refusal guzzle 8 makes, made here, because guzzle 7 does not make it. A response
         // carrying both `Content-Length` and `Transfer-Encoding` contradicts itself about where its
         // body ends; RFC 9112 §6.1 forbids it outright. Guzzle 8 validates the framing before the
-        // response is ever visible and rejects the transfer — measured — while guzzle 7 has no such
-        // check and hands back an ordinary 200 with both headers still on it. Without this,
-        // widening the constraint would have made the same wire event a delivered webhook on one
-        // major and a failed delivery on the other.
+        // response is ever visible and rejects the transfer, while guzzle 7 has no such check and
+        // hands back an ordinary 200 with both headers still on it. Without this, the same wire
+        // event would be a delivered webhook on one major and a failed delivery on the other.
         //
         // Guzzle 8 never reaches this line for such a response: its rejection arrives as an
         // exception that TransportExceptionNormalizer turns into the same class. Two routes,
@@ -151,7 +150,10 @@ final class HttpTransport
             $guzzle['curl'] = [CURLOPT_RESOLVE => $resolve];
         }
 
-        return $guzzle;
+        // A host's own options go first, so an option the transport sets overrides one of the same
+        // name, and one it reserves without setting is left out. Settings::requestOptions() refuses
+        // both before a delivery is ever sent; this holds the line for any other caller.
+        return [...array_diff_key($options->requestOptions, array_flip(RequestOptions::RESERVED)), ...$guzzle];
     }
 
     /**

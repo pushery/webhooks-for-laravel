@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Pushery\Webhooks\Support;
 
 use Illuminate\Support\Facades\Config;
+use InvalidArgumentException;
 use Pushery\Webhooks\Console\PreflightCommand;
+use Pushery\Webhooks\Core\Http\RequestOptions;
 use Pushery\Webhooks\Core\Signing\Ed25519Scheme;
 use Pushery\Webhooks\Core\Signing\SignatureScheme;
 use Pushery\Webhooks\Core\Signing\StandardWebhooksScheme;
@@ -47,6 +49,19 @@ final class Settings
     }
 
     /**
+     * The request options a host adds to every delivery, `webhooks.server.request_options`, once
+     * every key is one a host may add.
+     *
+     * @return array<string, mixed>
+     *
+     * @throws InvalidArgumentException when a key is one the transport owns
+     */
+    public function requestOptions(): array
+    {
+        return RequestOptions::addable(Config::array('webhooks.server.request_options', []));
+    }
+
+    /**
      * The connect-phase timeout of an outbound delivery, in seconds.
      */
     public function connectTimeout(): int
@@ -76,9 +91,10 @@ final class Settings
     }
 
     /**
-     * The longest Retry-After wait the queue can hold a delivery job for. Separate from
-     * the jitter cap on purpose: that one exists to stay under a queue's visibility
-     * timeout, while an endpoint's rate-limit window is routinely much longer.
+     * The longest Retry-After wait the queue can hold a delivery job for: a deferral dispatches
+     * a fresh job with that delay, and SQS delays a message by at most 15 minutes. Separate
+     * from the jitter cap on purpose: that one shapes the schedule of ordinary retries, while
+     * an endpoint's rate-limit window is routinely much longer.
      */
     public function retryAfterCap(): int
     {
@@ -665,6 +681,33 @@ final class Settings
         }
 
         return $wildcards;
+    }
+
+    /**
+     * The ability a catalog entry names for subscribing an endpoint to its event type, or null when
+     * the entry names none.
+     *
+     * A value that is not a usable ability name is refused loudly rather than read as none: read
+     * as none it would leave open the topic the host meant to close.
+     */
+    public function abilityFor(string $eventType): ?string
+    {
+        $entry = $this->catalog()[$eventType] ?? null;
+
+        if (! is_array($entry) || ! array_key_exists('ability', $entry) || $entry['ability'] === null) {
+            return null;
+        }
+
+        $ability = $entry['ability'];
+
+        if (! is_string($ability) || trim($ability) === '') {
+            throw new InvalidArgumentException(sprintf(
+                'The catalog entry for [%s] names an ability that is not a usable ability name. Name one, or remove the key.',
+                $eventType,
+            ));
+        }
+
+        return trim($ability);
     }
 
     /**

@@ -16,11 +16,18 @@
         "mysql"
     ],
     "license": "MIT",
+    "authors": [
+        {
+            "name": "Pushery",
+            "homepage": "https://www.pushery.com"
+        }
+    ],
     "type": "library",
     "homepage": "https://github.com/pushery/webhooks-for-laravel",
     "support": {
         "issues": "https://github.com/pushery/webhooks-for-laravel/issues",
-        "source": "https://github.com/pushery/webhooks-for-laravel"
+        "source": "https://github.com/pushery/webhooks-for-laravel",
+        "docs": "https://docs.pushery.com/webhooks-for-laravel/"
     },
     "require": {
         "php": "^8.4",

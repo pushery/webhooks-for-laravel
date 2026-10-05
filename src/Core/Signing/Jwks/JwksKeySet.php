@@ -6,6 +6,7 @@ namespace Pushery\Webhooks\Core\Signing\Jwks;
 
 use Illuminate\Contracts\Cache\Repository as Cache;
 use InvalidArgumentException;
+use Pushery\Webhooks\Core\Http\ErrorMessageRedactor;
 use Pushery\Webhooks\Core\Http\HttpTransport;
 use Pushery\Webhooks\Core\Http\TransportOptions;
 use Pushery\Webhooks\Core\Signing\Ed25519Scheme;
@@ -17,7 +18,7 @@ use Pushery\Webhooks\Core\Ssrf\SsrfGuard;
  * keys so a rotating provider's keys can back {@see Ed25519Scheme}
  * verification without redistributing anything. Only OKP/Ed25519 keys (`kty=OKP`,
  * `crv=Ed25519`) are read; the base64url `x` parameter is the raw 32-byte public key.
- * Keys are indexed by their `kid`.
+ * Keys are indexed by their `kid`, and a key without one by its position among the usable keys.
  *
  * The fetch is routed through the shared {@see SsrfGuard} + {@see HttpTransport}, so a
  * JWKS URL that resolves to a private, loopback or cloud-metadata address is refused
@@ -75,6 +76,11 @@ final readonly class JwksKeySet
      * holds exactly that key; without one it holds up to two keys (current + previous),
      * covering the rotation window a `v1a` header — which carries no key id — needs to
      * try. Throws when no matching key is available.
+     *
+     * The message names the JWKS without its userinfo, query and fragment, by the rule a failed
+     * fetch is already reported with. It is reported on every delivery for as long as the key is
+     * missing, and a provider that guards its key-set endpoint with a token in the query would
+     * otherwise have that token written to the log each time.
      */
     public function secretSet(string $url, int $ttlSeconds, ?string $kid = null): SecretSet
     {
@@ -83,13 +89,13 @@ final readonly class JwksKeySet
         if ($kid !== null) {
             return isset($keys[$kid])
                 ? SecretSet::fromCurrent($keys[$kid])
-                : throw new InvalidArgumentException("The JWKS at [{$url}] has no Ed25519 key with kid [{$kid}].");
+                : throw new InvalidArgumentException('The JWKS at ['.ErrorMessageRedactor::url($url)."] has no Ed25519 key with kid [{$kid}].");
         }
 
         $values = array_values($keys);
 
         return match (count($values)) {
-            0 => throw new InvalidArgumentException("The JWKS at [{$url}] exposes no usable Ed25519 (OKP) keys."),
+            0 => throw new InvalidArgumentException('The JWKS at ['.ErrorMessageRedactor::url($url).'] exposes no usable Ed25519 (OKP) keys.'),
             1 => SecretSet::fromCurrent($values[0]),
             default => SecretSet::rotating($values[0], $values[1]),
         };
@@ -123,8 +129,8 @@ final readonly class JwksKeySet
             return [];
         }
 
-        $keys = [];
-        $index = 0;
+        /** @var list<array{?string, string}> $usable */
+        $usable = [];
 
         foreach ($document['keys'] as $key) {
             if (! is_array($key)) {
@@ -148,13 +154,52 @@ final readonly class JwksKeySet
                 continue;
             }
 
-            // The cast is EQUIVALENT and reported every run: PHP normalizes an integer-like array
-            // key back to an int, so `$keys[0]` and `$keys['0']` are the same slot. It stays
-            // because the array is declared `array<string, string>` and a bare int is the one
-            // value that would make that declaration false at runtime while every test passed.
-            $kid = is_string($key['kid'] ?? null) && $key['kid'] !== '' ? $key['kid'] : (string) $index;
-            $keys[$kid] = base64_encode($raw);
-            $index++;
+            $usable[] = [is_string($key['kid'] ?? null) && $key['kid'] !== '' ? $key['kid'] : null, base64_encode($raw)];
+        }
+
+        return $this->indexed($usable);
+    }
+
+    /**
+     * The usable keys in document order, each under its `kid`, and a key without one under its
+     * position among them.
+     *
+     * PHP stores a numeric `kid` such as "1" under the same integer as that position. So the kids
+     * are reserved first, and a key without one takes the first position from its own onward that
+     * no kid holds: a document that publishes both keeps both, and a pinned numeric `kid` resolves
+     * to its own key.
+     *
+     * @param  list<array{?string, string}>  $usable
+     * @return array<int|string, string>
+     */
+    private function indexed(array $usable): array
+    {
+        $taken = [];
+
+        foreach ($usable as [$kid]) {
+            if ($kid !== null) {
+                $taken[$kid] = true;
+            }
+        }
+
+        $keys = [];
+
+        foreach ($usable as $position => [$kid, $public]) {
+            if ($kid === null) {
+                $slot = $position;
+
+                while (isset($taken[$slot])) {
+                    $slot++;
+                }
+
+                $taken[$slot] = true;
+                // The cast changes no slot: PHP normalizes an integer-like array key back to an
+                // int, so `$keys[1]` and `$keys['1']` are the same slot, which is why the kids
+                // are reserved first.
+                $kid = (string) $slot;
+            }
+
+            $keys[$kid] = $public;
         }
 
         return $keys;

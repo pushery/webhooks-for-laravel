@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Database;
 
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -22,31 +23,22 @@ use RuntimeException;
 final class PostgresRequirement
 {
     /**
-     * The oldest PostgreSQL this package is built and tested against.
+     * The oldest PostgreSQL this package supports, and the floor ensureVersion() enforces.
      *
-     * It was stated in three places and enforced in none. `installation.md`, the README and this
-     * class's own docblock all say "PostgreSQL 13+", and both migration guards used to `return` the
-     * moment they saw the pgsql driver — no version read at all. Meanwhile the MySQL half checks
-     * its floor, the SQL mode, MariaDB and FOUND_ROWS, each with a message naming what it found and
-     * what to do.
+     * A promise about which servers it runs on, not a report on which ones were tested: every
+     * shipped path is written to run on this version and on every later one. Both migration
+     * guards read it, so an older server is refused before the first migration, with a message
+     * that names the version found and the way out, as the MySQL half does for its own floor,
+     * the SQL mode, MariaDB and FOUND_ROWS.
      *
-     * So the two engines were treated unequally in the direction that matters: a host on MySQL
-     * 8.0 was told exactly what was wrong, and a host on PostgreSQL 12 got a raw SQL error from
-     * the middle of a migration — about a syntax it has never heard of, on a requirement it was
-     * never told about.
+     * Thirteen is deliberate, although the shipped dashboard migrations call `date_bin`, which
+     * PostgreSQL added in version 14. The same migration's `bucketExpression()` reads
+     * `server_version_num` and returns an epoch-floor expression below 140000, which yields the
+     * identical whole-hour boundary, so raising this constant would refuse a server that path
+     * still serves.
      *
-     * Thirteen is deliberate, and the obvious repair is to raise it to fourteen. The shipped
-     * dashboard migrations call `date_bin`, which PostgreSQL grew in 14 — three files say so, one
-     * of them in a comment. A reader who finds that and nothing else concludes the floor is a
-     * version too low and fixes it, which would refuse a server this package deliberately supports.
-     *
-     * What they would have missed is one method further down that same migration:
-     * `bucketExpression()` reads `server_version_num` and returns an epoch-floor expression
-     * below 140000, yielding the identical whole-hour boundary. The 13 path exists, it is
-     * written, and raising this constant would delete it without touching it.
-     *
-     * So the rule for changing this number: the floor is the OLDEST server every shipped path
-     * still has a branch for — not the newest syntax anything uses.
+     * The rule for changing this number: the floor is the OLDEST server every shipped path
+     * still has a branch for, not the newest syntax anything uses.
      */
     public const string MIN_VERSION = '13';
 
@@ -60,7 +52,10 @@ final class PostgresRequirement
         $driver = $resolved->getDriverName();
 
         if ($driver === 'pgsql') {
-            self::ensureVersion($resolved->getName() ?? 'default', $resolved->getServerVersion());
+            $name = $resolved->getName() ?? 'default';
+
+            self::ensureVersion($name, $resolved->getServerVersion());
+            self::ensureIdentity($name, $resolved);
 
             return;
         }
@@ -81,9 +76,8 @@ final class PostgresRequirement
      * Refuse a PostgreSQL older than the floor, in the same shape the MySQL half uses: name the
      * version found, the one required, and the way out.
      *
-     * Public and taking the version as an argument, so both guards read one floor and a test can
-     * drive it without a server of that vintage — which is the only way this arm can be proven
-     * at all, since the suite runs on a current PostgreSQL.
+     * Public and taking the version as an argument, so both guards read one floor and a caller
+     * can check a version without a server of that vintage.
      *
      * @throws RuntimeException when the server is older than {@see self::MIN_VERSION}
      */
@@ -95,7 +89,7 @@ final class PostgresRequirement
 
         throw new RuntimeException(sprintf(
             'The [%s] PostgreSQL connection reports version %s, but this package requires '
-            .'PostgreSQL %s+ — the oldest it is built and tested against. Its tables use jsonb, '
+            .'PostgreSQL %s+, the oldest it supports. Its tables use jsonb, '
             .'GIN indexes and declarative range partitioning, so an older server fails somewhere '
             .'inside a migration instead of here. Upgrade the server, or use MySQL 8.4+ and '
             .'re-publish the migrations to get that schema.',
@@ -103,5 +97,45 @@ final class PostgresRequirement
             $version,
             self::MIN_VERSION,
         ));
+    }
+
+    /**
+     * Refuse a server that speaks PostgreSQL's protocol without being PostgreSQL.
+     *
+     * Such a server passes the version check above: CockroachDB reports a
+     * `server_version` of 18.0.0, YugabyteDB 2.25 one of 15.2-YB-2.25.0.0-b0. Its `version()`
+     * banner says what it is, the way MariaDB's says what MariaDB is, so the banner is read
+     * rather than a list of products, and an engine nobody listed is refused the same way.
+     *
+     * @throws RuntimeException when the server's banner is not PostgreSQL's
+     */
+    public static function ensureIdentity(string $name, ConnectionInterface $connection): void
+    {
+        $row = (array) $connection->selectOne('select version() as banner');
+        $banner = $row['banner'] ?? null;
+
+        if (is_string($banner) && self::isPostgresBanner($banner)) {
+            return;
+        }
+
+        throw new RuntimeException(sprintf(
+            'The [%s] connection uses the pgsql driver, but its server reports itself as [%s], which is '
+            .'not PostgreSQL. A server that only speaks its protocol fails somewhere inside a migration '
+            .'instead of here: the tables use declarative range partitioning, materialized views and GIN '
+            .'indexes. Use PostgreSQL %s+, or MySQL 8.4+ and re-publish the migrations to get that schema.',
+            $name,
+            is_string($banner) ? mb_strimwidth($banner, 0, 80, '…') : 'no version at all',
+            self::MIN_VERSION,
+        ));
+    }
+
+    /**
+     * Whether a `version()` banner is PostgreSQL's own: `PostgreSQL ` and a plain release number,
+     * a development or pre-release suffix included, followed by the build details or nothing.
+     * A compatible engine either names itself first or appends its own version to the number.
+     */
+    public static function isPostgresBanner(string $banner): bool
+    {
+        return preg_match('/^PostgreSQL \d+(?:\.\d+)*(?:devel|(?:alpha|beta|rc)\d*)?(?:[\s,]|$)/', $banner) === 1;
     }
 }

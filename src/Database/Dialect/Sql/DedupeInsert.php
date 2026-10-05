@@ -18,8 +18,9 @@ use Pushery\Webhooks\Database\Dialect\Dialect;
  * DatabaseRequirement forbids MYSQL_ATTR_FOUND_ROWS, which would report 1 either way). Its
  * created_at/updated_at are bound from PHP rather than the session-zone-dependent NOW().
  *
- * Never `INSERT IGNORE` on MySQL: it downgrades every error — a truncation, a bad foreign key, a
- * deadlock — into a silently skipped row, so a real failure would look like a de-duplication.
+ * Never `INSERT IGNORE` on MySQL: it turns the errors it can ignore into warnings. A value too
+ * long for its column is stored cut short and a row whose foreign key resolves nothing is
+ * skipped, so a real failure would look like a de-duplication.
  *
  * @internal
  */

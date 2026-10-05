@@ -6,25 +6,18 @@
     <header>
         <x-wirekit::page-header :level="\Pushery\Webhooks\Support\UiVariant::pageHeadingLevel()" :title="__('webhooks::dashboard.heading')">
             <x-slot:actions>
-                {{-- WireKit's segmented-control, driven optimistically through selectWindow()
-                     rather than by a wire:model.
+                {{-- WireKit's segmented-control, bound with wire:model.live.
 
-                     A hand-rolled button group stood here, and its stated reason — "the component
-                     forwards only a bare `wire:model` to its hidden input" — was fixed upstream in
-                     WireKit v2.12.0 and is unreachable below the 2.53 floor this package enforces.
-                     It was a rebuild of a component we ship.
+                     No `optimistic` prop. The optimistic layer lives in a separate WireKit bundle
+                     (dist/wirekit-optimistic.js) that these screens do not load; with the prop set, the
+                     browser reports `wirekitOptimistic is not defined` and four more errors before the
+                     page finishes. Using it would make a second asset a requirement for every consumer,
+                     to move a three-option control a round trip sooner.
 
-                     No `optimistic` prop, and that is measured rather than chosen. The optimistic layer
-                     lives in a separate WireKit bundle (dist/wirekit-optimistic.js) that these screens do
-                     not load; with the prop set, a real browser reports `wirekitOptimistic is not defined`
-                     and four more before the page finishes. Using it would make a second asset a
-                     requirement for every consumer, to move a three-option control a round trip sooner.
-
-                     The binding needs `updatedWindow()`, and without it this would be a regression.
-                     `$window` carries `#[Url]`, so it is client input; mount() screens it against the
-                     configured set, and mount() runs once. The hand-rolled group this replaced went through
-                     the allowlisted `selectWindow()` on every click. A binding writes the property directly
-                     instead, so the same screening now sits in the update hook — see the component. --}}
+                     The binding needs `updatedWindow()`. `$window` carries `#[Url]`, so it is client
+                     input; mount() screens it against the configured set, and mount() runs once. A
+                     binding writes the property directly, so the same screening sits in the update
+                     hook — see the component. --}}
                 <x-wirekit::segmented-control
                     class="wh-dash-windows"
                     {{-- Named because it is live-bound: the hidden input a wire:model writes through is
@@ -47,7 +40,7 @@
                 href="{{ route('webhooks.dashboard', ['tab' => $t, 'window' => $window]) }}"
                 wire:navigate
                 @class([
-                    {{-- A FLOOR, not a repair — and the difference is measured. On a styled page these
+                    {{-- A minimum height, not a repair. On a styled page these
                          links come out at 36px, well clear of the 24px minimum in WCAG 2.5.8, so nothing
                          here is broken today. What is not guaranteed is that they stay there: the height
                          is padding token plus line height, and BOTH are values a host re-themes. Pinning

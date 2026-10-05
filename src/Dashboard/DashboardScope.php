@@ -130,15 +130,24 @@ final class DashboardScope
     {
         $ability = Config::string('webhooks.dashboard.all_tenants_ability', 'view-all-tenant-webhooks');
 
-        // The `=== ''` half is EQUIVALENT and reported every run: `Gate::has('')` is false, so
-        // the second half refuses an empty ability on its own. Kept because it names the case —
-        // a host that blanked the config rather than a host that forgot to define the gate —
-        // and the two are fixed differently.
-        if ($ability === '' || ! Gate::has($ability)) {
+        // A blank name and an undefined ability are refused alike and repaired differently, so
+        // each gets its own message. Defining 'view-all-tenant-webhooks' changes nothing while
+        // the config reads '': the ability this code asks for is the configured one.
+        if ($ability === '') {
+            throw new AuthorizationException(
+                'The webhook dashboard is in cross-tenant mode, which reads EVERY tenant\'s '
+                .'deliveries, so it requires its own ability, and webhooks.dashboard.all_tenants_ability '
+                .'(WEBHOOKS_DASHBOARD_ALL_TENANTS_ABILITY) is empty. Set it to an ability name '
+                ."(the shipped default is 'view-all-tenant-webhooks'), define that ability and grant it "
+                .'to your operators — or set webhooks.dashboard.all_tenants to false.'
+            );
+        }
+
+        if (! Gate::has($ability)) {
             throw new AuthorizationException(
                 'The webhook dashboard is in cross-tenant mode, which reads EVERY tenant\'s '
                 .'deliveries, so it requires its own ability. Define '
-                ."'".($ability === '' ? 'view-all-tenant-webhooks' : $ability)."' and grant it "
+                ."'{$ability}' and grant it "
                 .'to your operators — or set webhooks.dashboard.all_tenants to false.'
             );
         }

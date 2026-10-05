@@ -15,6 +15,7 @@ use Illuminate\Support\Str;
 use Override;
 use Pushery\Webhooks\Database\Concerns\HasZonedTimestamps;
 use Pushery\Webhooks\Database\Concerns\Replaceable;
+use Pushery\Webhooks\Database\Concerns\SavesUnlessTerminal;
 use Pushery\Webhooks\Database\Concerns\ScopesByTimestamp;
 use Pushery\Webhooks\Database\Concerns\UsesWebhookConnection;
 use Pushery\Webhooks\Database\Factories\WebhookServerDeliveryFactory;
@@ -52,6 +53,7 @@ class WebhookServerDelivery extends Model
     use HasZonedTimestamps;
     use MassPrunable;
     use Replaceable;
+    use SavesUnlessTerminal;
     use ScopesByTimestamp;
     use UsesWebhookConnection;
 
@@ -63,7 +65,19 @@ class WebhookServerDelivery extends Model
 
     protected $table = 'webhook_server_deliveries';
 
-    protected $guarded = [];
+    /**
+     * Only what was sent is mass-assignable. The row's uuid and the delivery outcome (status,
+     * http_status, attempt, duration_ms, error, delivered_at) are written by the engine alone,
+     * through forceFill(), so a stray create()/fill() from host code can never forge an outcome.
+     *
+     * @var list<string>
+     */
+    protected $fillable = [
+        'message_id',
+        'url',
+        'event_type',
+        'tags',
+    ];
 
     /**
      * The rows eligible for pruning: everything older than the configured window.
@@ -74,8 +88,9 @@ class WebhookServerDelivery extends Model
     {
         // The cutoff is bound for THIS connection's dialect: MySQL converts an offset-bearing
         // literal into the database session time zone (8.0.19+), which would slide the retention
-        // boundary by that offset and prune rows whose window has not closed yet.
-        return static::query()->where(
+        // boundary by that offset and prune rows whose window has not closed yet. Through
+        // model(), so a host that configures its own subclass prunes through it.
+        return static::model()::query()->where(
             'created_at',
             '<=',
             $this->boundTimestamp(Date::now()->subDays(Config::integer('webhooks.server.persistence.prune_after_days', 30))),
@@ -113,11 +128,10 @@ class WebhookServerDelivery extends Model
             'http_status' => 'integer',
             'attempt' => 'integer',
             'duration_ms' => 'integer',
-            // EQUIVALENT, and reported every run: this model uses timestamps, so Eloquent's
-            // getDates() already lists created_at and date-casts it with or without this line.
-            // (Measured — the arm asserting a Carbon instance stays green without it.) It is
-            // written out because UPDATED_AT is null on this model, which makes the timestamp
-            // handling non-obvious enough that the reader should not have to infer this one.
+            // This model uses timestamps, so Eloquent's getDates() already lists created_at and
+            // date-casts it with or without this line. It is written out because UPDATED_AT is
+            // null on this model, which makes the timestamp handling non-obvious enough that the
+            // reader should not have to infer this one.
             'created_at' => 'datetime',
             'delivered_at' => 'datetime',
         ];

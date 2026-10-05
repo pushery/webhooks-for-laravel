@@ -18,31 +18,31 @@
                 />
             @else
                 <div class="wh-dash-activity-legend mb-[var(--space-wk-sm)] flex flex-wrap gap-[var(--padding-wk-x-md)]">
-                    <span class="inline-flex items-center gap-[var(--gap-wk-sm)] text-[length:var(--text-wk-sm)]">
+                    <x-wirekit::text as="span" size="sm" class="inline-flex items-center gap-[var(--gap-wk-sm)]">
                         <span class="inline-block size-3 rounded-[var(--radius-wk-sm)] bg-[var(--color-wk-success)]" aria-hidden="true"></span>
                         {{ __('webhooks::dashboard.activity.delivered') }}
-                    </span>
-                    <span class="inline-flex items-center gap-[var(--gap-wk-sm)] text-[length:var(--text-wk-sm)]">
+                    </x-wirekit::text>
+                    <x-wirekit::text as="span" size="sm" class="inline-flex items-center gap-[var(--gap-wk-sm)]">
                         <span class="inline-block size-3 rounded-[var(--radius-wk-sm)] bg-[var(--color-wk-warning)]" aria-hidden="true"></span>
                         {{ __('webhooks::dashboard.activity.pending') }}
-                    </span>
-                    <span class="inline-flex items-center gap-[var(--gap-wk-sm)] text-[length:var(--text-wk-sm)]">
+                    </x-wirekit::text>
+                    <x-wirekit::text as="span" size="sm" class="inline-flex items-center gap-[var(--gap-wk-sm)]">
                         <span class="inline-block size-3 rounded-[var(--radius-wk-sm)] bg-[var(--color-wk-danger)]" aria-hidden="true"></span>
                         {{ __('webhooks::dashboard.activity.failed') }}
-                    </span>
+                    </x-wirekit::text>
                 </div>
 
                 {{-- The plot height is a package custom property, so a host that gives the
                      panel a different amount of room retunes it in one place instead of
                      forking the view. --}}
-                {{-- The scroll container and the bar min-width are one fix, and without it the plot
-                     went blank exactly when there was traffic to see. Each bar is `flex: 1 1 0%` in
-                     a row with a fixed gap, and a flex gap never shrinks: once the gaps alone are
+                {{-- The scroll container and the bar min-width belong together, and without them the
+                     plot goes blank exactly when there is traffic to see. Each bar is `flex: 1 1 0%`
+                     in a row with a fixed gap, and a flex gap never shrinks: once the gaps alone are
                      wider than the plot, the free space is negative, and because the flex-basis is
                      0 each bar's scaled shrink factor is 0 too — so nothing shrinks and every bar
-                     sits at 0px. The WireKit card around this is `overflow-hidden`, so there was
-                     not even a scrollbar to hint at it. Measured threshold: ~90 buckets at 1280px,
-                     ~42 on a 390px phone, and the 30d window can produce 720.
+                     sits at 0px. The WireKit card around this is `overflow-hidden`, so not even a
+                     scrollbar would hint at it. That starts at about 90 buckets at 1280px and about
+                     42 on a 390px phone, and the 30d window can produce 720.
 
                      `tabindex="0"` with a role and a name because WCAG 2.1.1 requires a
                      scrolling region to be reachable by keyboard; WireKit's own table does the

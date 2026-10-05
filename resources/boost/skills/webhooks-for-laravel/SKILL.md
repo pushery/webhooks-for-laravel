@@ -12,9 +12,7 @@ metadata:
 # Webhooks for Laravel
 
 Use this skill when a Laravel application installs or integrates the
-`pushery/webhooks-for-laravel` package. Laravel Boost surfaces it inside
-consuming applications, so keep it focused on adoption — never on package
-internals.
+`pushery/webhooks-for-laravel` package.
 
 ## Primary Goal
 
@@ -117,6 +115,23 @@ instead, call `ignoreMigrations()` on that layer's provider from a service
 provider's `register()` — `WebhooksServiceProvider`, `ServerServiceProvider`,
 `WebhookClientServiceProvider` or `WebhooksDashboardServiceProvider`, one per
 layer.
+
+The remaining tags publish what a host may restyle or reword. A published view
+replaces the package's own, so it no longer picks up fixes from later versions:
+publish only the views you change.
+
+| Tag | Publishes |
+| --- | --- |
+| `webhooks-views` | Every view except the operator console, into `resources/views/vendor/webhooks` |
+| `webhooks-dashboard-views` | The dashboard's views alone |
+| `webhooks-self-service-views` | The self-service portal's views alone |
+| `webhooks-ui` | The operator console in plain markup |
+| `webhooks-ui-wirekit` | The operator console styled with WireKit |
+| `webhooks-lang` | The translations, into `lang/vendor/webhooks` |
+| `webhooks` | The config, the views and the translations at once; no migration and neither console variant |
+
+`webhooks-ui` and `webhooks-ui-wirekit` write to the same place, so publish one of
+them and never both: whichever runs last wins.
 
 The persistent layers need **PostgreSQL or MySQL 8.4+**. An application that only
 sends needs no database at all — see the send-only path below.
@@ -229,9 +244,9 @@ Pushery\Webhooks\Platform\SelfServicePortalServiceProvider::class,
 <livewire:webhooks.self-service.endpoint-list />
 ```
 
-With `register_routes` false the provider registers the components and mounts
-nothing, and the panels drop the links they cannot resolve rather than failing to
-render. The `manage-webhook-endpoints` gate still applies on every request.
+With `register_routes` false the provider registers the components and none of
+the portal's pages (the secret panel's script route stays), and the panels drop the
+links they cannot resolve rather than failing to render. The `manage-webhook-endpoints` gate still applies on every request.
 
 **Check the operator console per action.** `Pushery\Webhooks\Livewire\SubscriptionManager`
 and `DeliveryLog` are unscoped across every tenant and must sit behind an
@@ -273,6 +288,45 @@ signed, SSRF-guarded, retrying sender:
 ```
 
 `PendingWebhook` keeps working — it needs only a queue — and no migration runs.
+
+### 5. Run the scheduler, and know the commands
+
+The package schedules its own maintenance, so the application has to run Laravel's
+scheduler. Nothing reports it when the scheduler does not run: the delivery log is
+never pruned, on PostgreSQL a new month gets no partition of its own, an endpoint
+that went quiet keeps a rotated-out secret valid, and the dashboard's counts stop
+moving.
+
+| Command | Cadence |
+| --- | --- |
+| `webhooks:partition-maintenance` | Daily: on PostgreSQL creates the coming delivery-log partitions and drops those past the retention window; on MySQL deletes the rows past it |
+| `webhooks:revoke-rotated-secrets` | Hourly: clears every endpoint secret whose rotation window has closed |
+| `webhooks:refresh-endpoint-health` | `platform.health.refresh`, every fifteen minutes by default, only while `platform.health.enabled` |
+| `webhooks:refresh-metrics` | `dashboard.metrics.refresh`, every five minutes by default, with the Dashboard layer |
+
+`model:prune` runs daily as well: on the inbound call log while the Client layer is
+on, and on the standalone delivery log while `server.persistence.enabled`. An
+application with a database per tenant sets `schedule.enabled` to `false` and runs
+these commands from its own tenant loop.
+
+Five more are for the application to run when it needs them:
+
+- `webhooks:preflight` checks that the database the persistent layers use is
+  supported, that the schema agrees with the configuration, and, with the Client
+  layer on, that every inbound client config can verify a delivery. It exits
+  non-zero when a check fails, so a deploy script can stop on it.
+- `webhooks:ed25519-keygen` prints an Ed25519 keypair for asymmetric signing
+  (`v1a`). The secret key stays with the sender; receivers hold only the public key.
+- `webhooks:egress-ips` prints `core.egress.published_ips`, the addresses your
+  consumers add to their firewalls, as `--format=json`, `txt` or `md`.
+- `webhooks:prune-orphaned-payloads` deletes offloaded payload objects that no
+  delivery-log or call-log row references any more. It is not scheduled: while a
+  `large_payload` setting, on the server or on an inbound client config, offloads
+  bodies to a disk, schedule it yourself or give the disk a lifecycle policy.
+  `--dry-run` reports what it would delete.
+- `webhooks:import-calls`, with the Client layer on, backfills the `webhook_calls`
+  log from the inbound-webhook table the application used before this package. It
+  can run again without duplicating rows.
 
 ## Examples
 
@@ -344,8 +398,6 @@ the tables and keep the sender.
   from a route. The package registers its commands only in the console, so that route
   passes every test and fails in production. Return `Webhooks::asyncApi()` from the
   route instead; it builds the same document from the catalog.
-- Do not document package internals here; keep this skill focused on adoption in
-  Laravel applications, and link the deeper reference material instead.
 
 ## Further reading
 

@@ -21,10 +21,13 @@ use Pushery\Webhooks\Core\Signing\VerificationResult;
  * rotation can be observed" — and every shipped scheme fills it in. Nothing read it back, so the
  * promise was kept by the schemes and dropped by the pipeline.
  *
- * `matchedKeyId` is {@see SecretSet::CURRENT} or {@see SecretSet::PREVIOUS} for the static-secret
- * path, the JWKS `kid` when the keys come from a JWKS document, and whatever a custom
- * {@see InboundVerifier} reported. It is null only when a
- * verifier authenticated the request without naming a key.
+ * `matchedKeyId` is {@see SecretSet::CURRENT} or {@see SecretSet::PREVIOUS} when a scheme
+ * verified the delivery, and whatever a custom {@see InboundVerifier} reported. For a static
+ * secret the two name the configured `secret` and `previous_secret`. For keys from a JWKS
+ * document they name the first and the second Ed25519 key the document publishes,
+ * by position, not by age: a JWK carries no reliable age, and its `kid` is not reported. With
+ * a pinned `kid` the one key is `current`. It is null only when a verifier authenticated the
+ * request without naming a key.
  *
  * It fires on every verified delivery, not only when the previous key matched, and that is the
  * design rather than a default anyone can trim. Firing only on `previous` makes silence

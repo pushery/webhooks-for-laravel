@@ -24,25 +24,12 @@
             {{-- The two lists pair up on a phone and dissolve into the row from `sm` up. --}}
             <div class="grid grid-cols-2 items-end gap-[var(--padding-wk-x-md)] sm:contents">
             @if ($windowChoices !== [])
-                {{-- Both filters are the library's own select again. They were native from
-                     2026-08-15 to today, because a WireKit select bound with wire:model.live made
-                     the endpoint list's delete confirmation unclickable on the same page — the
-                     dialog opened and the click on its destructive action never landed.
-
-                     RETIRED 2026-08-27, on the condition this file itself set: not on an upstream
-                     ticket closing, but on THIS composition — two separate Livewire components, a
-                     dialog per row, lazy panels — passing again. It was re-measured against v2.35.0
-                     two days earlier and was still broken then, which is why the condition was
-                     written that way and why "upstream says fixed" was not enough on its own.
-
-                     CONFIRMED against WireKit v2.37.2, the first version that carries the upstream
-                     fix (it landed in v2.37.0: the overlay took its geometry only from Tailwind
-                     utilities the host build had to compile, so the dialog sat in normal document
-                     flow and its confirm button was below the fold). The two arms that matter —
-                     "deletes an endpoint only through the alert-dialog" and the same under the
-                     CSP-safe bundle — run 1961 ms TOGETHER, against the two-second bar that was the
-                     retirement gate. `conflict` now refuses anything below 2.37, so the version
-                     without that fix is no longer reachable for a supported install. --}}
+                {{-- Both filters are WireKit's own select. On WireKit before 2.37, a select bound
+                     with wire:model.live on this page left the endpoint list's delete confirmation
+                     unclickable: the dialog's overlay took its geometry only from Tailwind utilities
+                     the host build had to compile, so the dialog sat in normal document flow and its
+                     confirm button was below the fold. The package's `conflict` on WireKit keeps
+                     those versions out. --}}
                 <x-wirekit::select
                     name="windowDays"
                     wire:model.live="windowDays"
@@ -128,7 +115,7 @@
     </div>
 
     @if ($message !== '')
-        <p role="status" class="mb-[var(--space-wk-sm)] text-[length:var(--text-wk-sm)] text-[color:var(--color-wk-text)]">{{ $message }}</p>
+        <x-wirekit::text size="sm" role="status" class="mb-[var(--space-wk-sm)]">{{ $message }}</x-wirekit::text>
     @endif
 
     {{-- Keyed on the TOTAL, not on this page being empty. A page past the end — which a
@@ -187,15 +174,7 @@
                         </x-wirekit::table.td>
                         <x-wirekit::table.td>
                             {{-- Null whenever no HTTP answer arrived at all, which is not
-                                 the same as a zero.
-
-                                 The duration hangs off the code rather than standing alone:
-                                 the package measures it on every attempt, including the ones
-                                 that never got an answer, and printing that number by itself
-                                 would read as "the receiver took 30s" when it means "we waited
-                                 30s for nothing". It is the question that comes after the
-                                 status code -- it arrived, so why did it take that long -- and
-                                 a receiver getting slower is the run-up to one that fails. --}}
+                                 the same as a zero. --}}
                             {{-- The duration hangs off the code rather than standing alone: the
                                  package measures it on every attempt, including the ones that
                                  never got an answer, and printing that number by itself would

@@ -6,8 +6,9 @@ namespace Pushery\Webhooks\Core\Http;
 
 /**
  * Strips the credentials out of a transport error message before it is persisted as a
- * delivery's `error`. The sibling of {@see HeaderRedactor}, and it uses the same marker,
- * because the two defend the same thing at two different exits.
+ * delivery's `error`, and out of an endpoint URL a delivery log stores beside it. The sibling
+ * of {@see HeaderRedactor}, and it uses the same marker, because the two defend the same thing
+ * at two different exits.
  *
  * A transport failure's message ends in the URL it failed against, and a webhook endpoint
  * URL is a place hosts really do put credentials — `https://TOKEN@receiver.test/hook`, or a
@@ -24,27 +25,21 @@ namespace Pushery\Webhooks\Core\Http;
  * anyone can reason about.
  *
  * The declared range is wider than the one any resolution reaches, and that difference
- * matters for the sentence above rather than for this class. `Utils::redactUserInfo` arrived
- * in psr7 2.7.0 — measured, present at 2.7.0 and absent at 2.6.3 — so on 2.0 through 2.6
- * guzzle does not redact the userinfo at all, which argues for this class more strongly
- * still. Those versions are out of reach regardless: guzzle 7.15.x requires psr7 `^2.13`
- * itself and guzzle 8 requires `^3.0`, so the constraint here never decides the number. It
- * is the base floor because a floor is a promise about who may install, not a record of
- * what was measured.
+ * matters for the sentence above rather than for this class. `Utils::redactUserInfo` exists
+ * from psr7 2.7.0 on (2.6.3 has none), so on 2.0 through 2.6 guzzle does not redact the
+ * userinfo at all, which argues for this class more strongly still. Those versions are out of
+ * reach regardless: guzzle 7.15.x requires psr7 `^2.13` itself and guzzle 8 requires `^3.0`,
+ * so the constraint here never decides the number. It is the base floor because a floor is a
+ * promise about who may install, not a record of what was tested.
  *
- * And neither major touches the query string, which this paragraph used to claim psr7 3
- * empties. Measured against the installed 3.1.0:
+ * And neither major touches the query string. On psr7 3.1.0:
  *
  *   https://user@h.test/hook?token=abc     ->  https://***@h.test/hook?token=abc
  *
  *   https://user:pw@h.test/hook?token=abc  ->  https://***@h.test/hook?token=abc
  *
- * The correction runs in the direction that matters: the library leaves the one component a
- * token most often hides in exactly where it was, so relying on it would have left `?token=`
- * in `webhook_deliveries.error` on both majors rather than on one. The claim understated the
- * need for this class. (The psr7 2 half above is read from its source, not executed — the
- * compat lane resolves what guzzle admits, which is 2.13.0, and runs this same suite against
- * it. It does NOT reach the declared floor, and that is guzzle's clamp rather than a gap.)
+ * The library leaves the one component a token most often hides in exactly where it was, so
+ * relying on it would leave `?token=` in `webhook_deliveries.error` on both majors.
  *
  * So the message is rewritten here, on both majors, to one shape. A URL already redacted
  * upstream passes through this unchanged in meaning — its `***` is re-marked, so the two
@@ -89,6 +84,16 @@ final class ErrorMessageRedactor
         // original message is the wrong answer there — it is the one that may carry the
         // credential — so refuse rather than pass it through.
         return $redacted ?? self::UNPARSEABLE;
+    }
+
+    /**
+     * One endpoint URL as a delivery log stores it: without its userinfo, its query and its
+     * fragment, by the same rule the error message beside it is redacted with. A log that kept
+     * the URL whole would hold the credential its own error column was cleaned of.
+     */
+    public static function url(string $url): string
+    {
+        return self::withoutCredentials($url);
     }
 
     /**

@@ -7,6 +7,7 @@ namespace Pushery\Webhooks\Pulse;
 use Laravel\Pulse\Pulse;
 use Pushery\Webhooks\Server\Events\WebhookAttemptsExhausted;
 use Pushery\Webhooks\Server\Events\WebhookAttemptSucceeded;
+use Pushery\Webhooks\Server\Exceptions\DeliveryRefused;
 
 /**
  * Feeds each terminal delivery outcome into Laravel Pulse for the internal-ops card
@@ -16,17 +17,20 @@ use Pushery\Webhooks\Server\Events\WebhookAttemptSucceeded;
  * it (pulse.enabled AND laravel/pulse installed), so a consumer without Pulse pays
  * nothing.
  *
- * Three Pulse entry types are written, all keyed by event type so the card can break
- * them down: a throughput count on every terminal delivery, a latency sample (avg and
- * max) whenever a response carried a duration, and a failure count on a final failure.
- * Failure rate is then failure-count over throughput-count.
+ * Four Pulse entry types are written, all keyed by event type so the card can break
+ * them down: a throughput count on every delivery that was attempted and reached its final
+ * outcome, a latency sample (avg and max) whenever a response carried a duration, a failure
+ * count on a final failure, and a refusal count on a delivery that was never sent.
+ * Failure rate is then failure-count over throughput-count, the rate the circuit breaker,
+ * the endpoint health score and DeliveryEngineCheck read.
  *
  * @internal
  */
 final readonly class WebhookDeliveryRecorder
 {
     /**
-     * The throughput entry type: one count per terminal delivery.
+     * The throughput entry type: one count per delivery that was attempted and reached its
+     * final outcome.
      */
     public const string THROUGHPUT = 'webhook_throughput';
 
@@ -39,6 +43,12 @@ final readonly class WebhookDeliveryRecorder
      * The failure entry type: one count per final (non-retryable / exhausted) failure.
      */
     public const string FAILURE = 'webhook_failure';
+
+    /**
+     * The refusal entry type: one count per delivery refused before it was sent, because its
+     * endpoint was switched off or deleted while it waited in the queue.
+     */
+    public const string REFUSED = 'webhook_refused';
 
     /**
      * The key used when a delivery carries no event type.
@@ -71,7 +81,16 @@ final readonly class WebhookDeliveryRecorder
     {
         $type = $event->data->eventType ?? self::UNKNOWN_EVENT;
 
-        // EQUIVALENT, and reported every run: both arms read the same property, and a
+        // A refused delivery was never sent, so it says nothing about any destination. Counted
+        // as throughput and as a failure, every delivery queued for an endpoint somebody switched
+        // off raised the failure rate; it is counted on its own instead, so it stays visible.
+        if ($event instanceof WebhookAttemptsExhausted && $event->exception instanceof DeliveryRefused) {
+            $this->pulse->record(self::REFUSED, $type)->count();
+
+            return;
+        }
+
+        // The split changes no value: both arms read the same property, and a
         // succeeded attempt always carries a response, so the nullsafe arm answers identically
         // for it. The split exists for the TYPE CHECKER — on the succeeded event the response
         // is non-nullable, and reading it nullsafe there would widen the result to null for a

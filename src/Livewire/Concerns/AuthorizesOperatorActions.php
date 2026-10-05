@@ -86,9 +86,10 @@ trait AuthorizesOperatorActions
      * hold operators who read and never act. Asked through either of them, those operators would lose the
      * console on the day the host upgraded.
      *
-     * Why a host names it: Livewire re-applies only PERSISTENT middleware on its own endpoint, and by
-     * default that is `Authenticate` and `Authorize` (`can:`). A page guarded by a middleware of the host's
-     * own is guarded at its first render and no longer after it, so a reader whose capability was revoked
+     * Why a host names it: Livewire re-applies only PERSISTENT middleware on its own endpoint. Its
+     * default list holds `Authenticate` (`auth`) and `Authorize` (`can:`) beside a few authentication
+     * middlewares of other packages, and no gate middleware a host writes. A page guarded by a middleware
+     * of the host's own is guarded at its first render and no longer after it, so a reader whose capability was revoked
      * keeps reading every tenant's deliveries in the open tab. `can:` on the route, or the host's middleware
      * registered with `Livewire::addPersistentMiddleware()`, closes that at the page; this closes it in the
      * component.

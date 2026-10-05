@@ -28,9 +28,8 @@ final class RetryAfter
 
         $value = trim($header);
 
-        // EQUIVALENT, and reported every run. Measured: an empty value fails both patterns
-        // below (`preg_match` answers 0 for each), so the alphabetic check refuses it and the
-        // method returns null anyway.
+        // An empty value would fail both patterns below as well (`preg_match` answers 0 for
+        // each), so the alphabetic check would refuse it and the method return null anyway.
         //
         // It stays because "the header was present but blank" is a distinct thing to have said
         // out loud, and because it keeps the two regexes describing only the shapes they are
@@ -46,24 +45,15 @@ final class RetryAfter
         // The only other valid form is an HTTP-date, and it is matched against the three
         // formats RFC 9110 §5.6.7 permits rather than handed to strtotime.
         //
-        // The alphabetic check that used to stand here guarded one direction only. It was
-        // written to reject numeric junk ("-5", "1e3") that strtotime coerces into a timestamp —
-        // correctly — and then passed everything alphabetic straight to the same function, whose
-        // relative-format vocabulary is enormous. Measured on the shipped code:
+        // strtotime would answer far more than that. It coerces numeric junk ("-5", "1e3") into a
+        // timestamp, and its relative-format vocabulary is enormous: "+1 hour", "tomorrow",
+        // "next week" and "midnight" all parse. None of those is an HTTP-date, and the docblock
+        // above says in as many words that anything unparseable is null. Handed to strtotime, a
+        // receiver — or a proxy rewriting headers — could steer the delivery schedule with a
+        // value the package promises to ignore, and "midnight" would steer it to zero.
         //
-        //   "+1 hour"    -> 3600
-        //   "tomorrow"   -> 43996
-        //   "next week"  -> 259200
-        //   "midnight"   -> 0
-        //
-        // None of those is an HTTP-date, and the docblock above says in as many words that
-        // anything unparseable is null. A receiver — or a proxy rewriting headers — that sends
-        // one of them therefore steered the delivery schedule with a value the package had
-        // already promised to ignore, and "midnight" steered it to zero.
-        //
-        // Matching the three permitted shapes closes both directions at once, which is why the
-        // alphabetic pre-check is gone rather than kept beside it: it was a proxy for "looks like
-        // a date", and a real date parser does not need one.
+        // Matching the three permitted shapes closes both directions at once, with no "looks like
+        // a date" pre-check in front of it: a real date parser does not need one.
         $timestamp = self::httpDate($value);
 
         if ($timestamp === null) {
@@ -102,10 +92,10 @@ final class RetryAfter
             $errors = DateTimeImmutable::getLastErrors();
 
             // Two halves of this line cannot be told apart from their alternatives, and one
-            // fact explains both: an ERROR never coexists with a successful parse. Measured over
-            // fourteen malformed values across all three formats -- rollovers, out-of-range
-            // times, trailing junk, wrong zones -- and every one that produced an error returned
-            // false as well. So the instanceof already implies error_count is zero, which leaves
+            // fact explains both: an ERROR never coexists with a successful parse, in any of the
+            // three formats -- a rollover, an out-of-range time, trailing junk or a wrong zone
+            // that produces an error returns false as well. So the instanceof already implies
+            // error_count is zero, which leaves
             // the sum and the difference reading the same, and leaves the type check unable to
             // let a false through even if it were removed.
             //

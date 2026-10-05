@@ -38,6 +38,24 @@ use Pushery\Webhooks\Core\Signing\StripeStyleScheme;
 final class WebhookConfig
 {
     /**
+     * The fewest bytes of HMAC key {@see self::signingKeyAdvisories()} lets pass without a word.
+     */
+    private const int SHORTEST_ADVISED_KEY_BYTES = 16;
+
+    /**
+     * The schemes of this package that key their HMAC with the configured secret as it is.
+     * Standard Webhooks derives its key by decoding the secret, so its length is counted after
+     * decoding ({@see StandardWebhooksScheme::derivedKeyBytes()}).
+     *
+     * @var list<class-string<SignatureScheme>>
+     */
+    private const array SCHEMES_KEYED_BY_THE_SECRET = [
+        GitHubScheme::class,
+        PlainHmacScheme::class,
+        StripeStyleScheme::class,
+    ];
+
+    /**
      * The built-in dialects whose wire format carries no timestamp, so a verification through
      * them can never return expired and `tolerance_seconds` is inert.
      *
@@ -246,36 +264,30 @@ final class WebhookConfig
      * dialect that has no timestamp to check it against, and the dedupe default is a HEADER the
      * producer may simply not send — a key that stays null, and a null collides with nothing.
      *
+     * A source that picks its handler from such a header draws an advisory of its own, because it
+     * needs another cure: the same captured body, resent under another event type, verifies and
+     * reaches another handler, whatever the dedupe key does.
+     *
      * @return list<string>
      */
     public static function replayBoundaryAdvisories(): array
     {
         $advisories = [];
-        $seen = [];
 
-        foreach (Config::array('webhooks.client.configs', []) as $entry) {
-            if (! is_array($entry)) {
-                continue;
-            }
+        foreach (self::advisableConfigs() as $name => $config) {
+            $router = $config->schemeRoutingOnAnUnsignedHeader();
 
-            $name = $entry['name'] ?? null;
-
-            // Both are already reported by configurationFaults(), which the preflight runs
-            // first and fails on. Repeating them here would say the same thing twice in two
-            // registers, and an advisory next to an error reads as a second, lesser error.
-            if (! is_string($name) || $name === '' || isset($seen[$name])) {
-                continue;
-            }
-
-            // The value is never read, only its presence: every reader below is an isset(),
-            // so false would do exactly as well. Written as true because that is what the
-            // name says -- seen.
-            $seen[$name] = true;
-
-            try {
-                $config = self::fromEntry($name, $entry);
-            } catch (InvalidArgumentException) {
-                continue;
+            if ($router !== null) {
+                $advisories[] = sprintf(
+                    'Webhook source [%s] verifies with %s, which signs the body alone, and picks its '
+                    .'handler from the header [%s], which that signature does not cover. A captured '
+                    .'authentic delivery resent with another value there verifies again and reaches '
+                    .'another handler in its process map. Confirm the event type in the handler '
+                    .'against the body it receives, or read it from the body where the producer puts it.',
+                    $name,
+                    class_basename($router),
+                    substr((string) $config->eventTypeSpec, 7),
+                );
             }
 
             $scheme = $config->schemeWithoutDeliveryIdHeader();
@@ -312,6 +324,104 @@ final class WebhookConfig
     }
 
     /**
+     * One advisory per configured source whose current or previous secret gives an HMAC key
+     * shorter than {@see self::SHORTEST_ADVISED_KEY_BYTES}.
+     *
+     * Not a fault: the configuration works, and a secret the producer issued cannot be made
+     * longer here. A key of a few bytes falls to an offline search over one captured delivery,
+     * after which anyone can sign as the producer, and nothing about the entry shows it: a
+     * secret of three bytes reads as configured exactly like one of thirty-two.
+     *
+     * @return list<string>
+     */
+    public static function signingKeyAdvisories(): array
+    {
+        $advisories = [];
+
+        foreach (self::advisableConfigs() as $name => $config) {
+            $bytes = $config->shortestKeyBytes();
+
+            if ($bytes !== null && $bytes < self::SHORTEST_ADVISED_KEY_BYTES) {
+                $advisories[] = sprintf(
+                    'Webhook source [%s] verifies with an HMAC key of %d bytes. A key that short can be '
+                    .'found offline from one captured delivery, and then anyone can sign as the producer. '
+                    .'Use a secret that gives at least %d bytes of key.',
+                    $name,
+                    $bytes,
+                    self::SHORTEST_ADVISED_KEY_BYTES,
+                );
+            }
+        }
+
+        return $advisories;
+    }
+
+    /**
+     * Every configured source the advisories read, once, by name: an entry that is not an array,
+     * has no usable name, repeats a name or does not load is left out.
+     *
+     * @return iterable<string, self>
+     */
+    private static function advisableConfigs(): iterable
+    {
+        $seen = [];
+
+        foreach (Config::array('webhooks.client.configs', []) as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+
+            $name = $entry['name'] ?? null;
+
+            // Both are already reported by configurationFaults(), which the preflight runs
+            // first and fails on. Repeating them here would say the same thing twice in two
+            // registers, and an advisory next to an error reads as a second, lesser error.
+            if (! is_string($name) || $name === '' || isset($seen[$name])) {
+                continue;
+            }
+
+            // The value is never read, only its presence: every reader below is an isset(),
+            // so false would do exactly as well. Written as true because that is what the
+            // name says -- seen.
+            $seen[$name] = true;
+
+            try {
+                yield $name => self::fromEntry($name, $entry);
+            } catch (InvalidArgumentException) {
+                continue;
+            }
+        }
+    }
+
+    /**
+     * The length of the shorter HMAC key this source verifies with, its current or its previous
+     * secret, or null when it verifies with no shared key this package can measure: a verifier,
+     * Ed25519, or a scheme of the host's own.
+     */
+    private function shortestKeyBytes(): ?int
+    {
+        if ($this->verifierClass !== null) {
+            return null;
+        }
+
+        $lengths = [];
+
+        foreach ([$this->secret, $this->previousSecret] as $secret) {
+            if ($secret === null) {
+                continue;
+            }
+
+            if (is_a($this->schemeClass, StandardWebhooksScheme::class, true)) {
+                $lengths[] = StandardWebhooksScheme::derivedKeyBytes($secret);
+            } elseif (array_any(self::SCHEMES_KEYED_BY_THE_SECRET, fn (string $scheme): bool => is_a($this->schemeClass, $scheme, true))) {
+                $lengths[] = strlen($secret);
+            }
+        }
+
+        return $lengths === [] ? null : min($lengths);
+    }
+
+    /**
      * The scheme class when this source's dialect sends no delivery-id header and nothing else
      * supplies the key, null otherwise.
      *
@@ -331,12 +441,41 @@ final class WebhookConfig
     }
 
     /**
-     * The scheme class when this source has no replay boundary at all, null when it has one.
+     * The scheme class when this source picks its handler from a header its signature does not
+     * cover and nothing stops an authentic delivery from coming back under another type, null
+     * otherwise.
+     *
+     * The two dialects without a replay window sign the body alone, so a header there is the
+     * sender's to choose: resent with the same body and signature, a captured delivery verifies
+     * again. A dedupe key read from the body stops that, because the body is the one part the
+     * sender cannot change; a key read from a header does not, and a resolver cannot be classified
+     * from here, so it is left alone. A 'verifier' replaces the scheme and is out of scope.
+     */
+    private function schemeRoutingOnAnUnsignedHeader(): ?string
+    {
+        if ($this->verifierClass !== null || ! str_starts_with((string) $this->eventTypeSpec, 'header:')) {
+            return null;
+        }
+
+        if ($this->dedupeId !== null && ! str_starts_with($this->dedupeId, 'header:')) {
+            return null;
+        }
+
+        return in_array($this->schemeClass, self::SCHEMES_WITHOUT_A_REPLAY_WINDOW, true)
+            ? $this->schemeClass
+            : null;
+    }
+
+    /**
+     * The scheme class when this source's dialect signs no timestamp and it configures no
+     * `dedupe_id`, null otherwise.
      *
      * A dialect with a signed timestamp bounds a replay with `tolerance_seconds`; the two that
      * carry none say so in their own docblocks, and a verification through them never returns
-     * expired. A configured `dedupe_id` is the other boundary, and it is enough on its own — so
-     * this asks for the absence of BOTH.
+     * expired. A configured `dedupe_id` takes a source out of this answer, and not because it
+     * bounds a replay: it answers the retry half. On these dialects a key read from a header is
+     * the sender's to choose, so nothing a host configures bounds a replay there, as
+     * {@see self::replayBoundaryAdvisories()} explains.
      *
      * A 'verifier' takes precedence over the scheme entirely and reaches its verdict however it
      * likes, so the question does not apply to one and no advice is offered about it.
@@ -511,8 +650,14 @@ final class WebhookConfig
      * an operator holding this against a producer log sees `sha256:…` and knows to hash
      * theirs rather than concluding the ids do not match.
      *
+     * A key that is not valid UTF-8 is hashed the same way, because the column cannot hold it
+     * either: PostgreSQL refuses the bytes (22021) and MySQL refuses them (1366), after the
+     * signature verified, so every retry answered 500. A header is read off the wire as it
+     * came, and a producer that signs only the body (GitHub) leaves its delivery header open
+     * to anything on the way. The same bytes hash to the same key, so a retry still dedupes.
+     *
      * The prefix is also what keeps the substitution honest in the other direction. A key
-     * that is already short passes through untouched, so the only way a stored `sha256:…`
+     * that is short and valid passes through untouched, so the only way a stored `sha256:…`
      * can appear is this branch — unless a producer sends that literal shape itself, which
      * would have to be the hash of one of its own over-long ids to collide with anything.
      */
@@ -520,7 +665,7 @@ final class WebhookConfig
     {
         // Characters, not bytes, and the same 255 the twin uses: varchar(255) counts
         // characters on PostgreSQL and on MySQL under utf8mb4 alike.
-        if ($value === null || mb_strlen($value) <= 255) {
+        if ($value === null || (mb_check_encoding($value, 'UTF-8') && mb_strlen($value) <= 255)) {
             return $value;
         }
 
@@ -606,6 +751,8 @@ final class WebhookConfig
     {
         // Characters, not bytes: varchar(255) counts characters on PostgreSQL and on MySQL
         // under utf8mb4 alike, and a byte-wise cut could also split a multi-byte character.
+        // mb_substr() also replaces a byte that is not valid UTF-8 with mbstring's substitute
+        // character, so a header in another encoding is stored rather than refused.
         return $value === null ? null : mb_substr($value, 0, 255);
     }
 
@@ -838,8 +985,8 @@ final class WebhookConfig
     }
 
     /**
-     * Normalize the optional 'rate_limit' block into a token-bucket size + decay, or
-     * null when the source declares none (unthrottled).
+     * Normalize the optional 'rate_limit' block into a fixed window (how many requests, over
+     * how many seconds), or null when the source declares none (unthrottled).
      *
      * @return array{max_attempts: int, decay_seconds: int}|null
      */

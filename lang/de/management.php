@@ -171,6 +171,14 @@ return [
             // An operator registers a GLOBAL endpoint here, so a type nothing publishes
             // costs every tenant's events for it rather than one tenant's.
             'in' => 'Diesen Event-Typ veröffentlicht diese Anwendung nicht.',
+            // Only reachable for a type whose catalog entry names an ability.
+            'ability' => 'Dir fehlt die Berechtigung, einen Endpunkt für :types zu abonnieren.',
+            // More types than one save may carry: the catalog's size, or without a catalog a
+            // fixed count. An endpoint that already holds more keeps them through an edit.
+            'max' => 'Ein Endpunkt kann höchstens :max Event-Typen abonnieren.',
+            // Only reachable without a catalog. The bound is the width of the MySQL index over
+            // the column, which refuses a longer value.
+            'length' => 'Ein Event-Typ darf höchstens :max Zeichen lang sein.',
         ],
         'url' => [
             // The scheme narrowing on the rule ('url:http,https') is what produces this,

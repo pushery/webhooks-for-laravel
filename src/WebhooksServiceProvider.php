@@ -124,6 +124,7 @@ final class WebhooksServiceProvider extends ServiceProvider
         // otherwise the cached columns move only via webhooks:refresh-endpoint-health.
         Event::subscribe(RefreshEndpointHealthOnDelivery::class);
 
+        // schedule-gate-ok: a host that runs these migrations itself still needs the partitions kept and the log pruned.
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
             // A DB-per-tenant host turns the package schedule off and drives these commands from
             // its own tenant loop; registering nothing here is what lets it (webhooks.schedule.enabled).
@@ -153,11 +154,10 @@ final class WebhooksServiceProvider extends ServiceProvider
             //
             // onOneServer() is the half that matters for a cluster — the Laravel scheduler fires
             // on every app server, so without it the command runs N times in parallel by design.
-            // withoutOverlapping() is the half that matters for a long first run over a backlog,
-            // where tomorrow's run would start on top of today's. The expiry is generous for the
-            // same reason: a lock left behind by a killed run must not silence the command for
-            // ever, and a maintenance pass that has not finished in six hours has a problem the
-            // next run will not fix by joining in.
+            // withoutOverlapping() keeps a second start, a manual pass beside the scheduled one,
+            // off a pass that is still running. Its lock lives six hours, so it never reaches the
+            // next day's run, and one left behind by a killed run has expired before that run
+            // starts: it silences nothing.
             //
             // Neither reaches the DB-per-tenant host that turns the package schedule off and
             // drives the command from its own tenant loop — there is no scheduler lock to take.
@@ -287,7 +287,8 @@ final class WebhooksServiceProvider extends ServiceProvider
             // Fail CLOSED: a host that registers the self-service layer but never defines the
             // 'webhooks.manage' ability must NOT silently expose endpoint management to every
             // authenticated user. With no ability defined, deny — the host opts a tenant in by
-            // defining 'webhooks.manage' (see the README's self-service authorization section).
+            // defining 'webhooks.manage' (see "Authorization is fail-closed" at
+            // https://docs.pushery.com/webhooks-for-laravel/layers/self-service-portal).
             if (! Gate::has('webhooks.manage')) {
                 return false;
             }

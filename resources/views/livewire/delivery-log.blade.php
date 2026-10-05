@@ -2,9 +2,9 @@
      place behind your own authorization. --}}
 @php
     // Defaults, because this stub is rendered from two kinds of caller. The component passes
-    // all three; the package's own suite renders the file directly through `View::make()` with a
-    // hand-built array, from ten call sites across four files. Requiring the keys there would
-    // make every one of them a place to remember rather than a place to read.
+    // all three; a direct `View::make()` with a hand-built array may pass none of them, and
+    // requiring the keys would make every such call a place to remember rather than a place to
+    // read.
     //
     // The values are today's behavior exactly: an empty catalog leaves the event-type filter as
     // free text, and both actions render. The ability check is the COURTESY -- the action itself
@@ -111,8 +111,13 @@
          reachable by keyboard (WCAG 2.1.1), and an unfocusable overflow div is exactly the
          failure this attribute prevents. role and name come with it so the region announces as
          something rather than as an unlabeled group -- WireKit's own table wraps itself in the
-         identical four attributes, which is why its twin of this screen never had the problem. --}}
-    <div class="w-full min-w-0 overflow-x-auto" tabindex="0" role="region" aria-label="{{ __('webhooks::management.a11y.delivery_log_table') }}">
+         identical four attributes, which is why its twin of this screen never had the problem.
+
+         `relative` makes the region the containing block of the `sr-only` column header. An
+         overflow container clips an absolutely positioned element only when it is that
+         element's containing block, so without it the header stays where its column lands and
+         widens the document whenever the table is wider than the screen. --}}
+    <div class="relative w-full min-w-0 overflow-x-auto" tabindex="0" role="region" aria-label="{{ __('webhooks::management.a11y.delivery_log_table') }}">
     <table class="w-full text-left text-sm" aria-label="{{ __('webhooks::management.a11y.delivery_log_table') }}">
         <thead>
             <tr>

@@ -16,6 +16,7 @@ use Override;
 use Pushery\Webhooks\Core\Payload\PayloadStore;
 use Pushery\Webhooks\Database\Concerns\HasZonedTimestamps;
 use Pushery\Webhooks\Database\Concerns\Replaceable;
+use Pushery\Webhooks\Database\Concerns\SavesUnlessTerminal;
 use Pushery\Webhooks\Database\Concerns\ScopesByTimestamp;
 use Pushery\Webhooks\Database\Concerns\UsesWebhookConnection;
 use Pushery\Webhooks\Database\Factories\WebhookDeliveryFactory;
@@ -54,6 +55,7 @@ class WebhookDelivery extends Model
     use HasUuids;
     use HasZonedTimestamps;
     use Replaceable;
+    use SavesUnlessTerminal;
     use ScopesByTimestamp;
     use UsesWebhookConnection;
 
@@ -225,5 +227,26 @@ class WebhookDelivery extends Model
         return $query->createdAfter(
             CarbonImmutable::now('UTC')->startOfMonth()->subMonths($months + 1),
         );
+    }
+
+    /**
+     * Narrow to the delivery a key from outside names, such as an id a browser sent with an
+     * action, and to nothing when the key cannot be a delivery's id.
+     *
+     * The id column is a uuid on PostgreSQL, which answers any other text with an error (22P02)
+     * rather than with no row. Looked up unchecked, such a key is a server error on PostgreSQL
+     * and not found on MySQL, whose char(36) column simply holds no such id. Checked here first,
+     * it is not found on both, like an id that is absent.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeWhereSubmittedKey(Builder $query, string $key): Builder
+    {
+        if (! $this->isValidUniqueId($key)) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereKey($key);
     }
 }

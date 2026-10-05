@@ -171,7 +171,7 @@ return new class extends Migration
                 PRIMARY KEY (id),
                 CONSTRAINT webhook_deliveries_subscription_id_foreign
                     FOREIGN KEY (subscription_id) REFERENCES webhook_subscriptions (id) ON DELETE CASCADE
-            ) ENGINE=InnoDB
+            ) ENGINE=InnoDB{$this->tableEncoding()}
             SQL);
 
         // The open worklist scan filters by status, so the index leads with it (no partial
@@ -182,5 +182,21 @@ return new class extends Migration
         DB::statement('CREATE INDEX webhook_deliveries_sub_event_idx ON webhook_deliveries (subscription_id, event_id)');
         DB::statement('CREATE INDEX webhook_deliveries_owner_idx ON webhook_deliveries (owner_type, owner_id, created_at)');
         DB::statement('CREATE INDEX webhook_deliveries_created_idx ON webhook_deliveries (created_at)');
+    }
+
+    /**
+     * The table's default character set and collation, taken from the connection the way the schema
+     * builder takes them for every other table. Without them the columns the DDL above does not pin
+     * (`payload_type`, `payload_disk`, `payload_path` and `error`) take the database's default, and on
+     * a database created as latin1 or utf8mb3 a payload type or an error text outside that set is
+     * refused with 1366, the delivery with it.
+     */
+    private function tableEncoding(): string
+    {
+        $charset = DB::connection()->getConfig('charset');
+        $collation = DB::connection()->getConfig('collation');
+
+        return (is_string($charset) && $charset !== '' ? ' default character set '.$charset : '')
+            .(is_string($collation) && $collation !== '' ? " collate '{$collation}'" : '');
     }
 };

@@ -13,7 +13,12 @@
      A floor cannot take out the jump for every account -- ten rows are taller than four skeleton
      ones whatever this says -- but it takes out the case that is both the worst and the certain
      one, and an arm holds it against the empty state's real height rather than against this
-     number. --}}
-<div class="wh-portal-list-placeholder min-h-52" role="status" aria-label="{{ __('webhooks::self-service.a11y.loading_endpoints') }}" wire:key="endpoint-list-placeholder">
+     number.
+
+     224px, because the empty state's height depends on the WireKit release: from 2.64 it pads
+     vertically with its side padding, and the empty list stands 226px tall; earlier releases
+     draw it at 210px. This floor is within a few pixels of the first and within one spacing step
+     of the second. --}}
+<div class="wh-portal-list-placeholder min-h-56" role="status" aria-label="{{ __('webhooks::self-service.a11y.loading_endpoints') }}" wire:key="endpoint-list-placeholder">
     <x-wirekit::skeleton.table :rows="4" />
 </div>

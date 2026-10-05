@@ -27,7 +27,8 @@ return [
     'metrics' => [
         'throughput' => 'Doorvoer',
         'failure_rate' => 'Foutpercentage',
-        'failed' => ':count mislukt',
+        'failed' => '{0} :count mislukt|{1} :count mislukt|[2,*] :count mislukt',
+        'refused' => '{0} :count geweigerd|{1} :count geweigerd|[2,*] :count geweigerd',
         'avg_latency' => 'Gem. latentie',
         'max_latency' => 'Max. latentie',
     ],

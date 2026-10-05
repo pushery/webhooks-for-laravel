@@ -15,17 +15,14 @@ namespace Pushery\Webhooks\Support;
  * with a fatal error, on twenty-six screen surfaces instead of the one that already carried the
  * call.
  *
- * That is not hypothetical: `PruneOrphanedPayloadsCommand` shipped `Number::fileSize()`, so a
- * scheduled command failed every run on such a host — after the deletion, before it could say what
- * it had freed. It never went red anywhere, because intl is present locally and in CI.
- * `IntlFreeNumberFormattingTest` holds the rule now, and derives the forbidden method list from the
- * framework rather than repeating it.
+ * That is not hypothetical: `PruneOrphanedPayloadsCommand` shipped `Number::fileSize()`, so a run
+ * of it failed on such a host — after the deletion, before it could say what it had freed. The forbidden method list is derived from the framework rather than repeated.
  *
  * The separators come from `lang/<locale>/formats.php`, beside the date patterns, for the same
- * reason those are translatable: they are properties of the language and not of a screen, and
- * the two characters are exactly inverted between en and the six other shipped locales — so a
- * German operator reading an English-formatted `1,234.5 ms` misreads it by a factor of a thousand
- * rather than merely finding it ugly.
+ * reason those are translatable: they are properties of the language and not of a screen. de,
+ * es, it, nl and pt swap en's two characters, and fr groups thousands with a narrow no-break
+ * space (U+202F) — so a German operator reading an English-formatted `1,234.5 ms` misreads it by
+ * a factor of a thousand rather than merely finding it ugly.
  *
  * Internal despite being called by name from shipped Blade, the same way {@see UiAssets} is. A
  * published view carries the fully-qualified call, so a host who publishes one takes on that
@@ -37,9 +34,10 @@ namespace Pushery\Webhooks\Support;
 final class LocalizedNumber
 {
     /**
-     * The byte-size units, smallest first. Ordinary binary steps, and the same ladder and the
-     * same rounding the framework's own fileSize walks — the output is unchanged for a host
-     * that had intl, which is what makes replacing the call safe rather than a visible change.
+     * The byte-size units, smallest first. Ordinary binary steps, the same ladder the
+     * framework's own fileSize walks. The rounding is not the framework's: number_format()
+     * rounds an exact half away from zero, where the framework's NumberFormatter rounds it to
+     * even, so 2560 bytes read "3 KB" here and "2 KB" there.
      *
      * @var list<string>
      */

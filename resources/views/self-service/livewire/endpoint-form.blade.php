@@ -6,8 +6,8 @@
      root unconditionally -- the live region above has to be in the DOM before its text appears,
      which is the whole reason it is permanent -- and a root that renders is a flex child of the
      portal's column even with nothing visible in it. The column then sets a gap before it and a
-     gap after it. Two closed panels cost two gaps, measured at 48px between the page heading and
-     the endpoint list against 27px on a screen with one panel.
+     gap after it. Two closed panels cost two gaps: 48px between the page heading and the
+     endpoint list, against 27px on a screen with one panel.
 
      `display: contents` removes the box, not the element: the live region keeps its own box and
      its place in the accessibility tree, and Livewire keeps the single root it needs. --}}
@@ -74,7 +74,7 @@
                         <x-wirekit::field :label="__('webhooks::self-service.form.event_types_label')" :error="$errors->first('eventTypes') ?: ($errors->first('eventTypes.*') ?: null)">
                             <x-wirekit::stack gap="xs">
                                 @forelse ($availableEventTypes as $type)
-                                    <x-wirekit::checkbox wire:model="eventTypes" value="{{ $type }}" label="{{ $type }}" />
+                                    <x-wirekit::checkbox wire:key="event-type-{{ $type }}" wire:model="eventTypes" value="{{ $type }}" label="{{ $type }}" />
                                 @empty
                                     <x-wirekit::text size="sm" intent="muted">
                                         {{ __('webhooks::self-service.form.no_event_types') }}

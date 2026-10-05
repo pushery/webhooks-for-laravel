@@ -56,7 +56,24 @@ class WebhookCall extends Model
 
     protected $table = 'webhook_calls';
 
-    protected $guarded = [];
+    /**
+     * The content of a received call is mass-assignable, and so is its status, because the
+     * handler a host writes is what advances a call to processed or failed. The source it arrived
+     * on is written by the receiver alone, through a raw insert, so a stray create()/fill() from
+     * host code can never move a call to another source and hand it to that source's handler.
+     *
+     * @var list<string>
+     */
+    protected $fillable = [
+        'webhook_id',
+        'event_type',
+        'payload',
+        'raw_body',
+        'payload_disk',
+        'payload_path',
+        'headers',
+        'status',
+    ];
 
     /**
      * The rows eligible for pruning: everything older than the configured window.
@@ -67,8 +84,9 @@ class WebhookCall extends Model
     {
         // The cutoff is bound for THIS connection's dialect: MySQL converts an offset-bearing
         // literal into the database session time zone (8.0.19+), which would slide the retention
-        // boundary by that offset and prune rows whose window has not closed yet.
-        return static::query()->where(
+        // boundary by that offset and prune rows whose window has not closed yet. Through
+        // model(), so a host that configures its own subclass prunes through it.
+        return static::model()::query()->where(
             'created_at',
             '<=',
             $this->boundTimestamp(Date::now()->subDays(Config::integer('webhooks.client.delete_after_days', 30))),

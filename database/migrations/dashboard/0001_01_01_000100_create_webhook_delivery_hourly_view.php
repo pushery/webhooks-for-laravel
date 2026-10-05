@@ -69,9 +69,10 @@ return new class extends Migration
         // A per-bucket latency_digest column is added only when the optional tdigest
         // extension is installed. It stores each hour's duration distribution as a
         // t-digest so the Tier-2 percentile driver can merge them across a window with
-        // rollup() in O(buckets). The whole column is guarded behind the extension
-        // check, so this migration still runs on a stock box without tdigest — the view
-        // simply omits the digest and the default 'live' driver keeps working.
+        // the extension's tdigest(tdigest) aggregate in O(buckets). The whole column is
+        // guarded behind the extension check, so this migration still runs on a stock
+        // box without tdigest — the view simply omits the digest and the default 'live'
+        // driver keeps working.
         $bucket = $this->bucketExpression();
         $digest = TdigestExtension::isInstalled($this->getConnection())
             ? ",\n                tdigest(duration_ms, 100)                                   AS latency_digest"
@@ -118,6 +119,11 @@ return new class extends Migration
      * engines, so a nullable owner pair would never collide and the owner-less (global) rollup row
      * would be duplicated on every refresh. There is no latency_digest column: MySQL has no
      * tdigest, and the Tier-2 driver refuses to run there.
+     *
+     * The owner pair and the bucket are the table's PRIMARY KEY, the key the view's unique index
+     * is on PostgreSQL. A server with sql_require_primary_key on, the default of some managed
+     * MySQL offerings and a requirement of Group Replication, refuses to create a table without
+     * one.
      */
     public function createMySql(): void
     {
@@ -127,13 +133,13 @@ return new class extends Migration
         // was the exception. A Blueprint column with no collation inherits the TABLE's, which for
         // a Blueprint-created table comes from the CONNECTION config — and Laravel's shipped
         // config/database.php names utf8mb4_unicode_ci there, which is case- and
-        // accent-insensitive. So the leading column of webhook_delivery_hourly_uidx compared
+        // accent-insensitive. So the leading column of the table's key compared
         // more loosely than the raw rows it aggregates, on any host that had not changed it.
         //
-        // The suite could not see it: the MySQL lane pins utf8mb4_0900_as_cs on the connection,
-        // so the column inherited the right thing here and the wrong thing everywhere else.
-        // `webhooks:preflight` reads it from the live schema now, which is the check that does
-        // not depend on how this file happens to be run.
+        // A connection that names utf8mb4_0900_as_cs hid it, because the column inherited the
+        // right thing there and the wrong thing everywhere else. `webhooks:preflight` reads it
+        // from the live schema, which is the check that does not depend on the connection the
+        // migration happened to run on.
         //
         // owner_id is the second column of that index, and under a uuid or ulid owner key it is a
         // CHAR column that inherited the same way. It declares the same collation for the same
@@ -156,7 +162,7 @@ return new class extends Migration
             $table->double('p50')->nullable();
             $table->double('p95')->nullable();
 
-            $table->unique(['owner_type', 'owner_id', 'bucket'], 'webhook_delivery_hourly_uidx');
+            $table->primary(['owner_type', 'owner_id', 'bucket']);
         });
     }
 

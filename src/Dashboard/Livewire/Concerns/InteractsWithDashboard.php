@@ -95,7 +95,8 @@ trait InteractsWithDashboard
             // that grows with each month the log survives. It hides no reachable row: the bound
             // sits a month below the retention floor.
             ->withinRetention()
-            ->findOrFail($deliveryId);
+            ->whereSubmittedKey($deliveryId)
+            ->firstOrFail();
     }
 
     /**

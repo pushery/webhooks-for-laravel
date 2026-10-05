@@ -9,8 +9,8 @@ use Pushery\Webhooks\Database\OwnerKeyType;
 use Pushery\Webhooks\Support\TenantIdentity;
 
 /**
- * What a dashboard read is scoped to. Three scopes, and the distinction between the last
- * two is a privilege boundary, not a detail:
+ * What a dashboard read is scoped to, and the distinction between global and all tenants is
+ * a privilege boundary, not a detail:
  *
  * - **tenant** — a single tenant, matched on the WHOLE owner morph pair.
  * - **global** — the owner-less rows only (`owner_type IS NULL AND owner_id IS NULL`): the
@@ -20,6 +20,8 @@ use Pushery\Webhooks\Support\TenantIdentity;
  *   operator console view ("what did we send to THIS customer's endpoint?"), and seeing
  *   another tenant's data is a real permission level above seeing the global ones — so it
  *   has its own config flag and its own ability, and is never implied by operator mode.
+ * - **untenanted** — a reader who holds the dashboard ability and belongs to no tenant: no
+ *   rows at all, see {@see self::untenanted()}.
  *
  * The scope is expressed once, as a SQL condition + bindings, so every reader applies it
  * identically whether it is an Eloquent query, a query-builder read or one of the metrics'
@@ -33,7 +35,7 @@ final readonly class DashboardTenant
     /**
      * A null identity alone no longer identifies the scope — global and all-tenants are both
      * owner-less at construction and mean opposite things — so the kind is carried explicitly.
-     * The constructor is private and the three factories below are the only way in, so an
+     * The constructor is private and the factories below are the only way in, so an
      * inconsistent pair cannot be built.
      */
     private function __construct(
@@ -75,7 +77,7 @@ final readonly class DashboardTenant
      * threw, and the page answered 500 -- a state the ability lets a person into and the screen
      * could not survive.
      *
-     * None of the three existing scopes is the answer. All-tenants shows every other tenant's
+     * None of the other scopes is the answer. All-tenants shows every other tenant's
      * history, which is a permission escalation traded for an empty state; global shows the
      * owner-less rows, which is a different question than "mine, and there are none"; and the
      * per-tenant scope is exactly the one that cannot be built without an identity.

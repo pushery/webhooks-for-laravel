@@ -50,7 +50,7 @@ final readonly class PinnedEndpoint
 
         // An IP literal gets no entry, and this is about delivery rather than tidiness. curl
         // parses an entry as `host:port:addr`, and its host half does not accept an IPv6 literal
-        // in any spelling — measured against curl 8.7.1, both `2606:…:443:2606:…` and the
+        // in any spelling — in curl 8.7.1 both `2606:…:443:2606:…` and the
         // bracketed `[2606:…]:443:[2606:…]` end in `curl: (49) Couldn't parse CURLOPT_RESOLVE
         // entry`. That is a hard failure, not a warning: the transfer never starts, so an
         // endpoint whose URL is written as an IPv6 literal could not be delivered to at all.

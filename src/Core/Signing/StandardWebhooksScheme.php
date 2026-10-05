@@ -119,19 +119,18 @@ final readonly class StandardWebhooksScheme implements SignatureScheme
     /**
      * The bytes the HMAC is taken over, per the spec: `{id}.{timestamp}.{body}`.
      *
-     * The timestamp is a STRING here rather than an int, and that is the whole of a small
-     * correction. Verification used to normalize the header to an integer first and sign that,
-     * which had two consequences, both measured:
+     * The timestamp is a STRING here rather than an int. Normalizing the header to an integer
+     * first and signing that would have two consequences:
      *
      *   a producer that sends `0<ts>` and signs `{id}.0<ts>.{body}`, exactly as the spec says,
-     *   was REFUSED, because this side computed `{id}.<ts>.{body}` instead
+     *   would be REFUSED, because this side would compute `{id}.<ts>.{body}` instead
      *
-     *   a delivery signed canonically stayed valid after somebody rewrote its header to
-     *   `0<ts>`, because both spellings normalized to the same integer
+     *   a delivery signed canonically would stay valid after somebody rewrote its header to
+     *   `0<ts>`, because both spellings normalize to the same integer
      *
      * Neither buys an attacker anything -- the id and the body are still covered, and the
-     * tolerance reads the same instant either way -- but the second one is exactly the property
-     * the header was assumed to have and did not. Signing what was actually sent gives it.
+     * tolerance reads the same instant either way -- but the second would take away a property
+     * the header is meant to have. Signing what was actually sent keeps it.
      *
      * Nothing changes for a delivery this package signed: the signer has always written a plain
      * decimal, and an int and its string are the same bytes here.
@@ -160,6 +159,16 @@ final readonly class StandardWebhooksScheme implements SignatureScheme
     public static function derivesUsableKey(string $secret): bool
     {
         return self::key($secret) !== null;
+    }
+
+    /**
+     * How many bytes of HMAC key a configured secret derives, zero when it derives none. Public
+     * for the same reason as {@see self::derivesUsableKey()}: a check of the key's length has to
+     * read the derivation the signer uses.
+     */
+    public static function derivedKeyBytes(string $secret): int
+    {
+        return strlen(self::key($secret) ?? '');
     }
 
     /**

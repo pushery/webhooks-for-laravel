@@ -26,6 +26,8 @@ use stdClass;
  * while the components they name are being replaced — which is the `__lazyLoad not found`
  * race. See {@see WebhooksDashboardPage} for the
  * whole chain, including why taking the window out of the keys would be the worse answer.
+ *
+ * @property-read Collection<int, stdClass> $trend
  */
 #[Lazy(isolate: false)]
 final class LatencyPanel extends Component
@@ -86,17 +88,14 @@ final class LatencyPanel extends Component
     public function peakLatency(): float
     {
         // Both fallbacks below are absorbed by the floor on the last line: `max(1.0, …)` takes
-        // anything at or below 1, so 0 and 1 and -1 all come out of this method as 1.0.
-        // Measured: `?? 0` changed to `?? 1` and `return 0.0` to `1.0`, the dashboard suites
-        // green for both.
-        //
-        // The control is the same method: a row carrying a real p95 is still reported as itself
-        // (ChartPeakFallbackTest pins 250.5), so this is a statement about values under the
-        // floor rather than about an unmeasured peak.
+        // anything at or below 1, so 0 and 1 and -1 all come out of this method as 1.0. A row
+        // carrying a real p95 above the floor is still reported as itself.
         //
         // They stay because the floor is a rendering decision — every bar divides by this — and
         // relying on it to also mean "no measurement" would put two jobs on one expression.
-        $values = $this->trend()
+        // Read as the property, so the rows come from the same memo the view reads: a call to the
+        // method runs the rollup query a second time in every render.
+        $values = $this->trend
             ->map(static function (stdClass $row): float {
                 $p95 = $row->p95 ?? 0;
 

@@ -37,7 +37,8 @@ return [
     'metrics' => [
         'throughput' => 'Throughput',
         'failure_rate' => 'Failure Rate',
-        'failed' => ':count failed',
+        'failed' => '{0} :count failed|{1} :count failed|[2,*] :count failed',
+        'refused' => '{0} :count refused|{1} :count refused|[2,*] :count refused',
         'avg_latency' => 'Avg Latency',
         'max_latency' => 'Max Latency',
     ],

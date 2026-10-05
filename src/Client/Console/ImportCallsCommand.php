@@ -17,6 +17,7 @@ use JsonException;
 use Pushery\Webhooks\Client\InboundMessage;
 use Pushery\Webhooks\Client\Models\WebhookCall;
 use Pushery\Webhooks\Client\WebhookCallStatus;
+use Pushery\Webhooks\Client\WebhookConfig;
 use Pushery\Webhooks\Core\Http\HeaderRedactor;
 use Pushery\Webhooks\Core\Payload\PayloadSanitizer;
 use Pushery\Webhooks\Database\Dialect\Dialect;
@@ -32,10 +33,11 @@ use stdClass;
  * starting empty. Live receipts already flow the moment the route is switched over; this is only
  * for the OLD rows.
  *
- * The source SHAPE is declared rather than assumed. Five `--from-*` options name the columns to
+ * The source SHAPE is declared rather than assumed. Seven `--from-*` options name the columns to
  * read, and their defaults describe the shape these tables almost always have — an `id`, a `name`
- * that says which producer it came from, a `payload`, its `headers`, and an `exception` recorded
- * when handling failed. A table that spells them differently needs no code, only the options.
+ * that says which producer it came from, a `payload`, its `headers`, an `exception` recorded when
+ * handling failed, and the `created_at` and `updated_at` Eloquent's timestamps() write. A table
+ * that spells them differently needs no code, only the options.
  *
  * It is safe to run twice. Each imported row's primary key is derived deterministically from
  * (source, source row id), so a second run re-derives the same ids and the idempotent insert skips
@@ -84,6 +86,13 @@ final class ImportCallsCommand extends Command
      */
     private const string IMPORT_KEY = 'legacy-call-import';
 
+    /**
+     * The client config of each source seen so far, null for a source the host declares none for.
+     *
+     * @var array<string, WebhookConfig|null>
+     */
+    private array $sourceConfigs = [];
+
     protected $signature = 'webhooks:import-calls
         {--source= : The value written to the `source` column. Defaults to each source row\'s own producer-name column; pass this to force one source for every imported row, and to keep two imports apart.}
         {--from-table=webhook_calls : The table to read from.}
@@ -93,6 +102,8 @@ final class ImportCallsCommand extends Command
         {--from-payload=payload : The source column holding the decoded JSON body.}
         {--from-headers=headers : The source column holding the request headers as JSON. Missing or empty imports as no headers.}
         {--from-error=exception : The source column that records a handling failure. Its PRESENCE marks the imported row failed; its text is not carried.}
+        {--from-created-at=created_at : The source column holding when each row was received. A source without it imports every row dated at the import, and the command says so.}
+        {--from-updated-at=updated_at : The source column holding when each row last changed.}
         {--from-timezone= : The time zone a source timestamp without an offset was written in. Defaults to app.timezone, the zone Eloquent\'s timestamps() write in; pass UTC for a table that stores UTC.}
         {--chunk=1000 : How many source rows to read per batch (bounds memory on a large backlog).}
         {--dry-run : Report what would be imported without writing anything.}';
@@ -101,6 +112,9 @@ final class ImportCallsCommand extends Command
 
     public function handle(): int
     {
+        // Every run reads the configs afresh: Artisan may hand the same instance a second run.
+        $this->sourceConfigs = [];
+
         $override = $this->stringOption('source');
         $fromTable = $this->stringOption('from-table') ?? 'webhook_calls';
         $fromConnection = $this->stringOption('from-connection');
@@ -111,6 +125,8 @@ final class ImportCallsCommand extends Command
             payload: $this->stringOption('from-payload') ?? 'payload',
             headers: $this->stringOption('from-headers') ?? 'headers',
             error: $this->stringOption('from-error') ?? 'exception',
+            createdAt: $this->stringOption('from-created-at') ?? 'created_at',
+            updatedAt: $this->stringOption('from-updated-at') ?? 'updated_at',
         );
         // The cast changes no value: a boolean console option is already a bool. It stays because
         // option() is declared as mixed, and the variable below is used as a condition in three
@@ -159,15 +175,28 @@ final class ImportCallsCommand extends Command
         $errored = 0;
         /** @var list<string> $errors */
         $errors = [];
+        // The timestamp columns the first source row does not carry, read once: null until a row
+        // has been seen, so an empty source warns about nothing.
+        /** @var list<string>|null $untimed */
+        $untimed = null;
 
         // Ordered and chunked by the DECLARED id column, not by a literal 'id'. chunkById walks
         // the table by that column, so leaving it hardcoded would order by a column a source table
         // need not have -- and the whole point of the map is that it need not.
         DB::connection($fromConnection)->table($fromTable)->orderBy($columns->id)->chunkById(
             $chunk,
-            function (Collection $rows) use ($override, $columns, $dialect, $zone, $sql, $dryRun, &$imported, &$skipped, &$errored, &$errors): void {
+            function (Collection $rows) use ($override, $columns, $dialect, $zone, $sql, $dryRun, &$imported, &$skipped, &$errored, &$errors, &$untimed): void {
                 /** @var array<string, list<mixed>> $pending id => bindings */
                 $pending = [];
+
+                $first = $rows->first();
+
+                if ($untimed === null && $first instanceof stdClass) {
+                    $untimed = array_values(array_filter(
+                        [$columns->createdAt, $columns->updatedAt],
+                        static fn (string $column): bool => ! property_exists($first, $column),
+                    ));
+                }
 
                 foreach ($rows as $row) {
                     try {
@@ -197,6 +226,13 @@ final class ImportCallsCommand extends Command
             },
             $columns->id,
         );
+
+        if ($untimed !== null && $untimed !== []) {
+            $this->warn(sprintf(
+                'The source rows carry no %s column, so the imported rows take the time of the import instead. Name the column with --from-created-at or --from-updated-at.',
+                implode(' or ', array_map(static fn (string $column): string => '['.$column.']', $untimed)),
+            ));
+        }
 
         $this->report($dryRun, $imported, $skipped, $errored, $errors);
 
@@ -256,7 +292,10 @@ final class ImportCallsCommand extends Command
         // json_decode rather than about this import. 512 is PHP's own default, written out only so
         // the JSON_THROW_ON_ERROR beside it can be passed at all.
         $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
-        $body = json_encode(PayloadSanitizer::scrub(is_array($decoded) ? $decoded : []), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $scrubbed = PayloadSanitizer::scrub(is_array($decoded) ? $decoded : []);
+        // Decoded to an array, `{}` and `[]` are one value, so the empty case is written as the object
+        // a bodyless call is rather than as the list json_encode() makes of an empty array.
+        $body = $scrubbed === [] ? '{}' : json_encode($scrubbed, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
         // The error column is read for its PRESENCE, not its content: it says whether handling
         // failed back then. The text itself is not carried -- this log has no column for it, and
@@ -275,21 +314,25 @@ final class ImportCallsCommand extends Command
             null, // payload_disk — imports are never offloaded
             null, // payload_path
             hash('sha256', $body),
-            $this->headersJson($row, $columns),
+            $this->headersJson($row, $columns, $source),
             $status->value,
-            $this->timestamp($row->created_at ?? null, $dialect, $zone),
-            $this->timestamp($row->updated_at ?? null, $dialect, $zone),
+            $this->timestamp($columns->of($row, $columns->createdAt), $dialect, $zone),
+            $this->timestamp($columns->of($row, $columns->updatedAt), $dialect, $zone),
         ];
     }
 
     /**
-     * The redacted-and-scrubbed headers JSON, or null when the source row stored none. The
-     * credential-bearing headers (Authorization, Cookie) are masked exactly as the live receive
-     * path masks them, so a backfilled row never carries a token the real path would have hidden.
+     * The redacted-and-scrubbed headers JSON, or null when the source row stored none.
+     *
+     * A source the host declares as a client config gets exactly what the live receive path would
+     * have stored for it: only the headers its `store_headers` keeps (none, by default), masked with
+     * its `redact` list on top of the credential-bearing ones. A source with no config is masked with
+     * those alone (Authorization, Cookie), which is all the live path could know about it. Either way
+     * a backfilled row never carries a header the real path would have dropped or hidden.
      *
      * @throws JsonException when the stored headers are not valid JSON
      */
-    private function headersJson(stdClass $row, LegacyCallColumns $columns): ?string
+    private function headersJson(stdClass $row, LegacyCallColumns $columns, string $source): ?string
     {
         $headers = $columns->of($row, $columns->headers);
 
@@ -306,7 +349,47 @@ final class ImportCallsCommand extends Command
             return null;
         }
 
-        return json_encode(PayloadSanitizer::scrub(HeaderRedactor::mask($decoded)), JSON_THROW_ON_ERROR);
+        $config = $this->sourceConfig($source);
+
+        if (! $config instanceof WebhookConfig) {
+            return json_encode(PayloadSanitizer::scrub(HeaderRedactor::mask($decoded)), JSON_THROW_ON_ERROR);
+        }
+
+        $store = $config->storeHeaders();
+
+        if ($store === []) {
+            return null;
+        }
+
+        if (is_array($store)) {
+            $only = array_map(strtolower(...), $store);
+            $decoded = array_filter(
+                $decoded,
+                static fn (int|string $name): bool => in_array(strtolower((string) $name), $only, true),
+                ARRAY_FILTER_USE_KEY,
+            );
+        }
+
+        return json_encode(PayloadSanitizer::scrub(HeaderRedactor::mask($decoded, $config->redact())), JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * The client config the live receiver would use for this source, or null when the host
+     * declares none under that name. Resolved once per source for the run; a declared config that
+     * does not load stops the import, because the live path could not receive for it either.
+     */
+    private function sourceConfig(string $source): ?WebhookConfig
+    {
+        if (! array_key_exists($source, $this->sourceConfigs)) {
+            $declared = array_any(
+                Config::array('webhooks.client.configs', []),
+                static fn (mixed $entry): bool => is_array($entry) && ($entry['name'] ?? null) === $source,
+            );
+
+            $this->sourceConfigs[$source] = $declared ? WebhookConfig::forName($source) : null;
+        }
+
+        return $this->sourceConfigs[$source];
     }
 
     /**

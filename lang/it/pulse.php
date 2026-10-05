@@ -27,7 +27,8 @@ return [
     'metrics' => [
         'throughput' => 'Portata',
         'failure_rate' => 'Tasso di errori',
-        'failed' => ':count non riuscite',
+        'failed' => '{0} :count non riuscite|{1} :count non riuscita|[2,*] :count non riuscite',
+        'refused' => '{0} :count rifiutate|{1} :count rifiutata|[2,*] :count rifiutate',
         'avg_latency' => 'Latenza media',
         'max_latency' => 'Latenza massima',
     ],

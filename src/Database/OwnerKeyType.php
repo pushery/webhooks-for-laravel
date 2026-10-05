@@ -82,8 +82,7 @@ enum OwnerKeyType: string
             // says the three tables "can never disagree"; on MySQL they did, by a factor of two at
             // the top of the range.
             //
-            // PostgreSQL has no unsigned integers, so the word would be a syntax error there —
-            // which is also why the split never showed up on the engine the suite defaults to.
+            // PostgreSQL has no unsigned integers, so the word would be a syntax error there.
             self::Bigint => $dialect === Dialect::MySql ? 'bigint unsigned' : 'bigint',
             self::Uuid => $dialect === Dialect::MySql ? 'char(36)' : 'uuid',
             self::Ulid => 'char(26)',

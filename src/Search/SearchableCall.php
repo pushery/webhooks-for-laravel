@@ -83,7 +83,7 @@ trait SearchableCall
             return '';
         }
 
-        // The `?: ''` is EQUIVALENT and reported every run. json_encode only answers false on
+        // The `?: ''` is never reached: json_encode only answers false on
         // INF/NAN or invalid UTF-8, neither of which survives a jsonb column, and no successful
         // encoding of an ARRAY is falsy — `[]` encodes to '[]'. So nothing reaches the fallback.
         //

@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Health;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Config;
+use Pushery\Webhooks\Database\Dialect\Dialect;
 use Pushery\Webhooks\Database\Dialect\Sql\ConditionalCount;
+use Pushery\Webhooks\Database\PartitionManager;
 use Pushery\Webhooks\Enums\DeliveryStatus;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Platform\Health\HealthStatus;
@@ -64,6 +67,10 @@ final class DeliveryEngineCheck extends Check
     private ?int $stallLookBackHours = null;
 
     private bool $warnOnFailingEndpoints = false;
+
+    private bool $warnOnPartitionDrift = false;
+
+    private ?string $failingEndpointRemedy = null;
 
     /**
      * How far back the check looks, in hours. 24 by default.
@@ -201,6 +208,36 @@ final class DeliveryEngineCheck extends Check
         return $this;
     }
 
+    /**
+     * Warn while the delivery log's partitions have drifted: rows sit in the default partition, or
+     * the partition for the next UTC month is not provisioned. Off by default, and there is nothing to
+     * read where the log is not partitioned (MySQL).
+     *
+     * Both are what `webhooks:partition-maintenance` repairs, and a scheduler that stopped running it
+     * is how they arise. Rows in the default partition keep the partition of their month from being
+     * created and stop retention pruning; without next month's partition, that month's deliveries
+     * land in the default partition.
+     */
+    public function warnWhenPartitionsDrift(): self
+    {
+        $this->warnOnPartitionDrift = true;
+
+        return $this;
+    }
+
+    /**
+     * A sentence that tells the reader of the failing-endpoint warning what to do before the endpoint
+     * is switched off, appended to the warning the way remedyForDisabledEndpoints() appends to its own.
+     * Off by default.
+     */
+    public function remedyForFailingEndpoints(string $sentence): self
+    {
+        $sentence = trim($sentence);
+        $this->failingEndpointRemedy = $sentence === '' ? null : $sentence;
+
+        return $this;
+    }
+
     public function run(): Result
     {
         $result = Result::make();
@@ -220,6 +257,7 @@ final class DeliveryEngineCheck extends Check
         $overdueRetries = $this->retryLimitMinutes === null ? null : $this->overdueRetries($this->retryLimitMinutes);
         $breakerDisabled = $this->warnOnlyAboutBreakerDisabledEndpoints ? $this->breakerDisabledEndpoints() : null;
         $failing = $this->warnOnFailingEndpoints ? $this->failingEndpoints() : null;
+        $drift = $this->warnOnPartitionDrift ? $this->partitionDrift() : null;
 
         $settled = $counts['succeeded'] + $counts['failed'] + $counts['exhausted'];
         $rate = $settled > 0 ? round(($counts['failed'] + $counts['exhausted']) / $settled * 100, 1) : null;
@@ -237,6 +275,10 @@ final class DeliveryEngineCheck extends Check
             ...($stalledPending === null ? [] : ['stalled_pending' => $stalledPending]),
             ...($overdueRetries === null ? [] : ['overdue_retries' => $overdueRetries]),
             ...($failing === null ? [] : ['failing_endpoints' => $failing]),
+            ...($drift === null ? [] : [
+                'default_partition_rows' => $drift['stranded'],
+                'next_month_partitioned' => $drift['next_month_partitioned'],
+            ]),
         ]);
 
         // A stopped engine outranks a failure rate: it produces no outcomes, so no rate reports it.
@@ -260,6 +302,12 @@ final class DeliveryEngineCheck extends Check
             );
         }
 
+        // A failure above the limit ends the check as the two above do. The warnings below are of
+        // one rank and are reported together: a switched-off endpoint must not hide the next one
+        // that is failing, which is the one an operator can still save before the breaker trips.
+        /** @var list<array{string, string}> $warnings */
+        $warnings = [];
+
         if ($rate !== null && $settled >= $this->minimumDeliveries) {
             $message = sprintf('%s%% of the %d deliveries in the last %d hours failed.', $this->percent($rate), $settled, $this->windowHours);
 
@@ -268,7 +316,7 @@ final class DeliveryEngineCheck extends Check
             }
 
             if ($this->warnAbovePercent !== null && $rate > $this->warnAbovePercent) {
-                return $result->shortSummary($this->percent($rate).'% failed')->warning($message);
+                $warnings[] = [$this->percent($rate).'% failed', $message];
             }
         }
 
@@ -278,31 +326,89 @@ final class DeliveryEngineCheck extends Check
                     ? 'The circuit breaker switched one webhook endpoint off, and it receives nothing until it is enabled again.'
                     : sprintf('The circuit breaker switched %d webhook endpoints off, and they receive nothing until they are enabled again.', $breakerDisabled);
 
-                return $result->shortSummary($breakerDisabled === 1 ? '1 endpoint off' : $breakerDisabled.' endpoints off')->warning(
-                    $this->disabledEndpointRemedy === null ? $message : $message.' '.$this->disabledEndpointRemedy,
-                );
+                $warnings[] = [
+                    $breakerDisabled === 1 ? '1 endpoint off' : $breakerDisabled.' endpoints off',
+                    $this->withRemedy($message, $this->disabledEndpointRemedy),
+                ];
             }
         } elseif ($this->warnOnDisabledEndpoints && $disabled > 0) {
             $message = $disabled === 1
                 ? 'One webhook endpoint is switched off and receives nothing until it is enabled again.'
                 : sprintf('%d webhook endpoints are switched off and receive nothing until they are enabled again.', $disabled);
 
-            return $result->shortSummary($disabled === 1 ? '1 endpoint off' : $disabled.' endpoints off')->warning(
-                $this->disabledEndpointRemedy === null ? $message : $message.' '.$this->disabledEndpointRemedy,
-            );
+            $warnings[] = [
+                $disabled === 1 ? '1 endpoint off' : $disabled.' endpoints off',
+                $this->withRemedy($message, $this->disabledEndpointRemedy),
+            ];
         }
 
-        // After the switched-off endpoints: one that is off already receives nothing, one that is
-        // failing still receives its deliveries.
         if ($failing !== null && $failing > 0) {
             $message = $failing === 1
                 ? 'One webhook endpoint that is switched on has a failing health score.'
                 : sprintf('%d webhook endpoints that are switched on have a failing health score.', $failing);
 
-            return $result->shortSummary($failing === 1 ? '1 endpoint failing' : $failing.' endpoints failing')->warning($message);
+            $warnings[] = [
+                $failing === 1 ? '1 endpoint failing' : $failing.' endpoints failing',
+                $this->withRemedy($message, $this->failingEndpointRemedy),
+            ];
+        }
+
+        if ($drift !== null && ($drift['stranded'] > 0 || ! $drift['next_month_partitioned'])) {
+            $sentences = [];
+
+            if ($drift['stranded'] > 0) {
+                $sentences[] = $drift['stranded'] === 1
+                    ? 'One webhook delivery sits in the default partition, outside the provisioned months.'
+                    : sprintf('%d webhook deliveries sit in the default partition, outside the provisioned months.', $drift['stranded']);
+            }
+
+            if (! $drift['next_month_partitioned']) {
+                $sentences[] = sprintf('The delivery log has no partition for %s yet.', $drift['next_month']);
+            }
+
+            $warnings[] = [
+                'Partitions drifted',
+                implode(' ', $sentences).' Check that the scheduler runs webhooks:partition-maintenance daily.',
+            ];
+        }
+
+        if ($warnings !== []) {
+            return $result
+                ->shortSummary(implode(', ', array_column($warnings, 0)))
+                ->warning(implode(' ', array_column($warnings, 1)));
         }
 
         return $result->shortSummary($rate === null ? 'No deliveries' : $this->percent($rate).'% failed')->ok();
+    }
+
+    /**
+     * What the partitions of the delivery log look like against the provisioned window, or null where
+     * the log is not partitioned.
+     *
+     * @return array{stranded: int, next_month: string, next_month_partitioned: bool}|null
+     */
+    private function partitionDrift(): ?array
+    {
+        if (WebhookConnection::dialect() === Dialect::MySql) {
+            return null;
+        }
+
+        $partitions = new PartitionManager;
+        $next = CarbonImmutable::now('UTC')->startOfMonth()->addMonth();
+
+        return [
+            'stranded' => $partitions->defaultPartitionCount(),
+            'next_month' => $next->format('Y-m'),
+            'next_month_partitioned' => in_array($partitions->partitionName($next), $partitions->monthlyPartitions(), true),
+        ];
+    }
+
+    /**
+     * A warning with the sentence a host named after it, or as the package wrote it when none was.
+     */
+    private function withRemedy(string $message, ?string $remedy): string
+    {
+        return $remedy === null ? $message : $message.' '.$remedy;
     }
 
     /**

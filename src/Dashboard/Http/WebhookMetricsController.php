@@ -14,7 +14,7 @@ use Pushery\Webhooks\Dashboard\Data\KpiSet;
 use Pushery\Webhooks\Dashboard\Metrics\WebhookMetrics;
 use Pushery\Webhooks\Dashboard\WindowResolver;
 use Pushery\Webhooks\Database\Concerns\HasZonedTimestamps;
-use Pushery\Webhooks\Database\Dialect\Dialect;
+use Pushery\Webhooks\Support\Timestamp;
 use Pushery\Webhooks\Support\WebhookConnection;
 use stdClass;
 use Symfony\Component\HttpFoundation\Response;
@@ -218,6 +218,7 @@ final class WebhookMetricsController
      * an instant off by its own offset, with the counts inside the bucket still correct: a
      * plausible chart drawn one or two hours beside the truth, and nothing anywhere goes red.
      * PostgreSQL returns the offset in the string, so there the parse was already exact.
+     * {@see Timestamp::read()} holds that decision for every reader.
      */
     private function toIso(mixed $value): string
     {
@@ -225,9 +226,7 @@ final class WebhookMetricsController
             return '';
         }
 
-        return WebhookConnection::dialect() === Dialect::MySql
-            ? CarbonImmutable::parse($value, 'UTC')->toIso8601String()
-            : CarbonImmutable::parse($value)->toIso8601String();
+        return Timestamp::read(WebhookConnection::dialect(), $value)->toIso8601String();
     }
 
     /**

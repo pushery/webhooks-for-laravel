@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks;
 
+use Closure;
 use DateTimeInterface;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
@@ -23,6 +26,8 @@ use Pushery\Webhooks\Core\Ssrf\SsrfGuard;
 use Pushery\Webhooks\Database\OwnerKeyType;
 use Pushery\Webhooks\Enums\DeliveryStatus;
 use Pushery\Webhooks\Events\WebhookDeliveryRateLimited;
+use Pushery\Webhooks\Events\WebhookEndpointDisabled;
+use Pushery\Webhooks\Events\WebhookEndpointEnabled;
 use Pushery\Webhooks\Events\WebhookEndpointRegistered;
 use Pushery\Webhooks\Events\WebhookSecretRotated;
 use Pushery\Webhooks\Exceptions\InvalidPayloadException;
@@ -31,6 +36,9 @@ use Pushery\Webhooks\Exceptions\TestPingThrottled;
 use Pushery\Webhooks\Models\WebhookDelivery;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Platform\AsyncApi\AsyncApiGenerator;
+use Pushery\Webhooks\Platform\Erasure\EventEraser;
+use Pushery\Webhooks\Platform\Erasure\ForgottenEvents;
+use Pushery\Webhooks\Platform\Support\EventTypeAbilities;
 use Pushery\Webhooks\Platform\Transform\PayloadTransformer;
 use Pushery\Webhooks\Platform\Transform\PayloadVersionRegistry;
 use Pushery\Webhooks\Search\SearchIndexer;
@@ -69,10 +77,29 @@ final readonly class WebhookManager
      * stored owner matches exactly what the read scope filters by. A null owner registers
      * a global, owner-less subscription.
      *
+     * When a person is signed in, a type whose catalog entry names an ability takes that
+     * ability, exactly as in the portal and the operator console. Without one, a console
+     * command, a seeder or a queued job, nobody is acting and nothing is asked.
+     *
      * @param  array<array-key, string>  $eventTypes
+     *
+     * @throws AuthorizationException when the acting user lacks the ability a type takes
      */
     public function subscribe(Model|TenantIdentity|null $owner, string $url, array $eventTypes, ?string $name = null): WebhookSubscription
     {
+        $actor = $this->actor();
+
+        if ($actor instanceof Authenticatable) {
+            $refused = new EventTypeAbilities($this->config)->refused($eventTypes, $actor);
+
+            if ($refused !== []) {
+                throw new AuthorizationException(sprintf(
+                    'Subscribing an endpoint to %s takes an ability the acting user does not have.',
+                    implode(', ', $refused),
+                ));
+            }
+        }
+
         // Vet the URL against the shared SSRF policy; the pinned endpoint it returns
         // is not needed here — a blocked URL throws BlockedDestination.
         $this->guard->resolveAndPin($url);
@@ -96,6 +123,25 @@ final readonly class WebhookManager
     }
 
     /**
+     * Delete every stored copy of these events: their rows in the delivery log, redeliveries
+     * included, their entries in the search index, and their offloaded payload objects where no
+     * other row still points at one. A delivery of them still waiting in the queue is not sent.
+     *
+     * An event id is the `event_id` a delivery carries, the one {@see self::dispatch()} hands back
+     * on every delivery of the fan-out and {@see self::dispatchTo()} on its one delivery. Keep it
+     * with whatever the payload was about, and a deletion request can reach the copies the delivery
+     * log holds.
+     *
+     * @param  array<array-key, string>  $eventIds
+     *
+     * @throws InvalidArgumentException when an id is not an event id
+     */
+    public function forgetEvents(array $eventIds): ForgottenEvents
+    {
+        return new EventEraser()->erase($eventIds);
+    }
+
+    /**
      * Permanently remove an endpoint. Its delivery-log rows are removed with it (the
      * subscription_id FK cascades), so this is the "forget this endpoint" operation —
      * to stop delivering while keeping the history, use {@see self::disable()}.
@@ -116,14 +162,24 @@ final readonly class WebhookManager
      * the streak here is what makes the endpoint genuinely live again — it gets the same
      * full budget of failures a fresh endpoint gets. disabled_at is cleared too, because
      * the active() scope filters on both columns.
+     *
+     * Fires {@see WebhookEndpointEnabled} when the endpoint was off before the call.
      */
     public function enable(WebhookSubscription $subscription): WebhookSubscription
     {
-        return $this->writeLifecycle($subscription, [
+        $switched = $this->writeLifecycle($subscription, [
             'is_active' => true,
             'disabled_at' => null,
             'consecutive_failures' => 0,
-        ]);
+        ], static fn (QueryBuilder $row): QueryBuilder => $row->where(
+            static fn (QueryBuilder $off): QueryBuilder => $off->where('is_active', false)->orWhereNotNull('disabled_at'),
+        ));
+
+        if ($switched) {
+            Event::dispatch(new WebhookEndpointEnabled($subscription, $this->actor()));
+        }
+
+        return $subscription;
     }
 
     /**
@@ -132,13 +188,22 @@ final readonly class WebhookManager
      * it back exactly as it was. A delivery already queued for it is refused at send time
      * by the delivery gate, so switching an endpoint off takes effect immediately rather
      * than after the queue drains.
+     *
+     * Fires {@see WebhookEndpointDisabled} when the endpoint was on before the call. The
+     * circuit breaker does not come through here and fires its own event.
      */
     public function disable(WebhookSubscription $subscription): WebhookSubscription
     {
-        return $this->writeLifecycle($subscription, [
+        $switched = $this->writeLifecycle($subscription, [
             'is_active' => false,
             'disabled_at' => now(),
-        ]);
+        ], static fn (QueryBuilder $row): QueryBuilder => $row->where('is_active', true)->whereNull('disabled_at'));
+
+        if ($switched) {
+            Event::dispatch(new WebhookEndpointDisabled($subscription, $this->actor()));
+        }
+
+        return $subscription;
     }
 
     /**
@@ -164,9 +229,17 @@ final readonly class WebhookManager
      * would cost a second query and would throw on a row that has since been deleted, where
      * both this method and its predecessor are a silent no-op.
      *
+     * The write runs first only while the row is in the state the call leaves, which `$from`
+     * describes, and that statement is the answer to whether the endpoint changed state: it writes
+     * and tells in one step, with nothing between the two that a concurrent writer could slip
+     * into, which is the breaker's own shape. Only when it matched no row does the same write run
+     * unconditionally, so an endpoint already in the target state is written exactly as before.
+     *
      * @param  array<string, mixed>  $attributes
+     * @param  Closure(QueryBuilder): QueryBuilder  $from
+     * @return bool whether the row was in the state `$from` describes, so the call changed it
      */
-    private function writeLifecycle(WebhookSubscription $subscription, array $attributes): WebhookSubscription
+    private function writeLifecycle(WebhookSubscription $subscription, array $attributes, Closure $from): bool
     {
         // The timestamp is passed rather than left to the builder, which would add its own:
         // the instance has to end up carrying the SAME value the row got, and the only way to
@@ -175,16 +248,15 @@ final readonly class WebhookManager
         // is your subscription, it is done".
         $attributes['updated_at'] = $subscription->freshTimestamp();
 
-        // Every timestamp goes through the model's own conversion, and leaving it out is the reason
-        // this method needed a second read. A query-builder update binds a DateTimeInterface
-        // through the query grammar and never reaches {@see \Pushery\Webhooks\Database\Concerns\HasZonedTimestamps::fromDateTime()},
-        // the one place this package normalizes a timestamp per engine. `save()` went through it;
-        // this does not, so writing `now()` straight through stores an instant an offset away from
-        // the one meant. Nothing complains: both values are real timestamps.
+        // Every timestamp goes through the model's own conversion. A query-builder update binds a
+        // DateTimeInterface through the query grammar and never reaches {@see \Pushery\Webhooks\Database\Concerns\HasZonedTimestamps::fromDateTime()},
+        // the one place this package normalizes a timestamp per engine. `save()` goes through it;
+        // a builder update does not, so writing `now()` straight through would store an instant an
+        // offset away from the one meant. Nothing complains: both values are real timestamps.
         //
-        // Measured at an hour off on this machine, and disabled_at is what the active() scope
-        // filters on — an endpoint switched off an hour in the future is one the scope still
-        // treats as live.
+        // The active() scope would not notice: it only asks whether disabled_at is set. Every
+        // reader of the instant itself would, a listener on the endpoint events, which carry the
+        // subscription, or a host query by date.
         // Into a second array rather than over the first, and that is not tidiness. The stored form
         // goes to the builder; the instance below gets the original values, because forceFill()
         // routes everything through setAttribute(), which runs fromDateTime() again on any date
@@ -207,9 +279,14 @@ final readonly class WebhookManager
         // `updated_at` is supplied above rather than added, the model declares no global scope,
         // and nothing listens for its model events. It is also the same kind of statement the
         // circuit breaker writes — which is the symmetry this whole method exists to restore.
-        $subscription->newQuery()->toBase()
-            ->where($subscription->getKeyName(), $subscription->getKey())
-            ->update($stored);
+        $row = static fn (): QueryBuilder => $subscription->newQuery()->toBase()
+            ->where($subscription->getKeyName(), $subscription->getKey());
+
+        $switched = $from($row())->update($stored) > 0;
+
+        if (! $switched) {
+            $row()->update($stored);
+        }
 
         // forceFill because the lifecycle columns are guarded — engine-owned, never
         // mass-assignable — and this IS the engine.
@@ -221,7 +298,7 @@ final readonly class WebhookManager
         // Only the columns actually written may be marked clean.
         $subscription->forceFill($attributes)->syncOriginalAttributes(array_keys($attributes));
 
-        return $subscription;
+        return $switched;
     }
 
     /**
@@ -264,7 +341,7 @@ final readonly class WebhookManager
 
         $shown = match (true) {
             is_string($key) => "'".$key."'",
-            // EQUIVALENT, and reported every run: the value goes to a `%s` in sprintf, which
+            // The cast changes no message: the value goes to a `%s` in sprintf, which
             // renders an int identically. It is written out so all three arms of this match
             // answer the same TYPE — the variable is a message fragment, not a key.
             is_int($key) => (string) $key,
@@ -435,9 +512,11 @@ final readonly class WebhookManager
      *
      * Refused, not deferred: a real event that arrives two minutes late still means what
      * it meant, while a test ping that does has already failed at the only thing it was
-     * for. The buckets are only hit once the ping is allowed through, so a refusal does not
-     * push the next opening further out — an over-eager caller stops making it worse for
-     * itself the moment it stops.
+     * for. The buckets are only hit once the ping is allowed through. On the bucket that
+     * refused, counting the refusal would move nothing, because the fixed window does not grow
+     * with its count. But a ping the destination bucket refuses would otherwise open the
+     * endpoint's own minute, and keep the endpoint shut a full minute after the refusal, long
+     * after the destination had opened again.
      *
      * @throws TestPingThrottled
      */
@@ -629,7 +708,7 @@ final readonly class WebhookManager
         // fires Scout's per-subclass observer, so without this an external engine (Meilisearch,
         // …) would never see the delivery. A no-op unless search is on and the host pointed its
         // search source at a Searchable model.
-        SearchIndexer::indexDelivery($delivery->id);
+        SearchIndexer::indexDelivery($delivery);
 
         // Reshape the event data for THIS endpoint before the body is built and signed,
         // so the transformed bytes are the signed-and-sent bytes. The outbound envelope
@@ -693,11 +772,29 @@ final readonly class WebhookManager
         $pointer = $this->payloadStore->offload($encoded, $disk);
 
         return [
-            'payload' => isset($data['type']) && is_string($data['type']) ? ['type' => $data['type']] : [],
+            'payload' => $this->offloadStub($data),
             'disk' => $disk,
             'path' => $pointer['path'],
             'sha256' => $pointer['sha256'],
         ];
+    }
+
+    /**
+     * The stub kept in the delivery log in place of an offloaded payload: the payload's own `type`
+     * member whenever it has one, as the payload carries it. `payload_type` is generated from the
+     * payload column, so an offloaded row then reads what the same payload reads inline, a
+     * number, an object or a JSON null included.
+     *
+     * @param  array<array-key, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function offloadStub(array $data): array
+    {
+        if (array_key_exists('type', $data)) {
+            return ['type' => $data['type']];
+        }
+
+        return [];
     }
 
     /**

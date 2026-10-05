@@ -253,6 +253,10 @@ final class EndpointDeliveries extends Component
      * standing would make every later render resolve a row that no longer exists — the
      * panel would answer 404 for the rest of the session over a deletion the tenant
      * performed deliberately.
+     *
+     * A declared readable endpoint stays, under the rule the filter itself applies: it is
+     * filtered on without the owner lookup, which does not find it and never could, so asking
+     * that lookup whether it still exists would drop it on every save of another endpoint.
      */
     #[On('endpoint-saved')]
     #[On('endpoint-deleted')]
@@ -263,7 +267,10 @@ final class EndpointDeliveries extends Component
         // and a null id is indistinguishable from "no filter was ever set". The 404 loop this
         // reset exists to prevent cannot happen there either, because the strict path resolves
         // the endpoint leniently rather than through the not-found lookup.
-        if (! $this->strictEndpoint && $this->endpointId !== null && ! $this->scopedQuery()->whereKey($this->endpointId)->exists()) {
+        if (! $this->strictEndpoint
+            && $this->endpointId !== null
+            && ! in_array($this->endpointId, ReadableEndpoints::ids(), true)
+            && ! $this->scopedQuery()->whereKey($this->endpointId)->exists()) {
             $this->endpointId = null;
         }
 
@@ -330,7 +337,7 @@ final class EndpointDeliveries extends Component
     {
         $this->message = '';
 
-        $delivery = $this->deliveryQuery()->select('*')->whereKey($id)->firstOrFail();
+        $delivery = $this->deliveryQuery()->select('*')->whereSubmittedKey($id)->firstOrFail();
 
         // Two lookups rather than one, and which runs is the host's declaration.
         //
@@ -503,10 +510,9 @@ final class EndpointDeliveries extends Component
         // jsonb payload on every page — a promise kept by the view alone is a promise about
         // the markup, not about what was read.
         //
-        // `subscription_id` was in this list with a comment saying the replay action needed it. It
-        // did not: redeliver() calls `->select('*')`, which replaces the column list rather than
-        // adding to it, so the row it works from was always complete. Measured by dropping the
-        // column with both panel suites running.
+        // No `subscription_id`: the replay action does not need it here. redeliver() calls
+        // `->select('*')`, which replaces the column list rather than adding to it, so the row it
+        // works from is complete.
         // duration_ms rides along with response_code because it is only ever rendered beside
         // one: a duration with no answer behind it is the time spent failing to get one, and
         // reading it as latency would be wrong in the direction that looks reassuring.
@@ -701,10 +707,9 @@ final class EndpointDeliveries extends Component
         $ceiling = Config::integer('webhooks.platform.deliveries.window_days', self::WINDOW_DAYS);
 
         // The left half is redundant against the right: the guard above leaves windowDays
-        // positive, so a ceiling of zero or less already fails the comparison. Measured -- every
-        // bound this constant can take leaves the suite green. It stays because "a non-positive
-        // ceiling means no ceiling" is the rule the method beside it states, and reading it here
-        // is cheaper than deriving it from the comparison.
+        // positive, so a ceiling of zero or less already fails the comparison. It stays because
+        // "a non-positive ceiling means no ceiling" is the rule the method beside it states, and
+        // reading it here is cheaper than deriving it from the comparison.
         return $ceiling > 0 && $this->windowDays < $ceiling;
     }
 

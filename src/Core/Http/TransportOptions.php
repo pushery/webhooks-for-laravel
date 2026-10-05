@@ -26,5 +26,12 @@ final readonly class TransportOptions
         public ?string $clientCertPassphrase = null,
         public string $contentType = 'application/json',
         public int $responseCaptureBytes = 65536,
+        /**
+         * A host's own request options, added to the attempt under every option the transport
+         * sets itself ({@see RequestOptions}).
+         *
+         * @var array<string, mixed>
+         */
+        public array $requestOptions = [],
     ) {}
 }

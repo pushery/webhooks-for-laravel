@@ -18,7 +18,7 @@ use Throwable;
  * wire boundary and nowhere else — the same doctrine as the verb uppercasing in {@see
  * HttpTransport} and the redaction in {@see ErrorMessageRedactor}.
  *
- * The divergence, measured on both sides. A read timeout that strikes AFTER the response
+ * The divergence between the two. A read timeout that strikes AFTER the response
  * headers have arrived is, on guzzle 7, unconditionally a response-less `ConnectException`:
  * errno 28 sits in its five-entry connection-error list and `CurlFactory` passes a literal
  * `null` for the response, so the partial response is discarded. Guzzle 8 removed 28 from
@@ -46,7 +46,7 @@ use Throwable;
  *
  * On guzzle 7 the whole class is a no-op by construction: `ResponseTimeoutException` does not
  * exist there, and `instanceof` against a missing class is `false` without autoloading or
- * error — measured, not assumed.
+ * error.
  *
  * @internal
  */
@@ -93,14 +93,13 @@ final class TransportExceptionNormalizer
         // Guzzle 8 refuses it, guzzle 7 hands it back as an ordinary 200 — so the majors
         // disagree, and the shape this package gives it settles the disagreement in one place.
         //
-        // Only that one event, and the narrowing is the point of the condition. This arm used to
-        // answer every `ResponseTransferException`, and guzzle 8 files far more than a framing
-        // contradiction under that class: `isResponseTransferError()` is true for its whole
-        // connection-error and network-error tables plus errnos 18 and 61, whenever response
-        // headers had already arrived. So a receiver that reset the connection or sent a short body
-        // — errno 56, errno 18, both transient — was answered NonRetryable, and the delivery failed
-        // final on the first attempt with its retry budget untouched. Measured end to end against a
-        // socket, with a well-formed response as the control.
+        // Only that one event, and the narrowing is the point of the condition. Guzzle 8 files far
+        // more than a framing contradiction under `ResponseTransferException`:
+        // `isResponseTransferError()` is true for its whole connection-error and network-error
+        // tables plus errnos 18 and 61, whenever response headers had already arrived. Answered
+        // as a class, a receiver that reset the connection or sent a short body — errno 56,
+        // errno 18, both transient — would be NonRetryable, and the delivery would fail final on
+        // the first attempt with its retry budget untouched.
         //
         // That is the expensive direction. A framing contradiction retried costs a handful of extra
         // requests to a receiver that is broken anyway; a reset treated as final loses the webhook,
@@ -124,17 +123,14 @@ final class TransportExceptionNormalizer
      *   CurlFactory::createRejection() — the errno path. Passes its own `$previous`, which is
      *                                   null for an ordinary curl failure.
      *
-     * Measured on both, through a real socket rather than read off the source:
+     * What each one carries:
      *
      *   framing    previous=RuntimeException  carriedResponse=200  bodyLen=0
      *   truncated  previous=NULL              carriedResponse=200  bodyLen=10
      *
      * The body length is the same fact from the other side and is the reason to trust the
-     * discriminator rather than merely observe it: a framing rejection happens while the
-     * HEADERS are parsed, so no body was ever admitted; a transfer break happens after the
-     * bytes started arriving. `TransportFramingShapeTest` drives both events over a socket, so
-     * a guzzle release that moves either construction turns this red instead of silently
-     * reclassifying a whole class of transient failures.
+     * discriminator: a framing rejection happens while the HEADERS are parsed, so no body was
+     * ever admitted; a transfer break happens after the bytes started arriving.
      */
     private static function isFramingContradiction(ResponseTransferException $exception): bool
     {

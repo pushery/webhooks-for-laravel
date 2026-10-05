@@ -7,7 +7,7 @@ namespace Pushery\Webhooks\Client\Console;
 use stdClass;
 
 /**
- * Which columns of a pre-existing inbound-webhook table hold the five things an import needs.
+ * Which columns of a pre-existing inbound-webhook table hold the seven things an import needs.
  *
  * It exists so the importer states the shape it is reading instead of assuming one. The defaults
  * on the command describe the shape these tables almost always have; a table that spells a column
@@ -29,6 +29,8 @@ final readonly class LegacyCallColumns
         public string $payload,
         public string $headers,
         public string $error,
+        public string $createdAt = 'created_at',
+        public string $updatedAt = 'updated_at',
     ) {}
 
     /**

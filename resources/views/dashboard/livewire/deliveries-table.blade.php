@@ -77,7 +77,7 @@
                                  surface, and every row would then be a row of buttons.
                                  Said out loud because a silent escape in a file that uses the
                                  library twenty lines further down reads as an oversight. --}}
-                            <button type="button" wire:click="viewDelivery('{{ $delivery->id }}')" class="cursor-pointer text-[color:var(--color-wk-accent)]" aria-label="{{ __('webhooks::dashboard.a11y.view_delivery', ['event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat(__('webhooks::dashboard.formats.precise'))]) }}">
+                            <button type="button" wire:click="viewDelivery('{{ $delivery->id }}')" class="cursor-pointer text-[color:var(--color-wk-accent)]" aria-label="{{ __('webhooks::dashboard.a11y.view_delivery', ['event' => $delivery->event_type, 'endpoint' => \Pushery\Webhooks\Dashboard\EndpointLabel::for($delivery->subscription?->name, $delivery->subscription?->url, $delivery->subscription_id), 'at' => $when->isoFormat(__('webhooks::dashboard.formats.precise'))]) }}">
                                 {{ $delivery->event_type }}
                             </button>
                         </x-wirekit::table.th>
@@ -116,7 +116,7 @@
                                     wire:click="redeliver('{{ $delivery->id }}')"
                                     wire:loading.attr="disabled"
                                     wire:target="redeliver"
-                                    :aria-label="__('webhooks::dashboard.a11y.replay_delivery', ['label' => __('webhooks::dashboard.table.replay'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat(__('webhooks::dashboard.formats.precise'))])"
+                                    :aria-label="__('webhooks::dashboard.a11y.replay_delivery', ['label' => __('webhooks::dashboard.table.replay'), 'event' => $delivery->event_type, 'endpoint' => \Pushery\Webhooks\Dashboard\EndpointLabel::for($delivery->subscription?->name, $delivery->subscription?->url, $delivery->subscription_id), 'at' => $when->isoFormat(__('webhooks::dashboard.formats.precise'))])"
                                 >{{ __('webhooks::dashboard.table.replay') }}</x-wirekit::button>
                             @endcan
                         </x-wirekit::table.td>
