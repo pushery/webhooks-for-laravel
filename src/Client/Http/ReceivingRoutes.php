@@ -50,10 +50,6 @@ final class ReceivingRoutes
     {
         $name = $route->getAction('webhookConfigName');
 
-        // The fallback on its own statement, not as a ternary arm: line coverage credits a
-        // one-line ternary to every path through it, so a `null` that never runs would read as
-        // covered for ever. The rule and the pcov measurement behind it are in
-        // tests/Feature/ConstantFallbackVisibilityTest.php.
         if (! is_string($name) || $name === '') {
             return null;
         }

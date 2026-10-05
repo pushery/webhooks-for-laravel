@@ -27,7 +27,8 @@
     "support": {
         "issues": "https://github.com/pushery/webhooks-for-laravel/issues",
         "source": "https://github.com/pushery/webhooks-for-laravel",
-        "docs": "https://docs.pushery.com/webhooks-for-laravel/"
+        "docs": "https://docs.pushery.com/webhooks-for-laravel/",
+        "security": "https://github.com/pushery/webhooks-for-laravel/security/policy"
     },
     "require": {
         "php": "^8.4",

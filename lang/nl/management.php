@@ -178,6 +178,7 @@ return [
             // Only reachable without a catalog. The bound is the width of the MySQL index over
             // the column, which refuses a longer value.
             'length' => 'Een event-type mag hoogstens :max tekens lang zijn.',
+            'bytes' => 'Samen mogen de gekozen event-types hoogstens :max bytes lang zijn.',
         ],
         'url' => [
             // The scheme narrowing on the rule ('url:http,https') is what produces this,

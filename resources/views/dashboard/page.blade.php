@@ -21,8 +21,7 @@
                 <x-wirekit::segmented-control
                     class="wh-dash-windows"
                     {{-- Named because it is live-bound: the hidden input a wire:model writes through is
-                         what a form would submit, and LiveBoundFieldsAreNamedTest holds every shipped
-                         control to that. --}}
+                         what a form would submit. --}}
                     name="window"
                     size="sm"
                     :label="__('webhooks::dashboard.a11y.time_window')"

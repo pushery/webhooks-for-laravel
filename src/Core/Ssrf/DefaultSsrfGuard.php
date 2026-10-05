@@ -102,8 +102,7 @@ final readonly class DefaultSsrfGuard implements SsrfGuard
         // So the obligation is discharged where it belongs rather than documented onto every
         // implementor. This does not cover the alternate encodings (`2130706433`, `0x7f000001`,
         // `0177.0.0.1`): those are not addresses to filter_var, they are names, and decoding them
-        // is genuinely the resolver's job. SystemHostResolver does it, and the catalog test
-        // says so rather than implying the guard handles it.
+        // is genuinely the resolver's job, and SystemHostResolver does it.
         if (filter_var($host, FILTER_VALIDATE_IP) !== false && $this->classifier->isBlocked($host)) {
             throw BlockedDestination::privateAddress($host, $host);
         }

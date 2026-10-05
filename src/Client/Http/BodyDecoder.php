@@ -166,9 +166,7 @@ final class BodyDecoder
         }
 
         // The limit is 2 rather than a bare `explode`, because only the part before the first `;`
-        // is wanted and splitting the rest is work nobody reads. Element [0] is the same at any
-        // limit above 1, so raising it changes nothing; lowering it to 1 keeps the whole header,
-        // parameters included, and BodyDecoderTest holds that direction.
+        // is wanted and splitting the rest is work nobody reads.
         return strtolower(trim(explode(';', $contentType, 2)[0]));
     }
 

@@ -92,9 +92,8 @@ final class DatabaseRequirement
 
     /**
      * The reason a genuine (non-MariaDB) MySQL server cannot be used, or null when it can.
-     * Pure by design — every branch is exercised from a unit test with crafted inputs, so
-     * the version floor and the strict/FOUND_ROWS checks are covered without needing an old
-     * or mis-configured server to connect to.
+     * Pure by design: it decides from the three values alone, so the version floor and the
+     * strict and FOUND_ROWS checks need no connection to an old or misconfigured server.
      */
     public static function mysqlRejection(string $version, string $sqlMode, bool $foundRows): ?string
     {
@@ -160,10 +159,9 @@ final class DatabaseRequirement
         /** @var object{sql_mode?: string}|null $row */
         $row = $connection->selectOne('SELECT @@session.sql_mode AS sql_mode');
 
-        // The coalesce changes no outcome: `SELECT @@session.sql_mode` always answers one
-        // row on a server that got this far, so the coalesce has no reachable input. It is the
-        // narrowing PHPStan needs from an optional property, and an empty mode is the safe
-        // reading — it satisfies no strictness check, so an unreadable mode is refused rather
+        // `SELECT @@session.sql_mode` always answers one row on a server that got this far, so
+        // the coalesce only narrows the optional property's type. An empty mode is the safe
+        // reading: it satisfies no strictness check, so an unreadable mode is refused rather
         // than waved through.
         return $row->sql_mode ?? '';
     }

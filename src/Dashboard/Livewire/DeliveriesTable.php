@@ -66,7 +66,7 @@ final class DeliveriesTable extends Component
     /**
      * The shipped ceiling, repeated here because an ABSENT key reads as null and a null
      * ceiling would switch the bound off — the one direction that is expensive and silent.
-     * ConfigDefaultsAreInSyncTest holds the two numbers together.
+     * It matches the shipped default in config/webhooks.php.
      */
     private const int WINDOW_DAYS = 30;
 

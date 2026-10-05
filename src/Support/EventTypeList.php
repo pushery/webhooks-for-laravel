@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Support;
 
+use Closure;
+use Pushery\Webhooks\Database\Dialect\Dialect;
 use Pushery\Webhooks\Models\WebhookSubscription;
 
 /**
@@ -49,6 +51,15 @@ final class EventTypeList
     public const int MAX_UNCATALOGED = 100;
 
     /**
+     * How many bytes all of one endpoint's event types may take together on MySQL. The
+     * multi-valued index over the column refuses a row whose values run past about 5,344 bytes
+     * in total, error 3906 on MySQL 8.4, and a form that let such a list through ended in a
+     * server error. The budget stays under that, and it applies on MySQL alone: PostgreSQL has
+     * no such bound, and the forms apply none there.
+     */
+    public const int MYSQL_MAX_TOTAL_BYTES = 5000;
+
+    /**
      * A scalar where the list belongs, a single name written without its brackets, reads as a
      * list of that one value, the same as it would inside a list. Anything else that is not an
      * array, a JSON null, reads as no types. Both are what the column's cast hands back for a
@@ -84,5 +95,54 @@ final class EventTypeList
     public static function maxCount(?array $accepted, array $stored): int
     {
         return max($accepted === null ? self::MAX_UNCATALOGED : count($accepted), count($stored));
+    }
+
+    /**
+     * The bytes a list of event types takes in the MySQL index: the UTF-8 length of every value,
+     * a repeated one counted each time.
+     *
+     * @param  array<mixed>  $types
+     */
+    public static function totalBytes(array $types): int
+    {
+        $bytes = 0;
+
+        foreach ($types as $type) {
+            if (is_string($type)) {
+                $bytes += strlen($type);
+            }
+        }
+
+        return $bytes;
+    }
+
+    /**
+     * The most bytes of event types one save may carry on MySQL. Like {@see self::maxCount()}, it never
+     * falls below what the endpoint already holds: a host may store more in code than the forms
+     * take, and a row MySQL stored fits its index, so keeping it through a rename cannot reach the
+     * server's error.
+     *
+     * @param  list<string>  $stored
+     */
+    public static function maxBytes(array $stored): int
+    {
+        return max(self::MYSQL_MAX_TOTAL_BYTES, self::totalBytes($stored));
+    }
+
+    /**
+     * The rule both forms put on `eventTypes`: on MySQL, the list takes at most `$maxBytes`.
+     *
+     * @return Closure(string, mixed, Closure): void
+     */
+    public static function fitsTheMySqlIndex(int $maxBytes, string $message): Closure
+    {
+        return static function (string $attribute, mixed $value, Closure $fail) use ($maxBytes, $message): void {
+            if (is_array($value)
+                && WebhookConnection::dialect() === Dialect::MySql
+                && self::totalBytes($value) > $maxBytes
+            ) {
+                $fail($message);
+            }
+        };
     }
 }

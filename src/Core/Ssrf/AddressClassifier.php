@@ -25,9 +25,8 @@ namespace Pushery\Webhooks\Core\Ssrf;
  * filter DOES cover, among them `fc00::/7` and `fe80::/10`, stay on the list too, so
  * one mechanism answers for every range instead of two that disagree at the seam.
  *
- * The four addresses named above are pinned in the unit tests against the filter
- * itself, not merely against this class: they are the reason the list exists, and a
- * sentence cannot keep that claim true across a PHP upgrade or a change to the list.
+ * The four addresses named above are the reason the list exists. Whether PHP's own
+ * filter covers them can change with a PHP upgrade, so the list does not rely on it.
  * Every IPv6 form that embeds an IPv4 address —
  * IPv4-mapped (`::ffff:a.b.c.d`), IPv4-translated (`::ffff:0:a.b.c.d`) and the
  * deprecated IPv4-compatible form (`::a.b.c.d`) — is unwrapped first so a private
@@ -188,13 +187,11 @@ final class AddressClassifier
         // Only the length clause is reachable from isBlocked(), and it is the one that matters:
         // an IPv4 address compared against an IPv6 CIDR would otherwise match on a prefix that
         // means something else entirely — 32.1.0.0 shares its first four bytes with 2001::/32
-        // — and ordinary public IPv4 space would be refused. Pinned from both sides in the tests.
+        // — and ordinary public IPv4 space would be refused.
         //
         // The two inet_pton checks cannot fire on this path: isBlocked() has already run the
         // address through FILTER_VALIDATE_IP, and the subnets come from the constant above.
-        // They stay because this method must not depend on its only caller's validation. An
-        // unreachable guard has no observable behavior to assert, so no test can distinguish its
-        // presence from its absence — which is not a reason to remove it.
+        // They stay because this method must not depend on its only caller's validation.
         if ($ipBin === false || $subnetBin === false || strlen($ipBin) !== strlen($subnetBin)) {
             return false;
         }
@@ -209,8 +206,7 @@ final class AddressClassifier
 
         // A whole-byte prefix is decided already, and this shortcut looks removable: for every
         // prefix in the list above, the mask path below reaches the same answer, because a
-        // zero remainder makes the mask 0 and the masked comparison trivially equal. No test
-        // can tell the two versions apart.
+        // zero remainder makes the mask 0 and the masked comparison trivially equal.
         //
         // It is not removable. The mask path indexes $ipBin[$wholeBytes], and a prefix that
         // covers the whole address (/32 on IPv4, /128 on IPv6) puts that index one past the

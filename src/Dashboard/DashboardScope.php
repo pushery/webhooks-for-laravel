@@ -171,29 +171,11 @@ final class DashboardScope
         $identity = self::normalize(self::resolve());
 
         if (! $identity instanceof TenantIdentity) {
-            // Two cases, two sentences, and merging them cost a reader an afternoon. The old
-            // message said "Register a resolver with DashboardScope::resolveUsing()" for both --
-            // and in the reported case a resolver WAS registered, it simply had nothing to
-            // return. That sends the reader to the one place the problem is not.
-            //
-            // They are also repaired differently: one is a wiring step the host never took, the
-            // other is a person who belongs to no tenant, which is an ordinary runtime state.
-            // One sentence, not two, and the second draft is why.
-            //
-            // The old message said "Register a resolver with DashboardScope::resolveUsing()" --
-            // and in the reported case a resolver WAS registered, it simply had nothing to
-            // return, so the reader was sent to the one place the problem was not.
-            //
-            // The obvious repair was to split it in two. That was wrong twice over. Written as
-            // a ternary it took the coverage floor from 100 to 94.6, because pcov credits a
-            // multi-line ternary line by line and the arm that does not run reads as uncovered.
-            // Written as two statements it stayed uncovered, because the unregistered case
-            // CANNOT reach here: the default resolver throws its own message first, or returns
-            // something normalize() can read. The arm asserting it passed only because that
-            // other message happens to contain the same sentence.
-            //
-            // So the unregistered case keeps its wording where it already lives, and this one
-            // says what is true when it is reached.
+            // Only a registered resolver reaches this line: without one, the default resolver
+            // throws its own message first, or returns something normalize() can read. So this
+            // message names what is true here, a resolver that returned no owner identity, and
+            // not a wiring step the host never took. A reader who belongs to no tenant is an
+            // ordinary runtime state, and the message says how to handle it.
             throw new RuntimeException(
                 'The webhook dashboard is tenant-scoped and its resolver returned no owner '
                 .'identity. That is an ordinary state for a reader who belongs to no tenant '

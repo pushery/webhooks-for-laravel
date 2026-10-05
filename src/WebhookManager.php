@@ -596,12 +596,9 @@ final readonly class WebhookManager
      * Null outside a session — a console command, a seeder, a queued job — which is the
      * whole reason the events carry a nullable actor.
      *
-     * This used to check that the container had `auth` bound first, on the theory that a
-     * send-only or console-driven host might register no guard. Coverage said otherwise by
-     * refusing to reach the branch, and it was right: this package requires
-     * laravel/framework, so the auth manager is bound in every host that can install it.
-     * The check could not fire, and a guard that cannot fire only makes the next reader
-     * believe in a case that does not exist.
+     * There is no check for a missing `auth` binding: this package requires
+     * laravel/framework, so the auth manager is bound in every host that can install it,
+     * including a send-only or console-driven one that registers no guard of its own.
      */
     private function actor(): ?Authenticatable
     {
@@ -898,7 +895,7 @@ final readonly class WebhookManager
             // Zero rather than any other non-positive number, and the difference is not
             // observable: the value becomes a queue delay, and a delay in the past is available
             // immediately just as a delay of none is. It is a zero because that is what "no
-            // delay" is called, not because a test can tell it from a negative one.
+            // delay" is called.
             return 0;
         }
 

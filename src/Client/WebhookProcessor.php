@@ -588,7 +588,7 @@ final readonly class WebhookProcessor
         if (RateLimiter::tooManyAttempts($key, $limit['max_attempts'])) {
             // The cast changes no outcome — PHP coerces the int into the header value either way.
             // It stays because the header array is declared as strings and the cast is where that
-            // becomes true, not because a test needs it.
+            // becomes true.
             abort(429, headers: ['Retry-After' => (string) RateLimiter::availableIn($key)]);
         }
     }

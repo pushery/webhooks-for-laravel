@@ -180,6 +180,9 @@ return [
             // Only reachable without a catalog. The bound is the width of the MySQL index over
             // the column, which refuses a longer value.
             'length' => 'An event type can be at most :max characters long.',
+            // Only reachable on MySQL, whose index over the column refuses a list longer than
+            // about 5,344 bytes in total. PostgreSQL has no such bound.
+            'bytes' => 'Together, the selected event types can be at most :max bytes long.',
         ],
         'url' => [
             // The scheme narrowing on the rule ('url:http,https') is what produces this,

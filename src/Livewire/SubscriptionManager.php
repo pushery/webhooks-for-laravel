@@ -203,12 +203,15 @@ class SubscriptionManager extends Component
         // writable from the browser, so an allowlist widened from one is an allowlist the
         // client widens.
         if ($accepted !== null && $stored !== []) {
-            // array_unique and array_values on this line cannot change the outcome: the result only
-            // ever reaches Rule::in, which cares about neither duplicates nor keys. The spread is
-            // a different matter: drop the stored half and an edit is refused over a value the
-            // operator never touched.
+            // The spread keeps what the row holds acceptable: drop the stored half and an edit is
+            // refused over a value the operator never touched. array_unique matters as well,
+            // because the list also sets the cap EventTypeList::maxCount() puts on a save, and a
+            // type both declared and already held would otherwise count twice. array_values
+            // cannot change an outcome, since neither that count nor Rule::in reads a key.
             $accepted = array_values(array_unique([...$accepted, ...$stored]));
         }
+
+        $maxBytes = EventTypeList::maxBytes($stored);
 
         // Four of these rule items are redundant against the property declarations, and each is
         // kept for the same reason:
@@ -240,8 +243,18 @@ class SubscriptionManager extends Component
             // authority; the rule only takes from it the cases that never needed to reach it.
             'url' => ['required', 'url:http,https', 'max:2048'],
             // Bounded the way the portal form is: by the catalog's size, or without one by a
-            // fixed count and the length MySQL's index takes.
-            'eventTypes' => ['required', 'array', 'min:1', 'max:'.EventTypeList::maxCount($accepted, $stored)],
+            // fixed count and the length MySQL's index takes, and on MySQL by the bytes its
+            // index takes for all the types together.
+            'eventTypes' => [
+                'required',
+                'array',
+                'min:1',
+                'max:'.EventTypeList::maxCount($accepted, $stored),
+                EventTypeList::fitsTheMySqlIndex($maxBytes, (string) __(
+                    'webhooks::management.validation.event_types.bytes',
+                    ['max' => $maxBytes],
+                )),
+            ],
             // Constrained to the catalog when the host keeps one, and unconstrained when it
             // does not — the catalog ships empty. An operator registers a GLOBAL endpoint
             // here, so a typo costs every tenant's events for that type, not one tenant's.
@@ -326,7 +339,7 @@ class SubscriptionManager extends Component
      * evaluates it with the Alpine parser it bundles. Up to Livewire 4.4.4 that parser refuses
      * a keyword after the dot, so the button renders and does nothing: no error, no log, and an
      * operator who clicks it concludes the endpoint is gone. Livewire 4.4.5 is the first release
-     * whose parser accepts it. CspSafeMethodNameTest holds the whole class.
+     * whose parser accepts it.
      */
     public function destroy(int $id): void
     {

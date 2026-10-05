@@ -242,14 +242,11 @@ final class WebhooksServiceProvider extends ServiceProvider
      * at all, so a guard written inside them would never run on the one host that needs it. A
      * listener on MigrationsEnded hears every migration run, forked or not.
      *
-     * It writes a log line rather than console output, and the reason is worth stating because the
-     * console would obviously read better. Illuminate\Console\Events\CommandFinished carries an
-     * output handle and would have been the natural hook, but the framework deliberately does not
-     * dispatch it under tests (Kernel::__construct skips rerouteSymfonyCommandEvents when
-     * runningUnitTests), so the branch could never be proven by an arm. The Migrator's own output
-     * handle has no public getter. An unprovable guard is one that rots silently, which is the same
-     * failure class this check exists to find. The place a reader is told
-     * on screen is `webhooks:preflight`, which fails outright.
+     * It writes a log line rather than console output. Illuminate\Console\Events\CommandFinished
+     * carries an output handle, but the framework does not dispatch it while unit tests run
+     * (Kernel::__construct skips rerouteSymfonyCommandEvents when runningUnitTests), and the
+     * Migrator's own output handle has no public getter. The place a reader is told on screen is
+     * `webhooks:preflight`, which fails outright.
      *
      * It reports and never fails: the migration's exit code is untouched, so a deploy is
      * never broken by a diagnosis.

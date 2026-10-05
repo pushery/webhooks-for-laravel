@@ -32,8 +32,7 @@ use Illuminate\Database\Connection;
 final class CollationAudit
 {
     /**
-     * The tables this package owns. Held against the shipped migrations by a test rather than
-     * trusted — this is the one hand-written part left, so it is the one part that can rot.
+     * The tables this package owns: every table the shipped migrations create, and no other.
      *
      * @var list<string>
      */

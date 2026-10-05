@@ -164,9 +164,7 @@ final class PreflightCommand extends Command
         //
         // Both halves join the register below instead of getting an `if` of their own. The icon half
         // is a property of the installation rather than of the configuration, so on any one tree it
-        // is either always entered or never; a conditional no run can enter is a line nobody has
-        // ever executed, and it would sit here looking tested. A list spread into a list has no such
-        // line.
+        // is either always entered or never, and a list spread into a list needs no conditional.
         $warnings = [
             ...ShippedIcons::advisories(ShippedIcons::unresolved()),
             // Same register as the client-side advisories above, and for the same reason: a list

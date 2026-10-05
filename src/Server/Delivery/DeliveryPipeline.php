@@ -92,8 +92,7 @@ final readonly class DeliveryPipeline
             // normalizer answered every one of them NonRetryable, so a receiver that reset one
             // connection lost that webhook after a single attempt. It now claims that
             // classification only where the permanent event is positively identified, which is what
-            // puts these two back on this line. `TransportFramingShapeTest` drives both over a
-            // socket, one arm each way.
+            // puts these two back on this line.
             return AttemptOutcome::retryable(null, $exception);
         }
 

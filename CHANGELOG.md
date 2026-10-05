@@ -4,6 +4,24 @@ All notable changes to `pushery/webhooks-for-laravel` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and
 the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
+
+## [3.16.0] - 2026-10-05
+
+### ✨ Added
+
+- **Six more limits read from the environment.** `WEBHOOKS_PLATFORM_RETENTION_MONTHS`, `WEBHOOKS_PLATFORM_SECRET_ROTATION_WINDOW_HOURS`, `WEBHOOKS_SERVER_PERSISTENCE_PRUNE_AFTER_DAYS`, `WEBHOOKS_CLIENT_DELETE_AFTER_DAYS`, `WEBHOOKS_PLATFORM_DELIVERIES_WINDOW_DAYS` and `WEBHOOKS_DASHBOARD_DELIVERIES_WINDOW_DAYS` change a retention, the rotation window of a signing secret or a delivery window without publishing the config, which would freeze every other default in it. A typo keeps the shipped value; `0` revokes a rotated secret at once and switches a delivery window off, as the config already documented.
+- **`composer.json` links the security policy** under `support.security`, so the package page names where to report a vulnerability.
+
+### 🐛 Fixed
+
+- **On MySQL, an endpoint's event types are bounded by the bytes its index takes.** MySQL's multi-valued index over `event_types` refuses a row whose values run past about 5,344 bytes together, and both the self-service portal and the operator console ended such a save in a server error, also for a legitimate selection from a large catalog. On MySQL both forms now answer a selection of more than 5,000 bytes with a translated field error; an endpoint that already holds more keeps its types through an edit. PostgreSQL has no such bound, and there the forms apply none.
+- **A received call records its handler's outcome.** Every call taken in live stayed `received`, although `WebhookCallStatus` and the reference said the handler moves it on, so a query for unprocessed or failed calls answered wrongly and the partial index over received calls grew with the whole log. A call is now `processed` once its handler returns and `failed` once the queue gives up on it after the last attempt; a status the handler writes itself is kept. A handler with a constructor or a `failed()` of its own calls the parent's.
+- **`warnWhenEndpointsAreDisabled(false)` silences the breaker-only warning as well.** After `warnOnlyAboutEndpointsTheBreakerDisabled()` the switch was ignored and the warning still came. The later of the two calls now decides, and the count stays in the result's meta either way.
+- **`DeliveryEngineCheck` says one minute, one hour and one delivery in the singular.** Its messages read "more than 1 minutes" or "of the 1 deliveries in the last 1 hours" whenever a limit, the window or the count of deliveries was one.
+- **The AsyncAPI document in YAML stays in block style at any depth.** A catalog schema sits four levels down in the document, and one nested three objects deep reached the tenth level, where the YAML switched to inline flow style for the rest of it. The JSON document was not affected.
+- **The comment at the top of `resources/css/webhooks.css` explains the WireKit glob in words that hold for any package installed beside this one.**
+
 ## [3.15.0] - 2026-10-05
 
 ### Added
@@ -3376,7 +3394,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.15.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.16.0...HEAD
+[3.16.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.15.0...v3.16.0
 [3.15.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.14.0...v3.15.0
 [3.14.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.13.0...v3.14.0
 [3.13.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.12.0...v3.13.0
