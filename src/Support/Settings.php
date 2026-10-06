@@ -21,12 +21,9 @@ use Pushery\Webhooks\Server\Exceptions\UnknownSignatureScheme;
  * config values. Every accessor carries the same default as config/webhooks.php, so a nested key
  * can never be undefined here.
  *
- * That default is not about `mergeConfigFrom`, which this package does not use. The sentence here
- * used to say it was — "mergeConfigFrom only shallow-merges top-level keys" — and that stopped
- * being the mechanism when {@see MergesPackageConfig} replaced it with {@see ConfigMerge::tree()},
- * a recursive merge that leaves no nested key missing. A reader who checked the claim would find no
- * `mergeConfigFrom` call anywhere in the package and reasonably conclude the defaults below are
- * redundant.
+ * That default is not about `mergeConfigFrom`, which this package does not use:
+ * {@see MergesPackageConfig} merges through {@see ConfigMerge::tree()}, a recursive merge that
+ * leaves no nested key missing.
  *
  * They are not, and the reason is a different one: a host running a stale config cache is served
  * the array it cached, not a freshly merged tree. Nothing re-merges for them until they clear it.
@@ -424,8 +421,7 @@ final class Settings
         // 262144, matching config/webhooks.php — not 0. A host on a stale config cache is served
         // the array it cached rather than a freshly merged tree, so a cached `server` block with
         // large_payload.enabled = true but no threshold would otherwise fall to 0 here and offload
-        // EVERY payload to disk, not just the large ones. (The reason used to be given as
-        // mergeConfigFrom's shallow merge; this package merges recursively and does not call it.)
+        // EVERY payload to disk, not only the large ones.
         return Config::integer('webhooks.server.large_payload.threshold', 262144);
     }
 

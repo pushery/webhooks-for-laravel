@@ -885,11 +885,12 @@ final class WebhookConfig
         // refusal a rejected signature gets. Read here rather than from the built config,
         // because there is no built config to read it from — this is the one branch that
         // never reaches the constructor.
-        // `trim()`, and the difference is a whole failure mode. This test used to be `=== ''`
-        // while SecretSet -- built once per REQUEST -- rejects anything that is empty after
-        // trimming. A `secret => ' '` therefore passed here, passed the preflight, and threw on
-        // every delivery: 500, which tells the producer to try again, so it does, and the
-        // installation reads as a transport problem rather than as a typo in a config file.
+        //
+        // The emptiness question goes through `trim()`, because SecretSet, built once per
+        // request, rejects anything that is empty after trimming. A `secret => ' '` would
+        // otherwise pass here and pass the preflight, then throw on every delivery: 500, which
+        // tells the producer to try again, so it does, and the installation reads as a transport
+        // problem rather than as a typo in a config file.
         //
         // The VALUE is not trimmed, only the emptiness question. A secret with meaningful
         // surrounding whitespace is unlikely, and silently rewriting somebody's credential is a

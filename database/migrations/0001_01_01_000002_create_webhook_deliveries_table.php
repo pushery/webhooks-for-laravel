@@ -115,16 +115,11 @@ return new class extends Migration
         // Cover the previous month through partition_months_ahead months ahead, so inserts
         // always land in a real partition; the maintenance command keeps the window rolling.
         //
-        // The count is derived rather than written out, and it used to be a literal 4 under a
-        // comment promising three months ahead. ensureWindow($from, $months) creates exactly
-        // $months consecutive months starting at $from, so from the previous month a 4 reaches +2
-        // and not +3 — one month less runway than both the comment and the setting said. The
-        // maintenance command next to it did the arithmetic correctly (`$monthsAhead + 1` from the
-        // current month), so a fresh install and steady state disagreed about the same configured
-        // value.
-        //
-        // Reading the setting is what keeps them from disagreeing again: +2 is prev and current
-        // on top of the months ahead, and it moves with the config instead of beside it.
+        // The count is derived from the setting rather than written out. ensureWindow($from,
+        // $months) creates exactly $months consecutive months starting at $from, so from the
+        // previous month it takes the months ahead plus two (the previous and the current month)
+        // to reach the window the maintenance command keeps (`$monthsAhead + 1` from the current
+        // month). A fresh install and steady state then agree about the same setting.
         //
         // The partition key is a timestamptz, so the months are UTC months — anchoring them to a
         // local calendar would shift every bound by the local offset and, since that offset

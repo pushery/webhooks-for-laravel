@@ -128,10 +128,10 @@ class DeliveryLog extends Component
      * `0` opens the log unbounded, for a host that wants the old behavior back.
      *
      * A range the host passed in wins, and that is the whole reason for the first condition
-     * below. This used to set the bound unconditionally, so a link carrying a date range lost
-     * it on arrival: the reader opened on the last thirty days and never saw what somebody
-     * had sent them, with nothing to suggest a range had been discarded. A default is what
-     * happens when nobody said otherwise, and somebody said otherwise here.
+     * below. Setting the bound unconditionally would make a link carrying a date range lose it
+     * on arrival: the reader would open on the last thirty days and never see what somebody had
+     * sent them, with nothing to suggest a range had been discarded. A default is what happens
+     * when nobody said otherwise, and somebody said otherwise here.
      */
     public function mount(): void
     {

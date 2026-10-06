@@ -657,12 +657,12 @@ final class PartitionManager
      * column may not be written explicitly, so it is left out of the drain's INSERT.
      *
      * Resolved through to_regclass, the same way tableExists() resolves the table, and that
-     * symmetry is the point. This used to filter `information_schema.columns` on `table_schema =
-     * current_schema()`, which is the first schema of the search_path, while to_regclass searches
-     * the whole path. On a host whose tables sit in a schema that is not leading, the existence
-     * check found the table and this returned nothing, and the empty list went straight into
-     * `INSERT INTO webhook_deliveries () SELECT FROM …`: a syntax error pointing at an empty column
-     * list instead of at the schema resolution behind it.
+     * symmetry is the point. A filter on `information_schema.columns` with `table_schema =
+     * current_schema()` would read only the first schema of the search_path, while to_regclass
+     * searches the whole path. On a host whose tables sit in a schema that is not leading, the
+     * existence check would find the table and the column list would come back empty, and the
+     * drain would send `INSERT INTO webhook_deliveries () SELECT FROM …`: a syntax error pointing
+     * at an empty column list instead of at the schema resolution behind it.
      *
      * Reading pg_attribute off the same OID makes the two questions physically the same object, so
      * they cannot answer about different tables however the search_path is ordered.

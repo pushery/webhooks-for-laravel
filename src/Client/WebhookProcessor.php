@@ -597,12 +597,10 @@ final readonly class WebhookProcessor
      * Count one request against the source's window, for a delivery that was not a repeat of
      * one already taken.
      *
-     * Separated from the check above, and that separation is the fix. The two used to be one
-     * call placed before the dedupe, so a REPLAY counted: a captured authentic delivery verifies
-     * correctly, and replaying it enough times used up the source's allowance and left the real
-     * producer answering 429 until the window rolled. The comment above the old call said
-     * the ordering meant "a forged request can never exhaust a real producer's bucket", which was
-     * true and was not the whole set — a replay is not forged.
+     * Separate from the check above and placed after the dedupe, so a replay does not count: a
+     * captured authentic delivery verifies correctly, and counting every replay of it would use
+     * up the source's allowance and leave the real producer answering 429 until the window
+     * rolls. A forged request cannot exhaust the bucket either, but a replay is not forged.
      *
      * The window is per SOURCE rather than per sender, so there is no address to charge instead;
      * what has to change is which requests count. A delivery the fast path or the authoritative
