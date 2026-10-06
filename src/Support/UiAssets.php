@@ -11,14 +11,12 @@ use Pushery\Webhooks\Support\Http\UiScriptController;
  * The package's own front-end asset: one small JavaScript file, served from the application's
  * own origin by a route this package registers.
  *
- * A file from 'self' rather than an inline script, and the difference is the whole point. The two
- * Alpine factories these screens mount used to be registered by an inline <script> inside each
- * view's @assets block, with an optional CSP nonce. On a host running a strict, nonce-less policy —
- * `script-src 'self'`, which an application is entitled to choose and which the package must not
- * ask it to loosen — the browser refuses to run it. Nothing throws, nothing reaches a server log,
- * and a CSP audit reads the expression as perfectly valid: the panel is simply dead. That was the
- * third distinct cause of the same dead surface, which is why the answer chosen here is the one
- * with no policy dependency left, instead of another correction inside the inline path.
+ * A file from 'self' rather than an inline script, and the difference is the whole point. On a
+ * host running a strict, nonce-less policy — `script-src 'self'`, which an application is
+ * entitled to choose and which the package must not ask it to loosen — the browser refuses to run
+ * an inline <script>. Nothing throws, nothing reaches a server log, and a CSP audit reads the
+ * expression as perfectly valid: the panel would be dead. A file from 'self' has no policy
+ * dependency left.
  *
  * It is served rather than published. A publishable asset would work only for a host that remembers
  * to run `vendor:publish` — and to run it again after every upgrade. The failure of forgetting is

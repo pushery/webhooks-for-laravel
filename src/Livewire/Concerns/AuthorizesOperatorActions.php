@@ -66,8 +66,8 @@ use Illuminate\Support\Facades\Gate;
  * argument it does not accept, which makes the action name harmless again.
  *
  * The consuming components are deliberately NOT final, so the override this docblock offers
- * is actually reachable. It used to be advertised on two final classes, which made the only
- * documented escape from the trap above impossible to take.
+ * is actually reachable: on a final class the only documented escape from the trap above could
+ * not be taken.
  *
  * The consuming component is a Livewire component, so $this->authorize() comes from its
  * base class.

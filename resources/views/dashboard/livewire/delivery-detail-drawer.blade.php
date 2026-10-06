@@ -19,14 +19,13 @@
      head and de-duplicates it by compile key, so this needs no layout hook and no publish
      step, and it travels with the view when a host publishes it.
 
-     It is a file from the app's own origin rather than an inline script, and that replaced an
-     earlier choice made here. The registration used to be inline, carrying an optional CSP nonce.
-     Under a strict nonce-less policy — `script-src 'self'`, which an application is entitled to
-     choose and which this package must not ask it to loosen — the browser refuses an inline script
-     outright. Nothing throws, nothing reaches a log, and a CSP audit reads the expression as valid:
-     the drawer's keyboard model is simply gone, on the one panel a keyboard or screen-reader user
-     cannot do without. Served as a file it runs under every policy, needs no nonce, and asks the
-     host for nothing. --}}
+     It is a file from the app's own origin rather than an inline script. Under a strict nonce-less
+     policy — `script-src 'self'`, which an application is entitled to choose and which this package
+     must not ask it to loosen — the browser refuses an inline script outright. Nothing throws,
+     nothing reaches a log, and a CSP audit reads the expression as valid: the drawer's keyboard
+     model would be gone, on the one panel a keyboard or screen-reader user cannot do
+     without. Served as a file it runs under every policy, needs no nonce, and asks the host for
+     nothing. --}}
 @assets
     <script src="{{ \Pushery\Webhooks\Support\UiAssets::url() }}" defer></script>
 @endassets

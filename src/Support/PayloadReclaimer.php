@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Support;
 
+use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use League\Flysystem\FileAttributes;
 
 /**
  * Deletes offloaded payload objects on a Storage disk that no log row still points at.
@@ -64,13 +67,7 @@ final class PayloadReclaimer
         $deleted = 0;
         $bytes = 0;
 
-        // allFiles() is typed as a bare array; keep only the string keys it actually yields so
-        // the path stays a string for the disk operations below.
-        //
-        // The filter removes nothing at run time, because the driver only ever yields strings. It
-        // stays because the guarantee it makes is a type guarantee, and the operations below are
-        // typed for a string.
-        foreach (array_filter($filesystem->allFiles(self::PREFIX), is_string(...)) as $path) {
+        foreach ($this->objects($filesystem) as [$path, $size]) {
             if (preg_match(self::OBJECT_KEY, $path) !== 1) {
                 $foreign++;
 
@@ -84,7 +81,7 @@ final class PayloadReclaimer
             }
 
             $orphaned++;
-            $bytes += $filesystem->size($path);
+            $bytes += $size ?? $filesystem->size($path);
 
             if (! $dryRun) {
                 $filesystem->delete($path);
@@ -93,6 +90,38 @@ final class PayloadReclaimer
         }
 
         return ['scanned' => $scanned, 'orphaned' => $orphaned, 'deleted' => $deleted, 'bytes' => $bytes, 'foreign' => $foreign];
+    }
+
+    /**
+     * Every file under the prefix, as its path and the size the listing reported, in the order the
+     * disk lists them.
+     *
+     * Walked as the driver yields it. allFiles() materializes the whole listing as attribute
+     * objects, sorts it by path and copies the paths into two more arrays, so its peak is several
+     * times the reference set, on exactly the installation this sweep exists for. Nothing here
+     * needs an order, because the set lookup is order-free. And the listing already carries each
+     * file's size, which size() would fetch again for every orphan, on S3 as a request of its own.
+     *
+     * A disk that is not backed by Flysystem has no driver to stream from, and is read through
+     * allFiles(), with no size from the listing.
+     *
+     * @return iterable<int, array{string, int|null}>
+     */
+    private function objects(Filesystem $filesystem): iterable
+    {
+        if (! $filesystem instanceof FilesystemAdapter) {
+            foreach ($filesystem->allFiles(self::PREFIX) as $path) {
+                yield [$path, null];
+            }
+
+            return;
+        }
+
+        foreach ($filesystem->getDriver()->listContents(self::PREFIX, true) as $item) {
+            if ($item instanceof FileAttributes) {
+                yield [$item->path(), $item->fileSize()];
+            }
+        }
     }
 
     /**

@@ -93,9 +93,7 @@ final class DashboardScope
         // of its own, and every test that asserts the empty state. A state the ability lets a
         // person into and the page cannot survive is a defect, not a configuration question.
         //
-        // Reported from a consumer against v2.6.0, where the standalone dashboard answered 500.
-        // Under v2.3.0 the same state simply rendered nothing; the untenanted scope is that
-        // behavior named rather than a new one.
+        // The untenanted scope answers that state with an empty dashboard.
         $identity = self::normalize(self::resolve());
 
         return $identity instanceof TenantIdentity

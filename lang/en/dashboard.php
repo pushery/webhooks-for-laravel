@@ -196,13 +196,13 @@ return [
         'retry_rate' => 'Retry rate',
         'deliveries_per_hour' => 'Deliveries per hour',
         'hour_summary' => [
-            // Four choice fragments rather than one sentence with four numbers in it. The key here
-            // used to be `':hour: :total total, :delivered delivered, …'`, and four of the seven
-            // locales froze the adjectives in the plural — so every hour bucket holding exactly one
-            // delivery announced "1 livrées", "1 entregados", "1 consegnate", "1 entregues". That
-            // is the common bucket, not an edge case: a thirty-day window renders up to 720
-            // of them and most are sparse. And these strings exist for one reader only, so the
-            // ungrammatical half is the whole of what that reader hears.
+            // Four choice fragments rather than one sentence with four numbers in it. In a single
+            // sentence such as `':hour: :total total, :delivered delivered, …'` four of the seven
+            // locales have to freeze their adjectives in one number, so an hour bucket holding
+            // exactly one delivery would announce "1 livrées", "1 entregados", "1 consegnate",
+            // "1 entregues". That is the common bucket, not an edge case: a thirty-day window
+            // renders up to 720 of them and most are sparse. And these strings exist for one
+            // reader only, so the ungrammatical half would be the whole of what that reader hears.
             //
             // A placeholder cannot fix it. Agreement is decided by the number, `trans_choice` takes
             // one count per string, and there are four. So the sentence is assembled from four

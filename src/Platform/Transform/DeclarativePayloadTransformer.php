@@ -86,15 +86,14 @@ final class DeclarativePayloadTransformer implements PayloadTransformer
      * Move each present old key to its new name, resolving every move against the original
      * payload rather than against the half-renamed one.
      *
-     * This used to write into the result as it went — `$result[$to] = $result[$from]` — and
-     * a rename that reads what an earlier rename just wrote is a different operation from the
-     * one anybody configured. `['a' => 'b', 'b' => 'c']` moved `a` into `b`, then found its own
-     * output there and moved it on to `c`: one key survived out of two, and the value that
-     * started in `b` was gone. The chain ate itself.
+     * Writing into the result as it goes (`$result[$to] = $result[$from]`) would let a rename
+     * read the value an earlier rename wrote, and that is a different operation from the one
+     * anybody configured: `['a' => 'b', 'b' => 'c']` would move `a` into `b`, then find its own
+     * output there and move it on to `c`, so one key would survive out of two and the value that
+     * started in `b` would be gone.
      *
      * Reading sources from the input and writing to a separate result makes the map order-free
-     * and makes a chain mean what it looks like. A swap (`['a' => 'b', 'b' => 'a']`) now works
-     * too, which it could not before.
+     * and makes a chain mean what it looks like. A swap (`['a' => 'b', 'b' => 'a']`) works too.
      *
      * A collision is refused rather than resolved: renaming onto a key the payload already has,
      * or two renames onto the same target, drops a value that the receiver has no way to know

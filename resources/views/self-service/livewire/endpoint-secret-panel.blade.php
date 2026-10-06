@@ -49,18 +49,17 @@
         <x-wirekit::card>
             <x-wirekit::card.body>
                 {{-- A plain region, NOT a live one, and that is the whole point of this line.
-                     It used to be `role="status" aria-live="polite"` around the entire card
-                     body -- and role="status" carries an implicit aria-atomic="true", so ANY
-                     change inside it re-announced the WHOLE region: the heading, the endpoint
-                     URL, the notice, the plaintext signing secret character by character, the
-                     previous secret and every button. Pressing Copy is such a change, because
-                     the button swaps its icon and its label. So was the ten-second expiry
-                     warning. In an open-plan office or on a speaker, that reads a production
-                     secret out loud without anyone asking for it.
+                     `role="status"` carries an implicit aria-atomic="true", so around the entire
+                     card body ANY change inside it would re-announce the WHOLE region: the
+                     heading, the endpoint URL, the notice, the plaintext signing secret character
+                     by character, the previous secret and every button. Pressing Copy is such a
+                     change, because the button swaps its icon and its label, and so is the
+                     ten-second expiry warning. In an open-plan office or on a speaker, that would
+                     read a production secret out loud without anyone asking for it.
 
-                     It also nested live regions two deep -- the countdown's hidden region below
-                     and the copy button's own `role="status"` -- which ARIA practice advises
-                     against on its own.
+                     A live region here would also nest live regions two deep -- the countdown's
+                     hidden region below and the copy button's own `role="status"` -- which ARIA
+                     practice advises against on its own.
 
                      The announcements live where they belong instead: the permanent hidden
                      region above says a secret was revealed, and the one below says the window

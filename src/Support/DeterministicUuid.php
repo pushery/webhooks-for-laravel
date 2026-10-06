@@ -16,15 +16,10 @@ namespace Pushery\Webhooks\Support;
  * the same ids and skips what it already wrote, rather than duplicating history. A random
  * UUID could not do that.
  *
- * The stated reason for hand-rolling it used to be false, and it is worth replacing rather
- * than deleting. It read: hand-rolled "so the package's `require` list stays as lean as it is
- * (illuminate, guzzle, opis)". Both halves fail on the first check. `ramsey/uuid ^4.7` is a hard
- * require of `laravel/framework`, so the library is already in every install of this package and
- * using it would add nothing to the tree. And `require` names no `illuminate/*` at all — that is
- * a deliberate decision of this package, so the parenthetical contradicted it while
- * omitting two of the five packages actually listed.
+ * It is not hand-rolled to keep the dependency tree small: `ramsey/uuid ^4.7` is a hard require
+ * of `laravel/framework`, so the library is already in every install of this package.
  *
- * The real reason it stays: using the library would mean declaring `ramsey/uuid` in `require`,
+ * The reason it stays: using the library would mean declaring `ramsey/uuid` in `require`,
  * because a package declares what it uses directly rather than borrowing a transitive. That is a
  * second constraint to carry across the next framework major, for one twenty-line function whose
  * output is fixed by RFC 4122 and cannot drift. The trade is worth making the other way because

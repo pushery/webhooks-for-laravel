@@ -8,11 +8,11 @@ namespace Pushery\Webhooks\Client;
  * How the bytes of an inbound delivery were read into {@see InboundMessage::$payload} —
  * or that nothing could read them.
  *
- * An empty payload used to say four things at once, and the one that matters was the one
- * nobody could see. A body no decoder understands arrives as `[]`, indistinguishable from a
- * body that genuinely carried nothing. The handler finds no fields, has nothing to do, marks
- * the call processed and answers 200 — and the producer, told the delivery succeeded, never
- * sends it again. Nothing throws and nothing is logged, so the loss is total and reads as
+ * An empty payload alone can mean four things, and the one that matters is the one nobody
+ * can see. A body no decoder understands arrives as `[]`, indistinguishable from a body that
+ * genuinely carried nothing. A handler that finds no fields has nothing to do, the call is
+ * marked processed and answered 200 — and the producer, told the delivery succeeded, never
+ * sends it again. Nothing throws and nothing is logged, so the loss would be total and read as
  * success from both ends.
  *
  * {@see self::Unreadable} is the case worth branching on. It is the only one where the

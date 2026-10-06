@@ -6,6 +6,16 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.16.1] - 2026-10-06
+
+### 🐛 Fixed
+
+- **`webhooks:prune-orphaned-payloads` walks the disk listing as it arrives.** It read the whole listing into memory and sorted it before deleting anything, then asked the disk again for every orphan's size, on S3 as a request of its own. On a disk with very many offloaded payloads, the installation the command is for, it could run out of memory before the first delete. The command reads that listing through Flysystem, so `composer.json` now declares `league/flysystem` (`^3.0`), which every Laravel 13 release already installs. The command reads that listing through Flysystem, so `composer.json` now declares `league/flysystem` (`^3.0`), which every Laravel 13 release already installs.
+
+### 📚 Documentation
+
+- **Comments in the shipped source say what the code does now.** Comments that retold how a line used to look, or which report changed it, state the rule they protect instead. No behavior changes.
+
 ## [3.16.0] - 2026-10-05
 
 ### ✨ Added
@@ -3394,7 +3404,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.16.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.16.1...HEAD
+[3.16.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.16.0...v3.16.1
 [3.16.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.15.0...v3.16.0
 [3.15.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.14.0...v3.15.0
 [3.14.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.13.0...v3.14.0

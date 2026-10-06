@@ -2,13 +2,11 @@
  * The Alpine components the package's own screens mount, served as a file from the application's
  * own origin.
  *
- * A file rather than an inline script. These factories used to be registered by an inline <script>
- * inside each view's @assets block, carrying an optional CSP nonce. Under a strict, nonce-less
- * policy — `script-src 'self'`, which an application is entitled to choose — the browser refuses to
- * run it. Nothing throws, nothing reaches a server log, and a CSP audit sees an expression that is
- * grammatically perfect: the surface is simply dead. That was the third distinct cause of the same
- * dead panel, so the fix is the one that has no policy dependency left. A file from 'self' runs
- * under every policy, with no nonce, no 'unsafe-inline', and nothing for the host to configure.
+ * A file rather than an inline script. Under a strict, nonce-less policy — `script-src 'self'`,
+ * which an application is entitled to choose — the browser refuses to run an inline <script>.
+ * Nothing throws, nothing reaches a server log, and a CSP audit sees an expression that is
+ * grammatically perfect: the surface would be dead. A file from 'self' runs under every
+ * policy, with no nonce, no 'unsafe-inline', and nothing for the host to configure.
  *
  * Registered factories rather than inline expressions. Under a policy without 'unsafe-eval' Alpine
  * runs its CSP evaluator, which parses attribute expressions against a small grammar instead of

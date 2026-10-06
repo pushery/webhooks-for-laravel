@@ -17,8 +17,8 @@ use Throwable;
  * The screens name WireKit aliases, never a set: `globe`, `inbox`, `plus`. Which glyph an alias
  * becomes is the host's choice, made once in `wirekit.icons.preset` — heroicons by default, or
  * lucide, phosphor, tabler, or several of them stacked. So "is blade-heroicons installed" is the
- * right question only on a host that kept the default. It used to be the only one asked, and a
- * phosphor installation with every icon rendering was told its icon pair was half installed.
+ * right question only on a host that kept the default: asked alone, it would tell a phosphor
+ * installation with every icon rendering that its icon pair was half installed.
  *
  * The question asked here is the one a page answers when it renders: resolve each alias through
  * the host's own WireKit configuration, then ask Blade Icons whether it can draw the result. That

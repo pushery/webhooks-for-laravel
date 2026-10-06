@@ -2,11 +2,9 @@
      not used: it paints a raw color palette (bg-white / text-gray-700 / dark: variants) that no
      token reaches, and its landmark carries a hardcoded English accessible name.
 
-     It used to be the only one, and what narrowed is the scope rather than the file. Every
-     paginating component now asks `UiVariant` which control to render, and on the WireKit
-     rendering the answer is WireKit's own pager — it grew a Livewire mode in 2.51, so keeping a
-     second copy here would be the package re-implementing what its dependency ships. That is the
-     thing a package exists to take OFF a consumer.
+     Every paginating component asks `UiVariant` which control to render, and on the WireKit
+     rendering the answer is WireKit's own pager. It has a Livewire mode since 2.51, so a second
+     copy here would be the package re-implementing what its dependency ships.
 
      What keeps this file is the other side of the same seam: WireKit is optional here
      (`require-dev` and `conflict`, never `require`), so the neutral screens have to render where
