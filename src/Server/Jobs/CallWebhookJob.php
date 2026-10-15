@@ -10,6 +10,7 @@ use Illuminate\Queue\Jobs\SyncJob;
 use Illuminate\Queue\QueueManager;
 use Illuminate\Queue\SqsQueue;
 use Illuminate\Queue\SyncQueue;
+use Illuminate\Support\Facades\Date;
 use Pushery\Webhooks\Core\Http\TransportResponse;
 use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 use Pushery\Webhooks\Server\Delivery\DeliveryGate;
@@ -24,6 +25,8 @@ use Pushery\Webhooks\Server\Events\WebhookAttemptStarting;
 use Pushery\Webhooks\Server\Events\WebhookAttemptSucceeded;
 use Pushery\Webhooks\Server\Exceptions\DeliveryRefused;
 use Pushery\Webhooks\Server\Exceptions\QueueCannotRetry;
+use Pushery\Webhooks\Server\Streams\StreamLedger;
+use Pushery\Webhooks\Server\Streams\Turn;
 use Throwable;
 
 /**
@@ -43,6 +46,13 @@ use Throwable;
  *
  * The message id is stable across attempts (re-signed at send time inside the
  * pipeline), so the receiver dedupes an at-least-once retry.
+ *
+ * A delivery with an ordering key goes out only when it is the oldest delivery of its stream
+ * that has not succeeded; until then its job comes back after a growing wait, which costs
+ * none of its tries. Anything but a success holds the stream at the delivery, so the ones
+ * behind it wait until it is resent or skipped through `Pushery\Webhooks\Server\DeliveryStreams`.
+ * A delivery with a time to keep trying retries until that time is up, however many tries
+ * that takes.
  */
 final class CallWebhookJob implements ShouldQueueAfterCommit
 {
@@ -70,6 +80,19 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
      */
     private const int SQS_MAX_DELAY_SECONDS = 900;
 
+    /**
+     * The longest a delivery waits before it looks again whether its turn in the stream has
+     * come, in seconds. The first wait is a second, and each one after it twice as long.
+     */
+    public const int LONGEST_TURN_WAIT = 60;
+
+    /**
+     * How long past a delivery's time to keep trying the queue still hands its job to a worker,
+     * in seconds. The last retry is scheduled for that moment itself, and a worker that picks it
+     * up a little late must still run it rather than fail the job unseen.
+     */
+    public const int DEADLINE_GRACE = 3600;
+
     public int $tries;
 
     public int $timeout;
@@ -95,6 +118,31 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
     public function handle(DeliveryPipeline $pipeline, DeliveryGate $gate): void
     {
         $attempt = $this->attempt();
+        $stream = $this->data->stream();
+
+        if ($stream !== null) {
+            $turn = app(StreamLedger::class)->turnOf($stream, $this->data->messageId);
+
+            if ($turn === Turn::Waiting) {
+                $this->waitForTurn();
+
+                return;
+            }
+
+            // A held delivery ended already and said so; it goes out again only after a resend,
+            // which lifts the hold before it queues the delivery.
+            if ($turn === Turn::Held) {
+                return;
+            }
+
+            if ($turn === Turn::Gone) {
+                $this->finalFailure($attempt, null, DeliveryRefused::because(
+                    'The delivery was taken out of its ordered stream before its turn came, so it was not sent.',
+                ));
+
+                return;
+            }
+        }
 
         // Re-check the destination the moment before it is sent, not only when it was
         // enqueued: an endpoint that has since been disabled (by the circuit breaker or
@@ -113,6 +161,8 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
         $outcome = $pipeline->attempt($this->data);
 
         if ($outcome->disposition === Disposition::Succeeded && $outcome->response instanceof TransportResponse) {
+            $this->leaveStream();
+
             event(new WebhookAttemptSucceeded($this->data, $attempt, $outcome->response));
 
             return;
@@ -121,6 +171,8 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
         event(new WebhookAttemptFailed($this->data, $attempt, $outcome->response, $outcome->exception));
 
         if ($outcome->disposition !== Disposition::Retryable) {
+            $this->holdStream();
+
             event(new WebhookAttemptsExhausted($this->data, $attempt, $outcome->response, $outcome->exception));
 
             return;
@@ -138,7 +190,10 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
         // hint exceeds a cap of zero, and each deferral re-dispatches the job with a delay of
         // the cap — zero — so the delivery fires retryAfterMaxDeferrals immediate requests at
         // the endpoint that asked for quiet, on top of its ordinary retry budget.
-        if ($hint !== null && $this->data->options->retryAfterCap > 0
+        //
+        // A delivery with a time to keep trying has no budget of tries to protect, so it never
+        // defers: its next attempt waits the cap like any other retry, within that time.
+        if ($hint !== null && $this->data->options->retryAfterCap > 0 && $this->data->retryUntil() === null
             && $hint > $this->data->options->retryAfterCap && $this->canDefer()) {
             $this->defer($attempt, $hint);
 
@@ -146,12 +201,14 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
         }
 
         if ($this->budgetRemaining($attempt) && $this->canRelease()) {
-            $delay = $this->data->backoff->delayAfterAttempt($attempt, $hint);
+            $delay = $this->withinDeadline($this->data->backoff->delayAfterAttempt($attempt, $hint));
             event(new WebhookAttemptRetrying($this->data, $attempt, $delay));
             $this->release($delay);
 
             return;
         }
+
+        $this->holdStream();
 
         // Either the budget is spent, or the queue cannot carry a retry at all. The second
         // case has to say so: without it, a retryable failure on the sync connection fired
@@ -172,11 +229,16 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
      * failing endpoint `tries` times back-to-back. The job's own retries go through
      * release() with the same strategy; this covers the path it does not control.
      *
+     * A delivery with a time to keep trying is retried by the worker past its tries, until
+     * that time is up, and the worker repeats the schedule's last delay for every retry the
+     * schedule does not name. So such a delivery always gets at least one delay, even with a
+     * single try, where the schedule would otherwise be empty and each retry immediate.
+     *
      * @return list<int>
      */
     public function backoff(): array
     {
-        return $this->data->backoff->schedule($this->tries);
+        return $this->data->backoff->schedule($this->data->retryUntil() === null ? $this->tries : max(2, $this->tries));
     }
 
     /**
@@ -186,7 +248,22 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
      */
     public function failed(?Throwable $exception): void
     {
+        $this->holdStream();
+
         event(new WebhookAttemptsExhausted($this->data, $this->attempt(), null, $exception));
+    }
+
+    /**
+     * The moment the queue stops handing this job to a worker, for a delivery with a time to
+     * keep trying: that time, plus {@see self::DEADLINE_GRACE}. Laravel reads it when the job is
+     * queued and, while it lies ahead, retries the job however often it has run, so the job's
+     * own count of tries plays no part. Null for a delivery that counts its tries.
+     */
+    public function retryUntil(): ?int
+    {
+        $deadline = $this->data->retryUntil();
+
+        return $deadline === null ? null : $deadline + self::DEADLINE_GRACE;
     }
 
     /**
@@ -210,11 +287,75 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
     /**
      * Whether the delivery may make another attempt. Attempts spent waiting out an
      * endpoint's own rate-limit window are not charged to the budget: the endpoint told
-     * us when to come back, and honoring that is not a failed try of ours.
+     * us when to come back, and honoring that is not a failed try of ours. A delivery with
+     * a time to keep trying has no budget of tries at all: it may until that time is up.
      */
     private function budgetRemaining(int $attempt): bool
     {
+        $deadline = $this->data->retryUntil();
+
+        if ($deadline !== null) {
+            return Date::now()->getTimestamp() < $deadline;
+        }
+
         return $attempt - $this->data->retryAfterDeferrals < $this->tries;
+    }
+
+    /**
+     * The delay before the next attempt, shortened so that the attempt still falls within the
+     * delivery's time to keep trying. The last attempt then lands on that moment, rather than
+     * the schedule stepping past it and giving the delivery up an interval early.
+     */
+    private function withinDeadline(int $delay): int
+    {
+        $deadline = $this->data->retryUntil();
+
+        if ($deadline === null) {
+            return $delay;
+        }
+
+        return max(1, min($delay, $deadline - Date::now()->getTimestamp()));
+    }
+
+    /**
+     * Come back once an older delivery of the stream may have succeeded: a fresh job, so the
+     * wait costs none of the delivery's tries, after a second, then twice as long each time, up
+     * to {@see self::LONGEST_TURN_WAIT}.
+     */
+    private function waitForTurn(): void
+    {
+        $delay = min(self::LONGEST_TURN_WAIT, 2 ** min($this->data->streamWaits(), 6));
+
+        $job = new self($this->data->waited($delay));
+        $job->onQueue($this->queue);
+        $job->onConnection($this->connection);
+        $job->delay($delay);
+
+        dispatch($job);
+    }
+
+    /**
+     * The delivery succeeded, so the next one of its stream may go out.
+     */
+    private function leaveStream(): void
+    {
+        $stream = $this->data->stream();
+
+        if ($stream !== null) {
+            app(StreamLedger::class)->leave($stream, $this->data->messageId);
+        }
+    }
+
+    /**
+     * The delivery ended without success, so it holds its stream until it is resent or skipped.
+     */
+    private function holdStream(): void
+    {
+        $stream = $this->data->stream();
+
+        if ($stream !== null) {
+            app(StreamLedger::class)->hold($stream, $this->data->messageId);
+        }
     }
 
     /**
@@ -262,13 +403,26 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
      */
     private function queueCanDelay(): bool
     {
-        $connection = app(QueueManager::class)->connection($this->connection);
+        return self::connectionCanHoldBack($this->connection, $this->queue);
+    }
 
-        if ($connection instanceof SyncQueue) {
+    /**
+     * Whether a job dispatched with a delay onto this queue connection and queue really waits
+     * that delay: not on the sync connection, and not on an SQS queue whose name ends in
+     * `.fifo`, for the reasons {@see self::queueCanDelay()} gives. An ordered delivery waits for
+     * its turn exactly this way, so it is refused on a connection where this is false.
+     *
+     * @internal
+     */
+    public static function connectionCanHoldBack(?string $connection, ?string $queue): bool
+    {
+        $resolved = app(QueueManager::class)->connection($connection);
+
+        if ($resolved instanceof SyncQueue) {
             return false;
         }
 
-        return ! $connection instanceof SqsQueue || ! str_ends_with($connection->getQueue($this->queue), '.fifo');
+        return ! $resolved instanceof SqsQueue || ! str_ends_with($resolved->getQueue($queue), '.fifo');
     }
 
     /**
@@ -307,6 +461,8 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
 
     private function finalFailure(int $attempt, ?TransportResponse $response, Throwable $exception): void
     {
+        $this->holdStream();
+
         event(new WebhookAttemptFailed($this->data, $attempt, $response, $exception));
         event(new WebhookAttemptsExhausted($this->data, $attempt, $response, $exception));
     }

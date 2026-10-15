@@ -7,6 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Pushery\Webhooks\Database\DatabaseRequirement;
 use Pushery\Webhooks\Database\Dialect\Dialect;
+use Pushery\Webhooks\Support\TableLookup;
 use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
@@ -48,7 +49,7 @@ return new class extends Migration
         // unsupported engine here rather than through a raw error further down.
         DatabaseRequirement::ensure($this->getConnection());
 
-        if (! Schema::connection($this->getConnection())->hasColumn('webhook_calls', 'exception')) {
+        if (! Schema::connection($this->getConnection())->hasColumn(TableLookup::qualified('webhook_calls', $this->getConnection()), 'exception')) {
             return;
         }
 
@@ -64,7 +65,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        if (Schema::connection($this->getConnection())->hasColumn('webhook_calls', 'exception')) {
+        if (Schema::connection($this->getConnection())->hasColumn(TableLookup::qualified('webhook_calls', $this->getConnection()), 'exception')) {
             return;
         }
 

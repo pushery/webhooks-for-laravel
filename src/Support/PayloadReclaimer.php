@@ -6,7 +6,6 @@ namespace Pushery\Webhooks\Support;
 
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Filesystem\FilesystemAdapter;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use League\Flysystem\FileAttributes;
 
@@ -134,7 +133,6 @@ final class PayloadReclaimer
      */
     private function referencedPaths(string $disk): array
     {
-        $schema = Schema::connection(WebhookConnection::name());
         $referenced = [];
 
         // Two shapes in this method and the loop above cannot change the outcome:
@@ -166,7 +164,7 @@ final class PayloadReclaimer
         // The package class is no better: the host configured its own because it wants its class,
         // and naming ours here is the bypass the model guard exists for. The rows are the answer,
         // whichever class a host reads them with.
-        if ($schema->hasTable('webhook_deliveries')) {
+        if (TableLookup::exists('webhook_deliveries', WebhookConnection::name())) {
             WebhookConnection::db()->table('webhook_deliveries')
                 ->where('payload_disk', $disk)
                 ->select(['id', 'payload_path'])
@@ -178,7 +176,7 @@ final class PayloadReclaimer
                 });
         }
 
-        if ($schema->hasTable('webhook_calls')) {
+        if (TableLookup::exists('webhook_calls', WebhookConnection::name())) {
             WebhookConnection::db()->table('webhook_calls')
                 ->where('payload_disk', $disk)
                 ->select(['id', 'payload_path'])

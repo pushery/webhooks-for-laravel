@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Pushery\Webhooks\Database\DatabaseRequirement;
 use Pushery\Webhooks\Database\Dialect\Dialect;
+use Pushery\Webhooks\Support\TableLookup;
 use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
@@ -47,7 +48,7 @@ return new class extends Migration
         $collation = $connection->getConfig('collation');
         $collation = is_string($collation) && $collation !== '' ? $collation : null;
 
-        if (! is_string($charset) || $charset === '' || ! $connection->getSchemaBuilder()->hasTable('webhook_deliveries')) {
+        if (! is_string($charset) || $charset === '' || ! TableLookup::exists('webhook_deliveries', $this->getConnection())) {
             return;
         }
 

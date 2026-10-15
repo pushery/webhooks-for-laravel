@@ -50,6 +50,9 @@ final class WebhookDeliveryCard extends Card
             'avgLatency' => $this->total(WebhookDeliveryRecorder::LATENCY, 'avg'),
             'maxLatency' => $this->total(WebhookDeliveryRecorder::LATENCY, 'max'),
             'events' => $events,
+            // Handed over rather than read as `$this->period` in the view, so the view renders the
+            // same outside a Livewire request.
+            'period' => $this->period,
         ]);
     }
 

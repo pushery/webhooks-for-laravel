@@ -35,9 +35,9 @@ final class ServerServiceProvider extends ServiceProvider
     use MergesPackageConfig;
 
     /**
-     * Whether the standalone delivery-log migration is registered automatically when
-     * persistence is enabled. Disable with self::ignoreMigrations() to publish and
-     * manage it in the host app instead.
+     * Whether the Server layer's migrations are registered automatically when persistence or
+     * ordered delivery is enabled. Disable with self::ignoreMigrations() to publish and
+     * manage them in the host app instead.
      */
     public static bool $runsMigrations = true;
 
@@ -109,17 +109,20 @@ final class ServerServiceProvider extends ServiceProvider
             Event::listen(WebhookAttemptsExhausted::class, [RecordDeliverySpan::class, 'onFinalFailure']);
         }
 
+        // The layer's tables come from one migration directory: the standalone delivery log and
+        // the streams of ordered delivery. It is registered when either of the two is on, so an
+        // app that uses neither gains no table.
+        if (self::$runsMigrations && ($this->persistsDeliveries() || $this->ordersDeliveries())) {
+            $this->loadMigrationsFrom(__DIR__.'/../../database/migrations/server');
+        }
+
         // Standalone delivery persistence is off by default: the Platform layer owns
         // the delivery log when it runs, so this only comes on for a send-without-
         // Platform consumer. When on, the subscriber upserts every delivery event
-        // into webhook_server_deliveries, its migration is registered, and pruning is
-        // scheduled. While off, none of it loads and today's behavior is unchanged.
+        // into webhook_server_deliveries and pruning is scheduled. While off, none of
+        // it loads and today's behavior is unchanged.
         if ($this->persistsDeliveries()) {
             Event::subscribe(PersistServerDelivery::class);
-
-            if (self::$runsMigrations) {
-                $this->loadMigrationsFrom(__DIR__.'/../../database/migrations/server');
-            }
 
             // schedule-gate-ok: a host that runs this layer's migrations itself still needs the record pruned.
             $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
@@ -152,5 +155,14 @@ final class ServerServiceProvider extends ServiceProvider
     public function persistsDeliveries(): bool
     {
         return Config::boolean('webhooks.server.persistence.enabled', false);
+    }
+
+    /**
+     * Whether ordered delivery may run: its streams live in a table of this layer, which is
+     * migrated only while this is on. Exposed so the conditional itself is directly testable.
+     */
+    public function ordersDeliveries(): bool
+    {
+        return Config::boolean('webhooks.server.ordering.enabled', false);
     }
 }

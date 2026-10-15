@@ -23,6 +23,7 @@ use Pushery\Webhooks\Core\Payload\PayloadSanitizer;
 use Pushery\Webhooks\Database\Dialect\Dialect;
 use Pushery\Webhooks\Database\Dialect\Sql\ImportInsert;
 use Pushery\Webhooks\Support\DeterministicUuid;
+use Pushery\Webhooks\Support\TableLookup;
 use Pushery\Webhooks\Support\Timestamp;
 use Pushery\Webhooks\Support\WebhookConnection;
 use stdClass;
@@ -146,7 +147,7 @@ final class ImportCallsCommand extends Command
             return self::FAILURE;
         }
 
-        if (! Schema::connection($fromConnection)->hasTable($fromTable)) {
+        if (! TableLookup::exists($fromTable, $fromConnection)) {
             $this->error(sprintf('Source table "%s" was not found on connection "%s".', $fromTable, $fromConnection ?? 'default'));
 
             return self::FAILURE;

@@ -6,7 +6,9 @@ namespace Pushery\Webhooks\Server;
 
 use Closure;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use JsonException;
 use Pushery\Webhooks\Core\Signing\JsonCanonicalizer;
 use Pushery\Webhooks\Core\Signing\SecretSet;
@@ -17,8 +19,10 @@ use Pushery\Webhooks\Server\Backoff\ExponentialWithJitter;
 use Pushery\Webhooks\Server\Data\DeliveryOptions;
 use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 use Pushery\Webhooks\Server\Events\WebhookDeliveryDispatching;
+use Pushery\Webhooks\Server\Exceptions\OrderedDeliveryUnavailable;
 use Pushery\Webhooks\Server\Jobs\CallWebhookJob;
 use Pushery\Webhooks\Server\Signing\EncryptedSecretResolver;
+use Pushery\Webhooks\Server\Streams\StreamLedger;
 use Pushery\Webhooks\Support\Settings;
 
 /**
@@ -89,6 +93,10 @@ final class PendingWebhook
     private int $retryAfterMaxDeferrals = 6;
 
     private int $tries = 3;
+
+    private ?int $retryForSeconds = null;
+
+    private ?string $orderingKey = null;
 
     private ?BackoffStrategy $backoff = null;
 
@@ -319,6 +327,37 @@ final class PendingWebhook
         return tap(clone $this, fn (self $call): mixed => $call->tries = max(1, $tries));
     }
 
+    /**
+     * Keep retrying for this many seconds instead of a number of tries: with the same backoff,
+     * until the time is up, and the last attempt on that moment. Then the delivery is exhausted
+     * like any other, and `DeliveryStreams::resend()` gives it the whole time again. The time
+     * starts when the delivery is due: after its delay, and for an ordered delivery once its
+     * turn has come. At least one second; null counts tries again.
+     */
+    public function retryForSeconds(?int $seconds): self
+    {
+        return tap(clone $this, fn (self $call): ?int => $call->retryForSeconds = $seconds === null ? null : max(1, $seconds));
+    }
+
+    /**
+     * Send this delivery in order with every other delivery to the same URL under the same key:
+     * one at a time, in the order they were dispatched, each only after the one before it
+     * succeeded. A delivery that ends without success holds the stream until it is resent or
+     * skipped through {@see DeliveryStreams}. Deliveries under other keys are not held up.
+     *
+     * Needs `webhooks.server.ordering.enabled` and a queue connection that can hold a job back;
+     * dispatching without either throws {@see OrderedDeliveryUnavailable}. Null sends the
+     * delivery on its own again.
+     */
+    public function orderedBy(?string $key): self
+    {
+        if ($key !== null && trim($key) === '') {
+            throw new InvalidArgumentException('An ordering key names the stream a delivery goes out in, so it cannot be empty. Pass null for a delivery that goes out on its own.');
+        }
+
+        return tap(clone $this, fn (self $call): ?string => $call->orderingKey = $key);
+    }
+
     public function useBackoffStrategy(BackoffStrategy $backoff): self
     {
         return tap(clone $this, fn (self $call): BackoffStrategy => $call->backoff = $backoff);
@@ -379,12 +418,18 @@ final class PendingWebhook
     }
 
     /**
-     * Send the delivery on the current process and return the dispatched delivery data.
+     * Send the delivery on the current process and return the dispatched delivery data. An
+     * ordered delivery cannot be sent this way, because it waits for its turn in the queue.
      *
      * @throws JsonException
+     * @throws OrderedDeliveryUnavailable
      */
     public function dispatchSync(): WebhookDeliveryData
     {
+        if ($this->orderingKey !== null) {
+            throw OrderedDeliveryUnavailable::dispatchedSync();
+        }
+
         return $this->dispatchUsing(dispatch_sync(...));
     }
 
@@ -456,6 +501,11 @@ final class PendingWebhook
             meta: $this->meta,
             tags: $this->tags,
             headers: $this->headers,
+            orderingKey: $this->orderingKey,
+            retryForSeconds: $this->retryForSeconds,
+            retryUntil: $this->retryForSeconds === null
+                ? null
+                : Date::now()->getTimestamp() + $this->delaySeconds + $this->retryForSeconds,
         );
     }
 
@@ -467,6 +517,11 @@ final class PendingWebhook
     private function dispatchUsing(Closure $dispatcher): WebhookDeliveryData
     {
         $data = $this->toDeliveryData();
+        $stream = $data->stream();
+
+        if ($stream !== null) {
+            StreamLedger::assertCanOrder($this->connection, $this->queue);
+        }
 
         event(new WebhookDeliveryDispatching($data));
 
@@ -478,7 +533,13 @@ final class PendingWebhook
             $job->delay($this->delaySeconds);
         }
 
-        $dispatcher($job);
+        if ($stream === null) {
+            $dispatcher($job);
+        } else {
+            StreamLedger::queueInStream($stream, $data->messageId, static function () use ($job, $dispatcher): void {
+                $dispatcher($job);
+            });
+        }
 
         // Return the exact data that was dispatched — its messageId (stable across attempts) is
         // what a Server-only caller correlates against its own log and any later status callback.

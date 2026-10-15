@@ -29,6 +29,10 @@ final readonly class GitHubScheme implements AcceptsSignatureHeaders, SignatureS
         return new self($signatureHeader ?? $this->signatureHeader);
     }
 
+    /**
+     * Signs with the current secret alone: the header has room for one signature, so during a
+     * rotation the previous secret only verifies.
+     */
     public function sign(WebhookMessage $message, SecretSet $secrets): SignatureHeaders
     {
         return SignatureHeaders::from([

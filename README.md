@@ -60,8 +60,9 @@ Everything ships under the `Pushery\Webhooks\` namespace.
 ## What you get
 
 - **Sending** — an immutable, fluent `PendingWebhook` builder: signed and queued,
-  exponential backoff with full jitter, `Retry-After` honored off the retry budget,
-  per-call timeouts, mutual TLS, secret rotation and Horizon tags.
+  exponential backoff with full jitter, `Retry-After` honored off the retry budget, a time
+  to keep trying instead of a number of tries, ordered delivery per key, per-call
+  timeouts, mutual TLS, secret rotation and Horizon tags.
 - **Receiving** — verify, throttle, de-duplicate, store and dispatch, with the exact
   received bytes preserved. Adapters ship for Standard Webhooks, Stripe, GitHub and
   plain HMAC, plus a seam for providers that authenticate without a signature at all.

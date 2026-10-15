@@ -1,7 +1,13 @@
 {{-- The card keeps Pulse's own structure and components; only the strings this
-     package contributes are translated. The period is formatted by Pulse itself. --}}
-<x-pulse::card :cols="$cols" :rows="$rows" :class="$class" wire:poll.5s="">
-    <x-pulse::card-header
+     package contributes are translated. The period is formatted by Pulse itself.
+
+     Each Pulse component is called through <x-dynamic-component>. Blade resolves a
+     component tag while it compiles, and `view:cache` compiles every view of this
+     package, so a `pulse::` tag stopped it on an application without Pulse. A dynamic
+     component is resolved when it renders, and this card renders only where Pulse
+     runs. --}}
+<x-dynamic-component component="pulse::card" :cols="$cols" :rows="$rows" :class="$class" wire:poll.5s="">
+    <x-dynamic-component component="pulse::card-header"
         :name="__('webhooks::pulse.card.name')"
         :title="__('webhooks::pulse.card.timing', ['duration' => \Pushery\Webhooks\Support\LocalizedNumber::format($time, 2).'ms', 'at' => $runAt])"
         {{-- Keyed on the raw period token rather than on `periodForHumans()`. That helper returns
@@ -11,14 +17,14 @@
 
              `in_array` instead of a lookup with a fallback string: an unknown token must not
              render a translation key at people, and Pulse's own default for one is `hour`. --}}
-        :details="__('webhooks::pulse.card.details.'.(in_array($this->period, ['6_hours', '24_hours', '7_days'], true) ? $this->period : 'hour'))"
+        :details="__('webhooks::pulse.card.details.'.(in_array($period, ['6_hours', '24_hours', '7_days'], true) ? $period : 'hour'))"
     >
         <x-slot:icon>
-            <x-pulse::icons.cloud-arrow-up />
+            <x-dynamic-component component="pulse::icons.cloud-arrow-up" />
         </x-slot:icon>
-    </x-pulse::card-header>
+    </x-dynamic-component>
 
-    <x-pulse::scroll :expand="$expand">
+    <x-dynamic-component component="pulse::scroll" :expand="$expand">
         <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 mb-3">
             <div>
                 <div class="text-xs text-gray-500 dark:text-gray-400 uppercase">{{ __('webhooks::pulse.metrics.throughput') }}</div>
@@ -54,36 +60,36 @@
         </div>
 
         @if ($events->isEmpty())
-            <x-pulse::no-results />
+            <x-dynamic-component component="pulse::no-results" />
         @else
-            <x-pulse::table>
+            <x-dynamic-component component="pulse::table">
                 <colgroup>
                     <col width="100%" />
                     <col width="0%" />
                     <col width="0%" />
                     <col width="0%" />
                 </colgroup>
-                <x-pulse::thead>
+                <x-dynamic-component component="pulse::thead">
                     <tr>
-                        <x-pulse::th>{{ __('webhooks::pulse.table.event') }}</x-pulse::th>
-                        <x-pulse::th class="text-right">{{ __('webhooks::pulse.table.count') }}</x-pulse::th>
-                        <x-pulse::th class="text-right">{{ __('webhooks::pulse.table.failures') }}</x-pulse::th>
-                        <x-pulse::th class="text-right">{{ __('webhooks::pulse.table.avg_max') }}</x-pulse::th>
+                        <x-dynamic-component component="pulse::th">{{ __('webhooks::pulse.table.event') }}</x-dynamic-component>
+                        <x-dynamic-component component="pulse::th" class="text-right">{{ __('webhooks::pulse.table.count') }}</x-dynamic-component>
+                        <x-dynamic-component component="pulse::th" class="text-right">{{ __('webhooks::pulse.table.failures') }}</x-dynamic-component>
+                        <x-dynamic-component component="pulse::th" class="text-right">{{ __('webhooks::pulse.table.avg_max') }}</x-dynamic-component>
                     </tr>
-                </x-pulse::thead>
+                </x-dynamic-component>
                 <tbody>
                     @foreach ($events->take(100) as $event)
                         <tr wire:key="{{ $event->event }}-spacer" class="h-2 first:h-0"></tr>
                         <tr wire:key="{{ $event->event }}-row">
-                            <x-pulse::td class="max-w-[1px]">
+                            <x-dynamic-component component="pulse::td" class="max-w-[1px]">
                                 <code class="block text-xs text-gray-900 dark:text-gray-100 truncate" title="{{ $event->event }}">
                                     {{ $event->event }}
                                 </code>
-                            </x-pulse::td>
-                            <x-pulse::td numeric class="text-gray-700 dark:text-gray-300 font-bold">
+                            </x-dynamic-component>
+                            <x-dynamic-component component="pulse::td" numeric class="text-gray-700 dark:text-gray-300 font-bold">
                                 {{ \Pushery\Webhooks\Support\LocalizedNumber::format($event->total) }}
-                            </x-pulse::td>
-                            <x-pulse::td numeric class="text-gray-700 dark:text-gray-300">
+                            </x-dynamic-component>
+                            <x-dynamic-component component="pulse::td" numeric class="text-gray-700 dark:text-gray-300">
                                 @if ($event->failed > 0)
                                     {{-- font-bold as well as the color, because at 14px on the
                                          cell's own background no red Pulse ships clears 4.5:1 —
@@ -98,18 +104,18 @@
                                 @else
                                     0
                                 @endif
-                            </x-pulse::td>
-                            <x-pulse::td numeric class="text-gray-700 dark:text-gray-300">
+                            </x-dynamic-component>
+                            <x-dynamic-component component="pulse::td" numeric class="text-gray-700 dark:text-gray-300">
                                 @if ($event->avg === null)
                                     <strong>&mdash;</strong>
                                 @else
                                     <strong>{{ \Pushery\Webhooks\Support\LocalizedNumber::format($event->avg) ?: '<1' }}</strong> / {{ \Pushery\Webhooks\Support\LocalizedNumber::format($event->max) }} ms
                                 @endif
-                            </x-pulse::td>
+                            </x-dynamic-component>
                         </tr>
                     @endforeach
                 </tbody>
-            </x-pulse::table>
+            </x-dynamic-component>
         @endif
-    </x-pulse::scroll>
-</x-pulse::card>
+    </x-dynamic-component>
+</x-dynamic-component>

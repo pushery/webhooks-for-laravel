@@ -82,8 +82,9 @@ return new class extends Migration
         // sequential scan of the whole table on every run.
         DB::statement('CREATE INDEX webhook_calls_created_idx ON webhook_calls (created_at)');
 
-        // GIN over jsonb_path_ops accelerates containment queries into the payload.
-        DB::statement('CREATE INDEX webhook_calls_payload_gin ON webhook_calls USING gin (payload jsonb_path_ops)');
+        // No GIN index over the payload: no query of this package searches inside it, and every
+        // received call would write its entries. A host that searches by containment builds one in a
+        // migration of its own.
     }
 
     private function createMySql(): void
@@ -91,10 +92,9 @@ return new class extends Migration
         // Case-sensitive collation on the identity/dedupe columns so MySQL's case-insensitive
         // default cannot collapse a distinct (source, webhook_id) — or a distinct hash — onto an
         // existing row. raw_body is LONGTEXT, because a base64 body far exceeds TEXT's 64 KB.
-        // There is no partial-index or GIN equivalent on MySQL: the
-        // dedupe key is a plain UNIQUE (NULL is DISTINCT in a unique index on both engines, so a
-        // null webhook_id never blocks an insert — exactly the partial predicate's effect), the
-        // worklist index leads with status, and payload containment search is served by Scout.
+        // There is no partial-index equivalent on MySQL: the dedupe key is a plain UNIQUE (NULL is
+        // DISTINCT in a unique index on both engines, so a null webhook_id never blocks an insert —
+        // exactly the partial predicate's effect), and the worklist index leads with status.
         $cs = 'utf8mb4_0900_as_cs';
 
         Schema::create('webhook_calls', function (Blueprint $table) use ($cs): void {

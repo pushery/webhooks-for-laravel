@@ -52,9 +52,10 @@ final readonly class SecretSet
     }
 
     /**
-     * The current secret token. A single-signature dialect (Stripe/GitHub
-     * style) signs an outgoing message with this one; a rotation window still emits
-     * a single header, so the previous secret is a verify-only concern.
+     * The current secret token. A dialect whose header has room for one signature signs an
+     * outgoing message with this one alone. A dialect that carries a signature per secret signs
+     * with every secret in all(), so during a rotation window the previous secret signs too.
+     * Each dialect's sign() says which of the two it is.
      */
     public function current(): string
     {
