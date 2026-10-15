@@ -6,6 +6,34 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.17.0] - 2026-10-15
+
+### ⚠️ Breaking
+
+- **Since 3.16.0, a handler that overrides `failed()` declares `failed(?Throwable $exception)`.** 3.16.0 gave `ProcessWebhookJob` a `failed()` of its own, with a nullable exception, because Laravel calls `failed(null)` when a handler fails its job without one. A subclass that kept `failed(Throwable $exception)` stopped loading with that release, since PHP refuses a parameter narrower than its parent's, and the 3.16.0 notes did not say so. This release keeps the signature. Declare the parameter nullable; calling `parent::failed($exception)` is no longer needed for the call to be recorded as failed (see Fixed below).
+
+### ✨ Added
+
+- **Ordered delivery per key.** `PendingWebhook::orderedBy($key)` sends the deliveries to one URL under one key one at a time, in the order they were dispatched, each after the one before it succeeded; deliveries under other keys are not held up. A delivery that ends without success holds its stream until `DeliveryStreams::resend()` sends it again from its place or `DeliveryStreams::skip()` lets the stream move on. Turn on `server.ordering.enabled` first: the Server layer then migrates a `webhook_delivery_streams` table, which holds only the deliveries that have not succeeded yet. An ordered delivery needs a queue connection that can hold a job back, so it is refused at dispatch with `OrderedDeliveryUnavailable` on `sync`, on an SQS FIFO queue and through `dispatchSync()`. If you publish the server migrations rather than load them, copy `0001_01_01_000006_create_webhook_delivery_streams_table.php` from the package's `database/migrations/server/`.
+- **A time to keep trying instead of a number of tries.** `PendingWebhook::retryForSeconds($seconds)` retries on the same backoff until the time is up, with the last attempt on that moment, and then reports the delivery exhausted. The time starts when the delivery is due, and `DeliveryStreams::resend()` gives an exhausted delivery the whole time again.
+- **`PlainHmacScheme` reads a Base64 digest, for Shopify and WooCommerce.** Both sign the raw body with HMAC-SHA256 as SendCloud does and send the digest as Base64, which the scheme compared as hex only, so each needed a scheme class of its own. Set `signature_encoding` to `base64` on the source, beside its `signature_headers.signature`, and the scheme reads and writes the digest that way; hex stays the default. The value is read in any case, an unknown one is refused when the config loads, and so is an encoding for any other scheme, whose format its dialect fixes. A host that builds the scheme itself passes `Pushery\Webhooks\Core\Signing\SignatureEncoding::Base64` or calls `withSignatureEncoding()`.
+
+### ⚡ Performance
+
+- **A received call no longer writes a GIN index that nothing reads.** On PostgreSQL the client's create-table migration built `webhook_calls_payload_gin`, a GIN index over the payload for containment queries, and no query in this package runs one: a stored call is found by its source and producer id, or by its status. Every received call still wrote its entries into the index, for a payload that can run to many kilobytes. A fresh install no longer builds it, and a new migration drops it from an existing one, in the schema a query finds `webhook_calls` in. If you search inside stored payloads by containment, keep the index with a migration of your own: `CREATE INDEX webhook_calls_payload_gin ON webhook_calls USING gin (payload jsonb_path_ops)`. If you publish the client migrations rather than load them, copy `0001_01_01_000005_drop_the_payload_gin_index_from_webhook_calls.php` from the package's `database/migrations/client/`.
+
+### 🐛 Fixed
+
+- **The outbound rate limit keeps a schedule per owner.** Since 3.13.0 the dispatch schedule of a subscription lives in the limiter store under a key that named the subscription's id alone. A host with a database per tenant has a subscription number 1 in every tenant, so all of them shared one schedule: `max_per_minute` held for all of them together, and one tenant's traffic deferred the deliveries of the others. The key now carries the subscription's owner as well, `global` for a subscription without one. A host that already gives `cache.limiter` a store per tenant keeps it, and nothing changes there.
+- **On PostgreSQL with a schema per tenant, the payload sweep and the event erasure keep what is still referenced.** With `search_path` set to `tenant, public` and the tables in `public`, Laravel's schema builder looks only in `current_schema()`, while every query walks the whole path. Asked that way, `webhooks:prune-orphaned-payloads` and `forgetEvents()` found neither the delivery log nor the call log, counted every payload object as unreferenced and deleted objects that rows still point at; `webhooks:import-calls` reported its source table missing, the owner key check read no table, and the migration that drops `webhook_calls.exception` did not see the column. They now look a table up the way a query finds it.
+- **`php artisan view:cache` and `optimize` run without Laravel Pulse.** Blade resolves a component tag while it compiles, and `view:cache` compiles every view of the package, so the Pulse card, built from Pulse's own components, stopped both commands on an application without Pulse. The card now calls those components through `<x-dynamic-component>`, which Blade resolves when the card renders, and it renders only where Pulse runs. A copy of the card published before this release keeps the tags it was published with.
+- **A handler with a `failed()` of its own leaves its call failed.** Since 3.16.0 the record of a failed call lived in `ProcessWebhookJob::failed()`, so a handler that overrode the method without calling `parent::failed()` left its call `received`. The queue's failure event records it now, whatever the handler's own `failed()` does. The base class declares `failed(?Throwable $exception)`, the signature Laravel documents, and PHP refuses a subclass that declares the parameter as `Throwable` without the question mark; such a handler declares `?Throwable`.
+- **`migrate --pretend` runs on PostgreSQL again.** The identity check read the server's banner with a select, which a pretended migration does not run, and refused every server as reporting no version at all. It leaves a pretended run alone now, so a tool that captures migrations through `Connection::pretend()` gets their SQL again; the real migration checks the server as before.
+
+### 📚 Documentation
+
+- **The signing dialects say which secrets they sign with.** The docblock of `SecretSet::current()` said a rotation window emits a single signature. The Stripe-style dialect, Standard Webhooks and Ed25519 sign with every secret in the set, one signature each, and GitHub's dialect and the plain HMAC sign with the current secret alone. Each dialect's `sign()` now says which it is; nothing about signing changes.
+
 ## [3.16.1] - 2026-10-06
 
 ### 🐛 Fixed
@@ -3404,7 +3432,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.16.1...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.17.0...HEAD
+[3.17.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.16.1...v3.17.0
 [3.16.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.16.0...v3.16.1
 [3.16.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.15.0...v3.16.0
 [3.15.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.14.0...v3.15.0

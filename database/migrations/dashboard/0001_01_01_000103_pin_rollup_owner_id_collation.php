@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Pushery\Webhooks\Database\DatabaseRequirement;
 use Pushery\Webhooks\Database\Dialect\Dialect;
 use Pushery\Webhooks\Database\OwnerKeyType;
+use Pushery\Webhooks\Support\TableLookup;
 use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
@@ -48,7 +49,7 @@ return new class extends Migration
 
         $connection = DB::connection($this->getConnection());
 
-        if (! $connection->getSchemaBuilder()->hasTable('webhook_delivery_hourly')) {
+        if (! TableLookup::exists('webhook_delivery_hourly', $this->getConnection())) {
             return;
         }
 

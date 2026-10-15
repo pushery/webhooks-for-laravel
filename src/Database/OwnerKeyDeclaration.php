@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Schema;
 use Pushery\Webhooks\Dashboard\Policies\WebhookDeliveryPolicy;
 use Pushery\Webhooks\Models\WebhookDelivery;
+use Pushery\Webhooks\Support\TableLookup;
 use Pushery\Webhooks\WebhookManager;
 use Throwable;
 
@@ -93,17 +94,18 @@ final class OwnerKeyDeclaration
         // It is kept because this line is what turns "unset or blank" into "the application
         // default", and saying so here is cheaper than making a reader derive it from two
         // coercions.
-        $schema = Schema::connection(is_string($name) && $name !== '' ? $name : null);
+        $connection = is_string($name) && $name !== '' ? $name : null;
+        $schema = Schema::connection($connection);
 
         $found = [];
 
         foreach (self::TABLES as $table) {
             try {
-                if (! $schema->hasTable($table)) {
+                if (! TableLookup::exists($table, $connection)) {
                     continue;
                 }
 
-                $column = self::ownerColumn($schema->getColumns($table));
+                $column = self::ownerColumn($schema->getColumns(TableLookup::qualified($table, $connection)));
             } catch (Throwable) {
                 // Reading a schema is not this check's job to guarantee. A connection that
                 // cannot answer is the caller's problem to report, not a contradiction.

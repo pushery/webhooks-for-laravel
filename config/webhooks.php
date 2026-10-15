@@ -250,6 +250,15 @@ return [
             'prune_after_days' => EnvLimit::ceiling(env('WEBHOOKS_SERVER_PERSISTENCE_PRUNE_AFTER_DAYS'), 30),
         ],
 
+        // Ordered delivery, for PendingWebhook::orderedBy(): deliveries to one URL under one key
+        // go out one at a time, each after the one before it succeeded. The streams live in the
+        // webhook_delivery_streams table, which holds only the deliveries that have not succeeded
+        // yet, and the Server layer migrates it while this is on. Off by default; dispatching an
+        // ordered delivery while it is off throws rather than sending out of order.
+        'ordering' => [
+            'enabled' => false,
+        ],
+
         // A payload larger than 'threshold' bytes is written to 'disk', and the delivery log keeps
         // a stub and a pointer instead. The queued job still carries the whole body it signs and
         // sends; the sending guide says what that means on SQS.
@@ -740,6 +749,10 @@ return [
             //         'timestamp' => 'webhook-timestamp',
             //         'signature' => 'webhook-signature',
             //     ],
+            //     // How PlainHmacScheme writes its digest: 'hex' (the default) or 'base64',
+            //     // which Shopify and WooCommerce send. No other scheme reads it, and an entry
+            //     // that names it for one is refused when the config loads.
+            //     'signature_encoding' => 'hex',
             //     'tolerance_seconds' => 300,
             //     'invalid_status' => 401,
             //     // Reached by a 'verifier' whose provider callback did not answer,

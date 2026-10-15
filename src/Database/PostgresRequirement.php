@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Database;
 
+use Illuminate\Database\Connection;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -111,6 +112,12 @@ final class PostgresRequirement
      */
     public static function ensureIdentity(string $name, ConnectionInterface $connection): void
     {
+        // A pretended migration runs no select and reads no rows, so there is no banner to judge.
+        // ensure() still reads the version from the connection, and the real migration asks again.
+        if ($connection instanceof Connection && $connection->pretending()) {
+            return;
+        }
+
         $row = (array) $connection->selectOne('select version() as banner');
         $banner = $row['banner'] ?? null;
 

@@ -30,6 +30,10 @@ readonly class StripeStyleScheme implements AcceptsSignatureHeaders, SignatureSc
         return new self($signatureHeader ?? $this->signatureHeader);
     }
 
+    /**
+     * Signs with every secret in the set, current first, one `v1=` each. During a rotation a
+     * receiver that still holds the previous secret keeps verifying, the way Stripe rolls one.
+     */
     public function sign(WebhookMessage $message, SecretSet $secrets): SignatureHeaders
     {
         $toSign = $message->timestamp.'.'.$message->rawBody;

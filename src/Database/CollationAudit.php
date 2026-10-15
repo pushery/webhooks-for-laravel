@@ -39,6 +39,7 @@ final class CollationAudit
     public const array TABLES = [
         'webhook_deliveries',
         'webhook_calls',
+        'webhook_delivery_streams',
         'webhook_server_deliveries',
         'webhook_subscriptions',
         'webhook_delivery_hourly',

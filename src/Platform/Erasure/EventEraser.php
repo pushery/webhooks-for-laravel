@@ -7,10 +7,10 @@ namespace Pushery\Webhooks\Platform\Erasure;
 use DateTimeImmutable;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Query\Builder;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use Pushery\Webhooks\Search\SearchIndexer;
+use Pushery\Webhooks\Support\TableLookup;
 use Pushery\Webhooks\Support\Timestamp;
 use Pushery\Webhooks\Support\WebhookConnection;
 
@@ -127,11 +127,9 @@ final class EventEraser
      */
     private function stillReferenced(string $disk, string $path): bool
     {
-        $schema = Schema::connection(WebhookConnection::name());
-
         return array_any(
             ['webhook_deliveries', 'webhook_calls'],
-            static fn (string $table): bool => $schema->hasTable($table) && WebhookConnection::db()->table($table)
+            static fn (string $table): bool => TableLookup::exists($table, WebhookConnection::name()) && WebhookConnection::db()->table($table)
                 ->where('payload_disk', $disk)
                 ->where('payload_path', $path)
                 ->exists(),

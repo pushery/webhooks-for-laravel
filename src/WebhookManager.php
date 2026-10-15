@@ -901,7 +901,7 @@ final readonly class WebhookManager
 
         $limit = max(1, $this->config->rateLimitPerMinute());
         $store = $this->throttleStore();
-        $key = "webhooks:dispatch:{$subscription->id}";
+        $key = 'webhooks:dispatch:'.$this->scheduleOwner($subscription).':'.$subscription->id;
         $now = Date::now()->getTimestamp();
 
         // The first delivery to a quiet endpoint opens window zero. The anchor is then kept for as
@@ -930,6 +930,26 @@ final readonly class WebhookManager
         $store->put($nextKey, $next, $ttl);
 
         return max(0, $anchor + $window * self::RATE_LIMIT_WINDOW - $now);
+    }
+
+    /**
+     * Whose dispatch schedule a subscription keeps, as its part of the cache key: the owner's type
+     * and id, or `global` for a subscription without one.
+     *
+     * The id of a subscription alone is not enough. A host with a database per tenant has a
+     * subscription number 1 in every tenant. Keyed by the id alone, they would share one schedule
+     * in the limiter store, and one tenant's traffic would defer the deliveries of the others.
+     */
+    private function scheduleOwner(WebhookSubscription $subscription): string
+    {
+        $type = $subscription->owner_type;
+        $id = $subscription->owner_id;
+
+        if (! is_string($type) || $type === '' || $id === null || $id === '') {
+            return 'global';
+        }
+
+        return str_replace('\\', '.', $type).':'.$id;
     }
 
     /**

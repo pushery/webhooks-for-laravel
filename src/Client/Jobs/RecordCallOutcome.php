@@ -10,7 +10,7 @@ use Pushery\Webhooks\Client\WebhookCallStatus;
 
 /**
  * Records a handler's outcome on the call it handled: processed once handle() returns. A failure
- * is recorded by ProcessWebhookJob::failed(), which the queue calls after the last attempt; an
+ * is recorded by {@see RecordFailedCall} once the queue gives up after the last attempt; an
  * exception that passes through here ends only this attempt, and the queue may try again.
  *
  * A handler that released its job back onto the queue, or failed it, leaves the call to that

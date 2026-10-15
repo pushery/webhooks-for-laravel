@@ -6,15 +6,18 @@ namespace Pushery\Webhooks\Client;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route as RouteFacade;
 use Illuminate\Support\ServiceProvider;
 use Override;
 use Pushery\Webhooks\Client\Console\ImportCallsCommand;
 use Pushery\Webhooks\Client\Http\CaptureRawBody;
 use Pushery\Webhooks\Client\Http\WebhookController;
+use Pushery\Webhooks\Client\Jobs\RecordFailedCall;
 use Pushery\Webhooks\Client\Models\WebhookCall;
 use Pushery\Webhooks\Support\MergesPackageConfig;
 
@@ -62,6 +65,10 @@ final class WebhookClientServiceProvider extends ServiceProvider
         }
 
         $this->registerRouteMacro();
+
+        // A handler's job that the queue gives up on leaves its call failed, whether or not the
+        // handler's own failed() calls the parent's.
+        Event::listen(JobFailed::class, RecordFailedCall::class);
 
         if (Config::boolean('webhooks.client.raw_body_capture', true) && $this->app->bound(Kernel::class)) {
             $this->app->make(Kernel::class)->prependMiddleware(CaptureRawBody::class);

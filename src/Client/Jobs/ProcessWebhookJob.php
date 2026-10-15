@@ -36,8 +36,9 @@ use Throwable;
  * queue gives up on it after the last attempt. A status the handler writes itself stays, and a
  * call whose handler releases the job back onto the queue stays received until a later attempt
  * returns or the last one fails. A subclass with a constructor of its own calls
- * parent::__construct(), and one with a failed() of its own calls parent::failed(), or that half
- * of the record is lost.
+ * parent::__construct(). A failed() of its own declares its parameter as ?Throwable, the
+ * signature Laravel documents, because PHP refuses a narrower one; it need not call
+ * parent::failed(), because the queue's failure event records the call either way.
  */
 class ProcessWebhookJob implements ShouldQueue
 {
@@ -58,7 +59,8 @@ class ProcessWebhookJob implements ShouldQueue
     }
 
     /**
-     * Record that the call failed for good. The queue calls this after the last attempt.
+     * Record that the call failed for good. The queue calls this after the last attempt, and
+     * {@see RecordFailedCall} records the same once the queue's failure event follows.
      */
     public function failed(?Throwable $exception): void
     {

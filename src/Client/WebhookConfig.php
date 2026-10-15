@@ -22,6 +22,7 @@ use Pushery\Webhooks\Core\Signing\GitHubScheme;
 use Pushery\Webhooks\Core\Signing\Jwks\JwksKeySet;
 use Pushery\Webhooks\Core\Signing\PlainHmacScheme;
 use Pushery\Webhooks\Core\Signing\SecretSet;
+use Pushery\Webhooks\Core\Signing\SignatureEncoding;
 use Pushery\Webhooks\Core\Signing\SignatureHeaders;
 use Pushery\Webhooks\Core\Signing\SignatureScheme;
 use Pushery\Webhooks\Core\Signing\StandardWebhooksScheme;
@@ -134,6 +135,7 @@ final class WebhookConfig
         private readonly ?string $jwksKid,
         private readonly array $largePayload,
         private readonly ?array $rateLimit,
+        private readonly ?SignatureEncoding $signatureEncoding = null,
     ) {}
 
     /**
@@ -527,13 +529,20 @@ final class WebhookConfig
         // null keeps the scheme's own default), so a provider that uses a different header —
         // PlainHmacScheme for SendCloud's 'Sendcloud-Signature', say — works from config
         // alone instead of forcing the host to write a scheme class just to bind the header.
-        return $scheme instanceof AcceptsSignatureHeaders
-            ? $scheme->withSignatureHeaders(
+        if ($scheme instanceof AcceptsSignatureHeaders) {
+            $scheme = $scheme->withSignatureHeaders(
                 $this->explicitHeaders['id'] ?? null,
                 $this->explicitHeaders['timestamp'] ?? null,
                 $this->explicitHeaders['signature'] ?? null,
-            )
-            : $scheme;
+            );
+        }
+
+        // An encoding reaches here only for PlainHmacScheme: parsing refuses it for any other.
+        if ($this->signatureEncoding instanceof SignatureEncoding && $scheme instanceof PlainHmacScheme) {
+            return $scheme->withSignatureEncoding($this->signatureEncoding);
+        }
+
+        return $scheme;
     }
 
     /**
@@ -963,6 +972,7 @@ final class WebhookConfig
             jwksKid: $jwks['kid'] ?? null,
             largePayload: self::resolveLargePayload($entry['large_payload'] ?? null),
             rateLimit: self::resolveRateLimit($entry['rate_limit'] ?? null),
+            signatureEncoding: self::resolveSignatureEncoding($name, $entry['signature_encoding'] ?? null, $scheme),
         );
     }
 
@@ -1093,6 +1103,31 @@ final class WebhookConfig
         }
 
         throw new InvalidArgumentException("The webhook client config [{$name}] has an invalid 'dedupe'; expected 'redis+db' or 'db'.");
+    }
+
+    /**
+     * Validate the optional 'signature_encoding' up front, so a typo fails at config load rather
+     * than as a refusal of every delivery, which reads exactly like a wrong secret. Only
+     * PlainHmacScheme writes its digest in more than one way; every other scheme's format is fixed
+     * by its dialect, so naming an encoding for one is refused as well.
+     */
+    private static function resolveSignatureEncoding(string $name, mixed $spec, string $scheme): ?SignatureEncoding
+    {
+        if ($spec === null) {
+            return null;
+        }
+
+        $encoding = is_string($spec) ? SignatureEncoding::tryFrom(strtolower(trim($spec))) : null;
+
+        if ($encoding === null) {
+            throw new InvalidArgumentException("The webhook client config [{$name}] has an invalid 'signature_encoding'; expected 'hex' or 'base64'.");
+        }
+
+        if (! is_a($scheme, PlainHmacScheme::class, true)) {
+            throw new InvalidArgumentException("The webhook client config [{$name}] sets 'signature_encoding', which only PlainHmacScheme reads; [{$scheme}] writes its signature in the format its dialect fixes.");
+        }
+
+        return $encoding;
     }
 
     /**
