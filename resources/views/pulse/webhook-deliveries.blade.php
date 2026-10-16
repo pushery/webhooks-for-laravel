@@ -33,7 +33,7 @@
             <div>
                 <div class="text-xs text-gray-500 dark:text-gray-400 uppercase">{{ __('webhooks::pulse.metrics.failure_rate') }}</div>
                 {{-- text-red-400 / dark:text-red-300, and the pair is not a preference.
-                     Pulse serves ONLY its own compiled stylesheet — its layout loads
+                     Pulse serves only its own compiled stylesheet — its layout loads
                      Pulse::css() and nothing of the host's Tailwind build — so a class that is
                      not in that file does not exist on this page. `text-red-500` and
                      `dark:text-red-400` are not in it, which is why the failure figure has

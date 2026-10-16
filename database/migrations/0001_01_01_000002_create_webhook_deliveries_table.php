@@ -83,7 +83,7 @@ return new class extends Migration
         // them tiny even as succeeded rows pile up.
         DB::statement("CREATE INDEX webhook_deliveries_open_idx ON webhook_deliveries (subscription_id, created_at) WHERE status IN ('pending', 'failed')");
         // The health/scoring aggregate range-scans one subscription's recent history
-        // across ALL statuses, so it needs a NON-partial (subscription_id, created_at)
+        // across all statuses, so it needs a NON-partial (subscription_id, created_at)
         // index: the partial open index above cannot serve an all-status read, and
         // without this the planner falls back to the event index below and scans the
         // endpoint's entire history to filter the window.
@@ -91,17 +91,17 @@ return new class extends Migration
         // Redelivery and idempotency look a delivery up by its subscription + event.
         DB::statement('CREATE INDEX webhook_deliveries_sub_event_idx ON webhook_deliveries (subscription_id, event_id)');
         // The dashboard reads a single tenant's delivery history newest-first, always
-        // filtering the WHOLE (owner_type, owner_id) morph pair, so the index leads
+        // filtering the whole (owner_type, owner_id) morph pair, so the index leads
         // with both owner columns before created_at — leaving owner_type as a heap
         // filter would interleave a second owner type that shares an owner_id.
         DB::statement('CREATE INDEX webhook_deliveries_owner_idx ON webhook_deliveries (owner_type, owner_id, created_at)');
-        // A GLOBAL newest-first read — the operator delivery log, which is deliberately not
-        // owner-scoped — is served by none of the indexes above: every one of them LEADS with
+        // A global newest-first read — the operator delivery log, which is deliberately not
+        // owner-scoped — is served by none of the indexes above: every one of them leads with
         // another column, so none can produce created_at order on its own. Without this the
-        // planner sequentially scans EVERY live partition and sorts the union before it can
+        // planner sequentially scans every live partition and sorts the union before it can
         // take the first page, and the sort is blocking: the LIMIT saves nothing.
         //
-        // Declared on the partitioned PARENT, so PostgreSQL propagates it to every partition
+        // Declared on the partitioned parent, so PostgreSQL propagates it to every partition
         // the rolling PartitionManager window creates later — an index added per partition
         // would silently stop covering new months.
         //
@@ -131,10 +131,10 @@ return new class extends Migration
     }
 
     /**
-     * A flat InnoDB table — no partitioning, so it CAN carry the FK cascade a partitioned
+     * A flat InnoDB table — no partitioning, so it can carry the FK cascade a partitioned
      * MySQL table cannot (ERROR 1506). Deleting a subscription therefore still removes its
      * deliveries at the database, keeping the GDPR-erasure guarantee absolute. Retention is a
-     * chunked, indexed DELETE instead of an O(1) partition drop, which is a SECOND reason this
+     * chunked, indexed DELETE instead of an O(1) partition drop, which is a second reason this
      * lane needs a plain created_at index — the first, a global newest-first operator read, applies
      * to both engines, so PostgreSQL carries one too. Timestamps are DATETIME(6)
      * holding UTC; payload_type is uncapped MEDIUMTEXT via JSON_UNQUOTE(JSON_EXTRACT(...)).

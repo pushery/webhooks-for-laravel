@@ -118,7 +118,7 @@ final class BodyDecoder
      * Read a declared form body, refusing anything PHP only partly read.
      *
      * `parse_str` reports success either way, so the two ways it loses fields are asked about
-     * directly. Over `max_input_vars` it keeps the first N and RAISES a warning, which is the
+     * directly. Over `max_input_vars` it keeps the first N and raises a warning, which is the
      * only report there is — the handler below is what turns that report into a refusal, since
      * a payload quietly missing two thirds of a delivery is worse than one reported unread: a
      * handler acts on it. Past its nesting ceiling it drops the field too, and warns only while
@@ -176,7 +176,7 @@ final class BodyDecoder
      * Percent-escapes decode to arbitrary bytes, so `name=Andr%E9` yields a Latin-1 e-acute. A
      * JSON payload can never contain one — json_decode rejects the body before this point — so
      * everything downstream is built on the assumption that it cannot be there. Storing the
-     * payload and serializing the handler job onto the queue both encode as JSON and THROW on
+     * payload and serializing the handler job onto the queue both encode as JSON and throw on
      * such a byte, after the signature already verified: a 500 on every retry and the delivery
      * lost, the same way round as the defect this decoder was written for. The search excerpt
      * does not throw; it yields an empty excerpt instead, which is quieter and no better.

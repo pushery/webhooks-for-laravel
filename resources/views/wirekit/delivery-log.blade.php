@@ -10,7 +10,7 @@
     // read.
     //
     // The values are today's behavior exactly: an empty catalog leaves the event-type filter as
-    // free text, and both actions render. The ability check is the COURTESY -- the action itself
+    // free text, and both actions render. The ability check is the courtesy -- the action itself
     // still calls `authorizeAction()` and still refuses -- so defaulting it to "show" cannot open
     // anything. Defaulting it the other way would hide controls from every host that renders this
     // view directly, which is a silent regression rather than a safe one.
@@ -21,7 +21,7 @@
 
 <x-wirekit::stack gap="md" class="wh-deliveries">
 
-    {{-- Permanently in the DOM, so a filter change has something to speak THROUGH: a region
+    {{-- Permanently in the DOM, so a filter change has something to speak through: a region
          inserted together with its own text is not announced by most screen readers. The
          wire:key carries the count, so Livewire's morph sees a changed node rather than an
          identical one it can leave alone -- the same detail the transform editor's preview
@@ -30,11 +30,11 @@
          A live-bound filter swaps the table underneath and says nothing on its own. The count
          is in the document, in the pagination summary, but as a plain paragraph outside any
          live region: a reader has to travel back down and read to learn whether the change
-         produced three rows, two hundred, or none. And the empty state REPLACES the table, so a
+         produced three rows, two hundred, or none. And the empty state replaces the table, so a
          virtual cursor that was standing in it loses its position silently (WCAG 4.1.3). --}}
     <x-wirekit::visually-hidden role="status" aria-live="polite" wire:key="wh-filtered-{{ $deliveries->count() }}">{{ trans_choice('webhooks::pagination.filtered_of_unknown_total', $deliveries->count()) }}</x-wirekit::visually-hidden>
     {{-- The component's two refusals — a redeliver against a switched-off endpoint, and a ping
-         past its allowance — reach the reader only through here. Rendered CONDITIONALLY rather
+         past its allowance — reach the reader only through here. Rendered conditionally rather
          than as an always-present region: a permanently blank live region gets announced on
          every update by some screen readers, which teaches the reader to ignore it. --}}
     @if ($message !== '')
@@ -59,7 +59,7 @@
             </x-wirekit::select>
         </div>
 
-        {{-- A choice where the application HAS a catalog, free text where it has none, and the
+        {{-- A choice where the application has a catalog, free text where it has none, and the
              empty catalog is the load-bearing case rather than an oversight: a host that
              declares none goes on registering any type it likes, so a select there would
              offer nothing and hide the only control that works.
@@ -87,7 +87,7 @@
             @endif
         </div>
 
-        {{-- A LIST of the reader's endpoints, not a free-text id: the log is unscoped across
+        {{-- A list of the reader's endpoints, not a free-text id: the log is unscoped across
              every tenant, and "what happened at THIS endpoint" is the first question after an
              incident. A control that takes a number is one nobody can use without running a
              query first. --}}
@@ -103,7 +103,7 @@
         {{-- Debounced like the event-type field: a date input reports every keystroke while a
              reader types the year, and each one would be a round trip and a query.
 
-             The two dates carry VISIBLE labels, unlike the lists beside them. A list names itself
+             The two dates carry visible labels, unlike the lists beside them. A list names itself
              through its first option; two bare date fields side by side say nothing about which one
              starts the range. Each also sits in a box of its own width: a date input without one
              takes the width its engine gives it, Chromium and WebKit disagree by up to 53 pixels,
@@ -154,7 +154,7 @@
             <x-wirekit::table.head>
                 <x-wirekit::table.row>
                     <x-wirekit::table.th>{{ __('webhooks::management.table.event') }}</x-wirekit::table.th>
-                    {{-- On THIS screen and not on the portal's, because this query is deliberately
+                    {{-- On this screen and not on the portal's, because this query is deliberately
                          unscoped across every tenant: rows for different endpoints stand under one
                          another, and without this cell the row does not say where it went. The
                          endpoint filter is optional, so "set a filter first" is not an answer. --}}
@@ -214,9 +214,9 @@
                                  a real HTTP request to a customer's endpoint.
 
                                  The visible word is interpolated rather than described, so the
-                                 name CONTAINS it in all seven languages (WCAG 2.5.3). --}}
+                                 name contains it in all seven languages (WCAG 2.5.3). --}}
                             {{-- `LLL` without a zone, unlike the dashboard's names: this console renders no
-                             zone anywhere — its own <time title> is a bare LLL — and a name that carried
+                             zone anywhere — its own <time title> is a bare lll — and a name that carried
                              one would be the only place on the screen that did. The dashboard has a
                              translatable `formats.absolute` for exactly that reason; this namespace has
                              none, and inventing one here would be a wider change than a label needs. --}}
@@ -232,7 +232,7 @@
                             @if ($canRedeliver)
                                 {{-- The dialog, not a bare click. Pressing this sends a real
                                      HTTP request to a customer's endpoint under the delivery's
-                                     ORIGINAL id, so a receiver that deduplicates treats it as one
+                                     original id, so a receiver that deduplicates treats it as one
                                      it has already seen -- and the wrong row is one keystroke
                                      away in a list of twenty identical-looking actions. The
                                      rotate and delete confirmations in the subscription manager
@@ -264,7 +264,7 @@
             </x-wirekit::table.body>
         </x-wirekit::table>
     @endif
-    {{-- OUTSIDE the @if, matching the neutral stub beside this one. A simplePaginate list
+    {{-- Outside the @if, matching the neutral stub beside this one. A simplePaginate list
          does not know how many pages there are, so a page past the end renders an empty
          table — and with the control inside the @else the only way back was to edit the
          URL. The package's pagination view renders nothing while there is a single page,

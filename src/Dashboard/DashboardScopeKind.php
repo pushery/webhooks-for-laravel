@@ -7,7 +7,7 @@ namespace Pushery\Webhooks\Dashboard;
 /**
  * Which dashboard scope a {@see DashboardTenant} is.
  *
- * It exists because two of them — global and all-tenants — carry NO tenant identity, so the
+ * It exists because two of them — global and all-tenants — carry no tenant identity, so the
  * scope can no longer be derived from "is the identity null". Deriving it that way is what
  * made "the owner-less rows" and "every row" indistinguishable in code, and those two differ
  * by a permission level.
@@ -29,7 +29,7 @@ enum DashboardScopeKind
      * No tenant at all: the reader holds the dashboard ability and belongs to nobody.
      *
      * A distinct case rather than reusing Global, because the two are opposites in what they
-     * show. Global reads the owner-less rows an operator registered; this one reads NOTHING.
+     * show. Global reads the owner-less rows an operator registered; this one reads nothing.
      * Folding them together would answer "what did I send?" with somebody else's endpoints.
      */
     case Untenanted;

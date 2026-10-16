@@ -23,13 +23,13 @@ use Pushery\Webhooks\Support\Settings;
 use Pushery\Webhooks\Support\UiVariant;
 
 /**
- * The OPERATOR console for webhook endpoints: register one, edit it, switch it on or off,
+ * The operator console for webhook endpoints: register one, edit it, switch it on or off,
  * rotate its signing secret, delete it. A published stub — restyle it and make it yours.
  *
- * It is deliberately UNSCOPED, and unauthorized by default: it lists and mutates EVERY
+ * It is deliberately unscoped, and unauthorized by default: it lists and mutates every
  * endpoint in the installation regardless of owner, and the endpoints it registers are
  * global (owner-less), so every tenant's events reach them. That is what an operator screen
- * is for — and it means the component MUST be embedded behind an operator-only gate of your
+ * is for — and it means the component must be embedded behind an operator-only gate of your
  * own. It is not a tenant-facing surface, and putting it on one leaks endpoints across
  * tenants.
  *
@@ -102,7 +102,7 @@ class SubscriptionManager extends Component
     /**
      * Drop the plaintext secret before the component is serialized.
      *
-     * It has to reach the ONE response that reveals it — that is what it is for — and it has no
+     * It has to reach the one response that reveals it — that is what it is for — and it has no
      * business in the component's state afterwards, where every later request of the session
      * would carry it again long after the operator copied it.
      *
@@ -158,7 +158,7 @@ class SubscriptionManager extends Component
         $this->editingId = $subscription->id;
         $this->name = $subscription->name ?? '';
         $this->url = $subscription->url;
-        // Normalized on the way IN, the same way save() is careful on the way out — a row
+        // Normalized on the way in, the same way save() is careful on the way out — a row
         // holding a JSON object or a number would otherwise open and never save again.
         // See EventTypeList.
         $this->eventTypes = $subscription->eventTypeNames();
@@ -196,10 +196,10 @@ class SubscriptionManager extends Component
         $stored = $this->storedEventTypes();
 
         // What the opened row already holds stays acceptable even once the catalog stops
-        // declaring it. The usual adoption order writes the catalog AFTER the endpoints
+        // declaring it. The usual adoption order writes the catalog after the endpoints
         // exist, and without this a rename would be refused over a value the operator never
         // touched — with no checkbox to remove it by, since the form draws one per catalog
-        // type. Read from the ROW, never from component state: a public property is
+        // type. Read from the row, never from component state: a public property is
         // writable from the browser, so an allowlist widened from one is an allowlist the
         // client widens.
         if ($accepted !== null && $stored !== []) {
@@ -221,9 +221,9 @@ class SubscriptionManager extends Component
         // a typed array property 'eventTypes' => 'min:1' — masked by 'required', which already
         // rejects []
         //
-        // The first three are the validator restating what the TYPE system enforces one layer
+        // The first three are the validator restating what the type system enforces one layer
         // up, so no input can reach them; the fourth is redundant against its own neighbor.
-        // 'required' and 'max:255' ARE reachable.
+        // 'required' and 'max:255' are reachable.
         //
         // They stay. This list is the written
         // contract of the form, read by anyone changing it, and a subclass that widens a
@@ -256,7 +256,7 @@ class SubscriptionManager extends Component
                 )),
             ],
             // Constrained to the catalog when the host keeps one, and unconstrained when it
-            // does not — the catalog ships empty. An operator registers a GLOBAL endpoint
+            // does not — the catalog ships empty. An operator registers a global endpoint
             // here, so a typo costs every tenant's events for that type, not one tenant's.
             'eventTypes.*' => $accepted === null
                 ? ['string', 'max:'.EventTypeList::MAX_LENGTH]
@@ -273,7 +273,7 @@ class SubscriptionManager extends Component
         ]);
 
         // A type whose catalog entry names an ability takes it here too, and only where this save
-        // ADDS the type: one the endpoint already carries stays through an edit, and removing it
+        // adds the type: one the endpoint already carries stays through an edit, and removing it
         // asks nothing.
         $refused = new EventTypeAbilities()->refused(
             array_values(array_diff($this->eventTypes, $stored)),
@@ -436,7 +436,7 @@ class SubscriptionManager extends Component
     }
 
     /**
-     * What the endpoint currently open for editing already holds, read from the ROW.
+     * What the endpoint currently open for editing already holds, read from the row.
      *
      * A row that is gone answers with nothing rather than a 404: this is consulted on every
      * render, so an endpoint deleted from a second tab would otherwise take the whole
@@ -477,7 +477,7 @@ class SubscriptionManager extends Component
     }
 
     /**
-     * And the same control for the SIMPLE paginator this component actually builds.
+     * And the same control for the simple paginator this component actually builds.
      *
      * Livewire resolves the two independently: paginationView() feeds
      * Paginator::defaultView, paginationSimpleView() feeds Paginator::defaultSimpleView,
@@ -528,10 +528,10 @@ class SubscriptionManager extends Component
             // differently per query, so a reader sees one endpoint twice and another never, on the
             // same screen whose whole point is that the list outgrows a page.
             'subscriptions' => WebhookSubscription::model()::query()->latest()->orderByDesc('id')->simplePaginate(25, pageName: $this->getPageName()),
-            // The catalog, plus anything the OPENED ROW already holds that the catalog no
+            // The catalog, plus anything the opened row already holds that the catalog no
             // longer declares. Without the second half the stale value has no checkbox, so
             // it can be neither kept nor dropped — Livewire's checkbox binding only ever
-            // adds or removes its OWN value.
+            // adds or removes its own value.
             // The array_values here cannot change the outcome (the view iterates, keys unread)
             // while its neighbor array_unique can: without it the opened row's types repeat. Both
             // stay.

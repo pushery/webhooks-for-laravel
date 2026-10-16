@@ -13,7 +13,7 @@ use Throwable;
  * Clears every rotated-away signing secret whose rotation window has closed.
  *
  * A delivery revokes its own endpoint's expired secret on the way out, so a busy
- * endpoint needs nothing from this command. A DORMANT one does: without the sweep, an
+ * endpoint needs nothing from this command. A dormant one does: without the sweep, an
  * endpoint that stops receiving traffic the day it rotates would keep its old secret —
  * and that secret's signatures — valid indefinitely, which is precisely the state a
  * rotation exists to end. Scheduled hourly while the Platform layer is on.

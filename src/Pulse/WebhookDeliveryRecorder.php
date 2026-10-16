@@ -14,7 +14,7 @@ use Pushery\Webhooks\Server\Exceptions\DeliveryRefused;
  * (throughput, failure rate and latency). This is the single-view, gated engineering
  * monitor — distinct from the multi-tenant customer dashboard, which has its own read
  * model. It records nothing unless the opt-in {@see WebhookPulseServiceProvider} boots
- * it (pulse.enabled AND laravel/pulse installed), so a consumer without Pulse pays
+ * it (pulse.enabled and laravel/pulse installed), so a consumer without Pulse pays
  * nothing.
  *
  * Four Pulse entry types are written, all keyed by event type so the card can break
@@ -92,7 +92,7 @@ final readonly class WebhookDeliveryRecorder
 
         // The split changes no value: both arms read the same property, and a
         // succeeded attempt always carries a response, so the nullsafe arm answers identically
-        // for it. The split exists for the TYPE CHECKER — on the succeeded event the response
+        // for it. The split exists for the type checker — on the succeeded event the response
         // is non-nullable, and reading it nullsafe there would widen the result to null for a
         // case that cannot happen.
         $durationMs = $event instanceof WebhookAttemptSucceeded

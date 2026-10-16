@@ -22,7 +22,7 @@ use Pushery\Webhooks\Support\ScheduleCadence;
  * remounts the panels that take one and they come up on the new window without a
  * full navigation.
  *
- * That is deliberately NOT a broadcast. An event cannot reach a panel that is still
+ * That is deliberately not a broadcast. An event cannot reach a panel that is still
  * lazy — Livewire's client drops it — and the panel would then resolve on the window
  * frozen into its placeholder and never leave it. The key carries the window instead,
  * because a key is read at render time and an event is not. See the comment in the
@@ -62,7 +62,7 @@ final class WebhooksDashboardPage extends Component
         }
 
         if (! in_array($this->window, $this->windows(), true)) {
-            // Fall back to the FIRST configured window, not a hardcoded '24h': a host may narrow
+            // Fall back to the first configured window, not a hardcoded '24h': a host may narrow
             // dashboard.windows to a set that omits 24h, and defaulting to an un-offered window
             // renders a range no button selects and disagrees with what the JSON API serves.
             $this->window = $this->windows()[0];
@@ -92,7 +92,7 @@ final class WebhooksDashboardPage extends Component
      * between a hand-edited request and a window the host never offered. That reaches
      * WindowResolver, the panel keys, and the range the panels then count over.
      *
-     * A rejected value falls back to the first CONFIGURED window rather than a literal '24h',
+     * A rejected value falls back to the first configured window rather than a literal '24h',
      * for the reason mount() gives: a host may narrow dashboard.windows to a set without it.
      */
     public function updatedWindow(string $value): void

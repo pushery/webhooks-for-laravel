@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Pushery\Webhooks\Core\Ssrf;
 
 /**
- * The production resolver: resolves BOTH A (IPv4) and AAAA (IPv6) records via the
+ * The production resolver: resolves both a (IPv4) and AAAA (IPv6) records via the
  * system resolver, so an IPv6-only host is vetted rather than silently failing an
  * IPv4-only lookup. An IP literal resolves to itself. DNS warnings on a lookup
  * that returns nothing are suppressed — the empty result is what the caller acts
@@ -22,7 +22,7 @@ namespace Pushery\Webhooks\Core\Ssrf;
 final class SystemHostResolver implements HostResolver
 {
     /**
-     * How the AAAA records are fetched. Injectable so the WIRING — that the answer reaches
+     * How the AAAA records are fetched. Injectable so the wiring — that the answer reaches
      * {@see self::merge()} at all — is provable without a live lookup; the default is the
      * system resolver and is what the container always builds.
      *
@@ -57,7 +57,7 @@ final class SystemHostResolver implements HostResolver
      *
      * `dns_get_record()` answers `false` on a resolution error, and {@see self::merge()}
      * declares `array` — so without this conversion a failed lookup would raise a TypeError
-     * AFTER the guard had decided to resolve, turning "fail closed" into a 500. An entry that
+     * after the guard had decided to resolve, turning "fail closed" into a 500. An entry that
      * is not itself an array is dropped for the same reason {@see self::ipv6From()} drops a
      * record with no usable address: a malformed answer must never reach the classifier as
      * something it will try to read.
@@ -78,7 +78,7 @@ final class SystemHostResolver implements HostResolver
 
     /**
      * The address list one lookup answers with: every A record, then every AAAA record,
-     * de-duplicated and renumbered so the caller always receives a plain list. BOTH
+     * de-duplicated and renumbered so the caller always receives a plain list. Both
      * families are kept — dropping either would leave half the destination unvetted, and
      * the guard must classify every address a delivery could actually connect to. Pure
      * and static so the merge is directly testable without a live DNS lookup.

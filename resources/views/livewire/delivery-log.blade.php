@@ -7,7 +7,7 @@
     // read.
     //
     // The values are today's behavior exactly: an empty catalog leaves the event-type filter as
-    // free text, and both actions render. The ability check is the COURTESY -- the action itself
+    // free text, and both actions render. The ability check is the courtesy -- the action itself
     // still calls `authorizeAction()` and still refuses -- so defaulting it to "show" cannot open
     // anything. Defaulting it the other way would hide controls from every host that renders this
     // view directly, which is a silent regression rather than a safe one.
@@ -18,7 +18,7 @@
 
 <div class="wh-deliveries space-y-4">
 
-    {{-- Permanently in the DOM, so a filter change has something to speak THROUGH: a region
+    {{-- Permanently in the DOM, so a filter change has something to speak through: a region
          inserted together with its own text is not announced by most screen readers. The
          wire:key carries the count, so Livewire's morph sees a changed node rather than an
          identical one it can leave alone -- the same detail the transform editor's preview
@@ -27,7 +27,7 @@
          A live-bound filter swaps the table underneath and says nothing on its own. The count
          is in the document, in the pagination summary, but as a plain paragraph outside any
          live region: a reader has to travel back down and read to learn whether the change
-         produced three rows, two hundred, or none. And the empty state REPLACES the table, so a
+         produced three rows, two hundred, or none. And the empty state replaces the table, so a
          virtual cursor that was standing in it loses its position silently (WCAG 4.1.3). --}}
     {{-- sr-only rather than the WireKit component: this stub is the design-system-free one,
          and reaching for x-wirekit::visually-hidden here would make it require the package it
@@ -52,7 +52,7 @@
             <option value="exhausted">{{ __('webhooks::management.status_options.exhausted') }}</option>
             <option value="refused">{{ __('webhooks::management.status_options.refused') }}</option>
         </select>
-        {{-- A choice where the application HAS a catalog, free text where it has none. The
+        {{-- A choice where the application has a catalog, free text where it has none. The
              empty catalog is the load-bearing case rather than an oversight: a host that
              declares none goes on registering any type it likes, and a select there would offer
              nothing while hiding the only control that works. Free text is compared with an
@@ -104,7 +104,7 @@
     @else
     {{-- A scroll container of its own, so the overbreadth stops here instead of reaching the
          document. Without it the whole page grows a horizontal scrollbar on a narrow viewport
-         and the header and page chrome slide away with the table, because it is the DOCUMENT
+         and the header and page chrome slide away with the table, because it is the document
          that scrolls rather than the table.
 
          tabindex="0" is not optional once the container exists: a scrollable region has to be
@@ -122,7 +122,7 @@
         <thead>
             <tr>
                 <th class="px-3 py-2">{{ __('webhooks::management.table.event') }}</th>
-                {{-- On THIS screen and not on the portal's: the query is deliberately unscoped
+                {{-- On this screen and not on the portal's: the query is deliberately unscoped
                      across every tenant, so rows for different endpoints stand under one another
                      and without this cell the row does not say where it went. The endpoint
                      filter is optional, so "set one first" is not an answer. --}}
@@ -159,11 +159,11 @@
                         <time datetime="{{ $delivery->created_at->toIso8601String() }}" title="{{ $when->isoFormat('LLL') }}">{{ $when->diffForHumans() }}</time>
                     </td>
                     <td class="px-3 py-2 text-right">
-                        {{-- Both go over the wire and both DO something: a second redeliver
+                        {{-- Both go over the wire and both do something: a second redeliver
                              queues a second delivery, a second ping spends the allowance the
                              component then throttles. So neither takes a second click while
                              the first is still in flight. --}}
-                        {{-- Named per ROW, like every other action button this package ships.
+                        {{-- Named per row, like every other action button this package ships.
                              Twenty buttons all reading "Redeliver" are twenty identical entries
                              in a screen reader's element list, where the reading order that
                              supplies the event does not exist. --}}
@@ -180,7 +180,7 @@
                                  for rotate and delete.
 
                                  It is confirmed because pressing it sends a real HTTP request to
-                                 a customer's endpoint under the delivery's ORIGINAL id, and the
+                                 a customer's endpoint under the delivery's original id, and the
                                  wrong row is one keystroke away in a list of twenty
                                  identical-looking actions. --}}
                             <button

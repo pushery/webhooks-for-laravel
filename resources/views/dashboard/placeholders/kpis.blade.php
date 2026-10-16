@@ -1,4 +1,4 @@
-{{-- Lazy placeholder for the KPI ribbon: five skeleton cards in the SAME WireKit stats
+{{-- Lazy placeholder for the KPI ribbon: five skeleton cards in the same WireKit stats
      grid the real ribbon renders into, so the panel never shifts when the metrics land.
 
      The class is `wh-dash-kpis-placeholder`, NOT `wh-dash-kpis`. It used to carry the

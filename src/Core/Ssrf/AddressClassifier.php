@@ -7,7 +7,7 @@ namespace Pushery\Webhooks\Core\Ssrf;
 /**
  * Classifies a resolved IP address as safe (public) or blocked. Blocked covers
  * every private, loopback, link-local, ULA, carrier-grade-NAT, multicast,
- * documentation, benchmarking, transition and cloud-metadata range for BOTH IPv4
+ * documentation, benchmarking, transition and cloud-metadata range for both IPv4
  * and IPv6, and every block the IANA special-purpose address registries list as not
  * globally reachable. A few blocks those registries call reachable are refused too,
  * where they hold service addresses no webhook receiver lives at.
@@ -22,7 +22,7 @@ namespace Pushery\Webhooks\Core\Ssrf;
  * (`198.18.0.1`), site-local IPv6 (`fec0::1`) and the IPv4-compatible loopback
  * `::7f00:1` all pass it, and so do the transition prefixes, the documentation blocks
  * and multicast — every one of them a reachable internal destination. The ranges the
- * filter DOES cover, among them `fc00::/7` and `fe80::/10`, stay on the list too, so
+ * filter does cover, among them `fc00::/7` and `fe80::/10`, stay on the list too, so
  * one mechanism answers for every range instead of two that disagree at the seam.
  *
  * The four addresses named above are the reason the list exists. Whether PHP's own
@@ -75,7 +75,7 @@ final class AddressClassifier
         // each for what it says about its own range.
         '2001::/23',
         // The IPv6 transition prefixes, and the reason they are here is not tidiness.
-        // 6to4 and Teredo EMBED an IPv4 address, and neither puts it in the low 32 bits —
+        // 6to4 and Teredo embed an IPv4 address, and neither puts it in the low 32 bits —
         // 6to4 carries it in bits 16-47, so `2002:7f00:0001::` addresses 127.0.0.1 and
         // walks straight past the unwrapping below, which only knows the three forms with a
         // 12-byte prefix. Blocking the whole prefix is the answer that does not depend on
@@ -90,7 +90,7 @@ final class AddressClassifier
         '5f00::/16',          // SRv6 segment identifiers (RFC 9602), routed inside an operator's network
         'fc00::/7',           // ULA (incl. fd00:ec2::254 cloud metadata)
         'fe80::/10',          // link-local
-        // Site-local. Deprecated in favor of ULA (RFC 3879), but private BY INTENT and
+        // Site-local. Deprecated in favor of ULA (RFC 3879), but private by intent and
         // still routed inside some networks — a webhook endpoint never legitimately lives
         // there, so it is blocked like every other private range.
         'fec0::/10',          // site-local (deprecated)

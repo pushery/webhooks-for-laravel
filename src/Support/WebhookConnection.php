@@ -13,7 +13,7 @@ use Pushery\Webhooks\Database\Dialect\Dialect;
  * Resolves the database connection the package stores its tables on.
  *
  * By default that is the application's own default connection. A host may instead point
- * webhooks.database.connection at a DEDICATED connection — the common case being a MySQL
+ * webhooks.database.connection at a dedicated connection — the common case being a MySQL
  * application that keeps webhooks' PostgreSQL-shaped tables on a PostgreSQL side-car. Every
  * model, migration and raw query in the package resolves through here, so the whole package
  * follows one connection and never silently splits across two.
@@ -50,7 +50,7 @@ final class WebhookConnection
     }
 
     /**
-     * The SQL dialect of the RESOLVED webhook connection — the engine the package's tables
+     * The SQL dialect of the resolved webhook connection — the engine the package's tables
      * physically live on (the side-car, when one is configured), never the application default.
      *
      * Runtime SQL must render for this dialect, not for an argument-less dialect lookup (which

@@ -11,7 +11,7 @@ use Pushery\Webhooks\Core\Signing\SignatureHeaders;
  * `event_type` strategies (`header:Name`, `body:dotted.path`) cannot reach.
  *
  * The case that motivated this is GitHub, and it is not exotic: the useful type is the
- * header AND a body field together — `X-GitHub-Event: release` plus `action: published`
+ * header and a body field together — `X-GitHub-Event: release` plus `action: published`
  * is one event, `release.published`, and neither half alone routes anything. A resolver
  * composes them without the configuration growing a special case per producer.
  *

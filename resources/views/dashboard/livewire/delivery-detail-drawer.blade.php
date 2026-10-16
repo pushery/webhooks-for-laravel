@@ -43,7 +43,7 @@
         >
             {{-- cursor-pointer, and it is load-bearing rather than cosmetic. Tailwind v4's
                  preflight gives buttons `cursor: default`, so without it the overlay reads as
-                 dead space — and the pointer is the ONLY feedback an overlay can give: it has
+                 dead space — and the pointer is the only feedback an overlay can give: it has
                  no border, no label and no focus ring. This is the drawer a reader clicks
                  through many deliveries in, asking "how do I get out of here" each time; the
                  other way out is Escape, which not everyone knows. An element that answers a
@@ -79,13 +79,13 @@
                     @endif
                 </div>
 
-                {{-- Absolute timestamps in the reader's locale, WITH their zone: this is the
+                {{-- Absolute timestamps in the reader's locale, with their zone: this is the
                      detail panel, where an operator correlates the delivery against their own
                      records. A bare wall-clock time cannot be correlated — the reader has no
                      way to tell whether it is theirs, and an hour of offset here reads as a
                      delivery that did not happen when it did.
 
-                     And in the DISPLAY zone, which is not necessarily the application's:
+                     And in the display zone, which is not necessarily the application's:
                      app.timezone is one process-wide setting, so in a multi-tenant back-office
                      it is UTC for storage while the operator reading this sits somewhere else.
                      Unset, DashboardTimezone hands the value straight back — see the seam for
@@ -106,11 +106,11 @@
                 <x-wirekit::text size="sm" weight="medium">{{ __('webhooks::dashboard.drawer.payload') }}</x-wirekit::text>
                 {{-- The body is gated separately from the rest of the drawer, and the component
                      decides how much of it exists at all — see Pushery\Webhooks\Dashboard\PayloadVisibility.
-                     $this->payloadJson is a COMPUTED property, so a body this user may not see is
+                     $this->payloadJson is a computed property, so a body this user may not see is
                      never serialized into the Livewire snapshot; the check below is a boundary,
                      not a curtain. Never bind the delivery or its payload as a public property. --}}
                 @if ($this->payloadOffloadNotice !== null)
-                    {{-- FIRST, because it changes how everything below reads. Past the offload
+                    {{-- First, because it changes how everything below reads. Past the offload
                          threshold the row holds only a stub, so the largest deliveries render as
                          the smallest ones — and under a redacted body the stub is
                          indistinguishable from "there was barely anything here". --}}
@@ -120,7 +120,7 @@
                 @endif
 
                 @if ($this->payloadNotice !== null)
-                    {{-- Say WHY, always. A panel that just stops after its heading reads as a
+                    {{-- Say why, always. A panel that just stops after its heading reads as a
                          defect, and the next person "fixes" it by deleting the guard. --}}
                     <x-wirekit::text size="sm" intent="muted" class="mt-[var(--padding-wk-y-sm)] wh-dash-drawer-payload-notice">
                         {{ $this->payloadNotice }}

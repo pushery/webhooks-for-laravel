@@ -10,7 +10,7 @@ use Throwable;
 
 /**
  * The delivery is over and it never landed: its attempts are spent, or one of them hit
- * a non-retryable failure (a blocked destination, a no-retry 4xx). Fires exactly ONCE
+ * a non-retryable failure (a blocked destination, a no-retry 4xx). Fires exactly once
  * per delivery, no matter how many attempts it took — the transport-level place to
  * react to a dead endpoint. The Platform circuit breaker listens here to count
  * consecutive failures and auto-disable an endpoint.

@@ -14,7 +14,7 @@ use RuntimeException;
  *
  * Refused rather than deferred, which is the opposite of what the delivery rate limit
  * does with an ordinary event — and deliberately so. A real event deferred by two minutes
- * still arrives and still means what it meant; a TEST ping deferred by two minutes has
+ * still arrives and still means what it meant; a test ping deferred by two minutes has
  * already failed at the only thing it was for, which is telling someone watching the
  * screen right now whether the endpoint answers.
  *

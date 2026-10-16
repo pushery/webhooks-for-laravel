@@ -17,7 +17,7 @@ use InvalidArgumentException;
  * asymmetric `v1a` entry side by side. A verifier ignores every non-`v1a` entry,
  * exactly as {@see StandardWebhooksScheme} ignores every non-`v1` one.
  *
- * Why asymmetric: the receiver only ever holds the PUBLIC key, so a leak of the
+ * Why asymmetric: the receiver only ever holds the public key, so a leak of the
  * receiver's stored key material cannot be used to forge deliveries — the property
  * a shared HMAC secret can never offer. Provider public keys can also be published
  * (static, or via a JWKS endpoint) and rotated without redistributing a secret.
@@ -30,7 +30,7 @@ use InvalidArgumentException;
  *              base64-encoded, optionally prefixed `whsk_`.
  *  - verify(): each SecretSet token is a 32-byte Ed25519 public key, base64-encoded,
  *              optionally prefixed `whpk_`. During rotation the set holds the current
- *              plus the previous public key and a delivery verifies if EITHER matches.
+ *              plus the previous public key and a delivery verifies if either matches.
  *
  * {@see \sodium_crypto_sign_verify_detached()} is constant-time by construction, so
  * no explicit `hash_equals` is needed here.
@@ -100,7 +100,7 @@ final readonly class Ed25519Scheme implements SignatureScheme
             return VerificationResult::malformed();
         }
 
-        // The header as RECEIVED, not the integer it was normalized to for the window check
+        // The header as received, not the integer it was normalized to for the window check
         // above, as {@see StandardWebhooksScheme} reads it.
         $toSign = $this->signedContent($id, $timestamp, $rawBody);
 

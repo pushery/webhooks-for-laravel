@@ -22,7 +22,7 @@ use Pushery\Webhooks\Support\UiVariant;
  * and filterable by status and event type, with an inline replay action and a
  * row-open into the detail drawer. An empty result renders the empty state.
  *
- * `isolate: false` bundles this panel's lazy load with its siblings' into ONE request. Six
+ * `isolate: false` bundles this panel's lazy load with its siblings' into one request. Six
  * isolated ones each morph the shared parent, and on a window switch four of them arrive
  * while the components they name are being replaced — which is the `__lazyLoad not found`
  * race. See {@see WebhooksDashboardPage} for the
@@ -64,7 +64,7 @@ final class DeliveriesTable extends Component
     public ?int $windowDays = null;
 
     /**
-     * The shipped ceiling, repeated here because an ABSENT key reads as null and a null
+     * The shipped ceiling, repeated here because an absent key reads as null and a null
      * ceiling would switch the bound off — the one direction that is expensive and silent.
      * It matches the shipped default in config/webhooks.php.
      */
@@ -152,10 +152,10 @@ final class DeliveriesTable extends Component
         // than a DELETE — and a query with no bound on created_at visits every partition
         // there is, on every render of a screen that stays open all day. Nothing goes red:
         // the page loads, it just loads with the whole history in the plan, and the cost
-        // arrives with the DATA rather than with the change.
+        // arrives with the data rather than with the change.
         //
         // Bound through the package's own timestamp scope rather than a bare where(): a
-        // naive literal is resolved by PostgreSQL against the database SESSION zone, which
+        // naive literal is resolved by PostgreSQL against the database session zone, which
         // is a connection setting unrelated to app.timezone.
         $days = $this->effectiveWindowDays();
 
@@ -168,7 +168,7 @@ final class DeliveriesTable extends Component
             // The `!== ''` test changes no result: with an empty filter the clause becomes LIKE
             // '%%', which matches every row the panel would have returned anyway.
             //
-            // It is NOT redundant for that reason alone — it is what keeps an unfiltered table
+            // It is not redundant for that reason alone — it is what keeps an unfiltered table
             // from carrying a pointless LIKE into the query plan on a partitioned table. Kept
             // for the plan, not for the result.
             ->when($this->eventType !== '', fn (Builder $query): Builder => $query->where('event_type', 'like', '%'.$this->eventType.'%'))
@@ -196,7 +196,7 @@ final class DeliveriesTable extends Component
     /**
      * The window in days, or null when the host switched the bound off entirely.
      *
-     * The configured value is a CEILING rather than merely a default; a non-positive one is
+     * The configured value is a ceiling rather than merely a default; a non-positive one is
      * the deliberate opt-out, for an installation that would rather pay the scan.
      */
     private function effectiveWindowDays(): ?int

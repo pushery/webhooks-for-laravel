@@ -11,15 +11,15 @@ use DateTimeZone;
 use Pushery\Webhooks\Database\Dialect\Dialect;
 
 /**
- * Renders a moment as an UNAMBIGUOUS SQL timestamp literal: the same instant in UTC,
+ * Renders a moment as an unambiguous SQL timestamp literal: the same instant in UTC,
  * carrying its offset — "2026-07-12 10:30:00.000000+00:00".
  *
  * On PostgreSQL every timestamp column in this package is timestamptz, and PostgreSQL resolves a
- * NAIVE literal ("2026-07-12 10:30:00") against the SESSION time zone — a database
+ * naive literal ("2026-07-12 10:30:00") against the session time zone — a database
  * setting, not an application one. A naive binding therefore means a different instant
  * depending on where it runs, and under a non-UTC application timezone the DST
  * fall-back hour maps two instants an hour apart onto the identical literal. Carrying
- * the offset removes both ambiguities: the literal IS the instant, whatever either
+ * the offset removes both ambiguities: the literal is the instant, whatever either
  * clock is set to.
  *
  * Use it for every timestamp this package binds into SQL — raw statements, query
@@ -44,7 +44,7 @@ final class Timestamp
 
     /**
      * The literal format for MySQL DATETIME(6), which is timezone-naive: UTC microseconds
-     * with NO offset. The value carries the instant only because it is always UTC — MySQL
+     * with no offset. The value carries the instant only because it is always UTC — MySQL
      * cannot store the offset a timestamptz literal carries, and TIMESTAMP would re-resolve
      * it against the session zone and top out in 2038.
      */
@@ -66,7 +66,7 @@ final class Timestamp
     /**
      * The instant rendered for the engine it will be compared against.
      *
-     * The two literals are not interchangeable, and picking the wrong one fails SILENTLY
+     * The two literals are not interchangeable, and picking the wrong one fails silently
      * rather than loudly. On MySQL the columns are UTC-naive DATETIME(6), and MySQL converts an
      * offset-bearing literal into the session time zone before it compares (8.0.19+), so on a
      * session that is not UTC every comparison slides by that offset: an equality finds nothing

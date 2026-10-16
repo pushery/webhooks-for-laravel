@@ -4,7 +4,7 @@
      can open the form or reveal its secret without a full navigation. Styled with
      WireKit tokens throughout.
 
-     max-w-6xl, and it was max-w-4xl. This was the NARROWEST of the four portal-family
+     max-w-6xl, and it was max-w-4xl. This was the narrowest of the four portal-family
      screens while carrying the widest content: the endpoint table needs 1015px for its
      eight columns and five row actions, and max-w-4xl left it 864px. The table scrolls
      on its own, so nothing was unreachable -- but `Transform` sat off the right edge on
@@ -18,7 +18,7 @@
 <div class="wh-portal mx-auto flex max-w-6xl flex-col gap-[var(--padding-wk-y-lg)] p-[var(--padding-wk-x-lg)]">
     <header>
         <x-wirekit::page-header :level="\Pushery\Webhooks\Support\UiVariant::pageHeadingLevel()" :title="__('webhooks::self-service.page.heading')" :description="__('webhooks::self-service.page.intro')">
-            {{-- The condition sits INSIDE the slot. Livewire marks every conditional block in its
+            {{-- The condition sits inside the slot. Livewire marks every conditional block in its
                  views with comments, and a block left in the default slot fills it: the page-header
                  then draws that slot instead of the title, and the heading renders empty. --}}
             <x-slot:actions>

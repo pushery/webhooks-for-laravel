@@ -44,7 +44,7 @@ final class PayloadTransformEditor extends Component
     public string $payloadVersion = '';
 
     /**
-     * The three rule lists, typed as what a public Livewire property CAN hold.
+     * The three rule lists, typed as what a public Livewire property can hold.
      *
      * These read `array<int, string>` and `array<int, array{from: string, to: string}>` until
      * 2026-08-27, and the narrower type was not a description but a wish. Livewire enforces the
@@ -79,8 +79,8 @@ final class PayloadTransformEditor extends Component
 
     public function mount(WebhookSubscription $subscription): void
     {
-        // Route-model binding resolves the {subscription} segment UNSCOPED, so re-resolve it
-        // through the owner-scoped query: a foreign id then fails not-found (404) BEFORE the
+        // Route-model binding resolves the {subscription} segment unscoped, so re-resolve it
+        // through the owner-scoped query: a foreign id then fails not-found (404) before the
         // policy, exactly as every other panel does — otherwise a foreign-but-existing id 403s
         // while a non-existent one 404s, letting a tenant enumerate which ids exist. The policy
         // stays the second, defense-in-depth guard.
@@ -165,7 +165,7 @@ final class PayloadTransformEditor extends Component
         // property, so the browser writes it straight onto a `varchar(20)` column — the same
         // hazard the URL field in the endpoint form caps at 2048, with a comment about MySQL's
         // 1406 error. Past 20 characters this is a 500 (Postgres 22001, MySQL 1406) where the
-        // reader should be getting a field message. And a rule list is a public ARRAY: Livewire
+        // reader should be getting a field message. And a rule list is a public array: Livewire
         // enforces the array, never its elements, so an entry that is not a string reached
         // the trim under strict_types and raised there.
         //
@@ -175,9 +175,9 @@ final class PayloadTransformEditor extends Component
         // configured set would narrow documented behavior to fix a column width. The width is
         // what is wrong here, so the width is what is bounded.
         // Eight of these rules cannot fire, and they stay anyway. The five top-level properties
-        // are DECLARED `string` and `array`, so PHP makes those two rules true before validation
+        // are declared `string` and `array`, so PHP makes those two rules true before validation
         // reads them, whatever the caller. What is genuinely enforced here is everything under a
-        // `.*`: nothing checks the type of an array ELEMENT, which is the shape that used to reach
+        // `.*`: nothing checks the type of an array element, which is the shape that used to reach
         // the trim and raise there.
         //
         // They stay because the set is read as a whole -- somebody looking for what
@@ -219,7 +219,7 @@ final class PayloadTransformEditor extends Component
     {
         $rules = $this->buildRules();
 
-        // Resolve rules EXACTLY as the delivery path does (WebhookManager::transformFor):
+        // Resolve rules exactly as the delivery path does (WebhookManager::transformFor):
         // an endpoint with no explicit per-endpoint transform inherits the selected version's
         // default rule set from the registry. save() stores an empty rule set as a null
         // transform, so empty controls always mean "inherit the version" — the preview must
@@ -324,7 +324,7 @@ final class PayloadTransformEditor extends Component
     /**
      * Refuse a field name that looks like a nested path.
      *
-     * The rule engine matches against the payload's TOP-LEVEL keys only, so `customer.email`
+     * The rule engine matches against the payload's top-level keys only, so `customer.email`
      * matches nothing and is a no-op -- an exact no-op, with no message, no log line and no
      * visible difference in the preview beside it. On the one screen where a tenant configures
      * which customer data leaves the building, silence is the wrong answer: the reader believes
@@ -409,7 +409,7 @@ final class PayloadTransformEditor extends Component
         $clean = [];
 
         foreach ($values as $value) {
-            // is_string, because this runs on the READ path too. render() calls preview() which
+            // is_string, because this runs on the read path too. render() calls preview() which
             // calls buildRules(), so a non-string element does not wait for a save to raise — it
             // takes the editor down on load and keeps it down until the state is reset. The
             // validation in save() protects the write; only this protects the render.

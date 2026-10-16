@@ -14,7 +14,7 @@ use Pushery\Webhooks\Core\Signing\Exceptions\InvalidMessage;
  * per the Standard Webhooks security model, must not be user-controlled and must
  * not contain a "." (the field separator in the signed string {id}.{ts}.{body}).
  *
- * The id is STABLE across delivery attempts: a retried delivery re-signs with the
+ * The id is stable across delivery attempts: a retried delivery re-signs with the
  * same id, so the receiver's idempotency key never changes.
  */
 final readonly class WebhookMessage

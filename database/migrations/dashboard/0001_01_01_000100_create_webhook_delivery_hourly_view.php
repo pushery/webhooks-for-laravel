@@ -78,7 +78,7 @@ return new class extends Migration
             ? ",\n                tdigest(duration_ms, 100)                                   AS latency_digest"
             : '';
 
-        // Grouped by the WHOLE morph pair (owner_type, owner_id) — not owner_id alone —
+        // Grouped by the whole morph pair (owner_type, owner_id) — not owner_id alone —
         // so two tenants that share an owner_id under different owner types never share a
         // rollup row, and a window read that filters the pair sees only its own tenant.
         DB::statement(<<<SQL
@@ -113,7 +113,7 @@ return new class extends Migration
     /**
      * MySQL has no materialized view, so the rollup is a real InnoDB table with the same name and
      * columns, refreshed in place by webhooks:refresh-metrics (an atomic recompute in a
-     * transaction, so readers always see a whole snapshot). The owner columns carry a NON-NULL
+     * transaction, so readers always see a whole snapshot). The owner columns carry a non-null
      * sentinel — '' for owner_type and the owner_key_type's zero value for owner_id (0 for bigint,
      * the nil UUID/ULID otherwise) — because a unique index treats NULLs as distinct on both
      * engines, so a nullable owner pair would never collide and the owner-less (global) rollup row
@@ -130,8 +130,8 @@ return new class extends Migration
         $ownerKeyType = OwnerKeyType::fromConfig();
 
         // The same collation the three other tables pin on their identity columns, and this one
-        // was the exception. A Blueprint column with no collation inherits the TABLE's, which for
-        // a Blueprint-created table comes from the CONNECTION config — and Laravel's shipped
+        // was the exception. A Blueprint column with no collation inherits the table's, which for
+        // a Blueprint-created table comes from the connection config — and Laravel's shipped
         // config/database.php names utf8mb4_unicode_ci there, which is case- and
         // accent-insensitive. So the leading column of the table's key compared
         // more loosely than the raw rows it aggregates, on any host that had not changed it.
@@ -171,8 +171,8 @@ return new class extends Migration
      * primary path; on PostgreSQL 13 it does not exist, so an epoch-floor expression
      * yields the identical whole-hour boundary.
      *
-     * The date_bin origin carries an explicit +00 offset, NOT a bare '2000-01-01' — a bare
-     * timestamptz literal is resolved against the database SESSION time zone, so under a
+     * The date_bin origin carries an explicit +00 offset, not a bare '2000-01-01' — a bare
+     * timestamptz literal is resolved against the database session time zone, so under a
      * sub-hour-offset session zone (Asia/Kolkata +05:30, say) the origin instant would land at
      * :30 past the hour and every bucket boundary would shift with it, diverging from both the
      * epoch-floor fallback below and MySQL's whole-hour DATE_FORMAT truncation. Pinning it to a

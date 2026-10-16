@@ -10,7 +10,7 @@ use Pushery\Webhooks\Database\Dialect\Dialect;
 use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
- * Rebuilds `webhook_delivery_hourly` on an EXISTING PostgreSQL install so a refused delivery is
+ * Rebuilds `webhook_delivery_hourly` on an existing PostgreSQL install so a refused delivery is
  * counted as a failure instead of falling into no bucket at all.
  *
  * The fix was half-applied, and the half that was missing is the default engine. When `refused` was
@@ -29,7 +29,7 @@ use Pushery\Webhooks\Support\WebhookConnection;
  *
  * Nothing is at risk: every row of this view is derived from the delivery log, and
  * `webhooks:refresh-metrics` rebuilds it on its schedule. The view is dropped and recreated here,
- * and this migration REFRESHES it before it returns — a recreated materialized view is not merely
+ * and this migration refreshes it before it returns — a recreated materialized view is not merely
  * empty, every SELECT against it raises 55000 until something populates it, so leaving that to
  * the next scheduled run would take the dashboard down for the whole interval. The reasoning is
  * spelled out at the statement itself.

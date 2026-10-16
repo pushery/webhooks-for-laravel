@@ -89,7 +89,7 @@ final readonly class StandardWebhooksScheme implements SignatureScheme
             return VerificationResult::malformed();
         }
 
-        // The header as RECEIVED, not the integer it was normalized to for the window check
+        // The header as received, not the integer it was normalized to for the window check
         // above. {@see self::signedContent()} for what that changes and why.
         $toSign = $this->signedContent($id, $timestamp, $rawBody);
 
@@ -119,11 +119,11 @@ final readonly class StandardWebhooksScheme implements SignatureScheme
     /**
      * The bytes the HMAC is taken over, per the spec: `{id}.{timestamp}.{body}`.
      *
-     * The timestamp is a STRING here rather than an int. Normalizing the header to an integer
+     * The timestamp is a string here rather than an int. Normalizing the header to an integer
      * first and signing that would have two consequences:
      *
      *   a producer that sends `0<ts>` and signs `{id}.0<ts>.{body}`, exactly as the spec says,
-     *   would be REFUSED, because this side would compute `{id}.<ts>.{body}` instead
+     *   would be refused, because this side would compute `{id}.<ts>.{body}` instead
      *
      *   a delivery signed canonically would stay valid after somebody rewrote its header to
      *   `0<ts>`, because both spellings normalize to the same integer
@@ -141,7 +141,7 @@ final readonly class StandardWebhooksScheme implements SignatureScheme
     }
 
     /**
-     * @param  non-empty-string  $key  the DERIVED key, never the configured secret
+     * @param  non-empty-string  $key  the derived key, never the configured secret
      */
     private function hmac(string $toSign, string $key): string
     {
@@ -151,7 +151,7 @@ final readonly class StandardWebhooksScheme implements SignatureScheme
     /**
      * Whether a configured secret derives an HMAC key at all.
      *
-     * Public because the configuration checks need the SAME derivation the signing path
+     * Public because the configuration checks need the same derivation the signing path
      * uses. Re-deriving it in a second place is how the two come apart, and this one is
      * not a place they may: a check that disagrees with the signer would pass exactly the
      * secrets the signer cannot use.
@@ -175,7 +175,7 @@ final readonly class StandardWebhooksScheme implements SignatureScheme
      * The raw HMAC key bytes, or null when the secret decodes to nothing.
      *
      * The derivation matches the reference SDKs exactly — strip an optional `whsec_`,
-     * then base64-decode. What the reference does NOT do is notice the empty result, and
+     * then base64-decode. What the reference does not do is notice the empty result, and
      * this package has a place to notice it, so it does. See {@see UnusableSigningSecret}
      * for why an empty key is not a key.
      *

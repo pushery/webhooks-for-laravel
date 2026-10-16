@@ -85,7 +85,7 @@ final class WebhooksServiceProvider extends ServiceProvider
 
         // Publishing is registered regardless of the Platform switch: the config, the
         // views, the translations and each layer's migrations must be publishable by a
-        // send-only or receive-only consumer too — the one who has Platform switched OFF
+        // send-only or receive-only consumer too — the one who has Platform switched off
         // is exactly the one who cannot publish the config that switches it back on.
         if ($this->app->runningInConsole()) {
             $this->registerPublishing();
@@ -108,7 +108,7 @@ final class WebhooksServiceProvider extends ServiceProvider
         // Every Platform delivery names the endpoint it was built for, so the queued job
         // re-reads it immediately before sending and refuses a delivery whose endpoint was
         // switched off — or deleted — while it waited in the queue. This rebinds the Server
-        // layer's OpenDeliveryGate, and ONLY while the Platform layer runs: a send-only or
+        // layer's OpenDeliveryGate, and only while the Platform layer runs: a send-only or
         // receive-only host keeps the open gate, so a stray subscription_id meta key never
         // queries webhook_subscriptions, a table its config never migrated. Isolation by the
         // config gate, not by SubscriptionDeliveryGate's short-circuit — and the gate is read
@@ -139,7 +139,7 @@ final class WebhooksServiceProvider extends ServiceProvider
             // This line used to name `DETACH PARTITION` as well, and that is the one piece of DDL
             // the command deliberately does not issue.
             // `PartitionManager::drainDefaultPartitionInto()` explains at length why: a
-            // non-concurrent DETACH takes ACCESS EXCLUSIVE on the parent and holds it to commit,
+            // non-concurrent DETACH takes access EXCLUSIVE on the parent and holds it to commit,
             // which would stop the entire outbound delivery path for the length of the move. The
             // drain is built the way it is precisely to avoid it. Naming it here described the
             // shape that was rejected, so a reader weighing the lock cost of this schedule entry
@@ -191,7 +191,7 @@ final class WebhooksServiceProvider extends ServiceProvider
                 ->withoutOverlapping(55)
                 ->onOneServer();
 
-            // A finished delivery only refreshes ITS OWN endpoint's cached health, so an
+            // A finished delivery only refreshes its own endpoint's cached health, so an
             // endpoint whose traffic dries up would keep the last score a delivery left
             // frozen forever and the status board would silently lie. When continuous
             // scoring is on, sweep every active endpoint on a cadence so a gone-quiet
@@ -269,8 +269,8 @@ final class WebhooksServiceProvider extends ServiceProvider
     /**
      * Wire the self-service authorization surface — the manage-webhook-endpoints
      * ability plus the row-level subscription policy — but only when a host has
-     * opted a tenant in to managing its own endpoints. The gate is fail-CLOSED: with
-     * no host 'webhooks.manage' ability defined it DENIES, so registering the layer
+     * opted a tenant in to managing its own endpoints. The gate is fail-closed: with
+     * no host 'webhooks.manage' ability defined it denies, so registering the layer
      * never silently exposes endpoint management to every authenticated user. A host
      * opts a tenant in by defining 'webhooks.manage'.
      */
@@ -281,8 +281,8 @@ final class WebhooksServiceProvider extends ServiceProvider
         }
 
         Gate::define('manage-webhook-endpoints', static function (Authenticatable $user): bool {
-            // Fail CLOSED: a host that registers the self-service layer but never defines the
-            // 'webhooks.manage' ability must NOT silently expose endpoint management to every
+            // Fail closed: a host that registers the self-service layer but never defines the
+            // 'webhooks.manage' ability must not silently expose endpoint management to every
             // authenticated user. With no ability defined, deny — the host opts a tenant in by
             // defining 'webhooks.manage' (see "Authorization is fail-closed" at
             // https://docs.pushery.com/webhooks-for-laravel/layers/self-service-portal).
@@ -309,7 +309,7 @@ final class WebhooksServiceProvider extends ServiceProvider
         //    server and dashboard tables in a send-only host that never switched those layers
         //    on. Splitting them by layer exists precisely to prevent that; an umbrella over
         //    them would undo it in one command.
-        //  - The two UI variants. `webhooks-ui` and `webhooks-ui-wirekit` write to the SAME
+        //  - The two UI variants. `webhooks-ui` and `webhooks-ui-wirekit` write to the same
         //    destination on purpose — a host picks exactly one — so publishing both would
         //    resolve to whichever ran last. An umbrella that produces an order-dependent
         //    result is worse than no umbrella. For the same reason `webhooks-views` leaves
@@ -322,7 +322,7 @@ final class WebhooksServiceProvider extends ServiceProvider
             __DIR__.'/../config/webhooks.php' => config_path('webhooks.php'),
         ], ['webhooks', 'webhooks-config']);
 
-        // One migration tag per LAYER, each landing its files FLAT in database/migrations.
+        // One migration tag per layer, each landing its files flat in database/migrations.
         //
         // Publishing database/migrations/ as a directory would be the obvious thing and it
         // would be silently broken: vendor:publish mirrors a directory recursively, so the
@@ -332,7 +332,7 @@ final class WebhooksServiceProvider extends ServiceProvider
         // request would die on a missing table. Mapping file by file to a flat
         // destination is what makes the published migration a migration the migrator runs.
         //
-        // The tags are split by layer because a published migration RUNS: handing a
+        // The tags are split by layer because a published migration runs: handing a
         // send-only consumer the client and dashboard migrations would create tables for
         // layers they never switched on.
         // publishesMigrations(), not publishes(). Since Laravel 11 `vendor:publish` re-dates a

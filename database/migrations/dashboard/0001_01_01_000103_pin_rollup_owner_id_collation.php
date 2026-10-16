@@ -12,7 +12,7 @@ use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
  * Pins `webhook_delivery_hourly.owner_id` to the case- and accent-sensitive collation on an
- * EXISTING MySQL rollup table whose owners are keyed by uuid or ulid.
+ * existing MySQL rollup table whose owners are keyed by uuid or ulid.
  *
  * The column is the second one of the rollup's unique index, and as a CHAR column it inherited
  * the table's collation, which for a Blueprint-created table comes from the connection config.

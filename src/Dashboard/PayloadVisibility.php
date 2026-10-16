@@ -11,13 +11,13 @@ use Illuminate\Support\Facades\Gate;
  * How much of a delivery's stored body the acting user may see.
  *
  * The dashboard's route gate (`view-webhook-dashboard`) answers "may you read the delivery
- * LOG" — the status, the timing, the endpoint. The body is a different question. In a real
+ * log" — the status, the timing, the endpoint. The body is a different question. In a real
  * integration `webhook_deliveries.payload` is the business record itself: the order, the
  * customer, the shipping address. Letting one ability answer both means "may see that a
  * delivery failed" silently implies "may see whose order it was", and that is not a
  * permission level, it is the absence of one.
  *
- * So the body carries its OWN ability, and it fails CLOSED. That direction is deliberate and
+ * So the body carries its own ability, and it fails closed. That direction is deliberate and
  * it is the same reasoning {@see DashboardScope::authorizeAllTenants()} spells out: the
  * dashboard ability is one a per-tenant dashboard necessarily grants broadly, because every
  * customer needs it to see their own deliveries. Defaulting the body open would therefore
@@ -27,13 +27,13 @@ use Illuminate\Support\Facades\Gate;
  * `Gate::define('view-webhook-payload', fn () => true)` — which is greppable and reviewable,
  * unlike an absence.
  *
- * Denial does not mean a blank space. The default fallback REDACTS: the structure of the body
+ * Denial does not mean a blank space. The default fallback redacts: the structure of the body
  * survives, its values do not. That is a deliberate design choice rather than a softer one —
  * for debugging, the shape of a body is almost always the useful part, and a drawer that
  * simply stops after its heading reads as a defect, which is how a guard gets "repaired" out
  * of existence by the next person to look at it.
  *
- * @internal Engine internals, deliberately. A host's extension points here are the ABILITY and
+ * @internal Engine internals, deliberately. A host's extension points here are the ability and
  * the two config keys, not this class — so the drawer view resolves the decision through the
  * component rather than naming this class, and a published view keeps working if the mechanism
  * behind it is reshaped inside the 1.x line.
@@ -58,7 +58,7 @@ final class PayloadVisibility
     /**
      * What the acting user gets for a delivery body.
      *
-     * Full only when the configured ability EXISTS and passes. A blank ability name, an
+     * Full only when the configured ability exists and passes. A blank ability name, an
      * ability the host never defined, and a user who fails it all land on the configured
      * fallback — never on the full body.
      */
@@ -72,7 +72,7 @@ final class PayloadVisibility
 
         // The `!== ''` half decides nothing on its own, for the same reason as its
         // twin in DashboardScope: `Gate::has('')` is false, so an empty ability already fails
-        // the conjunction. It is written out because this branch decides whether a PAYLOAD is
+        // the conjunction. It is written out because this branch decides whether a payload is
         // shown, and a guard that reads as three independent conditions is the one that stays
         // correct when someone reorders it.
         if (is_string($ability) && $ability !== '' && Gate::has($ability) && Gate::allows($ability)) {

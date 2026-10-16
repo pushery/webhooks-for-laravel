@@ -19,7 +19,7 @@ use InvalidArgumentException;
  * It extends InvalidArgumentException, which is what this condition has always thrown, so
  * a host already catching that still catches this. What it adds is the two things the bare
  * exception could not carry: the status the endpoint should answer with, and a report()
- * that says the fault is a CONFIGURATION rather than an application error.
+ * that says the fault is a configuration rather than an application error.
  *
  * The status matters more than it looks. A configuration fault is the one refusal that used
  * to escape as a 500 — and 5xx is the only answer a producer reads as "try again". Some do
@@ -48,12 +48,12 @@ final class WebhookConfigCannotVerify extends InvalidArgumentException
     }
 
     /**
-     * The secret is present but derives NO key, which is worse than absent.
+     * The secret is present but derives no key, which is worse than absent.
      *
      * Standard Webhooks base64-decodes the secret to get its HMAC key. A value carrying no
      * base64 characters -- the bare `whsec_` prefix above all -- decodes to zero bytes, and
      * HMAC under an empty key is computable by anyone who sees the request. Absent, the
-     * config refuses everything; like this, it would ACCEPT everything, while reading as
+     * config refuses everything; like this, it would accept everything, while reading as
      * configured. The same refusal and the same status, because it is the same fact about
      * the request: it cannot be accepted as authentic.
      */

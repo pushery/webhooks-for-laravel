@@ -64,14 +64,14 @@ final readonly class DefaultSsrfGuard implements SsrfGuard
         }
         $port = $parts['port'] ?? ($scheme === 'http' ? 80 : 443);
 
-        // And the same name has to reach the TRANSPORT, or the pin describes a destination the
+        // And the same name has to reach the transport, or the pin describes a destination the
         // request never asks for: PinnedEndpoint names $host in its CURLOPT_RESOLVE entry while
         // the request goes to ->url, so a URL still carrying the dot is resolved again at
         // connect time — the TOCTOU rebind window the pin exists to close. Rebuilt only when
         // the two disagree, so an ordinary URL reaches curl exactly as its caller wrote it.
         $url = $this->canonicalize($url, $parts, $host);
 
-        // A blocked NAME is matched as a name. A blocked ADDRESS is matched as an address, in
+        // A blocked name is matched as a name. A blocked address is matched as an address, in
         // whatever spelling the URL carries it (`[::ffff:93.184.216.34]` is 93.184.216.34), and
         // again below against everything the host resolves to, which is where a decimal or hex
         // spelling such as `1572395042` turns into the address it names.
@@ -110,11 +110,11 @@ final readonly class DefaultSsrfGuard implements SsrfGuard
         $ips = $this->resolver->resolve($host);
 
         if ($ips === []) {
-            // RETRYABLE, not final. PHP's resolver answers `false` for a name that does not
+            // Retryable, not final. PHP's resolver answers `false` for a name that does not
             // exist and for a lookup that merely failed — NXDOMAIN, SERVFAIL, a resolver
             // timeout, a few seconds of lost network — and only the first is permanent. See
             // HostUnresolvable for the arithmetic; the short version is that treating the
-            // transient three as final loses a delivery each AND feeds the circuit breaker,
+            // transient three as final loses a delivery each and feeds the circuit breaker,
             // while treating the permanent one as transient costs a few cheap lookups.
             throw HostUnresolvable::for($host);
         }
@@ -159,7 +159,7 @@ final readonly class DefaultSsrfGuard implements SsrfGuard
         // the Host header of every request this branch touches.
         // The cast answers the declared shape of parse_url()'s result, not the value: this
         // branch is only reached for a URL that already parsed with a scheme, so it is a string
-        // by then. strtolower() beside it is NOT redundant -- a scheme is case-insensitive and
+        // by then. strtolower() beside it is not redundant -- a scheme is case-insensitive and
         // the caller may have written it in capitals.
         return strtolower((string) $parts['scheme']).'://'
             .$userinfo
@@ -192,7 +192,7 @@ final readonly class DefaultSsrfGuard implements SsrfGuard
     private function matchesHostList(string $host, array $list): bool
     {
         // The same cut on the entries, so an operator may write the name either way. $host has
-        // already been canonicalized by the caller; this is about what the CONFIG is allowed
+        // already been canonicalized by the caller; this is about what the config is allowed
         // to contain.
         return array_any($list, fn (string $entry): bool => rtrim(strtolower($entry), '.') === $host);
     }

@@ -24,7 +24,7 @@ use Illuminate\Routing\Router;
  *
  * The failure is easy to walk into, because nothing about it is visible from inside the
  * application. `Route::webhooks()` is shown in the quickstart and on the receiving page without
- * naming a route FILE, and `routes/web.php` is where a Laravel developer puts a route by habit.
+ * naming a route file, and `routes/web.php` is where a Laravel developer puts a route by habit.
  * The host sees a route that exists, a config entry that is correct, and a producer dashboard
  * full of failures.
  *
@@ -91,7 +91,7 @@ final class ForgeryProtectedRoutes
             // yet. The group is included because a route registered inside `Route::middleware('web')`
             // reports the GROUP here, not its members, and that is the ordinary case.
             //
-            // The `is_string()` sits INSIDE the condition rather than above it as a skip: the
+            // The `is_string()` sits inside the condition rather than above it as a skip: the
             // declared type of this list is `mixed[]`, so `is_subclass_of()` needs the narrowing —
             // but as its own branch it would be a line no run can enter, which is the shape the
             // comment above rejects. On one condition it is a short-circuit within a line that

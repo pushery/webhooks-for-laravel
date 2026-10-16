@@ -42,7 +42,7 @@ final class ScheduleCadence
     /**
      * The cadence token in minutes — what "how often does this run" means as a number.
      *
-     * Exposed so a reader of the DATA can ask the same question the scheduler answers: a rollup
+     * Exposed so a reader of the data can ask the same question the scheduler answers: a rollup
      * one cadence behind is a rollup between two runs, and only a multiple of it means something
      * broke. An unsupported token falls back to five minutes rather than to zero, because zero
      * would make every comparison against it read as "always late".

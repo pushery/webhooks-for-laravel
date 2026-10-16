@@ -7,7 +7,7 @@ namespace Pushery\Webhooks\Server\Delivery;
 use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 
 /**
- * The last word on whether a QUEUED delivery may still go out.
+ * The last word on whether a queued delivery may still go out.
  *
  * A delivery's destination and secret are sealed into its payload at dispatch time,
  * so without this seam the job would keep POSTing to an endpoint that has since been

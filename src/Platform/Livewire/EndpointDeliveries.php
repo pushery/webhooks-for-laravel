@@ -40,7 +40,7 @@ use Pushery\Webhooks\Support\UiVariant;
  * Its own query is one indexed read bounded to a page, which is a smaller cost than a modal
  * that vanishes.
  *
- * It exists because the portal could show a customer THAT they had an endpoint and never
+ * It exists because the portal could show a customer that they had an endpoint and never
  * whether anything had ever reached it. A receiver seeing nothing arrive has exactly two
  * hypotheses — you did not send, or I did not accept — and without this list they cannot
  * rule out the first, so they write to support instead. The endpoint health badge does not
@@ -49,15 +49,15 @@ use Pushery\Webhooks\Support\UiVariant;
  *
  * Two properties of the query are load-bearing rather than incidental:
  *
- * - **It is scoped by the delivery row's OWN owner columns, with no join.** Each delivery
+ * - **It is scoped by the delivery row's own owner columns, with no join.** Each delivery
  *   carries the denormalized (owner_type, owner_id) of its subscription's owner, so there
- *   is no relation through which the scope could later be widened, and the whole PAIR is
+ *   is no relation through which the scope could later be widened, and the whole pair is
  *   compared because two tenants can share an owner_id under different owner types. With
  *   no tenant resolved it constrains to nothing rather than falling back to everything.
  * - **It reads no payload, ever, and no error text unless the host asked for one.** The
  *   outbound payload is gated behind its own ability on the operator dashboard and is never
  *   fetched here at all. `error` carries an HTTP client's exception message and can quote
- *   back whatever the receiver wrote — on the endpoint OWNER's own screen that text is the
+ *   back whatever the receiver wrote — on the endpoint owner's own screen that text is the
  *   answer they came for, on a portal where the reader does not run the receiver it is
  *   someone else's server talking, and which of the two this is embedded on is the host's
  *   knowledge. So it is a config key, the property may only ever decline it, and the column
@@ -67,7 +67,7 @@ use Pushery\Webhooks\Support\UiVariant;
  * - **It is bounded in time by default.** webhook_deliveries is range-partitioned by month,
  *   and a read with no lower bound on created_at cannot be pruned, so it visits every
  *   partition there is. Nothing goes red about that — the page loads, it just loads with the
- *   whole history in the plan, and the cost arrives with the DATA rather than with the
+ *   whole history in the plan, and the cost arrives with the data rather than with the
  *   change. A filter with no default is not a filter, it is an offer.
  */
 final class EndpointDeliveries extends Component
@@ -87,18 +87,18 @@ final class EndpointDeliveries extends Component
     /**
      * The most endpoints the filter offers, and the reason it offers a bounded number at all.
      *
-     * This select was filled with every endpoint the tenant owns, every column, on EVERY
+     * This select was filled with every endpoint the tenant owns, every column, on every
      * render of the panel — a filter change, a page change, a sibling event. The operator
      * console solved the identical problem carefully and says so in its own words; this is the
      * tenant-facing copy of the same control, and it had neither the cap nor the select().
      *
-     * When it truncates the view SAYS SO. A short list that looks complete is how a reader
+     * When it truncates the view says so. A short list that looks complete is how a reader
      * concludes an endpoint has no deliveries when it was simply never offered.
      */
     private const int ENDPOINT_OPTIONS = 200;
 
     /**
-     * The shipped window ceiling, repeated here because an ABSENT key reads as null and a
+     * The shipped window ceiling, repeated here because an absent key reads as null and a
      * null ceiling would switch the bound off — the one direction that is expensive and
      * silent. A host on a config cache built before this version is bounded in the meantime.
      * It matches the shipped default in config/webhooks.php.
@@ -115,7 +115,7 @@ final class EndpointDeliveries extends Component
      *
      * #[Locked] because it is the only narrowing here the reader must not be able to move.
      * $endpointId below is a filter over rows they may see anyway, so a tampered value costs
-     * nothing; this one is what a host embeds INSTEAD of trusting that filter, which makes a
+     * nothing; this one is what a host embeds instead of trusting that filter, which makes a
      * writable version of it exactly as useless as the filter it replaces.
      *
      * It narrows and never grants. The pin is applied as its own condition beside the owner
@@ -123,7 +123,7 @@ final class EndpointDeliveries extends Component
      * empty list rather than access to it — a host that pins the wrong resource gets nothing
      * back, which is the direction a scoping mistake has to fail in.
      *
-     * The case: a surface cut per RESOURCE rather than per account. There the panel belongs to
+     * The case: a surface cut per resource rather than per account. There the panel belongs to
      * one destination and who may read it hangs off a policy over that destination, so the
      * static resolvers beside it — which answer for the whole request — can only be satisfied
      * by declaring every endpoint the account may read anywhere and then leaning on the filter.
@@ -156,7 +156,7 @@ final class EndpointDeliveries extends Component
      * Whether an endpoint id that no longer resolves closes the list instead of dropping out
      * of it.
      *
-     * The default is the behavior every host has today: the filter is a NARROWING over rows
+     * The default is the behavior every host has today: the filter is a narrowing over rows
      * the reader may see anyway, so losing it widens the list back to the tenant's own
      * deliveries, which is a plausible reset and shows nothing that was hidden.
      *
@@ -182,9 +182,9 @@ final class EndpointDeliveries extends Component
     /**
      * How many days back the list reads, or null to take the host's configured ceiling.
      *
-     * This one IS public, unlike the page size above, because narrowing the window is a
+     * This one is public, unlike the page size above, because narrowing the window is a
      * thing a reader legitimately does. What makes that safe is the clamp: the value can
-     * only ever move the window IN, never past `platform.deliveries.window_days`. A property
+     * only ever move the window in, never past `platform.deliveries.window_days`. A property
      * that could widen it would be a way for the browser to ask for exactly the unbounded
      * scan the default exists to prevent.
      */
@@ -195,8 +195,8 @@ final class EndpointDeliveries extends Component
      *
      * Also narrowing-only, and for a sharper reason than the window: `error` carries an HTTP
      * client's exception message and can quote back whatever the receiver wrote. An
-     * embedding may switch it OFF where the host allows it; nothing sent from a browser may
-     * switch it ON.
+     * embedding may switch it off where the host allows it; nothing sent from a browser may
+     * switch it on.
      */
     public ?bool $showErrors = null;
 
@@ -259,7 +259,7 @@ final class EndpointDeliveries extends Component
     #[On('endpoint-deleted')]
     public function refreshDeliveries(): void
     {
-        // Under $strictEndpoint the id deliberately STAYS, and dropping it here would defeat
+        // Under $strictEndpoint the id deliberately stays, and dropping it here would defeat
         // the switch before the query ever sees it: an id that is gone must close the list,
         // and a null id is indistinguishable from "no filter was ever set". The 404 loop this
         // reset exists to prevent cannot happen there either, because the strict path resolves
@@ -319,11 +319,11 @@ final class EndpointDeliveries extends Component
      *
      * Four guards, in this order, and each answers a different question:
      *
-     * 1. The delivery is loaded through the OWNER-SCOPED query, so a foreign id resolves to
+     * 1. The delivery is loaded through the owner-scoped query, so a foreign id resolves to
      *    nothing and fails not-found before anything else runs — the same shape the endpoint
      *    lookup has, and the reason a probe cannot tell a foreign row from an absent one.
      * 2. The endpoint is loaded through {@see self::findOwnedEndpoint()}, which scopes again.
-     * 3. The `redeliver` ability is the row-level, defense-in-depth check on the ACTION.
+     * 3. The `redeliver` ability is the row-level, defense-in-depth check on the action.
      * 4. The per-tenant allowance, because this button makes the server send an HTTP request
      *    to a URL the reader controls.
      *
@@ -341,7 +341,7 @@ final class EndpointDeliveries extends Component
         // The owner-scoped one is still the default and still the whole answer for a host that
         // declared nothing. The unscoped one is reachable only for an id the host named through
         // {@see ReplayableEndpoints} -- and only after the line above already admitted the row
-        // through the READ scope, so an endpoint declared replayable but not readable never gets
+        // through the read scope, so an endpoint declared replayable but not readable never gets
         // this far. The policy below re-asks anyway; this decides which row it is asked about.
         $endpoint = ReplayableEndpoints::allows($delivery->subscription_id)
             ? WebhookSubscription::model()::query()->findOrFail($delivery->subscription_id)
@@ -404,8 +404,8 @@ final class EndpointDeliveries extends Component
             $deliveries = $this->page();
         }
 
-        // One row past the cap, so the truncation is DETECTABLE rather than assumed. Asking for
-        // MORE than one extra changes nothing observable -- the flag is a comparison against the
+        // One row past the cap, so the truncation is detectable rather than assumed. Asking for
+        // more than one extra changes nothing observable -- the flag is a comparison against the
         // cap and the view takes exactly the cap -- so only the +0 and the -1 readings are real.
         $endpoints = $this->endpointChoices();
 
@@ -503,7 +503,7 @@ final class EndpointDeliveries extends Component
     private function deliveryQuery(): Builder
     {
         // Only the columns the panel renders, and `error` only when it is actually rendered.
-        // The class promises to read no BODY of any kind, and a bare query would fetch the
+        // The class promises to read no body of any kind, and a bare query would fetch the
         // jsonb payload on every page — a promise kept by the view alone is a promise about
         // the markup, not about what was read.
         //
@@ -524,7 +524,7 @@ final class EndpointDeliveries extends Component
         $readable = ReadableEndpoints::ids();
 
         // Still closed when there is nothing to open it with. The owner pair is the ground set
-        // and a host may ADD to it (see ReadableEndpoints) -- with neither an owner nor a
+        // and a host may add to it (see ReadableEndpoints) -- with neither an owner nor a
         // declared readable endpoint the panel constrains to nothing rather than to everything,
         // which is the property this line has always had and the one worth not losing.
         if (! $owner instanceof TenantIdentity && $readable === []) {
@@ -556,12 +556,12 @@ final class EndpointDeliveries extends Component
             // The lenient lookup is the strict path's, and the pairing is the wrong way round
             // only until you read what each mode is protecting.
             //
-            // By default an id that does not resolve is a TAMPERED id -- the reset above has
+            // By default an id that does not resolve is a tampered id -- the reset above has
             // already removed the one legitimate way to hold a stale one -- so the not-found
             // lookup is right: an empty table would look like an answer about an endpoint the
             // reader does not own.
             //
-            // Under $strictEndpoint a stale id is the ORDINARY case, because the reset no
+            // Under $strictEndpoint a stale id is the ordinary case, because the reset no
             // longer runs, and 404-ing the panel for the rest of the session over a deletion
             // somebody performed on purpose is not an answer either. Both a deleted endpoint
             // and a tampered one close the list, and the trade is stated rather than
@@ -591,10 +591,10 @@ final class EndpointDeliveries extends Component
         // retention a DROP PARTITION rather than a DELETE — and a read with no bound on
         // created_at cannot be pruned, so it visits every partition there is. Nothing goes
         // red about that: the page loads, it just loads with the whole history in the plan,
-        // and the cost arrives with the DATA rather than with the change.
+        // and the cost arrives with the data rather than with the change.
         //
         // Bound through the package's own scope rather than a bare where(), because a naive
-        // literal is resolved by PostgreSQL against the database SESSION zone.
+        // literal is resolved by PostgreSQL against the database session zone.
         $days = $this->effectiveWindowDays();
 
         if ($days !== null) {
@@ -619,7 +619,7 @@ final class EndpointDeliveries extends Component
      */
     private function emptyStateKey(): string
     {
-        // Narrowed by outcome or by date: the only honest sentence is about the FILTERS. Both
+        // Narrowed by outcome or by date: the only honest sentence is about the filters. Both
         // others are claims about what was sent, and both are false here.
         if (DeliveryStatus::tryFrom($this->status) instanceof DeliveryStatus
             || CalendarDay::start($this->from) instanceof CarbonInterface
@@ -639,7 +639,7 @@ final class EndpointDeliveries extends Component
     }
 
     /**
-     * The tenant's deliveries as the READER has narrowed them.
+     * The tenant's deliveries as the reader has narrowed them.
      *
      * Separate from {@see self::deliveryQuery()} on purpose, and the separation is the fix for a defect
      * these filters introduced. The replay action loads its row through the owner-scoped query, and
@@ -653,7 +653,7 @@ final class EndpointDeliveries extends Component
      * package's own timestamp scopes for the two reasons the operator log states at its own
      * bounds: whereDate() wraps the column in a function and stops the planner pruning
      * partitions, and a bare where() binds a naive literal that PostgreSQL resolves against
-     * the database SESSION zone.
+     * the database session zone.
      *
      * @return Builder<WebhookDelivery>
      */
@@ -713,7 +713,7 @@ final class EndpointDeliveries extends Component
     /**
      * The window in days, or null when the host switched the bound off entirely.
      *
-     * The configured value is a CEILING, not merely a default: `windowDays` may narrow
+     * The configured value is a ceiling, not merely a default: `windowDays` may narrow
      * beneath it and may not reach past it. A non-positive ceiling is the deliberate opt-out
      * — a host that would rather pay the unbounded scan than ever hide a row.
      */
@@ -760,7 +760,7 @@ final class EndpointDeliveries extends Component
     /**
      * Whether the stored error text is rendered.
      *
-     * The config decides IF it may be, the property may only decline. `error` carries an HTTP
+     * The config decides if it may be, the property may only decline. `error` carries an HTTP
      * client's exception message and can quote back whatever the receiver wrote — on the
      * endpoint owner's own surface that is the answer they came for, but which surface this
      * is embedded on is the host's knowledge, not the browser's.

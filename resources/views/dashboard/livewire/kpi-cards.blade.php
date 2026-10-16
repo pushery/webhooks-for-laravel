@@ -5,7 +5,7 @@
      palette. Retry rate adds a usage meter for an at-a-glance bar.
 
      The poll lives on the root element rather than on the stats grid itself: the cadence
-     is interpolated into the DIRECTIVE NAME (wire:poll.30s), and Blade's component-tag
+     is interpolated into the directive name (wire:poll.30s), and Blade's component-tag
      compiler cannot parse an echo inside an attribute name. --}}
 @php($metrics = $this->metrics)
 <div

@@ -92,7 +92,7 @@ final class RetryAfter
             $errors = DateTimeImmutable::getLastErrors();
 
             // Two halves of this line cannot be told apart from their alternatives, and one
-            // fact explains both: an ERROR never coexists with a successful parse, in any of the
+            // fact explains both: an error never coexists with a successful parse, in any of the
             // three formats -- a rollover, an out-of-range time, trailing junk or a wrong zone
             // that produces an error returns false as well. So the instanceof already implies
             // error_count is zero, which leaves

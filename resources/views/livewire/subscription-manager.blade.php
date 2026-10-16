@@ -3,7 +3,7 @@
 @php
     // Each control's capability, decided by the component and passed in. A direct `View::make()`
     // with a hand-built array may pass none of them, and the defaults are today's behavior: every
-    // control renders. The check is the COURTESY -- each action still calls `authorizeAction()`
+    // control renders. The check is the courtesy -- each action still calls `authorizeAction()`
     // and still refuses -- so defaulting to "show" cannot open anything.
     $canCreate = $canCreate ?? true;
     $canEdit = $canEdit ?? true;
@@ -57,7 +57,7 @@
                      put it wherever its grammar wants it. --}}
                 <p class="text-sm text-gray-500">{{ __('webhooks::management.form.event_types_empty', ['file' => 'config/webhooks.php']) }}</p>
             @endforelse
-            {{-- Both keys: a per-item rule reports on the INDEXED path (eventTypes.0), so
+            {{-- Both keys: a per-item rule reports on the indexed path (eventTypes.0), so
                  a field-level lookup alone would refuse the save and show nothing. --}}
             {{-- The fieldset carries the description rather than a single checkbox: the error is
                  about the SET, and pointing every box at it would repeat the same sentence on
@@ -87,7 +87,7 @@
 
     @if ($newSecret)
         <div class="wh-new-secret rounded border border-green-300 bg-green-50 p-4">
-            {{-- A rotation says something a registration does not: the OLD secret keeps
+            {{-- A rotation says something a registration does not: the old secret keeps
                  verifying until the rotation window closes, which is what makes rotating
                  during an incident safe to do immediately. --}}
             {{-- A readonly input rather than a <code>, and that is about a rotation rather than
@@ -99,7 +99,7 @@
                  migration window nobody needed.
 
                  An input fixes the selection rather than the copying: focus it and Ctrl/Cmd-A
-                 selects the FIELD instead of the page, and the value comes back as one string
+                 selects the field instead of the page, and the value comes back as one string
                  with no wrap artifacts. It is also reachable by keyboard, which a <code> is not.
 
                  And it carries no `onfocus="this.select()"`, which is the obvious addition and the
@@ -111,7 +111,7 @@
                  need a named factory in the served asset, which is a different change with a
                  different cost.
 
-                 The heading is the input's LABEL rather than a paragraph beside it, so the field
+                 The heading is the input's label rather than a paragraph beside it, so the field
                  has an accessible name without inventing a lang key for one. --}}
             <label for="wh-new-secret-value" class="block text-sm font-medium">{{ $rotated ? __('webhooks::management.secret.rotated_heading') : __('webhooks::management.secret.heading') }}</label>
             <input
@@ -134,7 +134,7 @@
     @else
     {{-- A scroll container of its own, so the overbreadth stops here instead of reaching the
          document. Without it the whole page grows a horizontal scrollbar on a narrow viewport
-         and the header and page chrome slide away with the table, because it is the DOCUMENT
+         and the header and page chrome slide away with the table, because it is the document
          that scrolls rather than the table.
 
          tabindex="0" is not optional once the container exists: a scrollable region has to be

@@ -15,7 +15,7 @@ namespace Pushery\Webhooks\Core\Signing;
  * There is no timestamp in this dialect, so there is nothing to expire — the
  * tolerance argument is not consulted and a verification never returns `expired`.
  *
- * This is a RECEIVE adapter only, selected per source via a Client config
+ * This is a receive adapter only, selected per source via a Client config
  * `scheme`. It is never a sending default; {@see StandardWebhooksScheme} is.
  */
 final readonly class PlainHmacScheme implements AcceptsSignatureHeaders, SignatureScheme

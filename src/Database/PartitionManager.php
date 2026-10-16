@@ -19,14 +19,14 @@ use RuntimeException;
  * command so the partition scheme has a single source of truth.
  *
  * Months are UTC months. The partition key is a timestamptz, so a bound is an
- * INSTANT, not a wall-clock string: anchoring the boundaries to a local calendar
+ * instant, not a wall-clock string: anchoring the boundaries to a local calendar
  * would shift them by the local offset and — because that offset changes twice a
  * year — leave a one-hour gap or overlap between two adjacent partitions.
  *
  * The catch-all default partition is a safety net, not a resting place. A row that
  * lands in it blocks the creation of the partition that should have held it
  * ("updated partition constraint for default partition would be violated by some
- * row"), which would stop partition creation AND retention pruning dead. So the
+ * row"), which would stop partition creation and retention pruning dead. So the
  * manager drains it: the month's partition is built as a freestanding table, the
  * stranded rows move into it in chunks, and only then is it attached, so no DETACH
  * locks the parent while rows move. {@see self::drainDefaultPartitionInto()} states
@@ -42,7 +42,7 @@ final class PartitionManager
      * Rows moved out of the default partition per transaction.
      *
      * The drain runs after days or weeks of stranded deliveries, so the total is unbounded by
-     * nature; what this bounds is how long any ONE transaction holds its locks and how much a
+     * nature; what this bounds is how long any one transaction holds its locks and how much a
      * failure has to redo. A chunk that fails leaves its rows in the default, which is the state
      * the next run already starts from.
      */
@@ -132,7 +132,7 @@ final class PartitionManager
      * created, and false leaves those rows to the drain.
      *
      * The count and the CREATE share one transaction, which first takes the lock the CREATE needs
-     * anyway, ACCESS EXCLUSIVE on the parent. A write to the log waits for it before its row is
+     * anyway, access EXCLUSIVE on the parent. A write to the log waits for it before its row is
      * routed, so no delivery of the month can reach the default between the count and the CREATE.
      * Counted apart, one could, and the CREATE would then refuse the month ("updated partition
      * constraint for default partition would be violated by some row").
@@ -266,16 +266,16 @@ final class PartitionManager
         // of the database, so a second install, a tenant-per-schema layout or a
         // staging schema in the same database would make this return partitions belonging to
         // somebody else's parent. `to_regclass` resolves exactly one relation through the
-        // search_path, and asking for ITS children cannot answer about another lineage.
+        // search_path, and asking for its children cannot answer about another lineage.
         //
         // The cost of that would be a wrong DROP: a foreign partition in this list would make
-        // dropPartitionsOlderThan() drop the CURRENT schema's same-named table instead — see the
+        // dropPartitionsOlderThan() drop the current schema's same-named table instead — see the
         // note there.
         return array_keys($this->partitionIdentifiers());
     }
 
     /**
-     * Every monthly partition of THIS parent, as `bare name => identifier to address it by`.
+     * Every monthly partition of this parent, as `bare name => identifier to address it by`.
      *
      * Two values because two different questions are asked of the same relation, and answering
      * both from one row is what keeps them about the same object. The bare name is what the
@@ -378,7 +378,7 @@ final class PartitionManager
      * The point of this shape is that the parent is not locked while the rows move. The obvious
      * drain — DETACH the default, CREATE the partition, INSERT ... SELECT through the parent,
      * DELETE, re-ATTACH, all in one transaction — is what stood here, and the non-concurrent DETACH
-     * takes ACCESS EXCLUSIVE on the parent and holds it to commit. So every insert into
+     * takes access EXCLUSIVE on the parent and holds it to commit. So every insert into
      * webhook_deliveries blocked for the whole move: the entire outbound delivery path, stopped by
      * a daily unattended cron.
      *
@@ -388,7 +388,7 @@ final class PartitionManager
      *
      * The order here avoids the DETACH entirely. The reason the old shape needed it is that a
      * partitioned table refuses to create a partition whose range the default still holds rows
-     * for; so the target is built as a FREESTANDING table first, the rows are moved into it while
+     * for; so the target is built as a freestanding table first, the rows are moved into it while
      * it is still nobody's partition, and only then is it attached. Moving rows out of the default
      * takes ROW EXCLUSIVE on the default alone — inserts into every other partition run
      * untouched.
@@ -460,7 +460,7 @@ final class PartitionManager
         // The parent carries `webhook_deliveries_subscription_id_foreign`, and the LIKE copy
         // carries no foreign key at all.
         //
-        // Without them the moved rows sit OUTSIDE the key for the length of the drain, and the
+        // Without them the moved rows sit outside the key for the length of the drain, and the
         // key is ON DELETE CASCADE. A tenant deleting an endpoint in that window is an ordinary
         // thing to do; the cascade cannot reach these rows, because they are no longer in the
         // partitioned table. What follows is not an orphan but a failed ATTACH:
@@ -474,7 +474,7 @@ final class PartitionManager
         // self-perpetuating outage the drain exists to prevent.
         //
         // With the key present the cascade reaches the rows while they are here, and the ATTACH
-        // then succeeds — and PostgreSQL ADOPTS the constraint as the inherited one
+        // then succeeds — and PostgreSQL adopts the constraint as the inherited one
         // (`conparentid <> 0`), exactly as it does for a partition created the ordinary way. The
         // only difference is its name, so nothing is dropped afterwards.
         foreach ($this->parentForeignKeys() as $index => $key) {
@@ -487,13 +487,13 @@ final class PartitionManager
             // owner is gone, and ADD CONSTRAINT would validate and fail on it — the same wedge,
             // one statement earlier.
             //
-            // Removing those rows is not data loss for the key this table carries, which is ON
+            // Removing those rows is not data loss for the key this table carries, which is on
             // DELETE CASCADE: the parent would have removed them itself had they been in it. That
             // is a statement about today's schema, not about every key this loop can meet. A
             // RESTRICT or SET NULL key would have kept the row, and deleting it here would silently
             // do what the key forbids. The reader is deliberately general, so this is the
             // assumption to revisit the day a second key appears.
-            // The whole TUPLE, not one column at a time: for a composite key a row can have a
+            // The whole tuple, not one column at a time: for a composite key a row can have a
             // resolvable first column and an unresolvable pair, and a per-column check would
             // keep it and then fail the ADD CONSTRAINT below.
             $notNull = implode(' AND ', array_map(
@@ -636,7 +636,7 @@ final class PartitionManager
             $referenced = data_get($row, 'referenced_table');
             $referencedColumn = data_get($row, 'referenced_column');
 
-            // Guarded as ONE condition rather than an early `continue`, which is the shape
+            // Guarded as one condition rather than an early `continue`, which is the shape
             // insertableColumns() above uses for the same reason: the catalog always yields five
             // strings for an `f` constraint, so the other side is a line no run can enter — and
             // this file's floor is 100%, where such a line is a permanent red.
@@ -712,7 +712,7 @@ final class PartitionManager
     }
 
     /**
-     * Whether a relation of this name is an ATTACHED partition of this package's parent table.
+     * Whether a relation of this name is an attached partition of this package's parent table.
      *
      * Both sides resolve through `to_regclass`, so the question is about two specific OIDs and
      * not about two names that happen to match — the same reason insertableColumns() reads

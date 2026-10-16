@@ -12,7 +12,7 @@ use Pushery\Webhooks\Support\TableLookup;
 use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
- * Drops the GIN index over `webhook_calls.payload` from an EXISTING PostgreSQL install.
+ * Drops the GIN index over `webhook_calls.payload` from an existing PostgreSQL install.
  *
  * The create-table migration built `webhook_calls_payload_gin` for containment queries into the
  * payload, and nothing in this package runs one: a stored call is found by its source and producer

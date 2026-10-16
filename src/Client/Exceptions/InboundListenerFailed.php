@@ -16,7 +16,7 @@ use Throwable;
  * listener changes none of that. This wraps whatever the listener threw and is handed to
  * `report()`; nothing in the package catches it.
  *
- * It exists because handing the ORIGINAL exception to `report()` is not the same as reporting
+ * It exists because handing the original exception to `report()` is not the same as reporting
  * it. Laravel's handler skips a documented set outright — a listener that ran `firstOrFail()`,
  * `Gate::authorize()`, `validate()` or `abort()` throws something in that set, and reporting it
  * is a silent no-op. A failed alert that is itself unreported is the failure this whole area

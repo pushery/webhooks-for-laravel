@@ -16,12 +16,12 @@ use RuntimeException;
  * Resolves the tenant every self-service subscription query is scoped by, so a tenant
  * only ever sees and manages the endpoints it owns — a foreign owner's rows are never
  * visible. Because a subscription's owner is a morphTo, the tenant is identified by the
- * WHOLE (owner_type, owner_id) pair, never the id alone: two tenants that share an
+ * whole (owner_type, owner_id) pair, never the id alone: two tenants that share an
  * owner_id under different owner types are different tenants.
  *
  * The default resolution reads the authenticated user: a host that groups endpoints
  * under a team keys them by the team (currentTeam), otherwise the user is its own
- * tenant. Either way the resolver yields the tenant MODEL, from which the morph pair is
+ * tenant. Either way the resolver yields the tenant model, from which the morph pair is
  * derived — consistent with how the create path stores the owner. A host with a
  * different tenant model registers its own resolver with resolveUsing() so the package
  * stays agnostic about how a tenant is identified — and a test injects a fixed owner the
@@ -73,7 +73,7 @@ final class SubscriptionScope
 
     /**
      * Constrain a subscription query to the current tenant's own endpoints, matching
-     * BOTH owner columns. Foreign owners — and, deliberately, the global owner-less
+     * both owner columns. Foreign owners — and, deliberately, the global owner-less
      * subscriptions — are invisible to a self-service tenant, so a customer only manages
      * what it registered. With no tenant in scope the query is constrained to nothing.
      *
@@ -92,7 +92,7 @@ final class SubscriptionScope
     }
 
     /**
-     * A fresh subscription query scoped to a single owner by BOTH morph columns.
+     * A fresh subscription query scoped to a single owner by both morph columns.
      *
      * @return Builder<WebhookSubscription>
      */

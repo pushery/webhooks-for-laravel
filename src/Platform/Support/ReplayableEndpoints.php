@@ -8,7 +8,7 @@ use Closure;
 use RuntimeException;
 
 /**
- * The endpoints the acting reader may REPLAY FROM but does not own.
+ * The endpoints the acting reader may replay from but does not own.
  *
  * The sibling of {@see ReadableEndpoints}, one act further along, and the two are deliberately
  * separate rather than one list consulted twice. Seeing what was sent and sending it again are
@@ -35,7 +35,7 @@ use RuntimeException;
  *
  * Three properties are load-bearing rather than incidental:
  *
- * - **It only ever ADDS.** The owner path is untouched; this is consulted when ownership has
+ * - **It only ever adds.** The owner path is untouched; this is consulted when ownership has
  *   already said no. A host cannot use it to take replay away from an owner.
  * - **It does not bypass the ability.** `manage-webhook-endpoints`, where a host defines it,
  *   still has to pass. This answers *whose endpoint*, never *may this person manage webhooks

@@ -21,15 +21,15 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * The optional, read-only JSON metrics endpoint behind webhooks.dashboard.expose_json_api.
- * It serves the SAME read model the Livewire panels render — the hourly rollup and the
+ * It serves the same read model the Livewire panels render — the hourly rollup and the
  * window-level latency percentiles — so a host can drive its own charts, a status page or
  * an alerting rule from the numbers the dashboard shows.
  *
  * It is aggregates only. The recent-delivery queue, request/response bodies, headers and
- * signing material are deliberately NOT exposed: nothing here can leak a payload or a
+ * signing material are deliberately not exposed: nothing here can leak a payload or a
  * secret, and the response carries no row-level delivery data at all.
  *
- * Every read is scoped to the acting tenant's WHOLE morph pair via DashboardScope, exactly
+ * Every read is scoped to the acting tenant's whole morph pair via DashboardScope, exactly
  * as the panels scope theirs — two tenants sharing an owner_id under different owner types
  * are different tenants and never see each other's numbers. The route also carries the
  * dashboard's own middleware stack, and the view-webhook-dashboard gate is re-checked here

@@ -14,13 +14,13 @@ use Pushery\Webhooks\Models\WebhookDelivery;
  * query by the resolved owner, so a cross-tenant row never loads; this policy is
  * the second, defense-in-depth check on the action itself.
  *
- * Redelivery is allowed when the delivery belongs to the acting tenant AND — when a
+ * Redelivery is allowed when the delivery belongs to the acting tenant and — when a
  * host has defined a finer-grained 'webhooks.manage' ability — that ability passes.
  * With no such ability defined, tenant ownership alone authorizes, so the dashboard
  * is usable turnkey while a host can still tighten it.
  *
  * Across tenants that default is reversed. The ability that opens the cross-tenant scope
- * is a READ ability, granted to support staff so they can see what was sent, and a replay
+ * is a read ability, granted to support staff so they can see what was sent, and a replay
  * sends it again to another customer's endpoint. So there 'webhooks.manage' must be
  * defined and pass; left undefined, the replay is refused rather than inherited from the
  * right to read.

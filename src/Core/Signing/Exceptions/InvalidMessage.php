@@ -12,7 +12,7 @@ use Pushery\Webhooks\Core\Signing\WebhookMessage;
  * Thrown when a {@see WebhookMessage} is constructed with
  * an id or timestamp that violates the Standard Webhooks rules (a "." in the id,
  * an empty id, or a non-positive timestamp). This is a programmer error on the
- * SENDING side — never confused with untrusted receive-side input, which is
+ * sending side — never confused with untrusted receive-side input, which is
  * reported as a {@see VerificationResult} instead.
  */
 final class InvalidMessage extends InvalidArgumentException

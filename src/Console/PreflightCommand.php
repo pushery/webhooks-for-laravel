@@ -26,7 +26,7 @@ use RuntimeException;
  * capability guard the migrations do ({@see DatabaseRequirement}) and either confirms the
  * connection is supported or prints the one actionable message explaining what to fix.
  *
- * It then holds the CONFIGURATION against the SCHEMA — see {@see OwnerKeyDeclaration}. That
+ * It then holds the configuration against the schema — see {@see OwnerKeyDeclaration}. That
  * is the second question this command exists to answer at onboarding, because the answer is
  * otherwise delivered at the first customer click, months later, and in two of its three
  * forms it is not delivered at all: a wrongly declared owner key type refuses every owner
@@ -37,7 +37,7 @@ use RuntimeException;
  * database, or none — this command still confirms whichever connection it is pointed at, and
  * a table that does not exist cannot contradict anything.
  *
- * Its third question is about the RECEIVING side, and it is here for the same reason as the
+ * Its third question is about the receiving side, and it is here for the same reason as the
  * second: the answer is otherwise delivered by a producer, once, at the worst moment. A client
  * config with no 'secret', no 'jwks' and no 'verifier' cannot authenticate anything, and until
  * the first real delivery arrives nothing about the installation looks wrong — every page
@@ -108,7 +108,7 @@ final class PreflightCommand extends Command
                 return self::FAILURE;
             }
 
-            // A route that cannot carry traffic at all, and it is a FAILURE for the same reason
+            // A route that cannot carry traffic at all, and it is a failure for the same reason
             // the owner-key contradiction above is: this command exists to say whether the
             // install is sound before it carries traffic, and a receiving route behind CSRF
             // answers every delivery 419 before the signature is verified. Nothing in this
@@ -126,7 +126,7 @@ final class PreflightCommand extends Command
                 return self::FAILURE;
             }
 
-            // The other way the same binding breaks, and it is checked from the ROUTE side
+            // The other way the same binding breaks, and it is checked from the route side
             // because the config side cannot see it. A typo in the second argument of
             // Route::webhooks() leaves a route that exists, resolves and refuses every delivery
             // for ever -- and the config is not wrong, it simply has no entry of that name.
@@ -177,7 +177,7 @@ final class PreflightCommand extends Command
             $this->components->warn($message);
         }
 
-        // A FAILURE, and the same class as the forgery-protected route above: not a legal
+        // A failure, and the same class as the forgery-protected route above: not a legal
         // configuration with a cost, but one whose result is a duplicate webhook at a customer's
         // endpoint every time a delivery runs long. The two numbers belong to two different
         // owners — one is this package's arithmetic, the other the host's queue — so nothing but
@@ -190,12 +190,12 @@ final class PreflightCommand extends Command
             return self::FAILURE;
         }
 
-        // A WARNING rather than a failure: sync is a legitimate choice while developing, and
+        // A warning rather than a failure: sync is a legitimate choice while developing, and
         // failing a preflight over it would train a host to ignore this command's verdict.
         // What it must not do is stay silent, because the consequence is invisible from
         // inside the application — a released job on the sync connection is never picked up
         // again (SyncQueue never reads the released flag), so every retryable delivery
-        // failure ends after ONE attempt and the retry schedule below it does nothing at all.
+        // failure ends after one attempt and the retry schedule below it does nothing at all.
         // Read null-safe rather than through the typed getter. `webhooks.server.connection` is
         // `env('WEBHOOKS_SERVER_CONNECTION')` with no default, so on any host that has not set it
         // the key is present and null — and Config::string() throws on a present null, because its
@@ -220,7 +220,7 @@ final class PreflightCommand extends Command
         // The documentation names this command as one of the two things guarding the shipped
         // MySQL collation, and it read no collation anywhere — an operator following that page
         // after a restore or a DBA's ALTER got "preflight passed" over a schema that had lost
-        // the property. A FAILURE rather than a warning, for the same reason the owner-key
+        // the property. A failure rather than a warning, for the same reason the owner-key
         // contradiction above is one: the consequence is a delivery accepted, answered 200 and
         // dropped with nothing logged, and an installation that does that is not sound.
         $collation = CollationAudit::faults($connection);

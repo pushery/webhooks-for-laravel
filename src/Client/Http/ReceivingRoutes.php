@@ -13,7 +13,7 @@ use Illuminate\Routing\Router;
  * Two preflight checks ask the same question first — which of the host's routes are receiving
  * routes — and a second copy of that predicate is a second copy that drifts. It lives here once.
  *
- * Asked of the CONTROLLER rather than of the route name, because a host may rename the route and
+ * Asked of the controller rather than of the route name, because a host may rename the route and
  * the controller is what makes it a receiving route.
  *
  * @internal
@@ -27,7 +27,7 @@ final class ReceivingRoutes
     {
         $routes = [];
 
-        // `getRoutes()` is typed as the collection INTERFACE, which is not iterable — the
+        // `getRoutes()` is typed as the collection interface, which is not iterable — the
         // concrete RouteCollection is. Asking it for its array is one call and keeps the loop
         // honestly typed rather than asserting around the declaration.
         foreach ($router->getRoutes()->getRoutes() as $route) {
@@ -42,7 +42,7 @@ final class ReceivingRoutes
     /**
      * The config name the macro pinned onto a route, or null when there is none.
      *
-     * The macro puts it in the route's ACTION rather than in its defaults, so nothing in the URI
+     * The macro puts it in the route's action rather than in its defaults, so nothing in the URI
      * can reach it. Null is not reachable through the macro and is read defensively anyway: a
      * host can build the route by hand against the same controller.
      */

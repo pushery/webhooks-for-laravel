@@ -8,7 +8,7 @@ namespace Pushery\Webhooks\Core\Ssrf;
  * A vetted, connection-pinned destination: the original URL plus the exact IP
  * addresses it resolved to. The transport pins curl to these via CURLOPT_RESOLVE
  * so a TOCTOU DNS-rebind cannot swap the address between the guard's check and the
- * connect. An operator-allowlisted host is returned UNPINNED (no ips) — the
+ * connect. An operator-allowlisted host is returned unpinned (no ips) — the
  * operator has accepted responsibility for that host.
  */
 final readonly class PinnedEndpoint

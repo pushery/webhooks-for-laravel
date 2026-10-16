@@ -8,7 +8,7 @@ use Pushery\Webhooks\Core\Http\TransportResponse;
 use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 
 /**
- * ONE HTTP attempt returned a 2xx. Carries the captured response so a listener can
+ * One HTTP attempt returned a 2xx. Carries the captured response so a listener can
  * record duration_ms, the status and a response snapshot.
  *
  * Attempt-scoped, like every event in this namespace. The once-per-delivery domain

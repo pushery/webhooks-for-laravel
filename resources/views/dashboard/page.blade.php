@@ -42,7 +42,7 @@
                     {{-- A minimum height, not a repair. On a styled page these
                          links come out at 36px, well clear of the 24px minimum in WCAG 2.5.8, so nothing
                          here is broken today. What is not guaranteed is that they stay there: the height
-                         is padding token plus line height, and BOTH are values a host re-themes. Pinning
+                         is padding token plus line height, and both are values a host re-themes. Pinning
                          the floor makes the guarantee structural instead of incidental, and costs a
                          host nothing that it did not already agree to. 24px is WireKit's own number for
                          this; its input and combobox affordances carry the same pair. --}}
@@ -76,7 +76,7 @@
          advances; the latency percentiles beside them are computed live. With the refresh
          stopped, frozen counts sit next to current percentiles that make them look plausible,
          and nothing said which was which.
-         The lag is measured against the newest DELIVERY, not against the clock, so an endpoint
+         The lag is measured against the newest delivery, not against the clock, so an endpoint
          with no traffic never reports one -- and it only shows past twice the configured
          cadence, because one cadence behind is simply between two runs. --}}
     @if ($this->rollupLagMinutes() !== null)

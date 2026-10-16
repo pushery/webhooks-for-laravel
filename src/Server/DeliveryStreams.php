@@ -10,6 +10,8 @@ use Pushery\Webhooks\Server\Exceptions\OrderedDeliveryUnavailable;
 use Pushery\Webhooks\Server\Jobs\CallWebhookJob;
 use Pushery\Webhooks\Server\Streams\StreamLedger;
 use Pushery\Webhooks\Support\Settings;
+use Pushery\Webhooks\Testing\FakedWebhook;
+use Pushery\Webhooks\Testing\WebhookFake;
 
 /**
  * What an application does with a delivery that ended without success.
@@ -44,6 +46,18 @@ final readonly class DeliveryStreams
         $restarted = $data->restarted();
         $stream = $restarted->stream();
 
+        if ($stream !== null) {
+            StreamLedger::assertCanOrder($connection, $queue);
+        }
+
+        $fake = WebhookFake::active();
+
+        if ($fake instanceof WebhookFake) {
+            $fake->record(FakedWebhook::sentThroughTheServer($restarted));
+
+            return $restarted;
+        }
+
         $job = new CallWebhookJob($restarted);
         $job->onQueue($queue);
         $job->onConnection($connection);
@@ -51,7 +65,6 @@ final readonly class DeliveryStreams
         if ($stream === null) {
             dispatch($job);
         } else {
-            StreamLedger::assertCanOrder($connection, $queue);
             StreamLedger::queueInStream($stream, $restarted->messageId, static function () use ($job): void {
                 dispatch($job);
             });

@@ -18,12 +18,12 @@ use Throwable;
  * wire boundary and nowhere else — the same doctrine as the verb uppercasing in {@see
  * HttpTransport} and the redaction in {@see ErrorMessageRedactor}.
  *
- * The divergence between the two. A read timeout that strikes AFTER the response
+ * The divergence between the two. A read timeout that strikes after the response
  * headers have arrived is, on guzzle 7, unconditionally a response-less `ConnectException`:
  * errno 28 sits in its five-entry connection-error list and `CurlFactory` passes a literal
  * `null` for the response, so the partial response is discarded. Guzzle 8 removed 28 from
  * that list and branches on whether a response exists — with one, it raises a
- * `ResponseTimeoutException` that CARRIES it.
+ * `ResponseTimeoutException` that carries it.
  *
  * Laravel then treats the two differently, and this is where it becomes visible: it asks
  * `responseFromException()` for a response and, finding one whose status is >= 400, throws
@@ -89,7 +89,7 @@ final class TransportExceptionNormalizer
             return self::withoutCarriedResponse($exception);
         }
 
-        // A response that arrived COMPLETE and contradicts itself about where its body ends.
+        // A response that arrived complete and contradicts itself about where its body ends.
         // Guzzle 8 refuses it, guzzle 7 hands it back as an ordinary 200 — so the majors
         // disagree, and the shape this package gives it settles the disagreement in one place.
         //
@@ -129,7 +129,7 @@ final class TransportExceptionNormalizer
      *   truncated  previous=NULL              carriedResponse=200  bodyLen=10
      *
      * The body length is the same fact from the other side and is the reason to trust the
-     * discriminator: a framing rejection happens while the HEADERS are parsed, so no body was
+     * discriminator: a framing rejection happens while the headers are parsed, so no body was
      * ever admitted; a transfer break happens after the bytes started arriving.
      */
     private static function isFramingContradiction(ResponseTransferException $exception): bool

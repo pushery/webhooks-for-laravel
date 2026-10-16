@@ -42,7 +42,7 @@ use Throwable;
  *
  * A bad, expired or malformed signature aborts with the config's invalid_status
  * (401 by default) — never a 500, because such a request can never be made valid by
- * a retry. A verification that did not COMPLETE — an InboundVerifier whose provider
+ * a retry. A verification that did not complete — an InboundVerifier whose provider
  * callback timed out — is the exception: it is refused just as hard, but it is the one
  * refusal a retry could resolve, so it can be answered separately through
  * undetermined_status. A duplicate is answered with the same success response but not
@@ -126,11 +126,11 @@ final readonly class WebhookProcessor
 
         if (! $result->isValid()) {
             // Guarded like the two announcements below, and this is the one with a recorded
-            // incident behind it: the event's own docblock describes a throw landing INSIDE
+            // incident behind it: the event's own docblock describes a throw landing inside
             // dispatch(), before the abort() on the next line, turning every forged, unsigned
             // or expired POST into a 500 from an anonymous caller — on the one path three
             // docblocks promise is never a 500. That cause was fixed by taking the Request out
-            // of the payload; the SHAPE that let a listener reach the abort() was not, and this
+            // of the payload; the shape that let a listener reach the abort() was not, and this
             // event's docblock invites exactly the listener most likely to throw ("so a
             // listener can alert or rate-limit an abusive source" — an abuse listener is the
             // kind that reaches for Gate::authorize() or abort()).
@@ -156,7 +156,7 @@ final readonly class WebhookProcessor
             }
 
             // Every refusal stores nothing and dispatches nothing. What can differ is the
-            // one thing the SENDER can act on: whether to try again. A verification that did
+            // one thing the sender can act on: whether to try again. A verification that did
             // not complete — the provider callback timed out — is the only refusal a retry
             // could resolve, and answering it 401 tells a producer to give up on a delivery
             // that was probably genuine. It still needs the host's consent, because a
@@ -184,7 +184,7 @@ final readonly class WebhookProcessor
 
         // Throttle authentic requests per source. The refusal runs after verification, so a
         // forged request can never use up a real producer's allowance, and before the store, so
-        // a limited request is neither persisted nor dispatched. What COUNTS against the window
+        // a limited request is neither persisted nor dispatched. What counts against the window
         // is separate and happens further down, once this delivery is known not to be a repeat
         // of one already counted — see countAgainstRateLimit().
         $this->refuseWhenRateLimited();
@@ -192,10 +192,10 @@ final readonly class WebhookProcessor
         $webhookId = $this->config->webhookId($headers, $rawBody);
         $fastPathDedupe = $webhookId !== null && $this->config->usesFastPathDedupe();
 
-        // Fast-path dedupe: a repeated delivery whose id was already stored AND queued
+        // Fast-path dedupe: a repeated delivery whose id was already stored and queued
         // short-circuits to the success response before touching the database. The "seen"
         // marker is armed after both the store and the dispatch succeed, and — for a repeat the
-        // DATABASE recognized — by the duplicate branch below. Neither a store nor a dispatch
+        // database recognized — by the duplicate branch below. Neither a store nor a dispatch
         // failure may leave a marker behind that would swallow the producer's retry with a bare
         // success, which is why the rollback clears it as well as deleting the row. The
         // authoritative partial-unique insert still guards a concurrent race.
@@ -223,7 +223,7 @@ final readonly class WebhookProcessor
         // The event type is the column a stream is split on and what picks the handler job,
         // and not every producer puts it in the body: GitHub sends `X-GitHub-Event` and
         // leaves the body carrying only `action`. Read from the body alone, such an
-        // installation logs every delivery with an EMPTY type -- nothing goes red, the
+        // installation logs every delivery with an empty type -- nothing goes red, the
         // stream simply cannot be split. So the config gets to say where it comes from,
         // with the body's own value as the default it hands back unchanged.
         $eventType = $this->config->eventTypeFor($headers, $rawBody, $message->type);
@@ -267,7 +267,7 @@ final readonly class WebhookProcessor
         // Dispatch the processing job. This is the one step left that can still fail
         // after the durable insert (a queue-backend blip, a serialization error), and
         // until it succeeds the call has no worker. If it throws, delete the row this
-        // request just inserted and leave the id UNSEEN, so the producer's retry
+        // request just inserted and leave the id unseen, so the producer's retry
         // re-stores and re-dispatches instead of being swallowed as a duplicate and
         // acknowledged with a bare success — the delivery is never silently lost.
         try {
@@ -296,7 +296,7 @@ final readonly class WebhookProcessor
         $this->indexForSearch($call);
 
         // And count it here rather than at the check, for the same reason: this is the point at
-        // which the delivery is known to be new AND to have cost a row and a job. A dispatch that
+        // which the delivery is known to be new and to have cost a row and a job. A dispatch that
         // threw took the row with it above and never reaches this line, so a queue outage does
         // not use up the producer's allowance on top of everything else.
         $this->countAgainstRateLimit();
@@ -348,14 +348,14 @@ final readonly class WebhookProcessor
      * The cache is an accelerator in front of the partial-unique index, not an authority: its
      * whole job is to absorb a retry storm before it reaches the database. Read unguarded, an
      * unreachable store turned that into a hard dependency -- with Redis down the receiver
-     * accepted NOTHING, answering 500 to every delivery, while the index that actually
+     * accepted nothing, answering 500 to every delivery, while the index that actually
      * guarantees uniqueness was working the entire time.
      *
      * Falling through to the insert is the honest degradation: it costs a database round trip
      * per retry, which is exactly what the cache exists to save and not something anyone is
      * owed. It cannot produce a duplicate, because the index is what refuses one.
      *
-     * Not reported, and that is a decision rather than an oversight: a cache outage means EVERY
+     * Not reported, and that is a decision rather than an oversight: a cache outage means every
      * delivery takes this path, so reporting here would turn one incident into a second one made
      * of log volume. The store's own health is the host's monitoring, not this request's.
      */
@@ -466,7 +466,7 @@ final readonly class WebhookProcessor
             // replica. Against a streaming replica that is SQLSTATE 25006 and a 500 on every
             // authentic delivery; where the read node accepts writes it is worse, because the
             // row lands off the write path, the `find()` below reads a node that does not have
-            // it, and this method reports the delivery as a DUPLICATE.
+            // it, and this method reports the delivery as a duplicate.
             //
             // `select()` also never calls `recordsHaveBeenModified()`, so `sticky` cannot
             // protect the read that follows — the flag has to be set by hand. The MySQL arm
@@ -571,7 +571,7 @@ final readonly class WebhookProcessor
     /**
      * Refuse the request while the source's fixed window is full, when a limit is configured:
      * 429 with a Retry-After hint (the seconds until the window closes and the whole allowance
-     * returns), and nothing stored or dispatched. This only READS the count. The request is
+     * returns), and nothing stored or dispatched. This only reads the count. The request is
      * counted later, in countAgainstRateLimit(), once it is known not to be a repeat, so the
      * check and the count are not atomic; that method's docblock weighs what this costs.
      */
@@ -602,7 +602,7 @@ final readonly class WebhookProcessor
      * up the source's allowance and leave the real producer answering 429 until the window
      * rolls. A forged request cannot exhaust the bucket either, but a replay is not forged.
      *
-     * The window is per SOURCE rather than per sender, so there is no address to charge instead;
+     * The window is per source rather than per sender, so there is no address to charge instead;
      * what has to change is which requests count. A delivery the fast path or the authoritative
      * insert recognized as one already taken does not, because it caused no work: no row, no
      * offload, no job. Everything else does, including a delivery the host's own profile filters
@@ -654,7 +654,7 @@ final readonly class WebhookProcessor
             return null;
         }
 
-        // The CONFIG side is lowered here and is load-bearing: a host writes 'X-Keep', and
+        // The config side is lowered here and is load-bearing: a host writes 'X-Keep', and
         // without this the comparison below never matches.
         $only = is_array($store) ? array_map(strtolower(...), $store) : null;
 
@@ -682,7 +682,7 @@ final readonly class WebhookProcessor
         // Substitute invalid UTF-8, the same lossy-but-valid guarantee scrub() gives NUL bytes.
         // Header VALUES are read verbatim off the wire (never through json_decode like the
         // payload), so a stray non-UTF-8 byte — a Latin-1 accent, an intermediary's injected
-        // byte — would otherwise make this throw AFTER the signature already verified, 500 every
+        // byte — would otherwise make this throw after the signature already verified, 500 every
         // retry and silently lose the webhook. The exact bytes survive in raw_body + body_sha256.
         return json_encode(PayloadSanitizer::scrub($stored), JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
     }

@@ -7,7 +7,7 @@ namespace Pushery\Webhooks\Server\Events;
 use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 
 /**
- * A delivery is about to be QUEUED: fired synchronously at dispatch time, before any
+ * A delivery is about to be queued: fired synchronously at dispatch time, before any
  * HTTP work and before the first attempt exists. A listener observes the delivery on its
  * way into the queue and cannot change it: the data is readonly and nothing reads what a
  * listener returns. Throwing is the one way to stop it, and that aborts the caller's

@@ -14,13 +14,13 @@ use Illuminate\Support\Facades\Route;
  * the portal's own pages entirely. A panel that names a route unconditionally cannot survive
  * that: route() throws, and it throws from inside a view, so the whole screen 500s.
  *
- * What makes this worth a named seam rather than a bare Route::has() at each site is WHEN it
+ * What makes this worth a named seam rather than a bare Route::has() at each site is when it
  * goes wrong. The links that need a route are drawn per row, so an installation with no
  * endpoints yet renders perfectly and the failure waits for the first real one. An adoption
  * checked against a fresh account looks complete right up to the moment a customer has data.
  *
  * The condition is route registration and nothing else. In particular the transform editor's
- * link is NOT also gated on payload_versioning: that editor deliberately works while
+ * link is not also gated on payload_versioning: that editor deliberately works while
  * versioning is off — it stores rules that take effect once the feature is switched on, and
  * says so in a callout — so hiding the link there would remove working functionality rather
  * than protect anyone.

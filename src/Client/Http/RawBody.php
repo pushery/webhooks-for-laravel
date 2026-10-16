@@ -12,13 +12,13 @@ use Pushery\Webhooks\Client\Verification\InboundVerifier;
  *
  * A signature scheme is handed the body already. An {@see InboundVerifier}
  * is not — it receives the Request — and at least one of the two cases that seam exists for
- * NEEDS the bytes: a provider that verifies through a callback API checks the document it
+ * needs the bytes: a provider that verifies through a callback API checks the document it
  * sent, so the verifier has to send back exactly that document.
  *
  * Re-encoding is where this goes wrong, and it goes wrong quietly. `$request->json()->all()`
  * followed by `json_encode` is not the delivery: `/` comes back as `\/`, non-ASCII as
  * `\uXXXX`, and key order is not guaranteed to survive. The provider then answers about a
- * DIFFERENT document — with HTTP 200 and a negative verdict. Nothing throws, nothing logs,
+ * different document — with HTTP 200 and a negative verdict. Nothing throws, nothing logs,
  * and no test goes red while the provider is faked. In production it reads as "the provider
  * rejects our webhooks", with no cause anywhere.
  *

@@ -14,9 +14,9 @@ use Pushery\Webhooks\Models\WebhookSubscription;
  *
  * The column is a JSON cast, so the shape is whatever was written into it — and the two forms
  * that read it declare `array<int, string>` and bind checkboxes against it. A row holding a
- * JSON OBJECT rather than a list, or a number rather than a name, therefore arrives with keys
+ * JSON object rather than a list, or a number rather than a name, therefore arrives with keys
  * and with the type JSON gave it, and the endpoint becomes impossible to save: `eventTypes.*`
- * refuses the non-string, and an operator who only wanted to fix the NAME is told about an
+ * refuses the non-string, and an operator who only wanted to fix the name is told about an
  * event type they never touched, with no control to remove it by — the form draws one checkbox
  * per catalog entry, and a stray value is in no catalog. The screen is dead for that row.
  *

@@ -35,7 +35,7 @@ use Pushery\Webhooks\Support\UiAssets;
 /**
  * Boots the folded-in, customer-facing observability read model — the hourly
  * materialized view, the webhooks:refresh-metrics command and its schedule — but
- * ONLY when webhooks.dashboard.enabled. This provider is NOT auto-registered
+ * only when webhooks.dashboard.enabled. This provider is not auto-registered
  * (absent from composer extra.laravel.providers): register it in a host app to
  * expose the dashboard, so a send-only or API-only consumer never pays for it.
  *
@@ -79,7 +79,7 @@ final class WebhooksDashboardServiceProvider extends ServiceProvider
             return;
         }
 
-        // The dashboard's whole read model — the delivery log AND the materialized view
+        // The dashboard's whole read model — the delivery log and the materialized view
         // defined over it — belongs to the Platform layer. With Platform off, none of it
         // is migrated, so refuse to boot a UI that could only ever throw raw SQL errors.
         // A host that owns its own delivery-log model (dashboard.source_model) has taken
@@ -125,7 +125,7 @@ final class WebhooksDashboardServiceProvider extends ServiceProvider
 
     /**
      * Whether the dashboard still reads the Platform layer's own delivery log — i.e. the
-     * host has NOT pointed dashboard.source_model at a log model it owns and migrates
+     * host has not pointed dashboard.source_model at a log model it owns and migrates
      * itself, which is the documented way to run the dashboard without Platform.
      *
      * Decided by the table the model reads, not by its class: the package's searchable model
@@ -143,15 +143,15 @@ final class WebhooksDashboardServiceProvider extends ServiceProvider
 
     /**
      * The view gate the whole page hangs off, plus the row-level action policy. The
-     * gate is fail-CLOSED: with no host 'webhooks.view' ability defined it DENIES, so
+     * gate is fail-closed: with no host 'webhooks.view' ability defined it denies, so
      * registering the dashboard never silently exposes the operator surface to every
      * authenticated user. A host grants access by defining 'webhooks.view'.
      */
     private function registerAuthorization(): void
     {
         Gate::define('view-webhook-dashboard', static function (Authenticatable $user): bool {
-            // Fail CLOSED: a host that registers the dashboard but never defines the 'webhooks.view'
-            // ability must NOT silently expose the operator dashboard to every authenticated user.
+            // Fail closed: a host that registers the dashboard but never defines the 'webhooks.view'
+            // ability must not silently expose the operator dashboard to every authenticated user.
             // With no ability defined, deny — the host grants access by defining 'webhooks.view'
             // (see "Authorization is fail-closed" at
             // https://docs.pushery.com/webhooks-for-laravel/layers/dashboard).

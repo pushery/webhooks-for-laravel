@@ -19,7 +19,7 @@ use Pushery\Webhooks\Platform\Support\PortalRoutes;
  *
  * The whole page hangs off the manage-webhook-endpoints gate, authorized in boot — the
  * first hook on both the mount and the update path — so an unauthorized tenant is refused
- * before any panel renders AND a tenant whose ability is revoked mid-session is refused on
+ * before any panel renders and a tenant whose ability is revoked mid-session is refused on
  * its very next interaction, rather than being served from mounted state until it reloads.
  * Each panel additionally asserts the same gate and scopes every query to the acting tenant,
  * so a customer only ever manages the endpoints it owns.

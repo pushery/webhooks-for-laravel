@@ -7,7 +7,7 @@ namespace Pushery\Webhooks\Database\Dialect\Sql;
 use Pushery\Webhooks\Database\OwnerKeyType;
 
 /**
- * Recomputes the hourly delivery rollup on MySQL, which has no materialized view to REFRESH.
+ * Recomputes the hourly delivery rollup on MySQL, which has no materialized view to refresh.
  *
  * One INSERT ... SELECT rebuilds every bucket in the window: the additive counts come from a
  * GROUP BY, and the per-bucket p50/p95 from a PARTITION BY window emulation that interpolates
@@ -51,11 +51,11 @@ final class RollupRefresh
             .'COUNT(*) AS total, '
             ."COUNT(CASE WHEN status = 'succeeded' THEN 1 END) AS delivered, "
             ."COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending, "
-            // 'refused' belongs here and NOT in the health score, and the split is deliberate. This
+            // 'refused' belongs here and not in the health score, and the split is deliberate. This
             // rollup answers "what happened to my deliveries" for an operator, and a delivery
             // refused because its endpoint was off did not arrive; leaving it out of every bucket
             // would make the buckets stop summing to the total. The health score answers "how is
-            // this ENDPOINT behaving", which a delivery it never received says nothing about.
+            // this endpoint behaving", which a delivery it never received says nothing about.
             ."COUNT(CASE WHEN status IN ('failed', 'exhausted', 'refused') THEN 1 END) AS failed, "
             .'COUNT(CASE WHEN attempt > 1 THEN 1 END) AS retried '
             .'FROM webhook_deliveries WHERE created_at >= ? '
@@ -67,7 +67,7 @@ final class RollupRefresh
             .'FROM ('
             .'SELECT '.$ownerType.' AS ot, '.$ownerId.' AS oid, '.$bucket.' AS bkt, duration_ms AS d, '
             // rn ranks within the bucket (ordered window); cnt is the bucket total (an unordered
-            // window — COUNT(*) OVER an ORDERED window is a running count, not the total).
+            // window — COUNT(*) OVER an ordered window is a running count, not the total).
             .'ROW_NUMBER() OVER wo AS rn, '
             .'FLOOR(0.50 * (COUNT(*) OVER wp - 1)) + 1 AS b50, '
             .'0.50 * (COUNT(*) OVER wp - 1) - FLOOR(0.50 * (COUNT(*) OVER wp - 1)) AS f50, '

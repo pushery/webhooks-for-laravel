@@ -27,7 +27,7 @@ trait SearchableDelivery
      * filterable fields are always indexed: the event type, the endpoint
      * URL without its userinfo and query, the status, the owner/tenant morph
      * pair (owner_type + owner_id), the timestamp, and a short payload excerpt —
-     * never the full logged payload. The WHOLE morph pair is indexed so a
+     * never the full logged payload. The whole morph pair is indexed so a
      * tenant-scoped search can filter both columns: owner_id alone conflates two
      * tenants that share an id under different owner types. A payload that was
      * offloaded to a Storage disk is not read back or indexed; its excerpt is
@@ -66,9 +66,9 @@ trait SearchableDelivery
     }
 
     /**
-     * A tenant-scoped search: every query is constrained to the WHOLE owner morph pair
+     * A tenant-scoped search: every query is constrained to the whole owner morph pair
      * (owner_type + owner_id), so one tenant can never see another tenant's deliveries
-     * even when the underlying index is shared — cross-tenant isolation holds ONLY
+     * even when the underlying index is shared — cross-tenant isolation holds only
      * because both columns are matched; the owner_id alone conflates two tenants that
      * share an id under different owner types. Pass an empty query to list an owner's
      * rows, or a term to full-text search within them.
@@ -103,7 +103,7 @@ trait SearchableDelivery
 
         // The `?: ''` is never reached: json_encode only answers false on
         // INF/NAN or invalid UTF-8, neither of which survives a jsonb column, and no successful
-        // encoding of an ARRAY is falsy — `[]` encodes to '[]'. So nothing reaches the fallback.
+        // encoding of an array is falsy — `[]` encodes to '[]'. So nothing reaches the fallback.
         //
         // It stays because Str::limit is typed for a string: the moment that assumption stops
         // holding, the choice is an empty excerpt or a TypeError while indexing.

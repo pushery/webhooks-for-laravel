@@ -10,10 +10,10 @@ use Illuminate\Support\Facades\Date;
 use Pushery\Webhooks\Support\Timestamp;
 
 /**
- * Writes and reads this model's timestamps as INSTANTS, not as wall-clock strings.
+ * Writes and reads this model's timestamps as instants, not as wall-clock strings.
  *
  * Eloquent's default date format ("Y-m-d H:i:s") is naive, so the value it binds is
- * resolved against a DATABASE setting (PostgreSQL's session time zone), unrelated to
+ * resolved against a database setting (PostgreSQL's session time zone), unrelated to
  * app.timezone. The moment an application runs on a non-UTC timezone the two disagree
  * and every row is stored at the wrong instant; worse, during the DST fall-back hour
  * two instants an hour apart format to the identical naive string and collapse onto one
@@ -75,7 +75,7 @@ trait HasZonedTimestamps
      * MySQL the stored value is UTC-naive, so it is parsed as UTC before being shifted —
      * never resolved against the PHP default zone, which is what the parent would do.
      *
-     * The `is_string()` test is what keeps this to the READ path in practice: hydration hands
+     * The `is_string()` test is what keeps this to the read path in practice: hydration hands
      * over the column's raw string, while application code assigning a timestamp almost always
      * passes a date object, which falls through to the parent. See fromDateTime() above for why
      * the write path must not share this branch at all.

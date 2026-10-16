@@ -18,7 +18,7 @@ use Pushery\Webhooks\Client\Http\ReceivingRoutes as Routes;
  *
  * This is the mirror of `webhooks.client.expected`, and the pair covers the two directions the
  * binding can be broken in. That setting is a host saying "a client called this must exist"; this
- * check needs no setting at all, because a registered route already IS that statement: nobody
+ * check needs no setting at all, because a registered route already is that statement: nobody
  * mounts an endpoint for a source they do not expect to hear from.
  *
  * A failure rather than an advisory, for the same reason the CSRF check beside it is one: the

@@ -84,7 +84,7 @@ final class EndpointForm extends Component
         $this->endpointId = $subscription->id;
         $this->name = $subscription->name ?? '';
         $this->url = $subscription->url;
-        // Normalized on the way IN — see EventTypeList. The tenant-facing form has the same
+        // Normalized on the way in — see EventTypeList. The tenant-facing form has the same
         // exposure as the operator console, and a tenant has even less recourse.
         $this->eventTypes = $subscription->eventTypeNames();
         $this->isActive = $subscription->is_active;
@@ -156,11 +156,11 @@ final class EndpointForm extends Component
                 // authority; the rule only takes from it the cases that never needed to reach it.
                 'url' => ['required', 'url:http,https', 'max:2048'],
                 // Constrained to the catalog, and only when the host keeps one. The catalog
-                // ships EMPTY, so an `in` rule applied unconditionally would refuse every
+                // ships empty, so an `in` rule applied unconditionally would refuse every
                 // registration the day an application upgrades; null means "no catalog, no
                 // constraint".
                 //
-                // What a populated catalog constrains is REGISTRATION, not dispatch: the
+                // What a populated catalog constrains is registration, not dispatch: the
                 // fan-out never consults it, so an application can still emit a type it does
                 // not document. What it buys is that this form stops accepting a type it
                 // never offered — a typo like `user.registred` produced an endpoint that
@@ -225,7 +225,7 @@ final class EndpointForm extends Component
         );
 
         // Before the registration brake and the lock, so a refused topic costs the tenant nothing.
-        // Only the types this save ADDS: one the endpoint already carries stays through an edit by
+        // Only the types this save adds: one the endpoint already carries stays through an edit by
         // somebody without the ability, and removing it asks nothing.
         $refused = new EventTypeAbilities()->refused(
             array_values(array_diff($this->eventTypes, $stored)),
@@ -260,7 +260,7 @@ final class EndpointForm extends Component
         }
 
         try {
-            // The cap check moved INSIDE the lock, and that is the whole point: read
+            // The cap check moved inside the lock, and that is the whole point: read
             // outside it, the count is a fact about a moment that has already passed by
             // the time the insert runs, and two concurrent registrations both pass it.
             //
@@ -279,7 +279,7 @@ final class EndpointForm extends Component
                 try {
                     // Register through the manager so the URL is SSRF-vetted and the signing
                     // secret is generated and encrypted-at-rest by the existing scheme. The
-                    // new endpoint is owned by the SAME tenant identity the read scope
+                    // new endpoint is owned by the same tenant identity the read scope
                     // resolves, so create and filter can never diverge onto different owner
                     // columns.
                     return Webhooks::subscribe(
@@ -387,7 +387,7 @@ final class EndpointForm extends Component
     }
 
     /**
-     * What the endpoint currently being edited already holds, read from the ROW.
+     * What the endpoint currently being edited already holds, read from the row.
      *
      * Not a property, and that is the whole point. Every public property of a Livewire
      * component is writable from the browser, so a remembered set kept in component state

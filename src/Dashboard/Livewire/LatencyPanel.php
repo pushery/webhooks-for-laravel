@@ -21,7 +21,7 @@ use stdClass;
  * rows, never averaged from the rollup) plus the per-hour p50/p95 trend from the
  * rollup, shown as a compact token-styled sparkline of bars.
  *
- * `isolate: false` bundles this panel's lazy load with its siblings' into ONE request. Six
+ * `isolate: false` bundles this panel's lazy load with its siblings' into one request. Six
  * isolated ones each morph the shared parent, and on a window switch four of them arrive
  * while the components they name are being replaced — which is the `__lazyLoad not found`
  * race. See {@see WebhooksDashboardPage} for the

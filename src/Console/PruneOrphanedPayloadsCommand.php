@@ -17,8 +17,8 @@ use Pushery\Webhooks\Support\PayloadReclaimer;
  * Retention (row pruning / partition drops) removes rows, never the disk objects, and offloaded
  * bodies are content-addressed, so an object cannot be deleted per-row without stranding another
  * row that shares it. For object storage a lifecycle policy that expires by last-modified age is
- * the cheaper, standard reclamation (no full-bucket LIST) — reach for this command instead when
- * you offload to a LOCAL disk, or when compliance requires app-controlled deletion. It is NOT
+ * the cheaper, standard reclamation (no full-bucket list) — reach for this command instead when
+ * you offload to a local disk, or when compliance requires app-controlled deletion. It is not
  * scheduled by default: run or schedule it yourself, off-peak (it assumes offload writes are
  * quiesced for the sweep).
  *
@@ -31,12 +31,12 @@ use Pushery\Webhooks\Support\PayloadReclaimer;
  *     deliberate trade: an index on that column would cost the delivery log's hot insert path
  *     permanently, for a sweep that is manual and rare. The rows are streamed in chunks, so the
  *     scan is slow rather than memory-hungry.
- *   - The RESIDENT set is every still-referenced object key for the disk, held at once. It has to
+ *   - The resident set is every still-referenced object key for the disk, held at once. It has to
  *     be — an object is an orphan only when NO row references it, so the answer needs the whole
  *     set. Roughly the key length times the number of offloaded rows.
  *
  * The disk listing is the third: it enumerates every object under the prefix. On object storage
- * that is a full-bucket LIST, which is the cost a lifecycle policy exists to avoid, and the
+ * that is a full-bucket list, which is the cost a lifecycle policy exists to avoid, and the
  * paragraph above is why this command is the second choice there.
  *
  * @internal
@@ -85,7 +85,7 @@ final class PruneOrphanedPayloadsCommand extends Command
         }
 
         // NOT Number::fileSize(): it reaches Illuminate\Support\Number::format(), which throws
-        // without ext-intl — an extension this package does not require. The call sits AFTER the
+        // without ext-intl — an extension this package does not require. The call sits after the
         // deletion loop, so on such a host a run, scheduled by the host or started by hand, would
         // delete and then die without reporting what it had deleted.
         $size = LocalizedNumber::fileSize($totalBytes);
@@ -125,7 +125,7 @@ final class PruneOrphanedPayloadsCommand extends Command
         // any layer", the command returned success, and their orphaned call payloads accumulated on
         // the disk for ever with a scheduled job reporting nothing wrong.
         //
-        // Per SOURCE rather than one switch: `client.configs` is a list and each entry carries
+        // Per source rather than one switch: `client.configs` is a list and each entry carries
         // its own `large_payload` block, so two producers can offload to two different disks.
         // Reading only the first would be the same defect one level down.
         foreach (Config::array('webhooks.client.configs', []) as $entry) {

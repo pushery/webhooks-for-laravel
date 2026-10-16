@@ -38,7 +38,7 @@ final class PostgresRequirement
      * identical whole-hour boundary, so raising this constant would refuse a server that path
      * still serves.
      *
-     * The rule for changing this number: the floor is the OLDEST server every shipped path
+     * The rule for changing this number: the floor is the oldest server every shipped path
      * still has a branch for, not the newest syntax anything uses.
      */
     public const string MIN_VERSION = '13';

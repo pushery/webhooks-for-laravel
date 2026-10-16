@@ -10,7 +10,7 @@ use Pushery\Webhooks\Client\WebhookConfig;
 use Pushery\Webhooks\Core\Signing\VerificationResult;
 
 /**
- * Authenticates an inbound delivery when authenticity is NOT a pure comparison over the
+ * Authenticates an inbound delivery when authenticity is not a pure comparison over the
  * bytes — the case a signature scheme (a pure function of
  * body + headers + secret) cannot express:
  *
@@ -41,7 +41,7 @@ use Pushery\Webhooks\Core\Signing\VerificationResult;
  * answers that one case separately (503, say) so a producer is told to try again instead of
  * to give up. Left unset it falls back to `invalid_status` and nothing changes.
  *
- * If your verifier authenticates over the BYTES — PayPal's verify call does, since it checks
+ * If your verifier authenticates over the bytes — PayPal's verify call does, since it checks
  * the document it sent — read them with {@see RawBody::of()} and never
  * with `$request->json()`. A parsed-and-re-encoded body is a different document: `/` becomes
  * `\/`, non-ASCII becomes `\uXXXX`, and key order need not survive. The provider then answers

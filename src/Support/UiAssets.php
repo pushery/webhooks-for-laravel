@@ -58,7 +58,7 @@ final class UiAssets
     /**
      * The content hash, computed once per process.
      *
-     * It is the cache-buster AND the ETag. Keyed to the file's CONTENT rather than to the
+     * It is the cache-buster and the ETag. Keyed to the file's content rather than to the
      * package version, so a host running a dev checkout picks up an edit, and a version bump
      * that does not touch the file does not force every browser to re-download it.
      */

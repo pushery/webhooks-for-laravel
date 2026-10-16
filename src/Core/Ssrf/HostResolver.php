@@ -6,7 +6,7 @@ namespace Pushery\Webhooks\Core\Ssrf;
 
 /**
  * Resolves a hostname to its IP addresses. Abstracted so the SSRF guard can be
- * tested against a fake resolver, and so the real one resolves BOTH A and AAAA
+ * tested against a fake resolver, and so the real one resolves both a and AAAA
  * records — an IPv6-only host must not slip past an IPv4-only lookup.
  */
 interface HostResolver

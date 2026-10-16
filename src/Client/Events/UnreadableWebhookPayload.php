@@ -17,7 +17,7 @@ use Pushery\Webhooks\Client\Models\WebhookCall;
  * nothing to do, marks the call processed and returns 200, and the producer never repeats a
  * delivery it was told succeeded — a total loss that looks like success from both ends.
  *
- * It carries the STORED CALL rather than the request, and that is a correctness requirement
+ * It carries the stored call rather than the request, and that is a correctness requirement
  * rather than a preference: a listener may be queued, an `Illuminate\Http\Request` holds the
  * framework's user and route resolvers as closures, and a closure cannot be serialized. An
  * event that cannot reach a queue would throw on the way to one — destroying the very delivery

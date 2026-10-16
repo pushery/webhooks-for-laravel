@@ -94,7 +94,7 @@ final readonly class AsyncApiGenerator
      */
     public function toYaml(array $document): string
     {
-        // Round-trip through JSON to OBJECTS, not arrays, so an empty JSON object and an empty
+        // Round-trip through JSON to objects, not arrays, so an empty JSON object and an empty
         // JSON list stay apart: the dumper writes the first as a map and the second as a list.
         // Decoded to arrays, both arrive as [] and both leave as `{}`, and an empty `required` in
         // a catalog schema, or an empty list in an example, turns into a map in the YAML while

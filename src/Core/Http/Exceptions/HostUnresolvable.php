@@ -24,7 +24,7 @@ use RuntimeException;
  * of cheap lookups before the budget runs out and the delivery ends `exhausted` anyway.
  * The asymmetry is not close.
  *
- * {@see BlockedDestination::unresolvable()} stays for a guard implementation that CAN make
+ * {@see BlockedDestination::unresolvable()} stays for a guard implementation that can make
  * the distinction — a resolver reading a real NXDOMAIN may still refuse finally, and should.
  * The shipped guard cannot, so it does not claim to.
  */

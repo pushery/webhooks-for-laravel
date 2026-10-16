@@ -90,7 +90,7 @@ final class UiVariant
      * Note that the neutral rendering keeps the package's own pager, and that is not a leftover. WireKit
      * is optional here — `require-dev` and `conflict`, never `require` — so the neutral screens
      * render on hosts where no `<x-wirekit::…>` tag resolves at all. `webhooks::pagination` works
-     * there because it is hand-written markup over design TOKENS, which are CSS custom properties
+     * there because it is hand-written markup over design tokens, which are CSS custom properties
      * and need no package. Pointing it at a `wirekit::` view would turn an optional dependency
      * into a required one for anything that paginates.
      */
@@ -106,7 +106,7 @@ final class UiVariant
      * the built-in view for `simplePaginate()` — the defect `webhooks::pagination` documents in its
      * own header. Both seams therefore exist here, and every paginating component sets both.
      *
-     * The neutral side answers with the SAME view for both, exactly as it does today: one view
+     * The neutral side answers with the same view for both, exactly as it does today: one view
      * reads the two things a simple paginator cannot answer defensively rather than having a second
      * copy that drifts. The WireKit side does not need that, because the two views it ships are
      * three lines each and differ only in the variant they ask the component for — `mini`, which is
@@ -118,7 +118,7 @@ final class UiVariant
     }
 
     /**
-     * Whether what resolves for this component is something OTHER than the package's own view.
+     * Whether what resolves for this component is something other than the package's own view.
      *
      * Asked as "not ours" rather than as "under the publish path", and the difference is whose
      * override gets respected. `vendor:publish` is the common way a host takes a view over, and it
@@ -151,12 +151,12 @@ final class UiVariant
     /**
      * Whether the WireKit rendering is the one to use.
      *
-     * `auto` asks whether WireKit is REGISTERED, not merely installed, and the difference is
+     * `auto` asks whether WireKit is registered, not merely installed, and the difference is
      * the honest one: a library present in the vendor tree but kept out of discovery cannot
      * render an `<x-wirekit::…>` tag, so choosing its markup would produce the unstyled
      * screen this class exists to prevent — with the config now claiming otherwise.
      *
-     * There is deliberately NO version comparison here. `composer.json` already refuses
+     * There is deliberately no version comparison here. `composer.json` already refuses
      * `pushery/wirekit <2.53` outright, so a resolvable install is a tested one, and the
      * check happens where a version problem can still be fixed. A second copy of the floor
      * would drift from the constraint and would fail at render time, on a screen.

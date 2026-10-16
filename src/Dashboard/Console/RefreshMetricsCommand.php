@@ -48,7 +48,7 @@ final class RefreshMetricsCommand extends Command
     }
 
     /**
-     * MySQL has no materialized view to REFRESH, so the rollup table is rebuilt in place: clear it
+     * MySQL has no materialized view to refresh, so the rollup table is rebuilt in place: clear it
      * and re-aggregate the window in one transaction, so a reader never sees a half-built or empty
      * rollup — the whole previous snapshot stays visible (InnoDB consistent reads) until commit.
      * The transaction runs at READ COMMITTED where MySQL allows it, so the delivery log it reads
@@ -102,7 +102,7 @@ final class RefreshMetricsCommand extends Command
     /**
      * Whether a server that reports these values of `@@log_bin` and `@@binlog_format` writes its
      * binary log statement by statement: logging on, as the integer or the string a driver may
-     * return, and the format STATEMENT in either case.
+     * return, and the format statement in either case.
      *
      * @param  array<array-key, mixed>  $variables
      */
@@ -117,7 +117,7 @@ final class RefreshMetricsCommand extends Command
 
     /**
      * Whether the view holds a snapshot. One created or refreshed WITH NO DATA holds none, and so
-     * does one a schema-only restore left behind, since such a dump carries no REFRESH.
+     * does one a schema-only restore left behind, since such a dump carries no refresh.
      *
      * Counted rather than read as a boolean, so a connection that returns every value as a string
      * gives the same answer.

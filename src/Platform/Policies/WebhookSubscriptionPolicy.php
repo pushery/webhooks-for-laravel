@@ -18,7 +18,7 @@ use Pushery\Webhooks\Support\TenantIdentity;
  * is the second, defense-in-depth check on the action itself.
  *
  * Every ability is granted only when the subscription belongs to the acting tenant
- * AND the manage-webhook-endpoints ability passes. The package defines that ability
+ * and the manage-webhook-endpoints ability passes. The package defines that ability
  * together with this policy, and it denies until a host defines 'webhooks.manage'. A
  * policy that runs without the ability defined, registered by hand for instance,
  * authorizes nothing: tenant ownership alone never opens endpoint management.
@@ -35,8 +35,8 @@ final class WebhookSubscriptionPolicy
     {
         // Creation must fail closed on a null tenant like every sibling ability. There
         // is no row to own yet, so this checks the scope directly: without a tenant, a
-        // self-service create would pass a null owner to the manager and mint a GLOBAL,
-        // owner-less endpoint that then receives EVERY tenant's payloads — the exact
+        // self-service create would pass a null owner to the manager and mint a global,
+        // owner-less endpoint that then receives every tenant's payloads — the exact
         // cross-tenant leak the owner-scoping exists to prevent. (The operator console
         // is the sanctioned place to register a global endpoint; it is unauthorized by
         // design and never reaches this policy.)
@@ -63,17 +63,17 @@ final class WebhookSubscriptionPolicy
     /**
      * Replay a delivery that went to this endpoint.
      *
-     * Deliberately its OWN ability rather than folding into `update`: replaying causes an
+     * Deliberately its own ability rather than folding into `update`: replaying causes an
      * outbound HTTP request to leave the installation, which is a different kind of act from
      * editing a row, and a host tightening one has no reason to be forced to tighten the other.
      *
      * The ownership floor is the one place this ability differs from its siblings, and only
      * because a host asked it to. {@see ReplayableEndpoints} lets an application name endpoints
      * somebody may replay from without owning -- the administrator of an organization a
-     * destination is shared into, in the case it was built for. It can only ADD: with no
+     * destination is shared into, in the case it was built for. It can only add: with no
      * resolver registered this is ownership alone, exactly as before.
      *
-     * What it does NOT do is skip the ability. Whose endpoint and may-this-person-manage-webhooks
+     * What it does not do is skip the ability. Whose endpoint and may-this-person-manage-webhooks
      * are two questions, and a host that tightened the second did not ask for the first to
      * reopen it.
      */

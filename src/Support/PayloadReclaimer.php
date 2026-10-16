@@ -12,10 +12,10 @@ use League\Flysystem\FileAttributes;
 /**
  * Deletes offloaded payload objects on a Storage disk that no log row still points at.
  *
- * Offloaded bodies are content-addressed (the object key is the body's SHA-256), so ONE
+ * Offloaded bodies are content-addressed (the object key is the body's SHA-256), so one
  * object is shared by every row that carried the same bytes — a fanned-out delivery to many
  * endpoints, a producer that re-sent an identical payload. An object is therefore an orphan
- * only when NO row in ANY offload log still references it; deleting it while a single row
+ * only when no row in any offload log still references it; deleting it while a single row
  * points at it would strand that row's body. The two tables that hold offload pointers are
  * webhook_deliveries (the delivery log) and webhook_calls (the inbound call log); the
  * standalone server-delivery log does not offload, so it is not consulted.
@@ -26,7 +26,7 @@ use League\Flysystem\FileAttributes;
  *
  * The full set of still-referenced object keys for the disk is read once, then the disk is
  * walked and every key not in that set is deleted. It assumes offload writes are quiesced for
- * the run (schedule it off-peak): a body offloaded AFTER the reference set was read but BEFORE
+ * the run (schedule it off-peak): a body offloaded after the reference set was read but before
  * the delete would otherwise be stranded — the same eventual-consistency caveat a disk
  * lifecycle policy carries.
  *
@@ -124,7 +124,7 @@ final class PayloadReclaimer
     }
 
     /**
-     * Every object key still referenced on $disk, as a set keyed by key. Only rows on THIS
+     * Every object key still referenced on $disk, as a set keyed by key. Only rows on this
      * disk count — a row on another disk points at a different physical object with the same
      * content hash. A table that is not present (its layer never migrated) is skipped rather
      * than errored, so the sweep works whether one or both layers persist.

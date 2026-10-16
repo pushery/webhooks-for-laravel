@@ -32,9 +32,9 @@ use stdClass;
  * Copies an inbound-webhook backlog from a table you used before this package into its own
  * `webhook_calls` log, once, so a project adopting the Client layer keeps its history instead of
  * starting empty. Live receipts already flow the moment the route is switched over; this is only
- * for the OLD rows.
+ * for the old rows.
  *
- * The source SHAPE is declared rather than assumed. Seven `--from-*` options name the columns to
+ * The source shape is declared rather than assumed. Seven `--from-*` options name the columns to
  * read, and their defaults describe the shape these tables almost always have — an `id`, a `name`
  * that says which producer it came from, a `payload`, its `headers`, an `exception` recorded when
  * handling failed, and the `created_at` and `updated_at` Eloquent's timestamps() write. A table
@@ -52,11 +52,11 @@ use stdClass;
  *
  * Two honesty caveats, both forced by what such a table stores:
  *
- *  - it keeps only the PARSED payload, never the raw received bytes, so an imported row cannot
+ *  - it keeps only the parsed payload, never the raw received bytes, so an imported row cannot
  *    carry the producer's original body_sha256. This reconstructs it from the re-encoded payload —
  *    self-consistent (hash('sha256', $call->body()) === $call->body_sha256) but a reconstruction,
  *    not the wire bytes. Treat imported rows as historical records, not re-verifiable ones.
- *  - imported rows are written in a TERMINAL status (failed when the source row recorded an error,
+ *  - imported rows are written in a terminal status (failed when the source row recorded an error,
  *    otherwise processed), never 'received', and no processing job is dispatched. They are history;
  *    re-running a handler over months-old calls would fire real side effects again. The error TEXT
  *    is read to decide that status and is not carried across.
@@ -77,7 +77,7 @@ final class ImportCallsCommand extends Command
      *
      * This value changed in 3.0, and that is a breaking change rather than a rename. Every id this
      * command derives is a function of it, so a backlog imported by an earlier version re-derives
-     * to DIFFERENT ids now: the idempotent insert no longer recognizes those rows, and a re-run
+     * to different ids now: the idempotent insert no longer recognizes those rows, and a re-run
      * would import the whole backlog a second time. It cannot be detected from here — the old rows
      * are indistinguishable from rows this package received itself.
      *
@@ -181,7 +181,7 @@ final class ImportCallsCommand extends Command
         /** @var list<string>|null $untimed */
         $untimed = null;
 
-        // Ordered and chunked by the DECLARED id column, not by a literal 'id'. chunkById walks
+        // Ordered and chunked by the declared id column, not by a literal 'id'. chunkById walks
         // the table by that column, so leaving it hardcoded would order by a column a source table
         // need not have -- and the whole point of the map is that it need not.
         DB::connection($fromConnection)->table($fromTable)->orderBy($columns->id)->chunkById(
@@ -283,7 +283,7 @@ final class ImportCallsCommand extends Command
     private function bindings(stdClass $row, LegacyCallColumns $columns, string $source, string $id, Dialect $dialect, string $zone): array
     {
         // The payload column is typically json and nullable: a null or empty payload is a bodyless
-        // call, imported as an empty object rather than an error. Genuinely INVALID JSON (only
+        // call, imported as an empty object rather than an error. Genuinely invalid JSON (only
         // reachable from a text-typed source column) throws and the caller records the row as
         // unreadable.
         $payload = $columns->of($row, $columns->payload);
@@ -296,7 +296,7 @@ final class ImportCallsCommand extends Command
         // a bodyless call is rather than as the list json_encode() makes of an empty array.
         $body = $scrubbed === [] ? '{}' : json_encode($scrubbed, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
-        // The error column is read for its PRESENCE, not its content: it says whether handling
+        // The error column is read for its presence, not its content: it says whether handling
         // failed back then. The text itself is not carried -- this log has no column for it, and
         // inventing one would mean copying an unbounded, unredactable stack trace out of somebody
         // else's table into this one.

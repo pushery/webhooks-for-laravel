@@ -14,7 +14,7 @@ use Pushery\Webhooks\Core\Payload\Exceptions\OffloadFailed;
  * fanned-out delivery to many endpoints shares a single object. Reading the body
  * back is a plain disk fetch keyed by the stored pointer.
  *
- * The offloaded object is the ONLY copy of the body, so a failed write is fatal, not
+ * The offloaded object is the only copy of the body, so a failed write is fatal, not
  * a warning: Laravel's Filesystem returns FALSE from put() instead of throwing unless
  * the disk sets 'throw' => true, and sailing on past that would write a row pointing
  * at an object that does not exist — a webhook destroyed in silence. Every write is

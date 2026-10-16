@@ -18,7 +18,7 @@ use Pushery\Webhooks\Support\Settings;
  * relationship the other way round: `retry_after` must always exceed the timeout.
  *
  * {@see CallWebhookJob} derives its timeout from the HTTP budget — connect + total + headroom —
- * and bounds it from BELOW so a worker cannot kill a request mid-flight. Nothing bounds it from
+ * and bounds it from below so a worker cannot kill a request mid-flight. Nothing bounds it from
  * above, and the shipped config invites the raise: a slow consumer is the documented reason to
  * increase `server.timeout`. Against the framework's default `retry_after` of 90:
  *

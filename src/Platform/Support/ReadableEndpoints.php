@@ -8,12 +8,12 @@ use Closure;
 use RuntimeException;
 
 /**
- * The endpoints the acting reader may READ but does not own.
+ * The endpoints the acting reader may read but does not own.
  *
  * The delivery panel scopes to the acting tenant through {@see SubscriptionScope}, comparing the
  * denormalized owner pair on each delivery row. That answers one question — *does this row belong
  * to this owner?* — and an application often has a second one: *may this person see this row?*
- * The two agree until something is SHARED.
+ * The two agree until something is shared.
  *
  * The case this exists for, from a consuming application: a destination belongs to one user and
  * is shared with an organization. A member of that organization may see what was sent to it and
@@ -23,7 +23,7 @@ use RuntimeException;
  *
  * So the host answers the question it is the only one able to answer, and answers it as a set of
  * ids rather than as a predicate: a closure handed the query could drop the owner scoping, and
- * then the panel's central promise would depend on host code. Here the resolver can only ADD, and
+ * then the panel's central promise would depend on host code. Here the resolver can only add, and
  * what it adds is visible in one place.
  *
  * Registered from a service provider, like the tenant resolver beside it:
@@ -36,7 +36,7 @@ use RuntimeException;
  * exactly what it was — the seam is inert until somebody uses it, which is the only acceptable
  * default for something that widens a read.
  *
- * It widens READING and nothing else, and that is still true of THIS resolver: declaring an
+ * It widens reading and nothing else, and that is still true of this resolver: declaring an
  * endpoint readable grants no right to replay from it. A host that wants to grant both says so
  * twice, through {@see ReplayableEndpoints} as well — two resolvers rather than one flag read
  * in two places, because seeing what was sent and sending it again are different permissions

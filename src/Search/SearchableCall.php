@@ -85,7 +85,7 @@ trait SearchableCall
 
         // The `?: ''` is never reached: json_encode only answers false on
         // INF/NAN or invalid UTF-8, neither of which survives a jsonb column, and no successful
-        // encoding of an ARRAY is falsy — `[]` encodes to '[]'. So nothing reaches the fallback.
+        // encoding of an array is falsy — `[]` encodes to '[]'. So nothing reaches the fallback.
         //
         // It stays because Str::limit is typed for a string: the moment that assumption stops
         // holding, the choice is an empty excerpt or a TypeError while indexing.
