@@ -49,12 +49,12 @@ class DeliveryLog extends Component
     use WithPagination;
 
     /**
-     * At most this many endpoints are offered as filter options. This stub is UNSCOPED, so
+     * At most this many endpoints are offered as filter options. This stub is unscoped, so
      * that list is every subscription in the installation — on a multi-tenant host, one
      * option per customer endpoint. Rendering all of them on every render is a cost nobody
      * asked for, and the reader only ever picks one.
      *
-     * When it truncates the view SAYS SO. A short list that looks complete is how a reader
+     * When it truncates the view says so. A short list that looks complete is how a reader
      * concludes an endpoint has no deliveries when it simply was not offered — the same
      * wrong answer this whole surface exists to prevent.
      */
@@ -90,7 +90,7 @@ class DeliveryLog extends Component
      * missing feature.
      *
      * Renaming alone would have been a breaking change for the wrong people. Both stubs are
-     * meant to be PUBLISHED and edited — that is this package's main customization path — and
+     * meant to be published and edited — that is this package's main customization path — and
      * a published copy binds this name in its markup, so dropping it would break the filter in
      * every host that took the package up on its own advice. The two are kept in step in both
      * directions instead, and a host on either name sees no difference.
@@ -114,7 +114,7 @@ class DeliveryLog extends Component
      *
      * `webhook_deliveries` is range-partitioned by month, so a query with no lower bound on
      * `created_at` cannot be pruned and reads every partition there is. Both bounds started
-     * empty, so the FIRST render of a fresh instance did exactly that -- and nothing about it
+     * empty, so the first render of a fresh instance did exactly that -- and nothing about it
      * looks wrong: the page loads, and on a young installation it is fast. The cost arrives
      * with the data, months later, and reads as a database problem rather than as a default
      * nobody set.
@@ -283,7 +283,7 @@ class DeliveryLog extends Component
     }
 
     /**
-     * And the same control for the SIMPLE paginator this component actually builds.
+     * And the same control for the simple paginator this component actually builds.
      *
      * Livewire resolves the two independently: paginationView() feeds
      * Paginator::defaultView, paginationSimpleView() feeds Paginator::defaultSimpleView,
@@ -309,8 +309,8 @@ class DeliveryLog extends Component
         $endpoints = WebhookSubscription::model()::query()
             ->select(['id', 'name', 'url'])
             ->orderBy('id')
-            // One more than are shown, purely to learn whether there ARE more.
-            // One past the cap is what makes the truncation detectable. Asking for MORE than one
+            // One more than are shown, purely to learn whether there are more.
+            // One past the cap is what makes the truncation detectable. Asking for more than one
             // extra changes nothing observable: the flag compares against the cap and the view takes
             // exactly the cap, so only the +0 and the -1 readings are real.
             ->limit(self::ENDPOINT_OPTIONS + 1)
@@ -331,7 +331,7 @@ class DeliveryLog extends Component
             // string against a bigint the same way either side of it.
             ->when(ctype_digit($this->endpointId), fn (Builder $query): Builder => $query->where('subscription_id', (int) $this->endpointId));
 
-        // Through the package's own timestamp scopes, and NOT through whereDate() or a bare
+        // Through the package's own timestamp scopes, and not through whereDate() or a bare
         // where(). Two separate reasons, both silent when got wrong:
         //
         // whereDate() wraps the column in a function, which is exactly what stops the planner
@@ -339,8 +339,8 @@ class DeliveryLog extends Component
         // so a date filter written the obvious way reads every partition to answer a question
         // about one month.
         //
-        // And a bare where() binds a NAIVE literal, which PostgreSQL resolves against the
-        // database SESSION zone. With the session on +01, a delivery stored at 23:59 UTC on the
+        // And a bare where() binds a naive literal, which PostgreSQL resolves against the
+        // database session zone. With the session on +01, a delivery stored at 23:59 UTC on the
         // 20th would vanish from a window whose upper bound is the 20th: no error, no warning,
         // an answer off by the offset.
         // {@see \Pushery\Webhooks\Database\Concerns\ScopesByTimestamp} binds it per dialect instead.

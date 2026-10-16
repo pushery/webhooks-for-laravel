@@ -153,7 +153,7 @@ final class DeclarativePayloadTransformer implements PayloadTransformer
             }
         } while ($refused);
 
-        // The renamed fields are APPENDED, in the map's order, and the rest keep their places.
+        // The renamed fields are appended, in the map's order, and the rest keep their places.
         // That is what the previous implementation produced for every input it got right, so
         // this change is about the chain and the collision and about nothing else -- a body
         // whose key order moves is a body whose bytes move, and its signature with them.

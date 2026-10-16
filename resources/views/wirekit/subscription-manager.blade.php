@@ -3,7 +3,7 @@
      at https://docs.pushery.com/webhooks-for-laravel/guides/styling-the-ui); place behind
      your own authorization. Publish the neutral variant
      instead with the webhooks-ui tag. --}}
-{{-- The row-action icons, out of the SAME config block the self-service endpoint list reads. Two
+{{-- The row-action icons, out of the same config block the self-service endpoint list reads. Two
      screens of one package that disagree about whether a row action carries a symbol is a difference
      a reader notices and cannot explain -- and this screen had no seam at all, so a host who wanted
      icons here could only publish the view, which is the copy the other screen abolished.
@@ -12,11 +12,11 @@
      endpoint list gives: every shipped key is public API under SemVer, and a key reachable only
      through a bulk fetch reads, from the outside, exactly like a key nothing reads at all.
 
-     `null` still means NO icon, so a host who wants text-only actions can say so.
+     `null` still means no icon, so a host who wants text-only actions can say so.
 
-     The BLOCK form below is deliberate, and the reason is a trap rather than a preference. Blade
-     lifts php blocks out of the file BEFORE it compiles anything else, using one lazy pattern that
-     pairs an opening marker with the next closing one ANYWHERE further down. The bracketed
+     The block form below is deliberate, and the reason is a trap rather than a preference. Blade
+     lifts php blocks out of the file before it compiles anything else, using one lazy pattern that
+     pairs an opening marker with the next closing one anywhere further down. The bracketed
      one-expression form of that directive carries no closing marker of its own, so it pairs with
      the next block's closer instead and swallows everything between the two: that whole region is
      stored as raw PHP, the markup inside it is never compiled, and the view dies on the first tag
@@ -40,7 +40,7 @@
 
     // Each control's capability, decided by the component and passed in. A direct `View::make()`
     // with a hand-built array may pass none of them, and the defaults are today's behavior: every
-    // control renders. The check is the COURTESY -- each action still calls `authorizeAction()`
+    // control renders. The check is the courtesy -- each action still calls `authorizeAction()`
     // and still refuses -- so defaulting to "show" cannot open anything.
     $canCreate = $canCreate ?? true;
     $canEdit = $canEdit ?? true;
@@ -109,7 +109,7 @@
     @endif
 
     @if ($newSecret)
-        {{-- A rotation says something a registration does not: the OLD secret keeps verifying
+        {{-- A rotation says something a registration does not: the old secret keeps verifying
              until the rotation window closes, which is what makes rotating during an incident
              safe to do immediately. --}}
         {{-- The copy control is not decoration here. dehydrate() clears newSecret on every
@@ -122,9 +122,9 @@
         <x-wirekit::alert intent="success" :title="$rotated ? __('webhooks::management.secret.rotated_heading') : __('webhooks::management.secret.heading')">
             <div class="flex flex-wrap items-center gap-[var(--gap-wk-sm)]">
                 <x-wirekit::code class="wh-new-secret break-all">{{ $newSecret }}</x-wirekit::code>
-                {{-- A LABELED button, not an icon-only one: its accessible name then comes from
+                {{-- A labeled button, not an icon-only one: its accessible name then comes from
                      the visible text, so the name and the label cannot drift apart. The pair that
-                     has to hold together is the name and the VALUE — passing the secret as an
+                     has to hold together is the name and the value — passing the secret as an
                      undeclared attribute would leave the button unnamed and copy an empty string,
                      and either half alone still looks right on screen. --}}
                 <x-wirekit::clipboard-button
@@ -164,7 +164,7 @@
                 <x-wirekit::table.row>
                     {{-- The floor sits on the column that identifies the row, and only on that one,
                          for the reason the self-service endpoint list already worked out: a
-                         delivery URL is ONE unbroken token, so without `break-all` below it cannot
+                         delivery URL is one unbroken token, so without `break-all` below it cannot
                          wrap at all and the header cell grows to the width of the longest URL,
                          pushing the columns right of it out of the table. With `break-all` and no
                          floor the opposite happens -- the column is free to collapse, and a real
@@ -227,9 +227,9 @@
                             </x-wirekit::stack>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td align="right">
-                            {{-- FOUR buttons and, until now, no container: the cell laid them
+                            {{-- Four buttons and, until now, no container: the cell laid them
                                  out as inline children, so the moment the column narrowed each
-                                 one broke onto its own line, right-aligned and TOUCHING its
+                                 one broke onto its own line, right-aligned and touching its
                                  neighbor -- a staircase of broken buttons rather than a group.
                                  Touching, not overlapping: nothing collides, the group only
                                  loses its gaps. The gap token is what a reader sees. --}}
@@ -326,7 +326,7 @@
                                      surrounding chrome would break the moment the host changes its
                                      markup, and break silently.
 
-                                     The rotate dialog beside it deliberately has NONE: its row
+                                     The rotate dialog beside it deliberately has none: its row
                                      survives, so focus returns to the trigger by itself, and
                                      declaring a target there would REPLACE that with a jump to the
                                      table — worse than doing nothing. --}}
@@ -379,7 +379,7 @@
             </x-wirekit::table.body>
         </x-wirekit::table>
     @endif
-    {{-- OUTSIDE the @if, matching the neutral stub beside this one. A simplePaginate list
+    {{-- Outside the @if, matching the neutral stub beside this one. A simplePaginate list
          does not know how many pages there are, so a page past the end renders an empty
          table — and with the control inside the @else the only way back was to edit the
          URL. The package's pagination view renders nothing while there is a single page,

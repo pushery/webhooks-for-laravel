@@ -21,9 +21,9 @@ use Pushery\Webhooks\Support\UiVariant;
  *     <livewire:webhooks.admin.deliveries />
  *
  * Both components are deliberately unscoped and, by default, carry no authorization of
- * their own: they show and mutate EVERY tenant's endpoints and deliveries, which is what an
+ * their own: they show and mutate every tenant's endpoints and deliveries, which is what an
  * operator screen is for and exactly what a tenant may never see. Their mutating actions
- * DO honor `webhooks.admin.ability` once you set one — a check per action, which the page
+ * do honor `webhooks.admin.ability` once you set one — a check per action, which the page
  * gate above cannot give — but the page gate is what keeps the screen off a customer's
  * browser, and no config setting replaces it. The customer-facing
  * equivalents are the self-service portal
@@ -49,7 +49,7 @@ use Pushery\Webhooks\Support\UiVariant;
  * the configured variant — including one published from the WireKit tag before the setting
  * existed, which is why the resolution checks for an override first.
  *
- * It asks whether what resolves is NOT the package's own view rather than whether it sits under
+ * It asks whether what resolves is not the package's own view rather than whether it sits under
  * the publish path, so a host that overrides these views from their own service provider is
  * respected the same way. Publishing is the common route, not the only one.
  */

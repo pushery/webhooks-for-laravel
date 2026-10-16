@@ -10,7 +10,7 @@ use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 use RuntimeException;
 
 /**
- * The default resolver: the secret travels through the queue SEALED with the app
+ * The default resolver: the secret travels through the queue sealed with the app
  * encrypter and is unsealed here, at handle time — never at rest in cleartext.
  * Use {@see self::seal()} when building the delivery data to encrypt a SecretSet.
  *

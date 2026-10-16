@@ -6,6 +6,13 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.18.0] - 2026-10-16
+
+### ✨ Added
+
+- **A fetch of an outside URL under the SSRF guard.** `Core\Http\GuardedFetch::get($url, maxBytes: …)` gets a URL the application did not choose, such as an image in a received mail, with the guarantees a delivery has: the URL is vetted and the connection pinned to the vetted addresses, a redirect is handed back rather than followed, a proxy in the environment is bypassed and a compressed body is never inflated. The body is held to `maxBytes`: a longer declared length is refused before the body, and a body without a length is cut off where it passes the limit, so a server that never stops sending costs the limit and not the timeout. Either way the fetch throws `ResponseTooLarge`. It hands back a `FetchedResponse` with the status, the headers and the body. The Security page describes it.
+- **A fake for tests.** `Webhooks::fake()` records every webhook the package would send instead of sending it, for the rest of the test: no delivery-log row is written and no job is queued. It sees every way of sending, the facade and the manager, `WebhookEvent::dispatch()`, a `PendingWebhook` and `DeliveryStreams::resend()`, and it records a call whether or not an endpoint listens. `Webhooks::assertDispatched()`, `assertDispatchedTimes()`, `assertNotDispatched()` and `assertNothingDispatched()` assert on what it recorded, and `Webhooks::dispatched()` returns the records as `Testing\FakedWebhook`. The checks before a send still run, so a payload its catalog schema refuses still throws. The testing page of the documentation describes it.
+
 ## [3.17.0] - 2026-10-15
 
 ### ⚠️ Breaking
@@ -3432,7 +3439,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.17.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.18.0...HEAD
+[3.18.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.17.0...v3.18.0
 [3.17.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.16.1...v3.17.0
 [3.16.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.16.0...v3.16.1
 [3.16.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.15.0...v3.16.0

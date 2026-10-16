@@ -9,7 +9,7 @@ use RuntimeException;
 /**
  * The webhook body could not be written to (or read back from) the offload disk.
  *
- * It is thrown rather than swallowed on purpose: the offloaded object is the ONLY
+ * It is thrown rather than swallowed on purpose: the offloaded object is the only
  * copy of the body, so a row written with a pointer to an object that does not exist
  * is a permanently lost webhook. Failing here aborts the store, which lets the
  * caller's own at-least-once machinery — the producer's retry inbound, the queue's

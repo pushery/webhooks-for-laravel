@@ -18,7 +18,7 @@ namespace Pushery\Webhooks\Core\Payload;
  *
  * The second half is the same failure with a different cause. `json_decode` turns a literal
  * larger than a double can hold -- `1e400` -- into `INF`, and `json_encode` cannot write `INF`
- * back, so it throws. That happens AFTER the signature has been checked, in the storing path, so
+ * back, so it throws. That happens after the signature has been checked, in the storing path, so
  * a valid delivery from a producer with a very large number in it was answered 500 on every
  * attempt and never stored. It is not an attack, it is a currency or measurement source with a
  * value beyond the double range.
@@ -27,7 +27,7 @@ namespace Pushery\Webhooks\Core\Payload;
  * be told apart from a field that was absent. The string says what was there.
  *
  * Scrubbing is deliberately lossy-but-valid, and applies to keys as well as values.
- * It runs at the edge — once, before the payload is stored AND before it is signed —
+ * It runs at the edge — once, before the payload is stored and before it is signed —
  * so the logged copy and the delivered bytes stay identical and a redelivery
  * reproduces them exactly. Inbound, the exact received bytes survive alongside it (the
  * stored raw body and its SHA-256), so nothing is destroyed: only the queryable jsonb

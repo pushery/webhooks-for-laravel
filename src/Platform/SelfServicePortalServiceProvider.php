@@ -21,8 +21,8 @@ use Pushery\Webhooks\Support\UiAssets;
 
 /**
  * Boots the self-service endpoint portal — the customer-facing Livewire/WireKit
- * surface where a tenant manages its OWN webhook endpoints — but ONLY when
- * webhooks.platform.self_service.enabled. This provider is NOT auto-registered
+ * surface where a tenant manages its own webhook endpoints — but only when
+ * webhooks.platform.self_service.enabled. This provider is not auto-registered
  * (absent from composer extra.laravel.providers): register it in a host app to expose
  * the portal, so a send-only or operator-only consumer never pays for it.
  *

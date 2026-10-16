@@ -9,7 +9,7 @@ use Pushery\Webhooks\Client\Verification\InboundVerifier;
 /**
  * The typed result of {@see SignatureScheme::verify()}: a status plus, on success,
  * the id of the secret that matched (so a rotation can be observed). Carries no
- * detail about WHY an invalid signature failed beyond the coarse status — the
+ * detail about why an invalid signature failed beyond the coarse status — the
  * receiver must not leak which part failed to an untrusted caller.
  */
 final readonly class VerificationResult
@@ -43,7 +43,7 @@ final readonly class VerificationResult
      * Authenticity could not be established — the check itself did not complete.
      *
      * For an {@see InboundVerifier} whose callback timed out,
-     * failed DNS, or came back 5xx. It is NOT a softer valid: {@see self::isValid()} stays
+     * failed DNS, or came back 5xx. It is not a softer valid: {@see self::isValid()} stays
      * false, nothing is stored and nothing is dispatched. What it buys is that "the provider
      * said this delivery does not exist" and "the provider did not answer" stop being the
      * same value — the first is a forgery and a security signal, the second is an outage

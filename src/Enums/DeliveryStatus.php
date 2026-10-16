@@ -46,7 +46,7 @@ enum DeliveryStatus: string
     /**
      * The design-system intent a badge should carry for this status.
      *
-     * ONE ladder, because four copies of it had already become three different ladders. The
+     * One ladder, because four copies of it had already become three different ladders. The
      * WireKit console stub mapped `exhausted` to `warning` — the same amber it uses for
      * `pending` — while the dashboard and the portal mapped it to `danger`, so the worst
      * outcome a delivery has read one step too harmless on the surface a host publishes and

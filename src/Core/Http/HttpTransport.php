@@ -13,9 +13,9 @@ use Pushery\Webhooks\Core\Ssrf\PinnedEndpoint;
  * Sends the exact signed bytes to a vetted, IP-pinned destination over Laravel's
  * HTTP client. It never follows redirects (an open-redirect is an SSRF vector),
  * keeps TLS verification on, and pins curl to the guard's vetted IPs (anti-rebind)
- * on a DIRECT connection — the pin does not reach through an egress proxy, which
+ * on a direct connection — the pin does not reach through an egress proxy, which
  * resolves the host itself, so a proxied delivery relies on the operator's proxy to
- * enforce egress control. Without a configured egress proxy the connection IS direct:
+ * enforce egress control. Without a configured egress proxy the connection is direct:
  * a proxy the worker's environment names is bypassed rather than inherited. It applies separate connect/total timeouts, an optional
  * egress proxy and mutual TLS, and captures the response up to a byte cap without ever
  * buffering an unbounded body: the response is neither decoded nor kept beyond the cap
@@ -121,7 +121,7 @@ final class HttpTransport
             'decode_content' => false,
 
             // Keep only the capture prefix of the body. Guzzle's default sink buffers the
-            // WHOLE response (spilling to a temp file past 2 MB) and would leave the cap to
+            // whole response (spilling to a temp file past 2 MB) and would leave the cap to
             // trim what is already materialized, which bounds the log entry but not the
             // download.
             'sink' => new CappedSink($options->responseCaptureBytes),
@@ -158,7 +158,7 @@ final class HttpTransport
 
     /**
      * Read at most $cap bytes of the response, reporting truncation when there was
-     * more. It reads ONE byte past the cap and keeps the cap: that is what separates
+     * more. It reads one byte past the cap and keeps the cap: that is what separates
      * "exactly the cap" from "more than the cap" without ever holding more than the
      * cap plus a byte.
      *

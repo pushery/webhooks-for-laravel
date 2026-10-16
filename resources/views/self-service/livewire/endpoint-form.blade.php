@@ -20,7 +20,7 @@
     </x-wirekit::visually-hidden>
 
     @if ($open)
-        {{-- The form is inserted ABOVE the button that asked for it (page.blade.php puts the
+        {{-- The form is inserted above the button that asked for it (page.blade.php puts the
              form before the list), so without this nothing moves: a keyboard reader tabs
              forward out of the list instead of into what they just opened, and a screen-reader
              reader is still positioned after a trigger that now sits after the whole form.

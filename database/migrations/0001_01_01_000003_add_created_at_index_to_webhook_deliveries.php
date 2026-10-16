@@ -9,9 +9,9 @@ use Pushery\Webhooks\Database\Dialect\Dialect;
 use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
- * Adds the global newest-first index to an EXISTING webhook_deliveries table.
+ * Adds the global newest-first index to an existing webhook_deliveries table.
  *
- * THIS PACKAGE'S create-table migration carries this index now, which covers a fresh install
+ * This package's create-table migration carries this index now, which covers a fresh install
  * and nothing else: a host that already migrated will never re-run it, so without this file
  * the fix would reach only new installations while the release notes promised it to everyone.
  * That is the failure worth naming — a schema improvement that quietly skips every existing
@@ -26,7 +26,7 @@ use Pushery\Webhooks\Support\WebhookConnection;
  * PostgreSQL only. The MySQL lane's flat table has carried `webhook_deliveries_created_idx`
  * since it was created, so re-adding it there would fail on the duplicate name.
  *
- * LOCKING, for a large log: this builds the index on the partitioned PARENT, which recursively
+ * Locking, for a large log: this builds the index on the partitioned parent, which recursively
  * builds it on every existing partition and holds a lock on each for the duration. On a busy
  * multi-gigabyte log that is a real write-blocking window. PostgreSQL does not support
  * CREATE INDEX CONCURRENTLY on a partitioned parent, so the online path is manual and cannot be

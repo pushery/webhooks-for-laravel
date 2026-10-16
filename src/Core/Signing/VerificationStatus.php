@@ -10,7 +10,7 @@ use Pushery\Webhooks\Client\Verification\InboundVerifier;
  * The outcome of verifying an incoming webhook. Only {@see self::Valid} lets a request
  * through; every other value is a refusal.
  *
- * The first four are what a SIGNATURE SCHEME can produce, and for a scheme they are
+ * The first four are what a signature scheme can produce, and for a scheme they are
  * complete: a pure function of body + headers + secret always reaches a verdict, and every
  * verdict but Valid maps to a 4xx (never a 5xx — a bad signature cannot start passing
  * later, so telling the sender to retry is wrong).

@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Config;
  *
  * The gate itself is not negotiable and is not touched here: an unauthorized reader is
  * refused, before any panel renders and on every later interaction. What a host can choose is
- * what that refusal SAYS.
+ * what that refusal says.
  *
  * 403 is the honest answer and stays the default: the surface exists, you may not have it.
  * For a host whose convention is to hide rather than to deny, it is also a disclosure — "real,
@@ -27,7 +27,7 @@ use Illuminate\Support\Facades\Config;
  * installation that leaves the key alone can tell this class exists.
  *
  * Not to be confused with row-level ownership, which is a separate and already-decided
- * question: a foreign endpoint id fails not-found BEFORE its policy, everywhere in this
+ * question: a foreign endpoint id fails not-found before its policy, everywhere in this
  * package. That convention needs no configuration and is not affected by this one.
  *
  * @internal

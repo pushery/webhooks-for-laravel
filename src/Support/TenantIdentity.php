@@ -10,7 +10,7 @@ use RuntimeException;
 /**
  * A tenant's morph identity — the (owner_type, owner_id) pair that owns a webhook
  * subscription and its denormalized deliveries. Because a subscription's owner is a
- * morphTo, tenant isolation must compare the WHOLE pair: two tenants that happen to
+ * morphTo, tenant isolation must compare the whole pair: two tenants that happen to
  * share an owner_id under different owner types are different tenants and must never
  * see each other's endpoints, deliveries or signing secrets.
  */

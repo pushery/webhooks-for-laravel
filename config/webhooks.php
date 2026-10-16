@@ -36,11 +36,11 @@ return [
     | endpoint-health sweeps, and log pruning. A single-database app wants this on
     | (the default).
     |
-    | A DB-PER-TENANT host must turn it OFF: set 'enabled' => false and the package
-    | registers NOTHING in the scheduler, then run the commands yourself inside your
+    | A DB-per-tenant host must turn it off: set 'enabled' => false and the package
+    | registers nothing in the scheduler, then run the commands yourself inside your
     | own tenant loop (loop over active tenants, run each command on that tenant's
     | connection). Left on, the maintenance would run only on the central database and
-    | NEVER on a tenant's — the delivery log grows unbounded and the dashboard reads
+    | never on a tenant's — the delivery log grows unbounded and the dashboard reads
     | empty. The commands themselves are unchanged either way.
     |
     */
@@ -70,7 +70,7 @@ return [
         ],
 
         // The egress policy. Read this before changing it: two of the four keys
-        // WEAKEN the guard rather than tighten it.
+        // weaken the guard rather than tighten it.
         //
         //   https_only             Refuse a plaintext http:// endpoint. An empty
         //                          WEBHOOKS_HTTPS_ONLY= counts as unset and keeps it on.
@@ -78,13 +78,13 @@ return [
         //                          classified: private, loopback, link-local and
         //                          cloud-metadata (169.254.169.254) destinations all
         //                          become reachable, and no IP is pinned. Leave true.
-        //   blocked_hosts          The RESTRICTIVE list — a host named here is always
+        //   blocked_hosts          The restrictive list — a host named here is always
         //                          refused. This is the one to add to. An IP address
         //                          here is refused however the URL spells it and
         //                          whatever name resolves to it; a name here is refused
         //                          as that name, and a different name for the same
         //                          server is not.
-        //   allowed_hosts          A DANGEROUS OPT-OUT, not an allowlist. A host named
+        //   allowed_hosts          A dangerous opt-out, not an allowlist. A host named
         //                          here skips DNS resolution, skips the private /
         //                          loopback / metadata IP classification AND skips IP
         //                          pinning — so that host may resolve to an internal
@@ -103,12 +103,12 @@ return [
         // Publish the fixed set of source IPs your deliveries egress from, so a
         // consumer can allowlist them on its firewall. 'published_ips' is the list
         // the webhooks:egress-ips command prints (json/txt/md). 'enabled' is the
-        // master gate: while it is false a configured 'proxy' is IGNORED, so the proxy
+        // master gate: while it is false a configured 'proxy' is ignored, so the proxy
         // can be stood down without deleting its URL. When it is true and 'proxy' is a
         // non-empty string, every outbound delivery is routed through it — and note
-        // that this weakens the guard: the SSRF pin (CURLOPT_RESOLVE) binds a DIRECT
+        // that this weakens the guard: the SSRF pin (CURLOPT_RESOLVE) binds a direct
         // connection to the vetted IP, but a proxy resolves the host itself, so the pin
-        // is NOT enforced through a proxy. The operator's proxy
+        // is not enforced through a proxy. The operator's proxy
         // must enforce egress control itself. Off by default.
         'egress' => [
             'enabled' => filter_var(env('WEBHOOKS_EGRESS_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
@@ -130,7 +130,7 @@ return [
     | offloads a delivery-log payload larger than 'threshold' bytes to the 'disk'
     | Storage disk, leaving the row a pointer plus the body sha256 (off by default,
     | so every payload stays inline). Offloaded objects are content-addressed (identical
-    | bodies share one object) and are NOT deleted when the row is pruned or its
+    | bodies share one object) and are not deleted when the row is pruned or its
     | partition is dropped — retention removes rows only. Reclaim them with a lifecycle
     | policy on the 'disk' that expires objects by last-modified age of at least your
     | retention window; every offload re-writes the object, so an object past that age
@@ -150,14 +150,14 @@ return [
     */
 
     'server' => [
-        // The outbound delivery engine. NOTE: the Platform layer delivers its fan-out
-        // THROUGH this engine, so platform.enabled => true boots the Server regardless
-        // of this switch. To stop outbound delivery entirely, set BOTH to false.
+        // The outbound delivery engine. Note: the Platform layer delivers its fan-out
+        // through this engine, so platform.enabled => true boots the Server regardless
+        // of this switch. To stop outbound delivery entirely, set both to false.
         'enabled' => filter_var(env('WEBHOOKS_SERVER_ENABLED', true), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true,
         'queue' => env('WEBHOOKS_SERVER_QUEUE', 'default'),
         'connection' => env('WEBHOOKS_SERVER_CONNECTION'),
 
-        // Asymmetric Ed25519 (v1a) signing, off by default. When enabled EVERY outbound
+        // Asymmetric Ed25519 (v1a) signing, off by default. When enabled every outbound
         // delivery is signed with this one base64 Ed25519 secret key instead of the
         // endpoint's shared secret, and each receiver verifies with the matching public
         // key (pinned statically, or served from a JWKS endpoint) — so a leak of what a
@@ -189,12 +189,12 @@ return [
         // is a released job, which even SQS holds back for up to 12 hours, so the cap is the
         // schedule's choice rather than a limit of the queue.
         //
-        // retry_after_cap is a SEPARATE ceiling, and deliberately so: it is the longest
+        // retry_after_cap is a separate ceiling, and deliberately so: it is the longest
         // wait this queue can hold a newly dispatched job for (on SQS a message delay of at
         // most 15 minutes, which is the default's 900 seconds), while an endpoint's rate-limit
         // window (429/503 + Retry-After) is routinely much longer than that.
         // When an endpoint asks for longer than the cap, the delivery comes back at the
-        // cap and that wait is NOT charged against 'tries' — up to retry_after_max_deferrals
+        // cap and that wait is not charged against 'tries' — up to retry_after_max_deferrals
         // times — so an endpoint answering "Retry-After: 3600" is still there to receive
         // the webhook when its window elapses, instead of the delivery being exhausted
         // half an hour earlier. Raise retry_after_cap on a queue that can hold longer
@@ -207,7 +207,7 @@ return [
         // an ordinary retry, which the queue does wait for, and the delivery may be exhausted
         // before the window elapses.
         //
-        // A cap of 0 switches the hint OFF rather than shortening it to nothing: the delay
+        // A cap of 0 switches the hint off rather than shortening it to nothing: the delay
         // comes from the jittered schedule, exactly as if the endpoint had sent no header,
         // and nothing is deferred. Read the other way it would answer 'Retry-After: 60'
         // with an immediate retry against the endpoint that just asked for quiet — worse
@@ -223,7 +223,7 @@ return [
         'no_retry_on_4xx' => true,
         // Which 4xx stay retryable while the switch above is on. Digit strings are read as
         // the codes they obviously are, because the usual way this list grows a string is
-        // explode(',', env('...')) — and dropping those left an EMPTY list, which reads as
+        // explode(',', env('...')) — and dropping those left an empty list, which reads as
         // the deliberate "no 4xx is retryable" and gave a host the exact opposite of what
         // they configured. A value nothing can make sense of is still dropped, a list that
         // survives as nothing falls back to these three, and 'webhooks:preflight' says so
@@ -236,7 +236,7 @@ return [
         // cost a worker its timeout, but never its memory.
         'response_capture_bytes' => 65536,
 
-        // Opt-in standalone delivery log for the Server layer used WITHOUT the
+        // Opt-in standalone delivery log for the Server layer used without the
         // Platform layer. When the Platform layer runs it owns the webhook_deliveries
         // table and its full delivery lifecycle, so this stays off — enabling both
         // would double-log. Turn it on only when a consumer drives PendingWebhook /
@@ -306,20 +306,20 @@ return [
     'platform' => [
         'enabled' => filter_var(env('WEBHOOKS_PLATFORM_ENABLED', true), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true,
 
-        // The primary-key type of the models that OWN webhook subscriptions: 'bigint'
+        // The primary-key type of the models that own webhook subscriptions: 'bigint'
         // (default), 'uuid' or 'ulid'. It fixes the storage type of the denormalized
-        // owner_id column across the subscriptions table, the delivery log AND the
+        // owner_id column across the subscriptions table, the delivery log and the
         // dashboard rollup — the three must match or the tenant join breaks — so set it
         // to match your owner models and migrate; changing it on a populated database is a
         // schema migration, not a runtime toggle. A subscription with a null (global)
         // owner works under every setting.
         'owner_key_type' => env('WEBHOOKS_OWNER_KEY_TYPE', 'bigint'),
 
-        // The catalog also decides what may be REGISTERED. While it is empty — the shipped
+        // The catalog also decides what may be registered. While it is empty — the shipped
         // state — it constrains nothing and a subscription may name any event type. Write
         // one and the self-service form and the operator console refuse a type it does not
         // declare, because an endpoint registered for a type nothing publishes looks
-        // configured and stays silent. It does NOT constrain dispatch: the fan-out never
+        // configured and stays silent. It does not constrain dispatch: the fan-out never
         // consults it, so an application may still emit an undocumented type. An endpoint
         // registered before a type left the catalog stays editable.
         'catalog' => [
@@ -374,19 +374,19 @@ return [
             'max_per_minute' => EnvLimit::ceiling(env('WEBHOOKS_PLATFORM_RATE_LIMIT_MAX_PER_MINUTE'), 60),
         ],
 
-        // A brake on the MANUAL test ping (Webhooks::ping), which the shaping above
+        // A brake on the manual test ping (Webhooks::ping), which the shaping above
         // deliberately does not touch — a ping bypasses the allowance on purpose, so an
         // operator can prove an endpoint works while it is over its budget. That exemption
         // leaves the one send a human can repeat at will completely unbounded, and it goes
-        // to a destination the requester chose: the SSRF guard decides WHERE a ping may
-        // land, never HOW OFTEN, which is the half that makes an amplifier.
+        // to a destination the requester chose: the SSRF guard decides where a ping may
+        // land, never how often, which is the half that makes an amplifier.
         //
-        // Counted per ENDPOINT rather than per account, because that is the bound the
-        // destination cares about — how often IT is hit, not how many pings one account
+        // Counted per endpoint rather than per account, because that is the bound the
+        // destination cares about — how often it is hit, not how many pings one account
         // made across all of its endpoints. And counted per destination host within the
         // endpoint's owner as well, because endpoint URLs are not unique: without it, one
         // owner could multiply its pings to one host by registering it again and again.
-        // Over the allowance the ping is REFUSED
+        // Over the allowance the ping is refused
         // (Pushery\Webhooks\Exceptions\TestPingThrottled), not deferred: a test send that arrives
         // two minutes later has already failed at the only thing it was for.
         //
@@ -396,7 +396,7 @@ return [
             'max_per_minute' => EnvLimit::ceiling(env('WEBHOOKS_PLATFORM_TEST_PING_MAX_PER_MINUTE'), 5),
         ],
 
-        // How long an endpoint's PREVIOUS signing secret keeps verifying after a
+        // How long an endpoint's previous signing secret keeps verifying after a
         // rotation. Both secrets sign each delivery during the window, so a consumer can
         // migrate without dropping a webhook; once it closes, the old secret is cleared
         // from the row and can never sign again. That expiry is the entire point of
@@ -408,15 +408,15 @@ return [
 
         'partition_months_ahead' => 3,
 
-        // Let a tenant manage its OWN webhook endpoints (register, edit, rotate the
+        // Let a tenant manage its own webhook endpoints (register, edit, rotate the
         // secret, delete) rather than only an operator. Off by default. The portal
-        // SHIPS its screens: full-page Livewire panels — the endpoint list, the
+        // ships its screens: full-page Livewire panels — the endpoint list, the
         // create/edit form, the signing-secret panel, the health matrix and the
         // payload-transform editor — mounted at 'route_prefix' behind 'middleware'.
         //
-        // TWO things switch it on, and both are required: set 'enabled' to true AND
+        // Two things switch it on, and both are required: set 'enabled' to true and
         // register Pushery\Webhooks\Platform\SelfServicePortalServiceProvider in the host's
-        // bootstrap/providers.php — it is NOT auto-registered. It needs livewire/livewire
+        // bootstrap/providers.php — it is not auto-registered. It needs livewire/livewire
         // (and pushery/wirekit to render as shipped); a host on another UI kit publishes
         // the views with --tag=webhooks-self-service-views and restyles them.
         //
@@ -427,14 +427,14 @@ return [
         // 'max_endpoints_per_tenant' caps how many a single tenant may register
         // (null = unlimited).
         //
-        // 'registrations_per_minute' brakes how often ONE tenant may register an endpoint.
+        // 'registrations_per_minute' brakes how often one tenant may register an endpoint.
         // The cap bounds how many it ends up with; this bounds how fast it gets there, which
         // is a different question and the one an automated client asks. Counted per tenant,
         // over attempts that reach the write path — validation and authorization run first,
         // so a rejected form costs nothing against it. Set to null to remove the brake. The
         // brakes here read a digit string from env() as the number it spells.
         //
-        // It is ON by default, and that is a deliberate behavior change: a host doing a bulk
+        // It is on by default, and that is a deliberate behavior change: a host doing a bulk
         // import through the portal will meet it. Bulk registration belongs on the manager
         // (Webhooks::subscribe), which is not braked at all — this is the human surface.
         //
@@ -454,7 +454,7 @@ return [
             'route_prefix' => 'webhooks/endpoints',
             'register_routes' => true,
 
-            // What a refusal SAYS when a reader lacks manage-webhook-endpoints. The gate
+            // What a refusal says when a reader lacks manage-webhook-endpoints. The gate
             // itself is not configurable and is not weakened by this: an unauthorized reader
             // is refused either way, before any panel renders and on every later interaction.
             //
@@ -470,17 +470,17 @@ return [
             // distinguishable answer is information a prober can read too, so which one to
             // give is the host's call rather than the package's.
             //
-            // Row-level ownership is a SEPARATE and already-settled question: a foreign
+            // Row-level ownership is a separate and already-settled question: a foreign
             // endpoint id fails not-found before its policy everywhere in this package,
             // whatever this is set to.
             'refuse_with' => 403,
             'registrations_per_minute' => 10,
 
             // How many deliveries one tenant may replay per minute, through the portal's
-            // "send again" action. Not decoration: replaying makes the SERVER issue an HTTP
+            // "send again" action. Not decoration: replaying makes the server issue an HTTP
             // request to a URL the tenant registered, so with no brake one customer holding
             // the button down is an amplifier pointed wherever they like. The SSRF guard
-            // decides WHERE a request may go; this decides how MANY. A non-positive value
+            // decides where a request may go; this decides how many. A non-positive value
             // switches the brake off rather than refusing every replay.
             'replays_per_minute' => 10,
 
@@ -499,7 +499,7 @@ return [
 
         // The tenant-facing delivery list in the self-service portal.
         'deliveries' => [
-            // How many days back the list reads. This is a CEILING, not merely a default:
+            // How many days back the list reads. This is a ceiling, not merely a default:
             // the panel's windowDays property may narrow beneath it and can never reach
             // past it, because every public Livewire property is writable from the browser
             // and widening is the expensive direction.
@@ -508,7 +508,7 @@ return [
             // decision that makes retention a DROP PARTITION rather than a DELETE — and a
             // read with no lower bound on created_at cannot be pruned, so it visits every
             // partition there is. Nothing goes red: the page loads, it just loads with the
-            // whole history in the plan, and the cost arrives with the DATA rather than with
+            // whole history in the plan, and the cost arrives with the data rather than with
             // the change. A filter with no default is not a filter, it is an offer.
             //
             // Set 0 to switch the bound off entirely, for a host that would rather pay the
@@ -519,7 +519,7 @@ return [
             //
             // Off by default, and that is a decision rather than an oversight: `error` holds
             // an HTTP client's exception message and can quote back whatever the receiving
-            // server wrote. On the endpoint OWNER's own screen that text is the answer they
+            // server wrote. On the endpoint owner's own screen that text is the answer they
             // came for; on a portal where the reader is not the party that runs the
             // receiver, it is someone else's server talking. Which of the two this
             // installation is, is the host's knowledge — so this is a config key, and the
@@ -537,7 +537,7 @@ return [
         // far back the history reads. The webhooks:refresh-endpoint-health command
         // recomputes and caches the score on demand. When 'enabled' is true a
         // finished delivery also refreshes its own endpoint's cached score
-        // automatically AND the same command is scheduled on the 'refresh' cadence to
+        // automatically and the same command is scheduled on the 'refresh' cadence to
         // sweep every active endpoint — so an endpoint whose traffic dries up still
         // decays to its true band instead of freezing on the last score a delivery
         // left. Off by default, so the cached columns move only when you run the
@@ -573,7 +573,7 @@ return [
         // behavior). When enabled, an endpoint that carries a 'payload_version' and/or
         // a stored 'transform' receives a reshaped body — a safe, declarative mapping
         // (include / exclude / rename / rewrap, plus a stamped payload_version) applied
-        // to the event data BEFORE the body is signed, so the transformed bytes are the
+        // to the event data before the body is signed, so the transformed bytes are the
         // exact signed-and-sent bytes. Two endpoints subscribed to the same event with
         // different versions therefore receive different bodies. 'versions' declares
         // reusable default rule sets an endpoint can inherit by naming a version instead
@@ -642,7 +642,7 @@ return [
     | without limit. 'large_payload' offloads a body
     | larger than 'threshold' bytes to the 'disk' Storage disk, keeping only a pointer
     | plus the body sha256 in the row; rehydrate the full bytes with $call->body().
-    | Offloaded objects are content-addressed and are NOT deleted by 'delete_after_days'
+    | Offloaded objects are content-addressed and are not deleted by 'delete_after_days'
     | pruning (which removes rows only) — reclaim them with a lifecycle policy on the
     | 'disk' that expires objects by last-modified age of at least 'delete_after_days';
     | every offload re-writes the object, so an object past that age is unreferenced. Or run
@@ -653,7 +653,7 @@ return [
     'client' => [
         'enabled' => filter_var(env('WEBHOOKS_CLIENT_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
 
-        // Keep true. A middleware is prepended to the GLOBAL stack so the EXACT received
+        // Keep true. A middleware is prepended to the global stack so the exact received
         // bytes are captured before any other middleware can parse or re-encode the body;
         // signature verification then runs over those bytes. Set to false only if you supply
         // your own raw-body capture, or to avoid globally buffering every request body — with
@@ -667,27 +667,27 @@ return [
         // acknowledging an unread delivery is what stops the producer ever repeating it.
         'raw_body_capture' => true,
 
-        // There is deliberately NO body-size limit here, and the omission is a decision rather
+        // There is deliberately no body-size limit here, and the omission is a decision rather
         // than an oversight. What bounds an incoming body is your PHP installation's
         // post_max_size; this package adds nothing on top.
         //
-        // The cost is worth knowing: a large delivery is stored inline in the row AND carried a
+        // The cost is worth knowing: a large delivery is stored inline in the row and carried a
         // second time in the job that goes on the queue, so on a Redis queue it is the Redis
         // server's memory too. It takes your shared secret to send one, so this is not an
         // anonymous flood -- the ordinary case is a producer attaching a document by mistake.
         //
         // Two levers, and they answer different halves. 'large_payload' below moves a big body
         // onto a disk and keeps a pointer, which fixes the storage cost without refusing
-        // anything. A limit that REFUSES belongs in front of the route, in your own middleware,
+        // anything. A limit that refuses belongs in front of the route, in your own middleware,
         // because answering 413 to a producer is a policy about who may send you what.
         //
         // A default here would be either too low for somebody or too high to be worth having.
 
-        // Client names this application REQUIRES to be configured. Empty by default, so this
+        // Client names this application requires to be configured. Empty by default, so this
         // changes nothing until you fill it in.
         //
         // Everything else the preflight checks is found by reading the entries that exist, which
-        // means the one fault it could never see is an entry that SHOULD exist and does not. The
+        // means the one fault it could never see is an entry that should exist and does not. The
         // route does not disappear with it -- routes hang on the macro, not on the entry -- so a
         // client lost to a bad merge or an unset variable leaves an endpoint that refuses every
         // delivery, and nothing says why until a producer complains.
@@ -702,13 +702,13 @@ return [
             // [
             //     'name' => 'stripe',
             //     'secret' => env('STRIPE_WEBHOOK_SECRET'),
-            //     // The producer's PREVIOUS secret, kept verifying while a rotation is in
+            //     // The producer's previous secret, kept verifying while a rotation is in
             //     // flight. Without it a rotation is an outage: the producer switches, and
             //     // every delivery signed with the new secret is refused 401 until you have
             //     // deployed — with retries burning down in between. Set it to the old value
             //     // for the length of the window, then remove it.
             //     //
-            //     // BOTH secrets verify at the same time, so the window has no gap in it:
+            //     // Both secrets verify at the same time, so the window has no gap in it:
             //     // every scheme walks the set and accepts the first that matches, current
             //     // first, so the normal case still costs one comparison. Closing the window
             //     // is therefore a decision about the producer's timeline — and it IS
@@ -723,7 +723,7 @@ return [
             //     // A whpk_ secret or a 'jwks' url selects Ed25519 when 'scheme' is left
             //     // out. A raw base64 key does not, so name the scheme for one.
             //     // The JWKS document is fetched through the SSRF guard and cached for
-            //     // 'cache_ttl' seconds. 'kid' pins one key exactly; without it the FIRST TWO
+            //     // 'cache_ttl' seconds. 'kid' pins one key exactly; without it the first two
             //     // keys of the document are tried, in the order the document publishes them.
             //     //
             //     // That is a statement about position rather than about age: a JWK carries no
@@ -776,12 +776,12 @@ return [
             //     //     'invoice.paid' => \App\Jobs\HandleInvoicePaid::class,
             //     //     '*'            => \App\Jobs\HandleUnknownEvent::class,
             //     // ],
-            //     // Where the EVENT TYPE comes from — the column a stream is split on and
+            //     // Where the event type comes from — the column a stream is split on and
             //     // what 'process' routes by. Unset, it is the body's own `type`, which is
             //     // what a Standard Webhooks producer sends. Producers that name their
             //     // events elsewhere need this: GitHub puts it in X-GitHub-Event and leaves
             //     // the body carrying only `action`, so without it every delivery is logged
-            //     // with an EMPTY type and per-type routing falls to '*' every time. Same
+            //     // with an empty type and per-type routing falls to '*' every time. Same
             //     // grammar as 'dedupe_id' below.
             //     //
             //     // The header is not covered by the signature on this dialect either, so the
@@ -797,7 +797,7 @@ return [
             //     // this line the key is null, a null collides with nothing, and the producer's
             //     // own retries each store a row. 'webhooks:preflight' warns when it is missing.
             //     //
-            //     // Read what it is, not what it looks like: this is RETRY dedupe, not a replay
+            //     // Read what it is, not what it looks like: this is retry dedupe, not a replay
             //     // boundary. The header is not covered by the signature on this dialect — the
             //     // scheme signs the body alone — so the sender chooses the key. It separates
             //     // the honest repeats of a real producer, and against somebody who captured an
@@ -849,7 +849,7 @@ return [
     |
     | The folded-in, opt-in analytics layer over the delivery log. It reads; it
     | records nothing. Its provider (Pushery\Webhooks\Dashboard\WebhooksDashboardServiceProvider)
-    | is NOT auto-registered — enable 'enabled' AND register the provider to boot the
+    | is not auto-registered — enable 'enabled' and register the provider to boot the
     | hourly materialized view, the webhooks:refresh-metrics command and its schedule.
     | The Livewire/WireKit panels are the presentation layer on top of this read model:
     | rendering them as shipped needs livewire/livewire and pushery/wirekit (both
@@ -905,7 +905,7 @@ return [
         'enabled' => filter_var(env('WEBHOOKS_DASHBOARD_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
         'prefix' => 'webhooks',
         'middleware' => ['web', 'auth', 'can:view-webhook-dashboard'],
-        // Operator mode: read the GLOBAL, owner-less endpoints (subscriptions registered with
+        // Operator mode: read the global, owner-less endpoints (subscriptions registered with
         // a null owner) instead of scoping to the acting tenant. Turn this on for a single
         // operator dashboard over your own global endpoints; leave it off (the default) for a
         // per-tenant customer dashboard. It shows global rows to everyone the
@@ -913,7 +913,7 @@ return [
         'operator' => filter_var(env('WEBHOOKS_DASHBOARD_OPERATOR', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
 
         'deliveries' => [
-            // How many days back the delivery table reads. A CEILING, not merely a default:
+            // How many days back the delivery table reads. A ceiling, not merely a default:
             // the panel's windowDays property may narrow beneath it and can never reach past
             // it, because a public Livewire property is writable from the browser and
             // widening is the expensive direction.
@@ -923,38 +923,38 @@ return [
             // render of a screen that stays open all day. Set 0 to switch the bound off.
             'window_days' => EnvLimit::ceiling(env('WEBHOOKS_DASHBOARD_DELIVERIES_WINDOW_DAYS'), 30, zeroSwitchesOff: true),
         ],
-        // Cross-tenant operator mode: read EVERY delivery, owner-less and tenant-owned alike.
-        // This is the support/console view — "what did we send to THIS customer's endpoint?" —
-        // and it is deliberately NOT part of 'operator' above: seeing the global endpoints and
+        // Cross-tenant operator mode: read every delivery, owner-less and tenant-owned alike.
+        // This is the support/console view — "what did we send to this customer's endpoint?" —
+        // and it is deliberately not part of 'operator' above: seeing the global endpoints and
         // seeing every tenant's private history are different permission levels, and rolling
         // them together would silently widen every existing operator dashboard on upgrade.
         //
-        // It takes precedence over 'operator' when both are on, and it is gated by its OWN
+        // It takes precedence over 'operator' when both are on, and it is gated by its own
         // ability (below) on top of the route's view-webhook-dashboard middleware. If that
         // ability is defined and the acting user fails it, the dashboard denies the request
         // rather than quietly falling back to a narrower scope — a support screen that
         // silently shrinks to the handful of owner-less rows is the failure this exists to
         // prevent, and it shows no error while doing it.
         'all_tenants' => filter_var(env('WEBHOOKS_DASHBOARD_ALL_TENANTS', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
-        // The ability guarding cross-tenant reads. REQUIRED while 'all_tenants' is on: leave it
+        // The ability guarding cross-tenant reads. Required while 'all_tenants' is on: leave it
         // undefined and the dashboard refuses to load rather than reading every tenant's data.
         // Operator mode can default open because it shows only your own owner-less rows; this
         // shows every customer's, behind an ability a per-tenant dashboard grants broadly. To
         // deliberately run with no second gate, define it as always-true — explicit and
         // greppable, unlike an absence.
         //
-        // It opens READING only. Replaying a delivery in this mode sends it again to another
+        // It opens reading only. Replaying a delivery in this mode sends it again to another
         // customer's endpoint, so it needs the 'webhooks.manage' ability defined and granted;
         // left undefined, the replay is refused here, where the per-tenant dashboard allows it.
         'all_tenants_ability' => env('WEBHOOKS_DASHBOARD_ALL_TENANTS_ABILITY', 'view-all-tenant-webhooks'),
-        // The delivery BODY, which is a different permission level from the delivery log.
+        // The delivery body, which is a different permission level from the delivery log.
         // The drawer renders the stored request body, and in a real integration that body is
         // the business record itself — the order, the customer, the shipping address — next
         // to a copy button. Gating it with the same ability as the log would mean "may see
         // that a delivery failed" implies "may see whose order it was".
         //
-        // So the body has its own ability, and it FAILS CLOSED: full values only when
-        // 'ability' is defined AND the acting user passes it. That direction matters because
+        // So the body has its own ability, and it fails closed: full values only when
+        // 'ability' is defined and the acting user passes it. That direction matters because
         // view-webhook-dashboard is an ability a per-tenant dashboard necessarily grants
         // broadly — every customer needs it for their own deliveries — so defaulting the body
         // open would hand it to everyone that admits. To deliberately show every body to every
@@ -965,7 +965,7 @@ return [
         // replaces every value with its type, which is what debugging actually needs. A key
         // stays while it reads as a field name and becomes [key 1], [key 2], … when it reads as
         // data, such as an email address or an account number. 'hidden' shows nothing but the
-        // notice. Either way the drawer says WHY, because a panel that
+        // notice. Either way the drawer says why, because a panel that
         // simply stops after its heading reads as a bug and invites the guard's removal.
         // Anything other than those two tokens is read as 'hidden' — a typo in a security
         // setting must not be the permissive reading.
@@ -974,12 +974,12 @@ return [
             'denied' => env('WEBHOOKS_DASHBOARD_PAYLOAD_DENIED', 'redacted'),
         ],
         'source_model' => WebhookDelivery::class,
-        // The zone the dashboard RENDERS timestamps in, which is a different question from
+        // The zone the dashboard renders timestamps in, which is a different question from
         // the zone they are stored or read in. Null (the default) changes nothing: every
         // value stays in app.timezone, and the absolute format ends in `z` so the reader can
         // see which clock they are being shown.
         //
-        // Set it when app.timezone is not the right DISPLAY zone — which in a multi-tenant
+        // Set it when app.timezone is not the right display zone — which in a multi-tenant
         // back-office it usually is not: UTC is right for storage and wrong for the operator
         // reading the delivery log, and there is no single value the application could set
         // that is correct for every reader. Labeling the offset only tells them to do the
@@ -994,7 +994,7 @@ return [
         // zone identifier the runtime does not know falls back to the application zone rather
         // than throwing: a typo in a display setting must not take a dashboard down, and the
         // `z` in the format means the fallback names itself instead of showing a plausible
-        // wrong number. A class that does not implement the contract DOES throw — that is
+        // wrong number. A class that does not implement the contract does throw — that is
         // wiring, not a typo.
         'timezone' => env('WEBHOOKS_DASHBOARD_TIMEZONE'),
         'windows' => ['24h', '7d', '30d'],
@@ -1019,15 +1019,15 @@ return [
     | Pulse — the internal-ops delivery monitor (default off)
     |--------------------------------------------------------------------------
     |
-    | A single-view, gated Laravel Pulse card for YOUR engineers — throughput,
+    | A single-view, gated Laravel Pulse card for your engineers — throughput,
     | failure rate and latency of outbound deliveries, broken down by event type.
     | This is the internal monitor, distinct from the multi-tenant customer
     | dashboard above: it reuses Pulse's own sampling and aggregation rather than
     | the dashboard's materialized view.
     |
     | Strictly opt-in and off by default. Its provider
-    | (Pushery\Webhooks\Pulse\WebhookPulseServiceProvider) is NOT auto-registered: register
-    | it in a host app, set 'enabled' to true, AND require laravel/pulse (a Composer
+    | (Pushery\Webhooks\Pulse\WebhookPulseServiceProvider) is not auto-registered: register
+    | it in a host app, set 'enabled' to true, and require laravel/pulse (a Composer
     | suggestion). With any of those absent nothing boots — the recorder never
     | listens and the card is never registered. Once enabled, add the card to the
     | Pulse dashboard with <livewire:webhooks.pulse.deliveries />.
@@ -1060,7 +1060,7 @@ return [
     | Storage disk is never indexed verbatim; its excerpt is left empty so the
     | large body is never copied into the index.
     |
-    | The search ENGINE is Scout's own setting, not one of ours: pick it in
+    | The search engine is Scout's own setting, not one of ours: pick it in
     | config/scout.php ('database' needs no extra service; 'meilisearch' needs a running
     | Meilisearch plus MEILISEARCH_HOST / MEILISEARCH_KEY). For strict multi-tenant
     | isolation, always constrain a query by the owner/tenant column — the shipped
@@ -1071,12 +1071,12 @@ return [
     'search' => [
         'enabled' => filter_var(env('WEBHOOKS_SEARCH_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
 
-        // Whether the delivery BODY is copied into the index. Off, and off is the only
+        // Whether the delivery body is copied into the index. Off, and off is the only
         // safe default, because an index is not a screen.
         //
         // The payload is governed on every screen by the `view-webhook-payload` ability:
         // without it a reader sees the shape ([string], [int]) and not the customer's
-        // email. That decision is made per REQUEST, against the person looking. An index
+        // email. That decision is made per request, against the person looking. An index
         // has no request and no person — it is one shared artifact, queried by everyone
         // who can query it and retained by a system whose backups and access control
         // nobody reviewed for this. So the ability cannot govern it, and pretending it
@@ -1121,7 +1121,7 @@ return [
     |
     | 'theme' picks the color scheme those layouts render in. WireKit's dark tokens live
     | behind a 'dark' class on the document root and never switch on the operating
-    | system's preference by themselves — and because these are the PACKAGE's layouts,
+    | system's preference by themselves — and because these are the package's layouts,
     | the host has no place to put that class. So the layout puts it there:
     |
     |   'auto'  (default) — mirror the reader's system preference, and keep mirroring it
@@ -1132,18 +1132,18 @@ return [
     |
     | Pinning the theme is also the escape hatch under a strict Content-Security-Policy:
     | only 'auto' emits an inline script at all. If you keep 'auto' under a strict CSP, give
-    | that script a nonce your policy allows — a STATIC string in 'csp_nonce' below, or, for a
+    | that script a nonce your policy allows — a static string in 'csp_nonce' below, or, for a
     | per-request nonce, register one from a service provider with
     | UiTheme::resolveNonceUsing(fn () => Vite::cspNonce()). Do NOT put a closure in 'csp_nonce':
     | a closure in config makes `php artisan config:cache` throw.
     |
-    | The Tailwind utilities these screens are built from are compiled by YOUR app's
+    | The Tailwind utilities these screens are built from are compiled by your app's
     | build — the "Styling the UI" guide at
     | https://docs.pushery.com/webhooks-for-laravel/guides/styling-the-ui names the two
     | source globs it needs. The package ships no compiled stylesheet. If your app has
     | its own Vite pipeline, point 'assets' at a Blade partial that emits it (e.g.
     | @vite([...])) and the package layouts @include it in <head> — so the shipped
-    | screens load YOUR compiled CSS/JS without you having to publish and fork the
+    | screens load your compiled CSS/JS without you having to publish and fork the
     | layout.
     |
     */
@@ -1151,14 +1151,14 @@ return [
     'ui' => [
         'theme' => env('WEBHOOKS_UI_THEME', 'auto'),
 
-        // Which rendering of the two OPERATOR screens you get: 'auto', 'wirekit' or 'plain'.
+        // Which rendering of the two operator screens you get: 'auto', 'wirekit' or 'plain'.
         //
         // The package ships both — neutral Tailwind markup and pushery/wirekit markup — and
         // 'auto' picks the WireKit one when WireKit is registered in your app. No publish, no
         // copy to keep in step. There is no version setting because composer.json already
         // refuses a WireKit below the tested floor, so a resolvable install is a tested one.
         //
-        // A view you PUBLISHED always wins over this, whichever tag you published it with:
+        // A view you published always wins over this, whichever tag you published it with:
         // both land at resources/views/vendor/webhooks/livewire, and that is still the way to
         // make real changes rather than only to choose a style.
         'variant' => env('WEBHOOKS_UI_VARIANT', 'auto'),
@@ -1167,18 +1167,18 @@ return [
         // <link>/<script>) so the shipped screens use your asset pipeline. Null renders nothing.
         'assets' => null,
 
-        // Nonce for the inline theme script under a strict CSP: a STATIC string, or null (no
+        // Nonce for the inline theme script under a strict CSP: a static string, or null (no
         // nonce — fine without a CSP). For a per-request nonce, register a resolver from a
         // service provider instead — UiTheme::resolveNonceUsing(fn () => Vite::cspNonce()) —
-        // NOT a closure here: a closure in config makes `php artisan config:cache` throw.
+        // not a closure here: a closure in config makes `php artisan config:cache` throw.
         'csp_nonce' => null,
 
-        // The WireKit surface every shipped screen draws its SECONDARY actions with -- the two
+        // The WireKit surface every shipped screen draws its secondary actions with -- the two
         // operator screens, the self-service panels and the dashboard alike. 'ghost' is what
         // they have always used, so leaving this alone changes nothing.
         //
         // It exists because a design system usually settles on one secondary style, and a
-        // borderless untinted button next to a tinted one reads as a THIRD rank where there are
+        // borderless untinted button next to a tinted one reads as a third rank where there are
         // two. Until this existed the only way to change it was to publish the view and carry the
         // diff through every package update -- for a style choice.
         //
@@ -1229,7 +1229,7 @@ return [
             'transform' => 'sliders',
             'delete' => 'trash',
 
-            // The last four are the OPERATOR console's row, which drew no icons at all while the
+            // The last four are the operator console's row, which drew no icons at all while the
             // self-service list beside it drew one per action. It reads the same block on purpose:
             // two screens of one package disagreeing about whether a row action carries a symbol is
             // a difference a reader notices and cannot explain, and a second key set would be a
@@ -1248,7 +1248,7 @@ return [
             'rotate_secret' => 'refresh',
         ],
 
-        // The HTTP status a REFUSED operator action answers with. 403 is what this console
+        // The HTTP status a refused operator action answers with. 403 is what this console
         // has always sent and stays the default; nothing changes for a host that leaves it.
         //
         // 404 is for a host whose admin area is deliberately unfindable. There 403 is a
@@ -1270,7 +1270,7 @@ return [
             // It matters because webhook_deliveries is range-partitioned by month, so a query
             // with no lower bound on created_at cannot be pruned and reads every partition
             // there is. Nothing goes red when that happens: the page loads, and on a young
-            // installation it is fast. The cost arrives with the DATA, months later, looking
+            // installation it is fast. The cost arrives with the data, months later, looking
             // like a database problem rather than a missing default.
             //
             // The two tenant-facing lists work the other way round and keep their ceilings
@@ -1288,18 +1288,18 @@ return [
     | Operator console
     |--------------------------------------------------------------------------
     |
-    | The two publishable OPERATOR components (Pushery\Webhooks\Livewire\SubscriptionManager
+    | The two publishable operator components (Pushery\Webhooks\Livewire\SubscriptionManager
     | and Pushery\Webhooks\Livewire\DeliveryLog, registered by WebhooksUiServiceProvider).
-    | They are unscoped by design: they read and mutate EVERY tenant's endpoints and
+    | They are unscoped by design: they read and mutate every tenant's endpoints and
     | deliveries, which is what an operator screen is for and exactly what a customer
     | may never see. They must be embedded behind an operator-only gate of your own.
     |
-    | 'ability' adds a check on each ACTION, which is a different assurance from the
+    | 'ability' adds a check on each action, which is a different assurance from the
     | page gate you already put in front of them, not a duplicate of it. A page gate
     | decides who receives a Livewire snapshot; every interaction after that is a
     | separate request to Livewire's own endpoint. So a capability revoked mid-session
     | keeps working until the reader reloads — and if you ever embed a component in a
-    | second place, it inherits THAT page's gate rather than the original one.
+    | second place, it inherits that page's gate rather than the original one.
     |
     | Null is the default and means today's behavior exactly: no per-action check, the
     | page gate is the only guard. Set it to an ability name and all seven gated actions
@@ -1328,7 +1328,7 @@ return [
     | The action name travels in exactly that position, so 'create' becomes the guard,
     | the permission lookup asks for a guard nobody defined, the hook declines to decide,
     | and the check falls through to an ability that does not exist — a deny. The console
-    | then refuses EVERY action to EVERY operator, including the one the permission was
+    | then refuses every action to every operator, including the one the permission was
     | granted to, and it refuses silently: nothing throws, nothing is logged, the form
     | just does nothing.
     |
@@ -1338,8 +1338,8 @@ return [
     | rarely write.
     |
     | 'abilities' is the way past that, and it is the key a permission-based host wants.
-    | It names an ability PER ACTION, and an ability that comes from it is authorized
-    | ALONE — nothing travels in the slot the hook reads as a guard, so a permission name
+    | It names an ability per action, and an ability that comes from it is authorized
+    | alone — nothing travels in the slot the hook reads as a guard, so a permission name
     | works as itself:
     |
     |     'abilities' => ['*' => 'manage webhooks'],           // one permission, every action
@@ -1356,9 +1356,9 @@ return [
     | must not become a console that refuses everything, which is the failure this seam
     | exists to end, and it must not lift the check '*' holds either.
     |
-    | 'view' is the one entry the map answers for READING, and only by name: neither '*' nor
+    | 'view' is the one entry the map answers for reading, and only by name: neither '*' nor
     | 'ability' reaches it, because both were only ever asked about actions and a host may hold
-    | operators who read and never act. Named, the console asks it on EVERY request, the first
+    | operators who read and never act. Named, the console asks it on every request, the first
     | render and each filter, page turn and refresh after it, so a reader whose capability was
     | revoked is refused on the next one instead of reading on in the open tab:
     |
@@ -1374,7 +1374,7 @@ return [
     |
     | If you would rather not touch the config shape, the older one-line workaround still
     | works. Declare an ability that asks the permission itself and point 'ability' at
-    | THAT; a closure declared as fn ($user) => … ignores an argument it does not accept,
+    | that; a closure declared as fn ($user) => … ignores an argument it does not accept,
     | which makes the action name harmless:
     |
     |     Gate::define('webhooks.operate', fn ($user) => $user->can('manage webhooks'));

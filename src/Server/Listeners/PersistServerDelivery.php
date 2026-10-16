@@ -26,7 +26,7 @@ use Throwable;
 /**
  * The standalone counterpart to the Platform delivery-log subscriber: it maps the
  * six Server delivery events onto a single webhook_server_deliveries row per
- * message, so an app driving the Server layer WITHOUT the Platform layer still gets
+ * message, so an app driving the Server layer without the Platform layer still gets
  * a persisted, prunable record of every delivery.
  *
  * Every handler locates its row by the stable message id and is idempotent: a row
@@ -177,7 +177,7 @@ final class PersistServerDelivery
      * Whether a query failure is a unique-constraint violation — a lost insert race on the
      * unique message_id, not a real error. Laravel marshals a duplicate-key error into
      * UniqueConstraintViolationException on both PostgreSQL and MySQL, so that is the portable
-     * signal. The explicit 23505 string comparison is kept ALONGSIDE it, not replaced: a driver
+     * signal. The explicit 23505 string comparison is kept alongside it, not replaced: a driver
      * that reports the SQLSTATE as an integer (rather than the string Laravel's own detector
      * requires) is still recognized and recovered rather than surfacing as a hard write error.
      */

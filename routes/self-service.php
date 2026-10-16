@@ -32,9 +32,9 @@ Route::middleware(Config::array('webhooks.platform.self_service.middleware', ['w
         // segment is a 404 with nothing caught -- and catching the query exception would have
         // been the worse trade, since it swallows real database errors on the same route.
         //
-        // Bounded LENGTH, not just whereNumber(): digits alone leave the hole open at the
+        // Bounded length, not just whereNumber(): digits alone leave the hole open at the
         // other end. `9999999999999999999999999` is all digits, so whereNumber() passes it
-        // through, and the column rejects it for RANGE instead of syntax -- the same 500,
+        // through, and the column rejects it for range instead of syntax -- the same 500,
         // reached just as easily. Eighteen digits is the widest run that always fits a signed
         // bigint (10^18 - 1 < 2^63 - 1), so this refuses exactly what the column cannot hold
         // and nothing a real key could ever be.

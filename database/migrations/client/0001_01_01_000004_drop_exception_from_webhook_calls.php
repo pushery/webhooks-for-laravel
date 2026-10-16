@@ -11,9 +11,9 @@ use Pushery\Webhooks\Support\TableLookup;
 use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
- * Drops `exception` from an EXISTING webhook_calls table.
+ * Drops `exception` from an existing webhook_calls table.
  *
- * The column was declared when this table was first created and NOTHING in this package ever
+ * The column was declared when this table was first created and nothing in this package ever
  * wrote it — not the live receive path, not the backlog import, not a listener. It was carried in
  * from the shape of the table this log replaced, survived the rewrite that removed the dependency
  * it came from, and then sat there: declared on the model as `@property string|null $exception`,
@@ -59,7 +59,7 @@ return new class extends Migration
     }
 
     /**
-     * Restores the column's SHAPE, per engine, and not its contents — the drop above took those.
+     * Restores the column's shape, per engine, and not its contents — the drop above took those.
      * A rollback that silently produced an all-null column where data used to be would be the
      * quieter failure, so the class docblock says to copy the values out first.
      */

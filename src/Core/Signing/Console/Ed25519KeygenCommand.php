@@ -10,8 +10,8 @@ use Pushery\Webhooks\Core\Signing\Ed25519Scheme;
 
 /**
  * Prints a fresh Ed25519 keypair for the asymmetric {@see Ed25519Scheme}.
- * Keep the SECRET key on the sending side (its config secret / WEBHOOKS_ED25519_SECRET_KEY)
- * and hand the PUBLIC key to receivers — statically, or served from a JWKS endpoint.
+ * Keep the secret key on the sending side (its config secret / WEBHOOKS_ED25519_SECRET_KEY)
+ * and hand the public key to receivers — statically, or served from a JWKS endpoint.
  * Console-only; it emits key material and never runs as part of a request.
  *
  * @internal

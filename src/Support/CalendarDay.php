@@ -34,7 +34,7 @@ final class CalendarDay
             return null;
         }
 
-        // The shape is checked BEFORE Carbon sees it, because Carbon THROWS on a string it
+        // The shape is checked before Carbon sees it, because Carbon throws on a string it
         // cannot read rather than returning false: '2026-0', which is what wire:model.live
         // sends while a reader is still typing the year, throws "A four digit year could not be
         // found". /D so a trailing newline cannot slip past the anchor.
@@ -44,7 +44,7 @@ final class CalendarDay
 
         $date = Date::createFromFormat('!Y-m-d', $value);
 
-        // And the round-trip rejects what Carbon reads TOO willingly. Every well-shaped
+        // And the round-trip rejects what Carbon reads too willingly. Every well-shaped
         // string parses: '2026-13-45' becomes 2027-02-14, '2026-02-30' becomes
         // 2026-03-02, '0000-00-00' becomes -0001-11-30 — so the parse alone would answer a
         // question the reader did not ask. Comparing the result back against the input is

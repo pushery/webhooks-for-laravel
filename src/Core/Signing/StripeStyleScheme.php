@@ -10,10 +10,10 @@ use Illuminate\Support\Facades\Date;
  * A Stripe-style HMAC scheme: signed content `{timestamp}.{rawBody}`, hex
  * HMAC-SHA256, carried in a single header `Webhook-Signature: t=<unix>,v1=<hex>`
  * (with one `v1=` per active secret during rotation). The key is the raw secret
- * bytes — NOT base64-decoded — which is what Stripe-style producers use.
+ * bytes — not base64-decoded — which is what Stripe-style producers use.
  *
  * It is available as an inbound verification adapter, selected per source on the Client
- * layer to RECEIVE Stripe-style producers; it is never a sending default
+ * layer to receive Stripe-style producers; it is never a sending default
  * ({@see StandardWebhooksScheme} is). It is also the generic base for
  * {@see StripeScheme}, which pins the real `Stripe-Signature` header.
  */

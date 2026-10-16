@@ -83,7 +83,7 @@ class WebhookCall extends Model
      */
     public function prunable(): Builder
     {
-        // The cutoff is bound for THIS connection's dialect: MySQL converts an offset-bearing
+        // The cutoff is bound for this connection's dialect: MySQL converts an offset-bearing
         // literal into the database session time zone (8.0.19+), which would slide the retention
         // boundary by that offset and prune rows whose window has not closed yet. Through
         // model(), so a host that configures its own subclass prunes through it.
@@ -95,12 +95,12 @@ class WebhookCall extends Model
     }
 
     /**
-     * The EXACT body that was received and signature-verified, byte for byte — so
+     * The exact body that was received and signature-verified, byte for byte — so
      * hash('sha256', $call->body()) always equals $call->body_sha256, and the call can
      * be re-verified or forwarded later. An over-sized body offloaded to a Storage disk
      * is read back from there; every other call keeps its bytes in raw_body.
      *
-     * The stored payload is the parsed, queryable VIEW of those bytes, not the bytes:
+     * The stored payload is the parsed, queryable view of those bytes, not the bytes:
      * re-encoding it would change whitespace, escaping and float formatting, and a body
      * that never decoded would have nothing to re-encode.
      *

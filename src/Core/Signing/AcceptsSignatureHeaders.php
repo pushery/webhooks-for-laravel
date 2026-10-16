@@ -13,11 +13,11 @@ namespace Pushery\Webhooks\Core\Signing;
  * A null argument means "not configured — keep this scheme's own default", so a scheme
  * whose default header is provider-specific (GitHub's `X-Hub-Signature-256`, the plain
  * HMAC `Signature`) is never clobbered by the Standard-Webhooks fallback the config uses
- * for its other header accessors. Only the names the host EXPLICITLY set are passed here.
+ * for its other header accessors. Only the names the host explicitly set are passed here.
  *
  * The two first-class schemes ({@see StandardWebhooksScheme}, {@see Ed25519Scheme}) receive
  * their header names through their constructor instead and need not implement this; it
- * exists for every OTHER scheme, which the config resolves from the container with no
+ * exists for every other scheme, which the config resolves from the container with no
  * constructor arguments.
  */
 interface AcceptsSignatureHeaders

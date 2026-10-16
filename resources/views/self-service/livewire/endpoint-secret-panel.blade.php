@@ -7,7 +7,7 @@
      The timer is a registered component served as a file, rather than an inline expression and not
      an inline script — and both halves of that are load-bearing.
 
-     Registered rather than inline EXPRESSION: under a Content-Security-Policy without
+     Registered rather than inline expression: under a Content-Security-Policy without
      `unsafe-eval`, Alpine parses attribute expressions against a small grammar rather than
      handing them to `new Function`, and an object literal with methods does not parse there
      — the countdown would silently never start and the secret would stay on screen past its
@@ -15,8 +15,8 @@
      expression stays a bare factory call and no `JSON.parse` appears in an Alpine
      expression, where `JSON` is not resolvable.
 
-     A FILE rather than an inline SCRIPT: the registration used to ride in this block as an
-     inline `<script>` with an optional nonce, and under a strict NONCE-LESS policy
+     A file rather than an inline script: the registration used to ride in this block as an
+     inline `<script>` with an optional nonce, and under a strict nonce-less policy
      (`script-src 'self'`, which an application is entitled to choose) the browser simply
      refused to run it. Nothing threw, nothing reached a log, and a CSP audit read the
      expression as valid — the panel was dead and looked fine. Served from the app's own
@@ -39,7 +39,7 @@
     {{-- Persistent polite live region: survives the reveal card being torn down, so a
          screen reader still hears that the secret was withdrawn. --}}
     <x-wirekit::visually-hidden role="status" aria-live="polite">
-        {{-- Both ends of the window, and NEITHER contains the key. This region announces that a
+        {{-- Both ends of the window, and neither contains the key. This region announces that a
              secret appeared and that it went away again; the card itself announces nothing,
              because a live region wrapped around the card would read the key out loud on every
              unrelated change inside it. --}}
@@ -48,9 +48,9 @@
     @if ($secret !== null)
         <x-wirekit::card>
             <x-wirekit::card.body>
-                {{-- A plain region, NOT a live one, and that is the whole point of this line.
+                {{-- A plain region, not a live one, and that is the whole point of this line.
                      `role="status"` carries an implicit aria-atomic="true", so around the entire
-                     card body ANY change inside it would re-announce the WHOLE region: the
+                     card body any change inside it would re-announce the whole region: the
                      heading, the endpoint URL, the notice, the plaintext signing secret character
                      by character, the previous secret and every button. Pressing Copy is such a
                      change, because the button swaps its icon and its label, and so is the

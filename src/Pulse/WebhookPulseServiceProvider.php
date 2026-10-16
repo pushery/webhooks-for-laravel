@@ -16,8 +16,8 @@ use Pushery\Webhooks\Support\MergesPackageConfig;
 
 /**
  * Boots the internal-ops Laravel Pulse integration — the delivery recorder and its
- * card — but ONLY when it is both wanted and possible: webhooks.pulse.enabled is on
- * AND laravel/pulse is actually installed. It is deliberately NOT auto-registered
+ * card — but only when it is both wanted and possible: webhooks.pulse.enabled is on
+ * and laravel/pulse is actually installed. It is deliberately not auto-registered
  * (absent from composer extra.laravel.providers), so a consumer who neither runs Pulse
  * nor wants the internal monitor pays nothing and nothing boots.
  *
@@ -38,7 +38,7 @@ final class WebhookPulseServiceProvider extends ServiceProvider
 
     /**
      * The single condition the whole integration hangs off, exposed so it is directly
-     * testable: the opt-in flag AND the optional dependency both being present.
+     * testable: the opt-in flag and the optional dependency both being present.
      */
     public function shouldBoot(): bool
     {

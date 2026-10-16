@@ -24,7 +24,7 @@ use Pushery\Webhooks\Support\Settings;
  * readonly class cannot unserialize a property it no longer declares: the job would fail in
  * the worker.
  *
- * The $clientCertPassphrase carried here is SEALED with the app encrypter (like the signing
+ * The $clientCertPassphrase carried here is sealed with the app encrypter (like the signing
  * secret), so a mutual-TLS credential is never at rest in cleartext in the queue store or in
  * an attempt-event payload; {@see self::toTransportOptions()} unseals it at send time. Build
  * this through `PendingWebhook::useMutualTls()`, which seals it — never with a plaintext
@@ -56,7 +56,7 @@ final readonly class DeliveryOptions
 
     /**
      * Adapt to the Core transport options at send time. The client-cert passphrase is
-     * carried SEALED through the queue (see the class docblock) and is unsealed HERE, at
+     * carried sealed through the queue (see the class docblock) and is unsealed here, at
      * the Server→Core handoff on the worker — the same place and moment the signing secret
      * is unsealed — so the plaintext exists only in the transient options handed to the
      * transport, never at rest in the queue store or in an attempt-event payload.

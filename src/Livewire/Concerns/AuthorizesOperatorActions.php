@@ -16,13 +16,13 @@ use Illuminate\Support\Facades\Gate;
  * cannot give, which is a different one rather than a stricter version of the same one.
  *
  * A page gate decides who receives a Livewire snapshot. Every interaction after that is a
- * separate request to Livewire's own endpoint, so a capability revoked DURING an open
+ * separate request to Livewire's own endpoint, so a capability revoked during an open
  * session keeps working until the reader navigates — and a component embedded in a second
  * place inherits that page's gate rather than the original one. A check on each action
  * answers both, at the moment the action runs.
  *
  * Three ways in, and the default is none of them: set webhooks.admin.abilities to name an
- * ability PER ACTION (or one for all of them under '*'), set webhooks.admin.ability to
+ * ability per action (or one for all of them under '*'), set webhooks.admin.ability to
  * authorize every action against a single ability with the action name as its argument, or
  * override authorizeAction() in a subclass for a rule no ability can express. With both
  * config keys left at their defaults this method does nothing at all, which is exactly the
@@ -30,7 +30,7 @@ use Illuminate\Support\Facades\Gate;
  *
  * The ability must be one `Gate::define()` declared, not a permission name from a package that
  * resolves permissions through its own `Gate::before` hook. Such a hook conventionally reads the
- * first positional gate argument as a GUARD name and shifts it off the argument list:
+ * first positional gate argument as a guard name and shifts it off the argument list:
  *
  *     if (is_string($args[0] ?? null) && ! class_exists($args[0])) {
  *         $guard = array_shift($args);
@@ -39,8 +39,8 @@ use Illuminate\Support\Facades\Gate;
  * This seam passes the action name in exactly that position, so on such a host `'create'`
  * becomes the guard, the permission lookup asks for a guard nobody defined, the hook
  * declines to decide, and the check falls through to an ability that does not exist —
- * a DENY. Every action then refuses every operator, including the one the permission was
- * granted to, and it refuses SILENTLY: nothing throws and nothing is logged, so the form
+ * a deny. Every action then refuses every operator, including the one the permission was
+ * granted to, and it refuses silently: nothing throws and nothing is logged, so the form
  * simply does nothing when submitted.
  *
  * That failure is invisible to the obvious tests: a surface that denies everything looks
@@ -56,16 +56,16 @@ use Illuminate\Support\Facades\Gate;
  *     'abilities' => ['delete' => 'delete webhooks', …],    // or one per action
  *
  * That is also the shape a permission-based host wants anyway: the action is encoded in the
- * NAME rather than passed beside it, which is how a permission package models capabilities in
+ * name rather than passed beside it, which is how a permission package models capabilities in
  * the first place. The older single-ability key keeps its argument and its behavior untouched, so a
  * host already relying on `fn ($user, string $action) => …` sees no change.
  *
  * The one-line workaround for a host that would rather not touch the config shape remains
  * available: declare an ability of your own that asks the permission internally, and point
- * webhooks.admin.ability at THAT. A closure declared with `fn ($user) => …` ignores an
+ * webhooks.admin.ability at that. A closure declared with `fn ($user) => …` ignores an
  * argument it does not accept, which makes the action name harmless again.
  *
- * The consuming components are deliberately NOT final, so the override this docblock offers
+ * The consuming components are deliberately not final, so the override this docblock offers
  * is actually reachable: on a final class the only documented escape from the trap above could
  * not be taken.
  *
@@ -77,7 +77,7 @@ use Illuminate\Support\Facades\Gate;
 trait AuthorizesOperatorActions
 {
     /**
-     * Check reading on EVERY request, where the host named an ability for it.
+     * Check reading on every request, where the host named an ability for it.
      *
      * Livewire runs a trait's boot hook on the first render and on every update after it, so this is the
      * one place that sees a filter, a page turn and a refresh as well as an action. It asks only when
@@ -86,7 +86,7 @@ trait AuthorizesOperatorActions
      * hold operators who read and never act. Asked through either of them, those operators would lose the
      * console on the day the host upgraded.
      *
-     * Why a host names it: Livewire re-applies only PERSISTENT middleware on its own endpoint. Its
+     * Why a host names it: Livewire re-applies only persistent middleware on its own endpoint. Its
      * default list holds `Authenticate` (`auth`) and `Authorize` (`can:`) beside a few authentication
      * middlewares of other packages, and no gate middleware a host writes. A page guarded by a middleware
      * of the host's own is guarded at its first render and no longer after it, so a reader whose capability was revoked
@@ -114,7 +114,7 @@ trait AuthorizesOperatorActions
      * Assert that the current user may take one operator action, named by the action.
      *
      * The map wins when it names this action, and an ability that comes from it is
-     * authorized ALONE — the action is already in the name, so no argument is passed and
+     * authorized alone — the action is already in the name, so no argument is passed and
      * there is nothing for a Gate::before hook to mistake for a guard.
      *
      * Otherwise the single-ability key answers, and there the name still travels to the gate
@@ -203,7 +203,7 @@ trait AuthorizesOperatorActions
     }
 
     /**
-     * Whether this action would be allowed, WITHOUT throwing.
+     * Whether this action would be allowed, without throwing.
      *
      * The twin of {@see self::authorizeAction()}, and it exists so a view can decide whether to
      * render a control rather than offering one that answers 403 on click. It is not a second

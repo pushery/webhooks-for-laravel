@@ -112,10 +112,10 @@ final class WebhookClientServiceProvider extends ServiceProvider
         Router::macro('webhooks', function (string $url, ?string $name = null, string $verb = 'post'): Route {
             $name ??= $url;
 
-            // The name goes in the ACTION, not in defaults(), and the difference is whether
+            // The name goes in the action, not in defaults(), and the difference is whether
             // the binding is a promise or a suggestion. A defaults() value is only what the
             // parameter falls back to -- so a URI written with a literal {webhookConfigName}
-            // segment let the CALLER pick the config, and a route meant to be pinned to one
+            // segment let the caller pick the config, and a route meant to be pinned to one
             // source processed a delivery under another. The signature still had to match the
             // chosen config, so nothing was forged; what was lost is the binding itself, and the
             // stored row then disagreed with the route about where the delivery came from.

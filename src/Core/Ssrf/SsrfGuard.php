@@ -11,7 +11,7 @@ use Pushery\Webhooks\Core\Http\Exceptions\NonRetryable;
 /**
  * Vets an attacker-influenced webhook URL and returns a {@see PinnedEndpoint}
  * pinned to the exact vetted IP addresses. Run at registration time (Platform)
- * AND again immediately before each delivery attempt (Server) — resolving the
+ * and again immediately before each delivery attempt (Server) — resolving the
  * host itself each time is what defeats DNS rebinding. Fails closed.
  */
 interface SsrfGuard
@@ -23,7 +23,7 @@ interface SsrfGuard
      *                            {@see NonRetryable}: they are attacker influence
      *                            or misconfiguration, and the next attempt gets
      *                            the same answer.
-     * @throws HostUnresolvable when the host resolved to no address. NOT
+     * @throws HostUnresolvable when the host resolved to no address. Not
      *                          non-retryable, because PHP's resolver cannot say
      *                          whether the name is gone or the lookup merely
      *                          failed — see the exception for why the shipped

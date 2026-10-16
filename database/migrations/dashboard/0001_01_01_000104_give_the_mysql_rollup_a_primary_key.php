@@ -12,7 +12,7 @@ use Pushery\Webhooks\Support\TableLookup;
 use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
- * Gives an EXISTING MySQL rollup table its primary key.
+ * Gives an existing MySQL rollup table its primary key.
  *
  * The create migration declares the key on the owner pair and the bucket now, which covers a fresh
  * install and nothing else: a host that already migrated will never re-run it, and its table keeps

@@ -23,7 +23,7 @@ use Pushery\Webhooks\Models\WebhookDelivery;
  * failed and reading whose order it was are different permission levels. See
  * {@see PayloadVisibility}.
  *
- * Everything below the id is a COMPUTED property, and deliberately so: Livewire
+ * Everything below the id is a computed property, and deliberately so: Livewire
  * serializes public properties into its snapshot but not computed ones, so neither the
  * delivery nor its body ever travels to the browser. Promoting any of them to a public
  * property for convenience would put the payload back on the wire and quietly turn the
@@ -108,19 +108,19 @@ final class DeliveryDetailDrawer extends Component
     }
 
     /**
-     * The line saying the body was OFFLOADED, or null when it is stored inline.
+     * The line saying the body was offloaded, or null when it is stored inline.
      *
      * Without it the drawer misleads in the most expensive direction. Past
      * `server.large_payload.threshold` the manager writes only a stub into the row — the event
      * type, or nothing — and moves the body to a disk. The drawer renders that stub, so a
-     * delivery large enough to be offloaded appears as the SMALLEST one in the log, and an
+     * delivery large enough to be offloaded appears as the smallest one in the log, and an
      * operator reads it as "this payload was tiny" when the opposite is true.
      *
      * The payload gate makes it worse rather than better: under `redacted` the stub renders as
      * `{"type":"[string]"}`, and now two different explanations — "redacted" and "there was
      * barely anything here" — produce the same picture, both wrong.
      *
-     * Deliberately a NOTICE and not a rehydrate. Fetching the body from the disk on every open
+     * Deliberately a notice and not a rehydrate. Fetching the body from the disk on every open
      * would undo the reason the operator turned offloading on, and it would be a second read
      * path over the same data that the payload ability would have to cover as well. Saying what
      * happened costs nothing and removes the false reading.

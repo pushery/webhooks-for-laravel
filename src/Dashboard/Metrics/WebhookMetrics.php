@@ -27,13 +27,13 @@ use stdClass;
  * percentile_cont, the materialized view and array-aggregate percentiles are not
  * expressible through Eloquent, and this abstracts analytics — not CRUD.
  *
- * The tenant is the WHOLE morph pair (owner_type, owner_id), never the id alone:
+ * The tenant is the whole morph pair (owner_type, owner_id), never the id alone:
  * two tenants that share an owner_id under different owner types are different
- * tenants, so every read — the raw-row surface AND the hourly rollup — filters both
+ * tenants, so every read — the raw-row surface and the hourly rollup — filters both
  * columns, or one tenant's counts, event types and delivery rows leak into another's.
  *
  * Counts come cheaply from the hourly rollup (additive, so any window is a sum of
- * buckets). The window-level latency percentiles are computed LIVE over the raw
+ * buckets). The window-level latency percentiles are computed live over the raw
  * rows in the bounded window — never averaged from the rollup's per-hour buckets,
  * which would be statistically wrong (see the Tier-1 percentile strategy).
  *
@@ -204,7 +204,7 @@ final readonly class WebhookMetrics
 
         $bucketAt = Timestamp::read($dialect, $newestBucket);
 
-        // The rollup buckets by hour, so it is up to an hour behind the newest row BY DESIGN.
+        // The rollup buckets by hour, so it is up to an hour behind the newest row by design.
         // Reporting that as lag would make a healthy installation warn once an hour.
         $lag = $rowAt->diffInSeconds($bucketAt->addHour(), absolute: false);
 
@@ -252,7 +252,7 @@ final readonly class WebhookMetrics
             ->with(['subscription:id,name,url'])
             ->whereRaw($ownerSql, $ownerBindings)
             // The window the caller already asked for. Every other query here carries it;
-            // this one did not, so a panel named "recent" would sort the owner's WHOLE
+            // this one did not, so a panel named "recent" would sort the owner's whole
             // history to find its newest rows — and on the range-partitioned delivery table
             // that is a read the planner cannot prune, across every partition that exists.
             ->where('created_at', '>=', $this->since())
@@ -264,7 +264,7 @@ final readonly class WebhookMetrics
     /**
      * A row budget that is always a budget.
      *
-     * Laravel's `limit()` DROPS a negative value in silence — `if ($value >= 0)` — and the
+     * Laravel's `limit()` drops a negative value in silence — `if ($value >= 0)` — and the
      * statement then goes out with no LIMIT clause at all. That turns a bounded panel query
      * into a full read of the owner's history, and both callers poll, so one open tab
      * repeats it for as long as it is open.
@@ -360,7 +360,7 @@ final readonly class WebhookMetrics
      */
     private function tdigestPercentiles(): array
     {
-        // Probe the extension on the WEBHOOK connection (where the tdigest SQL below runs),
+        // Probe the extension on the webhook connection (where the tdigest SQL below runs),
         // not the app default: under a side-car topology the two differ, and checking the
         // wrong one either disables a supported feature or lets the SQL fail with the exact
         // missing-function error this guard exists to prevent.

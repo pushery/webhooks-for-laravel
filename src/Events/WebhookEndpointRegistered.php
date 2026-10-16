@@ -9,7 +9,7 @@ use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\WebhookManager;
 
 /**
- * Fired when a webhook endpoint is registered, naming WHO registered it.
+ * Fired when a webhook endpoint is registered, naming who registered it.
  *
  * The package's other events answer "what happened to a delivery". This one answers a
  * question an audit asks instead: which human did this, and when. The two do not overlap —

@@ -162,7 +162,7 @@ class WebhookDelivery extends Model
     }
 
     /**
-     * Scope a save to the row's PARTITION as well as its id.
+     * Scope a save to the row's partition as well as its id.
      *
      * The table is PARTITION BY RANGE (created_at) and its primary key is
      * (id, created_at). Eloquent would update WHERE id = ?, which the planner cannot
@@ -212,7 +212,7 @@ class WebhookDelivery extends Model
      * and the count grows with every month the log survives. The package states that invariant in
      * several places and three click paths in the operator surfaces did not hold it.
      *
-     * It costs nothing in reachable rows. The bound is one month BELOW the retention floor —
+     * It costs nothing in reachable rows. The bound is one month below the retention floor —
      * partitions are dropped whole and only once entirely older than it, so between two
      * maintenance runs a partition just past the floor can still exist, and cutting exactly at
      * the floor could hide a row that is genuinely still there.

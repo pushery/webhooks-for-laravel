@@ -11,11 +11,11 @@ use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
  * Pins `webhook_delivery_hourly.owner_type` to the case- and accent-sensitive collation on an
- * EXISTING MySQL rollup table.
+ * existing MySQL rollup table.
  *
  * The create migration carries the collation now, which covers a fresh install and nothing else:
  * a host that already migrated will never re-run it. Without this file the fix would reach only
- * new installations — and `webhooks:preflight` would then FAIL for every existing host whose
+ * new installations — and `webhooks:preflight` would then fail for every existing host whose
  * database default is case-insensitive, over a column they have no way to correct from here.
  *
  * MySQL only, and only when the collation is actually wrong. On PostgreSQL the question does not

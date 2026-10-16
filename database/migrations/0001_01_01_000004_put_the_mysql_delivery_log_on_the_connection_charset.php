@@ -12,7 +12,7 @@ use Pushery\Webhooks\Support\TableLookup;
 use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
- * Moves the unpinned text columns of an EXISTING MySQL delivery log onto the connection's character
+ * Moves the unpinned text columns of an existing MySQL delivery log onto the connection's character
  * set.
  *
  * The create migration names the connection's character set and collation as the table's default

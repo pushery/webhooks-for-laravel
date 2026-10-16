@@ -82,6 +82,8 @@ Everything ships under the `Pushery\Webhooks\` namespace.
   redacted before storage.
 - **Seven languages** — every string the shipped UI renders is translated, and the
   translations are publishable.
+- **A fake for your tests** — `Webhooks::fake()` records every webhook instead of sending
+  it, so a test asserts what your code dispatched, or that it dispatched nothing.
 
 Each layer has a single switch, so you pay only for what you turn on. A send-only app
 runs no migrations at all and needs no database.

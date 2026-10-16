@@ -45,8 +45,8 @@ final readonly class EndpointHealth
         $window = $this->config->healthWindowHours();
         $dialect = WebhookConnection::dialect();
 
-        // The window bound is bound for the ENGINE, not just the query shape. MySQL converts an
-        // offset-bearing literal into the database SESSION time zone (8.0.19+), which silently
+        // The window bound is bound for the engine, not just the query shape. MySQL converts an
+        // offset-bearing literal into the database session time zone (8.0.19+), which silently
         // slides the whole window by that offset against the UTC-naive DATETIME(6) column — an
         // endpoint's oldest hours drop out and a failing endpoint can score healthy. The naive
         // form is the instant the column actually holds.

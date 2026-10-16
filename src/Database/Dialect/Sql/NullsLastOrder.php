@@ -7,7 +7,7 @@ namespace Pushery\Webhooks\Database\Dialect\Sql;
 use Pushery\Webhooks\Database\Dialect\Dialect;
 
 /**
- * An ORDER BY term that sorts NULLs LAST in either direction, on both engines.
+ * An ORDER BY term that sorts NULLs last in either direction, on both engines.
  *
  * PostgreSQL says `col NULLS LAST` outright. MySQL has no such clause and sorts NULLs first on
  * ASC, so a leading `col IS NULL` term (0 for a value, 1 for NULL) pushes them to the end whichever

@@ -1,6 +1,6 @@
 {{-- Default full-page layout for the self-service endpoint portal.
 
-     WireKit's stylesheet (@wirekitStyles) carries the DESIGN TOKENS; the Tailwind
+     WireKit's stylesheet (@wirekitStyles) carries the design tokens; the Tailwind
      utilities that consume them — in WireKit's components and in these views — are
      compiled by the host application. A host therefore points its Tailwind build at both
      packages' views (see the "Styling the UI" guide at

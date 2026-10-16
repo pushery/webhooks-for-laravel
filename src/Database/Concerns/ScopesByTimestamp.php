@@ -10,18 +10,18 @@ use Pushery\Webhooks\Support\Timestamp;
 
 /**
  * Query scopes that bind a moment against this package's timestamp columns as an
- * UNAMBIGUOUS literal — the one thing a host querying these tables directly must get
+ * unambiguous literal — the one thing a host querying these tables directly must get
  * right and, without them, silently gets wrong.
  *
  * Every timestamp column the package ships is timestamptz on PostgreSQL and a UTC-naive
  * DATETIME(6) on MySQL. A plain `->where('created_at', '<', now()->subMinutes(15))` binds
- * a NAIVE literal, which PostgreSQL resolves against the database SESSION time zone — a
+ * a naive literal, which PostgreSQL resolves against the database session time zone — a
  * connection setting unrelated to app.timezone and routinely not UTC. The comparison is
  * then off by exactly that offset and the query quietly returns the wrong rows: no error,
  * no warning. These scopes bind the moment the way the package binds its own writes and
  * reads, per dialect, so the caller cannot get it wrong.
  *
- * Exposing the raw format as a constant would not be enough: the correct literal DIFFERS
+ * Exposing the raw format as a constant would not be enough: the correct literal differs
  * by engine (PostgreSQL carries the offset, MySQL is UTC-naive), so a copied constant is
  * right on one engine and wrong on the other. Only a dialect-aware binding — a scope, or
  * {@see self::boundTimestamp()} for a raw statement — is safe on both.
@@ -78,7 +78,7 @@ trait ScopesByTimestamp
     }
 
     /**
-     * The moment as the literal this connection's dialect resolves WITHOUT consulting the
+     * The moment as the literal this connection's dialect resolves without consulting the
      * session zone: an offset-bearing timestamptz on PostgreSQL, a UTC-naive DATETIME(6) on
      * MySQL. Public so a host building a raw statement the scopes don't cover can still bind
      * correctly — `(new WebhookDelivery)->boundTimestamp($moment)` — instead of copying the

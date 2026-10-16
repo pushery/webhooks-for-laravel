@@ -49,6 +49,8 @@ use Pushery\Webhooks\Support\Settings;
 use Pushery\Webhooks\Support\TenantIdentity;
 use Pushery\Webhooks\Support\Timestamp;
 use Pushery\Webhooks\Support\WebhookConnection;
+use Pushery\Webhooks\Testing\FakedWebhook;
+use Pushery\Webhooks\Testing\WebhookFake;
 
 /**
  * The package's public entry point: register endpoints, fan an event out to every
@@ -154,7 +156,7 @@ final readonly class WebhookManager
     /**
      * Bring an endpoint back into delivery — the recovery path for an endpoint the
      * circuit breaker auto-disabled (`Pushery\Webhooks\Events\WebhookEndpointAutoDisabled`), and
-     * the ONE place that knows what re-enabling means.
+     * the one place that knows what re-enabling means.
      *
      * Flipping is_active alone is not enough, and getting it wrong is silent: the
      * consecutive-failure streak that tripped the breaker is still standing, so the very
@@ -242,7 +244,7 @@ final readonly class WebhookManager
     private function writeLifecycle(WebhookSubscription $subscription, array $attributes, Closure $from): bool
     {
         // The timestamp is passed rather than left to the builder, which would add its own:
-        // the instance has to end up carrying the SAME value the row got, and the only way to
+        // the instance has to end up carrying the same value the row got, and the only way to
         // be sure of that is to choose it here. Without it the object handed back reports a
         // change time from before the change — on the one call whose whole shape says "here
         // is your subscription, it is done".
@@ -274,7 +276,7 @@ final readonly class WebhookManager
             }
         }
 
-        // Through the BASE builder, and the reason is that by this point there is nothing left
+        // Through the base builder, and the reason is that by this point there is nothing left
         // for the Eloquent layer to contribute: the values are already in their stored form,
         // `updated_at` is supplied above rather than added, the model declares no global scope,
         // and nothing listens for its model events. It is also the same kind of statement the
@@ -289,7 +291,7 @@ final readonly class WebhookManager
         }
 
         // forceFill because the lifecycle columns are guarded — engine-owned, never
-        // mass-assignable — and this IS the engine.
+        // mass-assignable — and this is the engine.
         //
         // syncOriginalAttributes rather than syncOriginal, and the difference is silent data loss
         // in the caller. syncOriginal() marks every attribute clean, including a change the caller
@@ -343,7 +345,7 @@ final readonly class WebhookManager
             is_string($key) => "'".$key."'",
             // The cast changes no message: the value goes to a `%s` in sprintf, which
             // renders an int identically. It is written out so all three arms of this match
-            // answer the same TYPE — the variable is a message fragment, not a key.
+            // answer the same type — the variable is a message fragment, not a key.
             is_int($key) => (string) $key,
             default => gettype($key),
         };
@@ -373,7 +375,7 @@ final readonly class WebhookManager
     {
         $this->payloadValidator->validate($eventType, $payload);
 
-        // Scrub NUL bytes ONCE, at the edge: the delivery log's payload column is jsonb,
+        // Scrub NUL bytes once, at the edge: the delivery log's payload column is jsonb,
         // which cannot hold one at all, and scrubbing here (rather than only on the way
         // into the column) keeps the logged copy and the signed, delivered bytes
         // identical — so a redelivery reproduces exactly what the endpoint first saw.
@@ -388,7 +390,13 @@ final readonly class WebhookManager
             ->get()
             ->values();
 
-        // Encode (and, when offload is on, write) the shared event payload ONCE for the
+        $faked = $this->recordedInstead($subscriptions, $eventType, $eventId, $payload);
+
+        if ($faked instanceof Collection) {
+            return $faked;
+        }
+
+        // Encode (and, when offload is on, write) the shared event payload once for the
         // whole fan-out — every matching endpoint logs the identical body, so a
         // content-addressed offload stores a single blob reused across all deliveries
         // instead of one round-trip + hash per subscriber. Skipped when nothing matches.
@@ -401,7 +409,7 @@ final readonly class WebhookManager
                 $eventId,
                 $payload,
                 $logged,
-                // The rate limit SHAPES an endpoint's traffic; it does not throw the event
+                // The rate limit shapes an endpoint's traffic; it does not throw the event
                 // away. An over-limit delivery is logged and enqueued with a delay instead
                 // of being dropped without a row, an event or a line in any log — the
                 // silent gap an operator only learns about from the customer who never
@@ -412,21 +420,21 @@ final readonly class WebhookManager
     }
 
     /**
-     * Deliver an application event to exactly ONE subscription.
+     * Deliver an application event to exactly one subscription.
      *
      * For a host that routes rule → endpoint rather than event → every endpoint of that
-     * type. `dispatch()` cannot express it: its third argument narrows to a TENANT, and
+     * type. `dispatch()` cannot express it: its third argument narrows to a tenant, and
      * two endpoints of the same customer share one. Neither can the two methods that do
      * take a single subscription — `ping()` sends a fixed `webhooks.ping` body, and
      * `redeliver()` needs a delivery that already exists.
      *
      * It is the same delivery, not a second kind of one. The payload goes through the
      * catalog schema, the NUL scrub and the same offload; the send re-validates SSRF,
-     * signs, honors the circuit breaker, and is SHAPED by the rate limit rather than
+     * signs, honors the circuit breaker, and is shaped by the rate limit rather than
      * discarded by it. A targeted send with its own semantics would be a second surface
      * to keep in step, and the gaps would open in the copy nobody reads.
      *
-     * Eligibility is decided by re-running the fan-out's OWN scopes against this one
+     * Eligibility is decided by re-running the fan-out's own scopes against this one
      * subscription rather than by re-reading `is_active` here. That is the whole point:
      * `active()` and `listeningFor()` already encode auto-disabling and the wildcard
      * setting, and a second opinion on "may this endpoint have this event" is a second
@@ -472,11 +480,18 @@ final readonly class WebhookManager
         }
 
         $payload = PayloadSanitizer::scrub($payload);
+        $eventId = (string) Str::uuid7();
+
+        $faked = $this->recordedInstead(new Collection([$subscription]), $eventType, $eventId, $payload);
+
+        if ($faked instanceof Collection) {
+            return $faked->firstOrFail();
+        }
 
         return $this->deliver(
             $subscription,
             $eventType,
-            (string) Str::uuid7(),
+            $eventId,
             $payload,
             null,
             $this->rateLimitDelayFor($subscription),
@@ -498,12 +513,16 @@ final readonly class WebhookManager
     {
         $this->guardTestPingAllowance($subscription);
 
-        return $this->deliver(
-            $subscription,
-            'webhooks.ping',
-            (string) Str::uuid7(),
-            ['message' => 'This is a test event from Webhooks for Laravel.'],
-        );
+        $eventId = (string) Str::uuid7();
+        $payload = ['message' => 'This is a test event from Webhooks for Laravel.'];
+
+        $faked = $this->recordedInstead(new Collection([$subscription]), 'webhooks.ping', $eventId, $payload);
+
+        if ($faked instanceof Collection) {
+            return $faked->firstOrFail();
+        }
+
+        return $this->deliver($subscription, 'webhooks.ping', $eventId, $payload);
     }
 
     /**
@@ -573,7 +592,7 @@ final readonly class WebhookManager
      * rotation window, a freshly generated secret becomes current, and the rotation
      * time is stamped. The new plaintext secret is returned so it can be revealed once.
      *
-     * The window is what makes this a rotation rather than a formality: it CLOSES.
+     * The window is what makes this a rotation rather than a formality: it closes.
      * Once it has, the old secret is cleared from the row and can never sign or verify
      * again ({@see self::revokeExpiredSecret()}) — a previous secret that lingers for
      * ever revokes nothing, which is the one thing a compromised secret must be.
@@ -640,12 +659,15 @@ final readonly class WebhookManager
             throw DeliveryRefused::because('The endpoint is disabled; the delivery was not replayed.');
         }
 
-        return $this->deliver(
-            $subscription,
-            $delivery->event_type,
-            $delivery->event_id,
-            $delivery->rehydratedPayload(),
-        );
+        $payload = $delivery->rehydratedPayload();
+
+        $faked = $this->recordedInstead(new Collection([$subscription]), $delivery->event_type, $delivery->event_id, $payload);
+
+        if ($faked instanceof Collection) {
+            return $faked->firstOrFail();
+        }
+
+        return $this->deliver($subscription, $delivery->event_type, $delivery->event_id, $payload);
     }
 
     /**
@@ -678,14 +700,45 @@ final readonly class WebhookManager
      */
     private function deliver(WebhookSubscription $subscription, string $eventType, string $eventId, array $data, ?array $logged = null, int $delaySeconds = 0): WebhookDelivery
     {
-        // The log stores the RAW event payload, not the transformed body: a redelivery
+        // The log stores the raw event payload, not the transformed body: a redelivery
         // re-runs the transform over the raw payload and so reproduces the exact same
         // outbound bytes, without ever transforming an already-transformed body twice.
         $logged ??= $this->loggedPayload($data);
 
-        // The tenant/identity and outcome columns are guarded, so the row is written
-        // with forceFill rather than mass-assignment — the log is engine-owned, never
-        // populated from host input.
+        $delivery = $this->newDelivery($subscription, $eventType, $eventId, $logged);
+        $delivery->save();
+
+        // Index the new row for Scout. The log is written through the base model, which never
+        // fires Scout's per-subclass observer, so without this an external engine (Meilisearch,
+        // …) would never see the delivery. A no-op unless search is on and the host pointed its
+        // search source at a Searchable model.
+        SearchIndexer::indexDelivery($delivery);
+
+        // Reshape the event data for this endpoint before the body is built and signed,
+        // so the transformed bytes are the signed-and-sent bytes. The outbound envelope
+        // always carries the full data; only the logged copy is ever offloaded, so a
+        // large payload leaves the delivery itself unchanged.
+        $outbound = $this->transformFor($subscription, $data);
+
+        $this->dispatchCall($subscription, $delivery, $eventType, $eventId, $outbound, $delaySeconds);
+
+        if ($delaySeconds > 0) {
+            Event::dispatch(new WebhookDeliveryRateLimited($delivery, $delaySeconds));
+        }
+
+        return $delivery;
+    }
+
+    /**
+     * The delivery-log row of one delivery, not yet saved.
+     *
+     * The tenant/identity and outcome columns are guarded, so the row is written with forceFill
+     * rather than mass-assignment — the log is engine-owned, never populated from host input.
+     *
+     * @param  array{payload: array<array-key, mixed>, disk: string|null, path: string|null, sha256: string|null}  $logged
+     */
+    private function newDelivery(WebhookSubscription $subscription, string $eventType, string $eventId, array $logged): WebhookDelivery
+    {
         $delivery = WebhookDelivery::resolve();
         $delivery->forceFill([
             'subscription_id' => $subscription->id,
@@ -699,27 +752,35 @@ final readonly class WebhookManager
             'body_sha256' => $logged['sha256'],
             'status' => DeliveryStatus::Pending,
             'attempt' => 0,
-        ])->save();
-
-        // Index the new row for Scout. The log is written through the base model, which never
-        // fires Scout's per-subclass observer, so without this an external engine (Meilisearch,
-        // …) would never see the delivery. A no-op unless search is on and the host pointed its
-        // search source at a Searchable model.
-        SearchIndexer::indexDelivery($delivery);
-
-        // Reshape the event data for THIS endpoint before the body is built and signed,
-        // so the transformed bytes are the signed-and-sent bytes. The outbound envelope
-        // always carries the full data; only the logged copy is ever offloaded, so a
-        // large payload leaves the delivery itself unchanged.
-        $outbound = $this->transformFor($subscription, $data);
-
-        $this->dispatchCall($subscription, $delivery, $eventType, $eventId, $outbound, $delaySeconds);
-
-        if ($delaySeconds > 0) {
-            Event::dispatch(new WebhookDeliveryRateLimited($delivery, $delaySeconds));
-        }
+        ]);
 
         return $delivery;
+    }
+
+    /**
+     * While a test has the {@see WebhookFake} on, record the call in place of sending it, and hand
+     * back the deliveries it would have logged, unsaved: nothing is written, offloaded, counted
+     * against a rate limit or queued. Null when no fake is on, and the call is sent.
+     *
+     * @param  Collection<int, WebhookSubscription>  $subscriptions
+     * @param  array<array-key, mixed>  $payload
+     * @return Collection<int, WebhookDelivery>|null
+     */
+    private function recordedInstead(Collection $subscriptions, string $eventType, string $eventId, array $payload): ?Collection
+    {
+        $fake = WebhookFake::active();
+
+        if (! $fake instanceof WebhookFake) {
+            return null;
+        }
+
+        $fake->record(new FakedWebhook($eventType, $payload, $subscriptions));
+
+        $logged = ['payload' => $payload, 'disk' => null, 'path' => null, 'sha256' => null];
+
+        return $subscriptions
+            ->map(fn (WebhookSubscription $subscription): WebhookDelivery => $this->newDelivery($subscription, $eventType, $eventId, $logged))
+            ->values();
     }
 
     /**
@@ -813,7 +874,7 @@ final readonly class WebhookManager
         // The engine's configured defaults — signing dialect, verb, timeouts, tries,
         // TLS verification, canonicalization, retry schedule, Retry-After policy, the
         // egress proxy, and the queue and connection — are already seeded by
-        // PendingWebhook::create(), so fan-out adds only what is specific to THIS event
+        // PendingWebhook::create(), so fan-out adds only what is specific to this event
         // and endpoint.
         $call = PendingWebhook::create()
             ->url($subscription->url)
@@ -876,12 +937,12 @@ final readonly class WebhookManager
     }
 
     /**
-     * How long THIS delivery must wait before it may be sent, in seconds — zero while
+     * How long this delivery must wait before it may be sent, in seconds — zero while
      * the endpoint is inside its allowance.
      *
      * Over the allowance, the delivery is deferred rather than dropped. The schedule is cut
      * into one-minute windows from the first delivery to a quiet endpoint, and a delivery
-     * takes the earliest window that still has room. A window counts what is scheduled INTO
+     * takes the earliest window that still has room. A window counts what is scheduled into
      * it, not what arrives while it is current, so load that keeps coming faster than the
      * allowance waits longer instead of raising the rate: no minute of the schedule carries
      * more than max_per_minute, whether the excess came as one burst or keeps arriving. The

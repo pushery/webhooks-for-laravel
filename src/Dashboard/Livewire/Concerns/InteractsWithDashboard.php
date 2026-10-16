@@ -45,7 +45,7 @@ trait InteractsWithDashboard
      * A delivery belonging to another tenant is never found — it 404s before the
      * policy runs — and the policy is the second guard on the action itself.
      *
-     * A replay to a DISABLED endpoint is refused where the operator can see why: the
+     * A replay to a disabled endpoint is refused where the operator can see why: the
      * endpoint was switched off, by its tenant or by the circuit breaker, and replaying
      * into it would send data to somewhere that is meant to be receiving none.
      *

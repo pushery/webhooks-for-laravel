@@ -103,7 +103,7 @@ final class Settings
      *
      * Values are read leniently on purpose. The only realistic way a string reaches this list is
      * a host building it from an environment variable — `explode(',', env('...'))` yields
-     * `['408', '425', '429']` — and dropping those left the classifier with an EMPTY list, which
+     * `['408', '425', '429']` — and dropping those left the classifier with an empty list, which
      * it reads as the deliberate statement "no 4xx is retryable" rather than as a fallback. The
      * host who wrote the three most retryable codes into their config got the exact opposite of
      * what they asked for: a 429 became a final failure, the Retry-After path was never entered,
@@ -163,7 +163,7 @@ final class Settings
 
             // Kept, not dropped: the classifier only consults this list for a 4xx, so an entry
             // outside the range is already inert and removing it would change nothing. What it
-            // needs is to be SAID — a host who wrote 503 here is waiting for a retry that the
+            // needs is to be said — a host who wrote 503 here is waiting for a retry that the
             // list was never going to produce.
             if ($code < 400 || $code > 499) {
                 $inert[] = $code;
@@ -194,7 +194,7 @@ final class Settings
             );
         }
 
-        // An explicitly empty list is a real choice and stays empty. A list the host FILLED that
+        // An explicitly empty list is a real choice and stays empty. A list the host filled that
         // survives as nothing is not the same statement, and reading it as one turns a typo into
         // "no 4xx is ever retried" — silently, because the config file still shows three codes.
         if ($configured !== [] && $codes === []) {
@@ -326,7 +326,7 @@ final class Settings
      * env() returns it, is the number it spells ({@see PerMinuteBrake}).
      *
      * The shipped default is repeated here rather than left to the merge, and only because
-     * of what an ABSENT key costs: it reads as null, which switches the brake off entirely.
+     * of what an absent key costs: it reads as null, which switches the brake off entirely.
      * A host running on a config cache built before this version upgraded still has the old
      * trimmed layer until it rebuilds, and that window should not be an unbraked one.
      * It matches the shipped default in config/webhooks.php.
@@ -421,7 +421,7 @@ final class Settings
         // 262144, matching config/webhooks.php — not 0. A host on a stale config cache is served
         // the array it cached rather than a freshly merged tree, so a cached `server` block with
         // large_payload.enabled = true but no threshold would otherwise fall to 0 here and offload
-        // EVERY payload to disk, not only the large ones.
+        // every payload to disk, not only the large ones.
         return Config::integer('webhooks.server.large_payload.threshold', 262144);
     }
 
@@ -566,9 +566,9 @@ final class Settings
     /**
      * The egress proxy every outbound delivery routes through, or null for a direct
      * connection. Fail-closed: a configured proxy is used only while the egress layer
-     * is enabled, because routing through a proxy WEAKENS the guard — the SSRF pin
-     * (CURLOPT_RESOLVE) binds a DIRECT connection to the vetted IP, but a proxy
-     * resolves the destination host itself, so the pin is NOT enforced through it and
+     * is enabled, because routing through a proxy weakens the guard — the SSRF pin
+     * (CURLOPT_RESOLVE) binds a direct connection to the vetted IP, but a proxy
+     * resolves the destination host itself, so the pin is not enforced through it and
      * the operator's proxy must enforce egress control.
      */
     public function egressProxy(): ?string
@@ -617,7 +617,7 @@ final class Settings
      * The event types a subscription may be registered for, or NULL when the catalog
      * declares none.
      *
-     * Null is the load-bearing value, not an empty list: the catalog ships EMPTY, and an
+     * Null is the load-bearing value, not an empty list: the catalog ships empty, and an
      * application that keeps it that way must go on registering any type it likes rather
      * than having every registration refused the day it upgrades. A caller turns null into
      * "no constraint"; only a populated catalog becomes an allowlist.

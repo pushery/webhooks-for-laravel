@@ -1,4 +1,4 @@
-{{-- The pagination control for the NEUTRAL rendering. Livewire's built-in view is deliberately
+{{-- The pagination control for the neutral rendering. Livewire's built-in view is deliberately
      not used: it paints a raw color palette (bg-white / text-gray-700 / dark: variants) that no
      token reaches, and its landmark carries a hardcoded English accessible name.
 
@@ -9,14 +9,14 @@
      What keeps this file is the other side of the same seam: WireKit is optional here
      (`require-dev` and `conflict`, never `require`), so the neutral screens have to render where
      no `<x-wirekit::…>` tag resolves at all. This markup does, because it is written against
-     design TOKENS — CSS custom properties, which need no package. Pointing the neutral rendering
+     design tokens — CSS custom properties, which need no package. Pointing the neutral rendering
      at a `wirekit::` view would make an optional dependency mandatory for anything that paginates.
 
      The Livewire paging semantics are kept exactly: previousPage / nextPage / gotoPage
      are called with the paginator's own page name, so several paginators can live on
      one page without colliding.
 
-     ONE view carries BOTH paginator types, and that is deliberate. Livewire resolves the
+     One view carries both paginator types, and that is deliberate. Livewire resolves the
      two independently -- paginationView() for a LengthAwarePaginator, paginationSimpleView()
      for the simple one it gets from simplePaginate() -- so a component that overrides only
      the first silently keeps Livewire's built-in view for the second. A second view of our
@@ -31,9 +31,9 @@
 @php($control = 'inline-flex min-w-[2.25rem] items-center justify-center rounded-[var(--radius-wk-md)] border-[length:var(--border-wk-width)] px-[var(--padding-wk-x-sm)] py-[var(--padding-wk-y-sm)] transition-colors duration-[var(--transition-wk-duration)] focus:outline-none focus-visible:ring-[length:var(--ring-wk-width)] focus-visible:ring-[var(--color-wk-ring)]')
 @php($enabled = $control.' cursor-pointer border-[color:var(--color-wk-border)] bg-[var(--color-wk-bg-elevated)] text-[color:var(--color-wk-text)] hover:bg-[var(--color-wk-bg-muted)]')
 @php($current = $control.' border-[color:var(--color-wk-accent)] bg-[var(--color-wk-accent)] text-[color:var(--color-wk-accent-fg)] font-[number:var(--font-wk-heading-weight)]')
-{{-- NO opacity on the inert state, and that is the whole of this line's history. It used to
+{{-- No opacity on the inert state, and that is the whole of this line's history. It used to
      carry `opacity-[var(--opacity-wk-disabled)]` on top of the muted pair, and opacity applies
-     to the ELEMENT: text and element background are composited against the page together, so
+     to the element: text and element background are composited against the page together, so
      6.26:1 became 2.15:1 light and 2.59:1 dark. "Previous" on the first page was close to
      unreadable, and the ellipsis between page numbers vanished.
 

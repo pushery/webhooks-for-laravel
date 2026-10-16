@@ -7,7 +7,7 @@ namespace Pushery\Webhooks\Server\Backoff;
 use Pushery\Webhooks\Server\Jobs\CallWebhookJob;
 
 /**
- * Exponential backoff with FULL jitter: the delay before retry N is a uniform
+ * Exponential backoff with full jitter: the delay before retry N is a uniform
  * random value in `[0, min(cap, base * 2^(N-1))]`. Full jitter is the
  * thundering-herd-safe choice — many endpoints failing at once retry at spread-out
  * times instead of hammering in lockstep. The cap (default 900s) is the longest wait the
@@ -15,7 +15,7 @@ use Pushery\Webhooks\Server\Jobs\CallWebhookJob;
  * SQS holds a released message back for up to 12 hours, its maximum visibility timeout.
  *
  * When a Retry-After hint is supplied it wins: a server that asked us to wait a
- * specific time is obeyed rather than jittered. It is clamped by its OWN cap, not by
+ * specific time is obeyed rather than jittered. It is clamped by its own cap, not by
  * the jitter cap — the jitter cap shapes the schedule of ordinary retries,
  * while an endpoint's rate-limit window is routinely longer than that, and silently
  * shortening it means coming back while it is still refusing us. What happens when a
@@ -23,7 +23,7 @@ use Pushery\Webhooks\Server\Jobs\CallWebhookJob;
  * ({@see CallWebhookJob}): it waits the cap without charging
  * the attempt to the retry budget.
  *
- * A Retry-After cap of ZERO switches the hint off rather than shortening it to nothing: the
+ * A Retry-After cap of zero switches the hint off rather than shortening it to nothing: the
  * delay comes from the jitter schedule as if the endpoint had sent no header. That is what the
  * option means, and it is the only reading that is not worse than not having the feature —
  * "wait zero seconds" would answer `Retry-After: 60` with an immediate retry.
@@ -44,7 +44,7 @@ final readonly class ExponentialWithJitter implements BackoffStrategy
         int $capSeconds = 900,
         ?int $retryAfterCapSeconds = null,
     ) {
-        // Floor the base AND the cap at one second so a misconfigured 0 (or negative) can never
+        // Floor the base and the cap at one second so a misconfigured 0 (or negative) can never
         // collapse the schedule to a zero-delay retry storm: the delay is random_int(0, ceiling)
         // and ceiling is min(cap, base << shift), so a zero cap would floor every draw to 0.
         $this->baseSeconds = max(1, $baseSeconds);
@@ -56,7 +56,7 @@ final readonly class ExponentialWithJitter implements BackoffStrategy
      * A copy whose Retry-After clamp is the given seconds, leaving the jitter cap untouched. The
      * delivery builder uses this so raising the Retry-After cap on a single call also raises the
      * clamp its released delay is bound by — otherwise the defer threshold and the delay clamp,
-     * which are the SAME wait, would silently disagree and the call would come back at the old cap
+     * which are the same wait, would silently disagree and the call would come back at the old cap
      * while the endpoint is still rate-limiting it.
      */
     public function withRetryAfterCap(int $retryAfterCapSeconds): self

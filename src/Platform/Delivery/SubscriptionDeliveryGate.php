@@ -17,7 +17,7 @@ use Pushery\Webhooks\Server\Delivery\DeliveryGate;
  * The url and the sealed secret are baked into the delivery at dispatch time, so
  * without this re-read a backlog outlives the endpoint it was built for: the circuit
  * breaker flips is_active to false and the queued deliveries keep hammering the dead
- * endpoint for their whole retry budget, and an endpoint a tenant DELETED in the
+ * endpoint for their whole retry budget, and an endpoint a tenant deleted in the
  * self-service portal still receives every delivery already in flight — data egress
  * after deletion.
  *

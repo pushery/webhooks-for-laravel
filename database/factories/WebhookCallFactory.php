@@ -41,7 +41,7 @@ final class WebhookCallFactory extends Factory
     }
 
     /**
-     * A call whose handling failed. The status is the whole of it: this log records THAT a call
+     * A call whose handling failed. The status is the whole of it: this log records that a call
      * failed and not what was thrown, since the column that used to hold the text was written by
      * nothing in the package and has been dropped.
      */

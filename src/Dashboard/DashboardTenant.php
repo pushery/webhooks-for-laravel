@@ -12,12 +12,12 @@ use Pushery\Webhooks\Support\TenantIdentity;
  * What a dashboard read is scoped to, and the distinction between global and all tenants is
  * a privilege boundary, not a detail:
  *
- * - **tenant** — a single tenant, matched on the WHOLE owner morph pair.
+ * - **tenant** — a single tenant, matched on the whole owner morph pair.
  * - **global** — the owner-less rows only (`owner_type IS NULL AND owner_id IS NULL`): the
  *   endpoints an operator registers with a null owner, which no tenant scope can see. It is
  *   NOT "everything"; a tenant's private rows stay invisible.
  * - **all tenants** — every row, owner-less and tenant-owned alike. This is the support /
- *   operator console view ("what did we send to THIS customer's endpoint?"), and seeing
+ *   operator console view ("what did we send to this customer's endpoint?"), and seeing
  *   another tenant's data is a real permission level above seeing the global ones — so it
  *   has its own config flag and its own ability, and is never implied by operator mode.
  * - **untenanted** — a reader who holds the dashboard ability and belongs to no tenant: no
@@ -59,7 +59,7 @@ final readonly class DashboardTenant
     }
 
     /**
-     * The cross-tenant operator scope: EVERY row, whoever owns it. Reserved for a support or
+     * The cross-tenant operator scope: every row, whoever owns it. Reserved for a support or
      * operator console, behind its own flag and ability — the one scope that can read another
      * tenant's delivery history.
      */
@@ -119,7 +119,7 @@ final readonly class DashboardTenant
     }
 
     /**
-     * The owner-scoping SQL fragment and its bindings against the RAW delivery/subscription
+     * The owner-scoping SQL fragment and its bindings against the raw delivery/subscription
      * tables, to `whereRaw()` onto any builder or splice into a raw query. There a global
      * owner is genuinely NULL on both columns, so global mode is `IS NULL` (no bindings);
      * tenant mode matches the whole pair.
@@ -149,8 +149,8 @@ final readonly class DashboardTenant
     }
 
     /**
-     * The owner-scoping fragment against the HOURLY ROLLUP, whose null-owner representation is
-     * dialect-specific: PostgreSQL's rollup is a materialized VIEW that preserves the source's
+     * The owner-scoping fragment against the hourly rollup, whose null-owner representation is
+     * dialect-specific: PostgreSQL's rollup is a materialized view that preserves the source's
      * NULL owner, while MySQL's is a TABLE whose unique key cannot span NULLs, so its refresh
      * COALESCEs a null owner to the ('' + owner_key_type zero) sentinel. Global mode therefore
      * matches `IS NULL` on PostgreSQL and that sentinel on MySQL; tenant mode is identical to
@@ -194,12 +194,12 @@ final readonly class DashboardTenant
         }
 
         // All-tenants covers every row by definition, so the per-row guard admits them all.
-        // The ACTION behind that guard is gated separately: in this scope the delivery policy
-        // requires the manage ability to be defined AND granted, because the ability that
-        // opened the scope only reads. This says what the scope can SEE, not what it may do.
+        // The action behind that guard is gated separately: in this scope the delivery policy
+        // requires the manage ability to be defined and granted, because the ability that
+        // opened the scope only reads. This says what the scope can see, not what it may do.
         // The untenanted scope covers nothing, so the per-row guard admits nothing. Reaching the
         // owner-less test below it would make an untenanted reader see exactly the rows an
-        // OPERATOR sees, which is the confusion the separate case exists to prevent.
+        // operator sees, which is the confusion the separate case exists to prevent.
         if ($this->kind === DashboardScopeKind::Untenanted) {
             return false;
         }

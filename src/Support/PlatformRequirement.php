@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Config;
 use RuntimeException;
 
 /**
- * Guards the layers that are built ON the Platform layer. The dashboard reads Platform's
+ * Guards the layers that are built on the Platform layer. The dashboard reads Platform's
  * delivery log and the self-service portal manages Platform's endpoints, so switching
  * either on while webhooks.platform.enabled is false leaves it pointing at tables whose
  * migrations never ran — and the consumer meets that as a raw `relation

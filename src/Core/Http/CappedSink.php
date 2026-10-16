@@ -9,14 +9,14 @@ use GuzzleHttp\Psr7\Utils;
 use Psr\Http\Message\StreamInterface;
 
 /**
- * The response sink: it KEEPS at most a bounded prefix of the body and throws the rest
+ * The response sink: it keeps at most a bounded prefix of the body and throws the rest
  * away as it arrives, while telling curl every byte was written so the transfer runs to
  * a clean finish.
  *
  * Without it, the transport buffers whatever the endpoint chooses to send — Guzzle's
  * curl handler writes the whole response into a php://temp sink, which spills to disk
  * past 2 MB — and only then trims it to the capture cap. In the Platform layer the
- * destination is TENANT-SUPPLIED through the self-service portal, so "whatever the
+ * destination is tenant-supplied through the self-service portal, so "whatever the
  * endpoint chooses to send" is an adversarial quantity: a broken (or hostile) endpoint
  * answering with an endless stream would have a worker writing gigabytes to /tmp for the
  * whole request timeout. Keeping only the prefix bounds the cost to the cap, whatever

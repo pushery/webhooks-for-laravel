@@ -78,7 +78,7 @@
                                  and most are sparse.
 
                                  Joined here rather than in the lang file because the pieces are a
-                                 LIST — its order is not grammar, so nothing a translator needs is
+                                 list — its order is not grammar, so nothing a translator needs is
                                  taken away by assembling it. --}}
                             aria-label="{{ $hour.': '.implode(', ', [
                                 trans_choice('webhooks::dashboard.a11y.hour_summary.total', $total, ['count' => $total]),

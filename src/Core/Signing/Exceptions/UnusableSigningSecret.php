@@ -11,13 +11,13 @@ use InvalidArgumentException;
  *
  * Standard Webhooks derives the key by stripping an optional `whsec_` prefix and
  * base64-decoding the rest. A value carrying no base64 characters therefore decodes
- * to ZERO bytes, and HMAC-SHA256 under an empty key is a pure function of bytes the
+ * to zero bytes, and HMAC-SHA256 under an empty key is a pure function of bytes the
  * attacker already has: anyone who sees `{id}.{timestamp}.{body}` can compute the
  * signature. The commonest way to reach that state is the bare prefix `whsec_`,
  * which is exactly what `WEBHOOKS_..._SECRET=whsec_${SECRET}` produces when the
  * variable is unset.
  *
- * This is a SENDING-side programmer or configuration error, so it is raised. The
+ * This is a sending-side programmer or configuration error, so it is raised. The
  * receiving side never raises it — an unusable secret there is skipped, because an
  * unverifiable request must answer with a refusal rather than a 500.
  */

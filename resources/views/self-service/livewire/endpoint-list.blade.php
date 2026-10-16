@@ -111,7 +111,7 @@
                                 :aria-pressed="$endpoint->is_active ? 'true' : 'false'"
                                 :aria-label="__('webhooks::self-service.a11y.toggle_active', [
                                     // The visible word is interpolated rather than described,
-                                    // so the accessible name CONTAINS it verbatim in all seven
+                                    // so the accessible name contains it verbatim in all seven
                                     // languages (WCAG 2.5.3) and cannot drift when one of them
                                     // is retranslated. Voice control matches what is on screen.
                                     'state' => $endpoint->is_active ? __('webhooks::self-service.list.active') : __('webhooks::self-service.list.disabled'),
@@ -163,7 +163,7 @@
                                 </x-wirekit::button>
                                 {{-- Only when the editor is actually mounted. This panel is
                                      embeddable in a host's own screen, where the portal's
-                                     routes need not exist — and this link is drawn per ROW,
+                                     routes need not exist — and this link is drawn per row,
                                      so an unconditional one renders fine against an empty
                                      account and throws on the first real endpoint. --}}
                                 @if ($showTransformLink)

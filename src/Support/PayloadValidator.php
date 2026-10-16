@@ -44,7 +44,7 @@ final readonly class PayloadValidator
         }
 
         // A webhook payload is a JSON object, but PHP cannot tell an empty list from an
-        // empty map, so opis's Helper::toJSON renders [] as a JSON ARRAY — which then fails
+        // empty map, so opis's Helper::toJSON renders [] as a JSON array — which then fails
         // an object schema even though {} would satisfy it. Validate an empty payload as the
         // empty object it represents; a non-empty payload keeps opis's list/map detection.
         $instance = $payload === [] ? new stdClass : Helper::toJSON($payload);

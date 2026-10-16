@@ -132,7 +132,7 @@ trait InteractsWithEndpoints
      * in its words or in the portal's. An unset cap with no host limit is always null.
      *
      * Read on its own this is only ever advisory — it is what decides whether a button is drawn.
-     * The decision that MUST hold is the one inside {@see self::withRegistrationLock()}, which asks
+     * The decision that must hold is the one inside {@see self::withRegistrationLock()}, which asks
      * the same question with the answer pinned.
      */
     protected function registrationRefusal(string $portalSentence): ?string
@@ -177,10 +177,10 @@ trait InteractsWithEndpoints
      *
      * Without it the cap is read-then-act: two requests both read count = max - 1, both
      * pass, both insert, and the cap is over with nothing to notice. That is not a
-     * contrived race — the cap bounds a SELF-SERVICE resource, and a double-submit is the
+     * contrived race — the cap bounds a self-service resource, and a double-submit is the
      * ordinary way one customer produces two simultaneous registrations.
      *
-     * Keyed by the WHOLE morph pair, matching the query scope exactly, so two tenants
+     * Keyed by the whole morph pair, matching the query scope exactly, so two tenants
      * never wait on each other and two tenants sharing an owner_id under different owner
      * types are still separate. With no cap configured and no host limit registered there is
      * nothing to race for and no lock is taken, so an unlimited installation pays nothing for
@@ -235,8 +235,8 @@ trait InteractsWithEndpoints
     /**
      * Whether this tenant has spent its registration allowance for the current minute.
      *
-     * The cap and this answer different questions: the cap bounds how MANY endpoints a
-     * tenant ends up with, this bounds how FAST it gets there. An installation with no cap
+     * The cap and this answer different questions: the cap bounds how many endpoints a
+     * tenant ends up with, this bounds how fast it gets there. An installation with no cap
      * has no answer to a client that registers in a loop, and one with a cap still has
      * none to a client that empties and refills it.
      *
@@ -371,7 +371,7 @@ trait InteractsWithEndpoints
     }
 
     /**
-     * The recompute allowance's cache key for one tenant. A FOURTH key beside the three
+     * The recompute allowance's cache key for one tenant. A fourth key beside the three
      * below, and its own for the reason the third one is: sharing a bucket would make one
      * action exhaust another, and neither reader would have any way to see why.
      */
@@ -390,7 +390,7 @@ trait InteractsWithEndpoints
     }
 
     /**
-     * The replay allowance's cache key for one tenant. A THIRD key beside the two below, and
+     * The replay allowance's cache key for one tenant. A third key beside the two below, and
      * deliberately its own: sharing one with the registration allowance would make a tenant
      * that registered an endpoint unable to replay a delivery, and neither reader would have
      * any way to see why.
@@ -404,7 +404,7 @@ trait InteractsWithEndpoints
 
     /**
      * The registration allowance's cache key for one tenant. Distinct from the
-     * registration LOCK's key: one bounds how fast a tenant may register, the other keeps
+     * registration lock's key: one bounds how fast a tenant may register, the other keeps
      * a single registration atomic, and sharing a key would make each break the other.
      */
     protected function registrationRateKey(TenantIdentity $owner): string

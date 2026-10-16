@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Pushery\Webhooks\Support;
 
 /**
- * Lays a host's published configuration OVER the shipped defaults, all the way down.
+ * Lays a host's published configuration over the shipped defaults, all the way down.
  *
  * Laravel's `mergeConfigFrom()` is an `array_merge` at the top level only. This package
  * ships thirteen top-level keys and twelve of them are deep trees, so a host that
@@ -17,7 +17,7 @@ namespace Pushery\Webhooks\Support;
  * Recursing is not enough on its own. `array_replace_recursive` merges numerically indexed
  * arrays BY INDEX, so a host narrowing `dashboard.windows` to `['7d']` gets back
  * `['7d', '7d', '30d']` — two windows it never asked for, one of them a value it removed
- * on purpose. A list is the value an operator SETS, not a container to descend into, so a
+ * on purpose. A list is the value an operator sets, not a container to descend into, so a
  * list is replaced whole and never merged. There are fourteen of them in the shipped file —
  * `models` counts, because an empty array is a leaf, as the paragraph after next explains — and
  * `core.ssrf.allowed_hosts` is the one where getting this wrong is a security question

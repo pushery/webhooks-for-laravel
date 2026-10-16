@@ -11,7 +11,7 @@ use InvalidArgumentException;
  * window, the previous one — so a delivery can be signed with both and a consumer that
  * still holds the old secret keeps verifying while it migrates.
  *
- * A SecretSet holds the RAW secret tokens (e.g. "whsec_…"); deriving the HMAC key
+ * A SecretSet holds the raw secret tokens (e.g. "whsec_…"); deriving the HMAC key
  * bytes from a token is scheme-specific and belongs to the {@see SignatureScheme}
  * (Standard Webhooks strips the "whsec_" prefix and base64-decodes; a Stripe-style
  * scheme uses the raw UTF-8 bytes). Iteration is current-first so a verifier can

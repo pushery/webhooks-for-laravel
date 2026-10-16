@@ -5,7 +5,7 @@
      quote back whatever the receiver wrote. --}}
 <div class="wh-portal-deliveries" wire:key="endpoint-deliveries">
 
-    {{-- Permanently in the DOM, so a filter change has something to speak THROUGH: a region
+    {{-- Permanently in the DOM, so a filter change has something to speak through: a region
          inserted together with its own text is not announced by most screen readers. The
          wire:key carries the count, so Livewire's morph sees a changed node rather than an
          identical one it can leave alone -- the same detail the transform editor's preview
@@ -14,7 +14,7 @@
          A live-bound filter swaps the table underneath and says nothing on its own. The count
          is in the document, in the pagination summary, but as a plain paragraph outside any
          live region: a reader has to travel back down and read to learn whether the change
-         produced three rows, two hundred, or none. And the empty state REPLACES the table, so a
+         produced three rows, two hundred, or none. And the empty state replaces the table, so a
          virtual cursor that was standing in it loses its position silently (WCAG 4.1.3). --}}
     <x-wirekit::visually-hidden role="status" aria-live="polite" wire:key="wh-filtered-{{ $deliveries->total() }}">{{ trans_choice('webhooks::pagination.filtered', $deliveries->total()) }}</x-wirekit::visually-hidden>
     <div class="mb-[var(--space-wk-sm)] flex flex-wrap items-center justify-between gap-[var(--padding-wk-x-md)]">
@@ -62,11 +62,11 @@
             </div>
 
             {{-- Debounced, because a date input reports every keystroke while a reader types
-                 the year and each one is a round trip and a query. The pair narrows WITHIN
+                 the year and each one is a round trip and a query. The pair narrows within
                  the window above and can never reach past it — the window's own bound stays
                  on the query, so the older of the two bounds simply loses.
 
-                 VISIBLE labels, unlike the lists: a list names itself through its first option,
+                 Visible labels, unlike the lists: a list names itself through its first option,
                  and two bare date fields say nothing about which one starts the range. On a phone
                  the pair shares a row in two equal columns, and from `sm` up each keeps a width of
                  its own. A date input without one takes the width its engine gives it, Chromium and
@@ -118,7 +118,7 @@
         <x-wirekit::text size="sm" role="status" class="mb-[var(--space-wk-sm)]">{{ $message }}</x-wirekit::text>
     @endif
 
-    {{-- Keyed on the TOTAL, not on this page being empty. A page past the end — which a
+    {{-- Keyed on the total, not on this page being empty. A page past the end — which a
          reader reaches by paging and then having the retention window drop the tail — would
          otherwise render "nothing has been sent" together with no pagination control at all,
          and a reader who is one click from their history would be told they have none. --}}
@@ -164,7 +164,7 @@
                     @php($when = $delivery->created_at->settings(['locale' => app()->getLocale()]))
                     <x-wirekit::table.row wire:key="d-{{ $delivery->id }}">
                         {{-- The row header is the event, not the outcome badge: announcing
-                             "Failed" tells a screen-reader user nothing about WHICH
+                             "Failed" tells a screen-reader user nothing about which
                              delivery failed. --}}
                         <x-wirekit::table.th headerScope="row">
                             <x-wirekit::text weight="medium">{{ $delivery->event_type }}</x-wirekit::text>
@@ -184,7 +184,7 @@
                                  getting slower is the run-up to one that fails.
 
                                  One expression rather than a raw PHP block, and the reason is
-                                 not style. Blade lifts raw blocks out of the template BEFORE it
+                                 not style. Blade lifts raw blocks out of the template before it
                                  strips comments, matching non-greedily from the first opening
                                  directive -- so a block form anywhere below the inline ones this
                                  file already uses swallows everything between them, and the rest

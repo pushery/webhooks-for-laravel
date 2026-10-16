@@ -59,7 +59,7 @@ final readonly class JwksKeySet
 
         $keys = $this->fetch($url);
 
-        // Cache ONLY a non-empty key set. fetch() returns an empty array for any response that is
+        // Cache only a non-empty key set. fetch() returns an empty array for any response that is
         // not a well-formed JWKS document — a provider's maintenance page, a 5xx with a body, a
         // transient parse failure — and Cache::remember would pin that empty result for the full
         // TTL, rejecting every JWKS-verified webhook for up to an hour. Not caching an empty fetch

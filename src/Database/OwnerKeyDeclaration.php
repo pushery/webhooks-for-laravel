@@ -15,17 +15,17 @@ use Throwable;
 /**
  * Holds `webhooks.platform.owner_key_type` against the columns it claims to describe.
  *
- * The setting is a DECLARATION, and it has to be: it is read before the tables exist, because
+ * The setting is a declaration, and it has to be: it is read before the tables exist, because
  * it is what renders them. Nothing afterwards ever checks that it still matches — and three
  * places at run time believe it over the database:
  *
  *   - {@see WebhookManager} rejects any owner key the declared type cannot
- *     hold. LOUD: an InvalidArgumentException, and the registration form is dead.
- *   - {@see WebhookDelivery} casts `owner_id` by it. SILENT: under a
+ *     hold. Loud: an InvalidArgumentException, and the registration form is dead.
+ *   - {@see WebhookDelivery} casts `owner_id` by it. Silent: under a
  *     wrongly declared `bigint`, `019fff78-…` reads back as `19` — and every UUIDv7 owner
  *     collapses onto that same `19`.
  *   - {@see WebhookDeliveryPolicy} compares that value
- *     against the tenant. FAIL-CLOSED: every tenant is refused its own deliveries, which
+ *     against the tenant. Fail-closed: every tenant is refused its own deliveries, which
  *     reads like an authorization decision rather than a defect.
  *
  * The contradiction is an expected state, not an abuse. A host that partitions differently
@@ -37,16 +37,16 @@ use Throwable;
  *
  * So the check reads the column rather than believing the setting, and it is deliberately
  * placed where a host is already looking: `webhooks:preflight` (onboarding) and right after
- * `migrate` (the moment the schema was touched at all — including by a FORKED migration,
+ * `migrate` (the moment the schema was touched at all — including by a forked migration,
  * which is precisely the case a guard living inside this package's migration files could
  * never see).
  *
- * It reports and never blocks. A schema it cannot READ — a server that does not answer, a
- * table that is not there — and a type spelling it does not recognize both produce NO
+ * It reports and never blocks. A schema it cannot read — a server that does not answer, a
+ * table that is not there — and a type spelling it does not recognize both produce no
  * finding: a check that guesses in the unknown direction turns into a false alarm against a
  * correct installation, and one of those costs more than the defect.
  *
- * What it does NOT swallow is a connection NAME that is not configured at all. That throws
+ * What it does not swallow is a connection name that is not configured at all. That throws
  * here exactly as it throws everywhere else in the package, because it is not a fact about
  * the schema — it is a config key pointing at nothing, and catching it here would only make
  * one loud misconfiguration quieter in one place.
@@ -184,7 +184,7 @@ final class OwnerKeyDeclaration
      * Which of the three declarable types a column spelling actually is.
      *
      * Read from the engine's own rendering rather than a table of expected spellings, because
-     * the spellings differ per engine AND per how the column was written: PostgreSQL answers
+     * the spellings differ per engine and per how the column was written: PostgreSQL answers
      * `bigint` / `uuid` / `character(26)`, MySQL answers `bigint unsigned` / `char(36)` /
      * `char(26)`, and a forked migration may have used any equivalent.
      *

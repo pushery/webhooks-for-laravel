@@ -80,7 +80,7 @@ final class WebhookConfig
      * and in the cache fast path alike.
      *
      * A superset of the list above and a different question. A dialect can carry a timestamp
-     * and no id (Stripe: the `evt_…` is in the body), which bounds a replay in TIME without
+     * and no id (Stripe: the `evt_…` is in the body), which bounds a replay in time without
      * making it idempotent — inside the tolerance window the same delivery is processed as
      * often as it arrives.
      *
@@ -167,7 +167,7 @@ final class WebhookConfig
      * of the host's own code, nothing renders differently, and the first symptom is a
      * delivery that was refused or lost — weeks after the deployment that caused it.
      *
-     * It does not restate the rules. It BUILDS each entry through the same path a request
+     * It does not restate the rules. It builds each entry through the same path a request
      * takes and collects what that refuses, so a rule added to the builder is covered here
      * the day it lands, and a second copy of the rules can never drift from the first.
      *
@@ -196,7 +196,7 @@ final class WebhookConfig
                 // Unreachable rather than broken: forName() matches on 'name', so an entry
                 // without one is never selected and the route pointing at it answers "no
                 // config named [...]" — a message that sends the reader looking for a
-                // MISSING entry rather than at the one sitting right there.
+                // missing entry rather than at the one sitting right there.
                 $faults[] = "The webhook client config at [{$at}] has no non-empty 'name', so no route can ever resolve it.";
 
                 continue;
@@ -224,7 +224,7 @@ final class WebhookConfig
         }
 
         // And the one fault that cannot be found by reading the entries: an entry that should
-        // be there and is not. Everything above walks what IS configured, so a client that
+        // be there and is not. Everything above walks what is configured, so a client that
         // vanished -- a bad merge, an unset variable in a fresh environment, a rename -- leaves
         // nothing behind to walk. The endpoint stays up, because the route hangs on the macro
         // and not on the entry, and refuses every delivery until somebody notices.
@@ -254,14 +254,14 @@ final class WebhookConfig
      * These are not faults. Every combination named here is a legal, working configuration; what
      * it lacks is a replay boundary, and neither half of the lack is visible from the config file.
      *
-     * And a source that HAS a dedupe_id on such a dialect is not covered either, which is the
+     * And a source that has a dedupe_id on such a dialect is not covered either, which is the
      * distinction this file used to blur. The key comes from a header the signature does not
      * cover, so the sender picks it: it separates a real producer's honest retries, and holds
      * nothing against somebody replaying a delivery they captured. That is retry dedupe, not a
      * replay boundary, and no setting here can turn it into one -- only a dialect that signs a
      * timestamp can.
      * `tolerance_seconds` sits right there in the entry and reads like protection even for a
-     * dialect that has no timestamp to check it against, and the dedupe default is a HEADER the
+     * dialect that has no timestamp to check it against, and the dedupe default is a header the
      * producer may simply not send — a key that stays null, and a null collides with nothing.
      *
      * A source that picks its handler from such a header draws an advisory of its own, because it
@@ -525,7 +525,7 @@ final class WebhookConfig
         }
 
         // Any other scheme is resolved from the container with no arguments, so it carries
-        // its own default header names. Hand it the ones the host EXPLICITLY configured (a
+        // its own default header names. Hand it the ones the host explicitly configured (a
         // null keeps the scheme's own default), so a provider that uses a different header —
         // PlainHmacScheme for SendCloud's 'Sendcloud-Signature', say — works from config
         // alone instead of forcing the host to write a scheme class just to bind the header.
@@ -635,10 +635,10 @@ final class WebhookConfig
     }
 
     /**
-     * Bound the dedupe key to the column that stores it — by HASHING, not by truncating.
+     * Bound the dedupe key to the column that stores it — by hashing, not by truncating.
      *
      * `webhook_id` is `varchar(255)` and has the same exposure `event_type` had: the row is
-     * written AFTER the signature verifies and BEFORE the 2xx goes back, so an over-long
+     * written after the signature verifies and before the 2xx goes back, so an over-long
      * value fails the insert, the request answers 500, and the producer retries into the
      * same failure until its budget runs out. The delivery was authentic, it was accepted,
      * and then it was gone.
@@ -653,7 +653,7 @@ final class WebhookConfig
      *
      * Hashing keeps what the column is for. The same long id hashes to the same key, so the
      * producer's retry still deduplicates; two different ids do not collide, prefix or not.
-     * The stored value is no longer the producer's own string — which is why it is PREFIXED:
+     * The stored value is no longer the producer's own string — which is why it is prefixed:
      * an operator holding this against a producer log sees `sha256:…` and knows to hash
      * theirs rather than concluding the ids do not match.
      *
@@ -720,12 +720,12 @@ final class WebhookConfig
      *
      * The header form exists because real producers put it there and nowhere else: GitHub
      * sends `X-GitHub-Event`, and its body carries only `action` — the sub-kind. Read from
-     * the body alone, such an installation logs every delivery with an EMPTY type, so the
+     * the body alone, such an installation logs every delivery with an empty type, so the
      * generated column is empty too and per-type job routing falls to the catch-all every
      * time. Nothing goes red; the stream simply cannot be split.
      *
      * The resolver form is the one GitHub actually wants, because the useful type is the
-     * header AND `action` together (`release.published`) rather than either half.
+     * header and `action` together (`release.published`) rather than either half.
      *
      * Deliberately the same grammar as 'dedupe_id', so one validator, one set of prefixes,
      * and one thing to learn.
@@ -739,8 +739,8 @@ final class WebhookConfig
      * Bound an event type to the column that stores it.
      *
      * `event_type` is `varchar(255)` on both engines, and since v2.0.0 the value can come
-     * straight from a producer's header. The write happens AFTER the signature verifies and
-     * BEFORE the 2xx goes back, so an over-long value does not truncate — it fails the
+     * straight from a producer's header. The write happens after the signature verifies and
+     * before the 2xx goes back, so an over-long value does not truncate — it fails the
      * insert, answers 500, and the producer retries into the same failure until its budget
      * runs out. The delivery is authentic, it was accepted, and it is lost.
      *
@@ -901,7 +901,7 @@ final class WebhookConfig
         // tells the producer to try again, so it does, and the installation reads as a transport
         // problem rather than as a typo in a config file.
         //
-        // The VALUE is not trimmed, only the emptiness question. A secret with meaningful
+        // The value is not trimmed, only the emptiness question. A secret with meaningful
         // surrounding whitespace is unlikely, and silently rewriting somebody's credential is a
         // worse habit than refusing an unusable one.
         if ($jwks === null && $verifier === null && (! is_string($secret) || trim($secret) === '')) {
@@ -941,7 +941,7 @@ final class WebhookConfig
         return new self(
             name: $name,
             secret: is_string($secret) ? $secret : '',
-            // Same trim, same reason, and this half is the one that breaks a WORKING install:
+            // Same trim, same reason, and this half is the one that breaks a working install:
             // a `previous_secret => ' '` reached SecretSet::rotating() and threw there, so a
             // correctly signed delivery was answered 500 too. Absent is the honest reading of a
             // rotation slot with nothing in it.
@@ -1087,7 +1087,7 @@ final class WebhookConfig
     }
 
     /**
-     * The idempotency DRIVER, validated at load. Only 'redis+db' (default) and 'db' are known;
+     * The idempotency driver, validated at load. Only 'redis+db' (default) and 'db' are known;
      * a typo would otherwise pass silently, and because usesFastPathDedupe() keys on a 'redis'
      * substring it would quietly disable the cache fast path — a silent performance regression
      * under a retry storm, with no error. Fails loudly here like the other config keys do.
@@ -1193,7 +1193,7 @@ final class WebhookConfig
      * resolver dedupe strategies.
      *
      * Shared with the envelope rather than restated, and for a sharper reason than tidiness:
-     * this runs BEFORE the envelope is built, on the same bytes. Two decoders that disagree
+     * this runs before the envelope is built, on the same bytes. Two decoders that disagree
      * would give one delivery a payload and no idempotency key — and a null key collides with
      * nothing in the partial-unique index, so every retry of it would store a fresh row.
      *
@@ -1267,7 +1267,7 @@ final class WebhookConfig
     }
 
     /**
-     * The header names the host EXPLICITLY set under 'signature_headers' — only these are
+     * The header names the host explicitly set under 'signature_headers' — only these are
      * pushed onto a scheme with its own default, so an absent key never overwrites it.
      *
      * @param  array<array-key, mixed>  $headers

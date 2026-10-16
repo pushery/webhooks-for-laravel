@@ -101,7 +101,7 @@ final class EndpointList extends Component
 
     /**
      * Enable or disable one owned endpoint, through the manager — so the UI cannot drift
-     * from what activation means (disabling stamps disabled_at; enabling clears it AND
+     * from what activation means (disabling stamps disabled_at; enabling clears it and
      * the circuit-breaker streak, or the endpoint would re-disable on its next failure).
      */
     public function toggle(int $id): void

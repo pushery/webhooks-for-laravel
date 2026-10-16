@@ -44,7 +44,7 @@ return new class extends Migration
             $table->string('event_type')->nullable();
             $table->jsonb('payload');
 
-            // The EXACT bytes that were received and signature-verified, base64-encoded.
+            // The exact bytes that were received and signature-verified, base64-encoded.
             // body_sha256 is a promise of byte fidelity — the reason to keep a hash at all
             // is to re-verify or forward the call later — and the parsed payload cannot
             // keep it: re-encoding a decoded envelope changes whitespace, slash and unicode
@@ -76,7 +76,7 @@ return new class extends Migration
         // keeps them small even as processed rows accumulate.
         DB::statement("CREATE INDEX webhook_calls_unprocessed_idx ON webhook_calls (created_at) WHERE status = 'received'");
 
-        // The scheduled prune deletes by created_at across ALL statuses, but old rows
+        // The scheduled prune deletes by created_at across all statuses, but old rows
         // are dominated by processed/failed rows that the partial index above excludes,
         // so the prune needs a plain (non-partial) created_at index to avoid a
         // sequential scan of the whole table on every run.

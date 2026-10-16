@@ -6,7 +6,7 @@
      the control below the table is the package's own pagination view. --}}
 <div class="wh-dash-deliveries" wire:key="deliveries-table">
 
-    {{-- Permanently in the DOM, so a filter change has something to speak THROUGH: a region
+    {{-- Permanently in the DOM, so a filter change has something to speak through: a region
          inserted together with its own text is not announced by most screen readers. The
          wire:key carries the count, so Livewire's morph sees a changed node rather than an
          identical one it can leave alone -- the same detail the transform editor's preview
@@ -15,7 +15,7 @@
          A live-bound filter swaps the table underneath and says nothing on its own. The count
          is in the document, in the pagination summary, but as a plain paragraph outside any
          live region: a reader has to travel back down and read to learn whether the change
-         produced three rows, two hundred, or none. And the empty state REPLACES the table, so a
+         produced three rows, two hundred, or none. And the empty state replaces the table, so a
          virtual cursor that was standing in it loses its position silently (WCAG 4.1.3). --}}
     <x-wirekit::visually-hidden role="status" aria-live="polite" wire:key="wh-filtered-{{ $deliveries->total() }}">{{ trans_choice('webhooks::pagination.filtered', $deliveries->total()) }}</x-wirekit::visually-hidden>
     <div class="mb-[var(--space-wk-sm)] flex flex-wrap items-end gap-[var(--padding-wk-x-md)]">

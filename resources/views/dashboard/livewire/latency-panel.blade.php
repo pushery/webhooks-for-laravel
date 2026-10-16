@@ -32,7 +32,7 @@
                         role="region"
                         aria-label="{{ __('webhooks::dashboard.a11y.latency_trend') }}"
                     >
-                    {{-- A LIST, not an image, and every bar names its own value. As a role="img"
+                    {{-- A list, not an image, and every bar names its own value. As a role="img"
                          with one label the chart announced its title and nothing else: the
                          milliseconds lived only in a `title` attribute, which a screen reader
                          does not read off a div and which a touch device cannot hover to reach.

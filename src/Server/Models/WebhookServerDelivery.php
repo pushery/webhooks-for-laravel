@@ -86,7 +86,7 @@ class WebhookServerDelivery extends Model
      */
     public function prunable(): Builder
     {
-        // The cutoff is bound for THIS connection's dialect: MySQL converts an offset-bearing
+        // The cutoff is bound for this connection's dialect: MySQL converts an offset-bearing
         // literal into the database session time zone (8.0.19+), which would slide the retention
         // boundary by that offset and prune rows whose window has not closed yet. Through
         // model(), so a host that configures its own subclass prunes through it.

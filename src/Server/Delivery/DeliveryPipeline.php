@@ -25,7 +25,7 @@ use Throwable;
  * at send time (queue dwell never expires a legitimate signature), using the stable
  * message id so retries carry the same `webhook-id`. A blocked destination is a
  * non-retryable final failure; every transport failure — connection, timeout, TLS,
- * DNS, reset, partial transfer — is retryable, and NONE of them may escape as an
+ * DNS, reset, partial transfer — is retryable, and none of them may escape as an
  * exception: an escaping transport error would bypass the lifecycle events that own
  * the delivery's fate and strand its log row.
  *
@@ -71,7 +71,7 @@ final readonly class DeliveryPipeline
             // says it once.
             return AttemptOutcome::finalFailure(null, $exception);
         } catch (Throwable $exception) {
-            // EVERY OTHER way the transport can fail is a retryable delivery failure — and
+            // Every other way the transport can fail is a retryable delivery failure — and
             // the net has to be this wide, because the type a failure arrives as depends on the
             // Laravel version beside this package. Up to 13.25 only Guzzle's ConnectException,
             // curl's five connect-phase errnos, becomes a ConnectionException; an expired,

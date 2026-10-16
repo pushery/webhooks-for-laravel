@@ -18,11 +18,11 @@ use RuntimeException;
  * Resolves the tenant every dashboard query is scoped by. A customer-facing dashboard
  * is multi-tenant, so no delivery is ever read without an owner in scope. Because a
  * delivery carries the denormalized (owner_type, owner_id) of its subscription's owner,
- * per-row reads and authorization match the WHOLE morph pair — the id alone is not a
+ * per-row reads and authorization match the whole morph pair — the id alone is not a
  * tenant, since two tenants can share an owner_id under different owner types.
  *
  * The default resolution reads the authenticated user and prefers a Jetstream-style
- * current team when the tenant model exposes one — the SAME rule the self-service
+ * current team when the tenant model exposes one — the same rule the self-service
  * SubscriptionScope applies — so the dashboard and the portal scope to the identical
  * tenant. A host app that keys deliveries by a different tenant (workspace, account)
  * registers its own resolver with resolveUsing() so the package stays agnostic about
@@ -59,17 +59,17 @@ final class DashboardScope
     /**
      * What the current dashboard request is scoped to, in precedence order:
      *
-     * 1. **ALL-TENANTS** (`webhooks.dashboard.all_tenants = true`) — every delivery, whoever
+     * 1. **all-tenants** (`webhooks.dashboard.all_tenants = true`) — every delivery, whoever
      *    owns it: the support/operator console. Checked first because it is the strictly wider
      *    scope, so a host that switches it on does not have to also remember to switch
      *    `operator` off. Additionally gated by its own ability, fail-closed (see below).
-     * 2. **OPERATOR** (`webhooks.dashboard.operator = true`) — the global, owner-less rows
+     * 2. **operator** (`webhooks.dashboard.operator = true`) — the global, owner-less rows
      *    only: the endpoints an operator registers with a null owner, which a tenant scope can
      *    never see. Not "everything"; a tenant's private rows stay invisible.
      * 3. Otherwise the acting tenant, resolved exactly as {@see self::currentOwner()}.
      *
      * Both operator modes show their rows to whoever the `view-webhook-dashboard` ability lets
-     * in, so gate that ability to operators. All-tenants carries a SECOND gate on top, because
+     * in, so gate that ability to operators. All-tenants carries a second gate on top, because
      * reading another tenant's delivery history is a higher permission level than reading your
      * own global endpoints.
      */
@@ -88,7 +88,7 @@ final class DashboardScope
         // Resolved here rather than through currentOwner(), and the difference is a 500.
         //
         // currentOwner() promises a TenantIdentity, so it has to throw when there is none. But
-        // "no tenant" is a state the `view-webhook-dashboard` ability ADMITS: an operator on a
+        // "no tenant" is a state the `view-webhook-dashboard` ability admits: an operator on a
         // fresh installation before the first tenant exists, a support account with no company
         // of its own, and every test that asserts the empty state. A state the ability lets a
         // person into and the page cannot survive is a defect, not a configuration question.
@@ -102,15 +102,15 @@ final class DashboardScope
     }
 
     /**
-     * Fail closed on the cross-tenant scope: the configured ability must EXIST and the acting
+     * Fail closed on the cross-tenant scope: the configured ability must exist and the acting
      * user must pass it. An undefined ability, a blank ability name and an unauthenticated
      * request all deny.
      *
      * The undefined case is the one worth spelling out, because the obvious default is the
      * dangerous one. Operator mode leaves an undefined ability open and that is fine there — it
      * exposes only the owner-less rows the operator itself registered. This scope exposes every
-     * TENANT's delivery history, and it sits behind `view-webhook-dashboard`, an ability a
-     * per-tenant dashboard necessarily grants BROADLY: every customer needs it to see their own
+     * tenant's delivery history, and it sits behind `view-webhook-dashboard`, an ability a
+     * per-tenant dashboard necessarily grants broadly: every customer needs it to see their own
      * deliveries. So a host that flips this flag without defining a second ability would hand
      * every customer every other customer's history — silently, with nothing failing. Copying
      * operator mode's default here copies its shape without its safety.
@@ -119,7 +119,7 @@ final class DashboardScope
      * `Gate::define('view-all-tenant-webhooks', fn () => true)` — which is greppable and
      * reviewable, unlike an absence.
      *
-     * It DENIES rather than narrowing. Falling back to the tenant or global scope would leave a
+     * It denies rather than narrowing. Falling back to the tenant or global scope would leave a
      * support screen rendering successfully while showing a fraction of the rows it is supposed
      * to — no error, no empty state, nothing failing a test. That silent narrowing is the exact
      * failure this whole scope was added to prevent, so it must not be its own failure mode.
@@ -241,7 +241,7 @@ final class DashboardScope
     /**
      * The tenant for an authenticated user. An Eloquent tenant resolves exactly like the
      * self-service SubscriptionScope — a Jetstream-style current team when present,
-     * otherwise the user itself — so the dashboard and the portal scope to the SAME
+     * otherwise the user itself — so the dashboard and the portal scope to the same
      * tenant; normalize() then derives the morph pair from the model's morph class + key,
      * matching how the owner is stored. A non-Eloquent authenticatable (e.g. GenericUser)
      * carries no morph class or team relation, so it falls back to its concrete class name

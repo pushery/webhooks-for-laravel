@@ -20,7 +20,7 @@ use Pushery\Webhooks\Database\Dialect\Dialect;
  * the three tables can never disagree and a UUID/ULID host is a config flag, not a migration
  * fork it has to re-apply after every `vendor:publish --force`.
  *
- * Set once, BEFORE migrating, via `webhooks.platform.owner_key_type`; changing it on a
+ * Set once, before migrating, via `webhooks.platform.owner_key_type`; changing it on a
  * populated database is a schema migration, not a runtime toggle.
  *
  * @internal
@@ -118,7 +118,7 @@ enum OwnerKeyType: string
             // the empty string is refused by the second clause alone, and the two clauses agree on
             // every other input as well.
             //
-            // It stays, and it is NOT to be "killed" by deletion. Without it a reader has to
+            // It stays, and it is not to be "killed" by deletion. Without it a reader has to
             // know what ctype_digit does with an empty string to see that '' is refused — and
             // an owner key that is the empty string reaching the subscribe guard is precisely
             // the case this line is here to make obvious.

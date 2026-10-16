@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Pushery\Webhooks\Dashboard;
 
 /**
- * Answers which zone the dashboard should render its timestamps in, for the reader of THIS
+ * Answers which zone the dashboard should render its timestamps in, for the reader of this
  * request.
  *
  * Point `webhooks.dashboard.timezone` at an implementation when one fixed zone is not enough —

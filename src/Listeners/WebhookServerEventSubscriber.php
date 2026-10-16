@@ -129,7 +129,7 @@ final readonly class WebhookServerEventSubscriber
 
         $subscription = $delivery->subscription;
 
-        // Only a real failure of a LIVE endpoint feeds the breaker. A refused delivery was never
+        // Only a real failure of a live endpoint feeds the breaker. A refused delivery was never
         // sent: its endpoint was disabled, deleted or given another URL while it waited. That is
         // our own decision, not the endpoint's fault. Charged to a disabled endpoint it would
         // trip the breaker again on the first hiccup after a re-enable; charged to one whose URL

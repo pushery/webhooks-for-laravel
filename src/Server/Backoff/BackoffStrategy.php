@@ -8,7 +8,7 @@ namespace Pushery\Webhooks\Server\Backoff;
  * Computes how long to wait before the retry that follows a failed attempt. The
  * default is {@see ExponentialWithJitter}. The job passes the endpoint's Retry-After
  * hint when a retryable 429/503 carried a readable one and the delivery honors
- * Retry-After (`respectRetryAfter`); a strategy MAY wait that long instead of following
+ * Retry-After (`respectRetryAfter`); a strategy may wait that long instead of following
  * its own schedule. Null means there is no hint to honor.
  */
 interface BackoffStrategy

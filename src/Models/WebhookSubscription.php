@@ -61,7 +61,7 @@ class WebhookSubscription extends Model
      * Timestamp scopes, exactly as on the three log models. This table carries columns a
      * host legitimately filters by moment — `disabled_at` (which endpoints were auto-disabled
      * in the last 24h?), `secret_rotated_at`, `health_calculated_at` — and a plain
-     * `->where('disabled_at', '>=', $moment)` binds a NAIVE literal that PostgreSQL resolves
+     * `->where('disabled_at', '>=', $moment)` binds a naive literal that PostgreSQL resolves
      * against the database session zone. The window then shifts by that offset and the query
      * quietly returns the wrong rows.
      *
@@ -78,7 +78,7 @@ class WebhookSubscription extends Model
     /**
      * The endpoint's own descriptive columns — the only ones a host may mass-assign.
      *
-     * is_active, disabled_at and consecutive_failures are DELIBERATELY absent: the three
+     * is_active, disabled_at and consecutive_failures are deliberately absent: the three
      * move together and only through WebhookManager::enable() / disable(), because
      * re-activating an endpoint without clearing the failure streak that disabled it
      * re-trips the circuit breaker on the very next failure. Guarding the column makes
@@ -168,9 +168,9 @@ class WebhookSubscription extends Model
     /**
      * Whether this endpoint was switched off by the circuit breaker rather than by a person.
      *
-     * Both paths write the SAME two columns — `is_active = false` and a `disabled_at` stamp
+     * Both paths write the same two columns — `is_active = false` and a `disabled_at` stamp
      * ({@see WebhookManager::disable()} and the breaker in WebhookServerEventSubscriber) — so
-     * the stamp cannot tell them apart. The failure STREAK can: the breaker only trips at or
+     * the stamp cannot tell them apart. The failure streak can: the breaker only trips at or
      * above its threshold and leaves the streak standing, while a person switching an endpoint
      * off never touches it.
      *
@@ -203,7 +203,7 @@ class WebhookSubscription extends Model
 
     /**
      * Subscriptions that listen for an event type. Exact matching by default; with
-     * `webhooks.platform.wildcards` on, a subscription may also list a PREFIX WILDCARD
+     * `webhooks.platform.wildcards` on, a subscription may also list a prefix wildcard
      * (`order.*`) and receives every event under that prefix. A concrete `order.line.added`
      * is then delivered to subscribers of `order.line.added`, `order.line.*` and `order.*` —
      * one prefix per dot boundary. Each arm is still a `whereJsonContains`, so the GIN /

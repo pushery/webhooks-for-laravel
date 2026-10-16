@@ -19,7 +19,7 @@ use Pushery\Webhooks\Support\WebhookConnection;
  * configured retention window (a cheap metadata operation compared with a bulk
  * DELETE). Scheduled daily by the service provider.
  *
- * The drain runs FIRST, and it is what makes this command self-healing. If the
+ * The drain runs first, and it is what makes this command self-healing. If the
  * schedule ever stops for longer than the provisioned runway — a paused worker, a
  * cron never installed on a new box, a long deploy freeze — deliveries land in the
  * default partition, and PostgreSQL then refuses to create the very partition that

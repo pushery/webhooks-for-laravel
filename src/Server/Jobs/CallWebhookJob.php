@@ -30,7 +30,7 @@ use Pushery\Webhooks\Server\Streams\Turn;
 use Throwable;
 
 /**
- * The queued delivery job. It is a THIN wrapper over the {@see DeliveryPipeline}:
+ * The queued delivery job. It is a thin wrapper over the {@see DeliveryPipeline}:
  * the pipeline does one attempt and returns a typed outcome; the job translates
  * that outcome into lifecycle events and queue control (retry via release(), or a
  * final-failure event). It never throws for a classified outcome, so the events are
@@ -104,7 +104,7 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
     ) {
         $this->tries = max(1, $data->maxTries);
 
-        // The JOB timeout must always sit above the HTTP timeout it wraps, or the worker
+        // The job timeout must always sit above the HTTP timeout it wraps, or the worker
         // kills the job mid-request: no lifecycle event fires, the delivery row is left
         // pending for ever and the retry budget is never honored. Raising
         // webhooks.server.timeout is a perfectly reasonable thing to do for a slow
@@ -181,7 +181,7 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
         $hint = $this->retryAfterHint($outcome->response);
 
         // The endpoint asked us to come back later than the queue can hold a job for.
-        // Waiting the cap and CHARGING the attempt would be the worst of both: we return
+        // Waiting the cap and charging the attempt would be the worst of both: we return
         // while it is still rate-limiting us, and the delivery is exhausted long before
         // its window elapses. Wait the cap, and do not charge it — bounded, so a
         // permanently rate-limiting endpoint still terminates.
@@ -212,7 +212,7 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
 
         // Either the budget is spent, or the queue cannot carry a retry at all. The second
         // case has to say so: without it, a retryable failure on the sync connection fired
-        // WebhookAttemptRetrying and then NOTHING — no terminal event, no failed(), and a
+        // WebhookAttemptRetrying and then nothing — no terminal event, no failed(), and a
         // delivery row left at a non-final state for ever, which is the one failure
         // observability cannot see. This class promises that cannot happen; it now keeps it.
         event(new WebhookAttemptsExhausted(
@@ -224,7 +224,7 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
     }
 
     /**
-     * The delay schedule the WORKER uses when an unexpected exception escapes handle()
+     * The delay schedule the worker uses when an unexpected exception escapes handle()
      * — which, without it, would re-release the job with no delay at all and hammer a
      * failing endpoint `tries` times back-to-back. The job's own retries go through
      * release() with the same strategy; this covers the path it does not control.
@@ -361,7 +361,7 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
     /**
      * Whether releasing this job actually re-queues it.
      *
-     * Only the sync connection is asked about, and a null job deliberately is NOT: a job
+     * Only the sync connection is asked about, and a null job deliberately is not: a job
      * with no queue context is one being driven directly, which is a test or a manual call
      * rather than anything a host deploys. Treating that as terminal would change behavior
      * on a path production never takes.
@@ -391,7 +391,7 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
      * just asked for an hour of quiet — the initial attempt plus all six deferrals.
      *
      * The code two branches up already warns about exactly this shape for a zero cap and
-     * excludes it. The same thing happens on `sync` at ANY cap, because there the delay is not
+     * excludes it. The same thing happens on `sync` at any cap, because there the delay is not
      * short — it is not honored at all.
      *
      * An SQS queue whose name ends in `.fifo` cannot hold it back either. A FIFO queue takes a
@@ -443,7 +443,7 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
     /**
      * Continue the delivery in a fresh job after the Retry-After cap, carrying the
      * attempts made so far and one more deferral. A release() cannot be used: it
-     * re-pushes the ORIGINAL payload, so the counters would be lost.
+     * re-pushes the original payload, so the counters would be lost.
      */
     private function defer(int $attempt, int $requested): void
     {

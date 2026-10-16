@@ -9,9 +9,9 @@ use Illuminate\Database\Connection;
 /**
  * Whether MySQL is still comparing the package's identity columns the way the schema declared.
  *
- * The shipped MySQL schema puts `utf8mb4_0900_as_cs` — case- AND accent-sensitive — on every
+ * The shipped MySQL schema puts `utf8mb4_0900_as_cs` — case- and accent-sensitive — on every
  * column that decides whether two rows are the same row. That is not a preference. Under a
- * case-insensitive collation `evt_AbC` and `evt_abc` collapse into ONE dedupe row, so a second,
+ * case-insensitive collation `evt_AbC` and `evt_abc` collapse into one dedupe row, so a second,
  * genuinely distinct delivery is answered 200 and dropped: signature verified, never processed,
  * nothing logged as an error.
  *
@@ -119,9 +119,9 @@ final class CollationAudit
      * What a collation no longer tells two identifiers apart by, as the two phrases a fault
      * names it with, or null while it tells them apart as the shipped schema does.
      *
-     * Case and accent are matched on the SUFFIX rather than against a list of collation names:
+     * Case and accent are matched on the suffix rather than against a list of collation names:
      * MySQL ships dozens, a host may pick a different character set, and `_as_cs` / `_bin` is the
-     * property the schema depends on. Padding is read from the server. A PAD SPACE collation
+     * property the schema depends on. Padding is read from the server. A pad space collation
      * compares `evt_1` and `evt_1 ` as equal, and the older binary collations such as
      * `utf8mb4_bin` pad, while `utf8mb4_0900_bin`, like the shipped `utf8mb4_0900_as_cs`, does
      * not.

@@ -11,17 +11,17 @@ use Pushery\Webhooks\Server\Jobs\CallWebhookJob;
 
 /**
  * The immutable, queue-serializable context for one webhook delivery. Carries
- * everything the {@see CallWebhookJob} needs — but NOT the
+ * everything the {@see CallWebhookJob} needs — but not the
  * raw signing secret: that travels as {@see self::$encryptedSecret}, sealed via the
  * app encrypter and unsealed at handle time, so a signing secret is never at rest in
  * cleartext in the queue store.
  *
- * The {@see self::$messageId} is STABLE across attempts (the Standard Webhooks
+ * The {@see self::$messageId} is stable across attempts (the Standard Webhooks
  * `webhook-id`), so a retry re-signs with the same id and the receiver dedupes.
  *
  * {@see self::$attemptOffset} and {@see self::$retryAfterDeferrals} carry the parts of
  * a delivery's history that a queue release cannot: releasing a job re-pushes its
- * ORIGINAL payload, so state mutated on the job object is lost. A delivery that honors
+ * original payload, so state mutated on the job object is lost. A delivery that honors
  * an endpoint's long Retry-After is therefore re-dispatched as a fresh job carrying
  * these two counters — how many requests it has already made, and how many of those
  * ended in a rate-limit wait that must not be charged to its retry budget.

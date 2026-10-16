@@ -37,11 +37,11 @@ final class TdigestExtension
     }
 
     /**
-     * Assert the extension is installed AND the rollup carries its digest column, throwing
+     * Assert the extension is installed and the rollup carries its digest column, throwing
      * one clear, actionable error naming the exact remediation when either is missing —
      * never a cryptic missing-function or missing-column failure deep inside the percentile
      * SQL. The two are independent: the column is added only when the extension is present as
-     * the migrations run, so installing the extension AFTERWARDS leaves the column absent.
+     * the migrations run, so installing the extension afterwards leaves the column absent.
      *
      * @throws RuntimeException when the tdigest driver is selected but the extension is absent,
      *                          or present but the rollup has no latency_digest column yet

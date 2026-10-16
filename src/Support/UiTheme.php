@@ -98,7 +98,7 @@ final class UiTheme
     /**
      * Register a per-request source for the theme script's CSP nonce — call it from a service
      * provider's boot(): `UiTheme::resolveNonceUsing(fn () => Vite::cspNonce())`. This is the
-     * per-request path; the config value is a STATIC string only, because a Closure placed in
+     * per-request path; the config value is a static string only, because a Closure placed in
      * config/webhooks.php makes `php artisan config:cache` throw (the config is not serializable)
      * — the exact deploy step a strict-CSP host runs.
      *
@@ -141,7 +141,7 @@ final class UiTheme
         }
 
         // A closure (or any non-string) in config can't be `config:cache`d — earlier releases
-        // documented one here, so fail LOUD with the migration path rather than silently drop the
+        // documented one here, so fail loud with the migration path rather than silently drop the
         // nonce (which would strip CSP protection from the theme script without a word).
         if (! is_string($configured)) {
             throw new InvalidArgumentException(

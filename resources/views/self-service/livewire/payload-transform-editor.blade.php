@@ -37,7 +37,7 @@
                     <x-wirekit::heading :level="2" size="sm">{{ __('webhooks::self-service.transform.rules') }}</x-wirekit::heading>
 
                     {{-- :value as well as wire:model. Livewire's binding sets the choice once
-                         Alpine runs; the SERVER render decides what a reader sees before that
+                         Alpine runs; the server render decides what a reader sees before that
                          — and without it the markup carries no `selected`, so the first paint
                          and a scripting-off render both show the first option regardless of
                          the stored version.
@@ -208,7 +208,7 @@
                             <x-wirekit::text size="sm" weight="medium">{{ __('webhooks::self-service.transform.input') }}</x-wirekit::text>
                             <x-wirekit::code-block language="json" :copy="true" class="wh-transform-input">{{ $inputJson }}</x-wirekit::code-block>
                         </x-wirekit::stack>
-                        {{-- A labeled region, NOT a live region around the code block: the output
+                        {{-- A labeled region, not a live region around the code block: the output
                              body recomputes on every debounced keystroke, and a live region there
                              would read the whole JSON document out again every 400 ms. The short
                              status sentence beside it carries the announcement instead. --}}

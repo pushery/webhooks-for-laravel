@@ -26,7 +26,7 @@ final class WebhookController
     public function __invoke(Request $request): Response
     {
         $route = $request->route();
-        // Read from the route's ACTION rather than from its parameters. A parameter can be
+        // Read from the route's action rather than from its parameters. A parameter can be
         // supplied by the URI; an action cannot, which is what makes the binding a promise.
         $name = $route instanceof Route ? $route->getAction('webhookConfigName') : null;
 

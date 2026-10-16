@@ -24,10 +24,12 @@ use Pushery\Webhooks\Server\Jobs\CallWebhookJob;
 use Pushery\Webhooks\Server\Signing\EncryptedSecretResolver;
 use Pushery\Webhooks\Server\Streams\StreamLedger;
 use Pushery\Webhooks\Support\Settings;
+use Pushery\Webhooks\Testing\FakedWebhook;
+use Pushery\Webhooks\Testing\WebhookFake;
 
 /**
  * The immutable, fluent builder for sending a webhook — the shape of Laravel's own
- * PendingRequest/PendingMail, and named for it. Each setter returns a CLONE, so a
+ * PendingRequest/PendingMail, and named for it. Each setter returns a clone, so a
  * half-built call is a reusable template. Consumers never write a service/action class
  * to send; they call this builder and react to the Pushery\Webhooks\Server\Events\* attempt
  * events via listeners.
@@ -117,7 +119,7 @@ final class PendingWebhook
      * HTTP verb, the timeouts, the try count, TLS verification, canonicalization, the
      * Retry-After policy, the retry schedule, the egress proxy, and the queue and
      * connection its job is pushed onto. Config is the
-     * default for EVERY delivery; the builder below overrides it per call. Seeding
+     * default for every delivery; the builder below overrides it per call. Seeding
      * here (rather than only where the Platform layer fans out) is what makes a
      * host's webhooks.server settings hold for a directly-driven call too.
      */
@@ -147,7 +149,7 @@ final class PendingWebhook
         $call->queue = $config->queue();
         $call->connection = $config->connection();
 
-        // Asymmetric mode signs with the Server's OWN Ed25519 key, so the key travels
+        // Asymmetric mode signs with the Server's own Ed25519 key, so the key travels
         // with the call from here; no per-endpoint shared secret is involved.
         $ed25519Key = $config->ed25519SigningKey();
 
@@ -184,7 +186,7 @@ final class PendingWebhook
     }
 
     /**
-     * Canonicalize the JSON payload (sorted keys) BEFORE signing, so signed and
+     * Canonicalize the JSON payload (sorted keys) before signing, so signed and
      * sent bytes stay identical for a receiver that re-canonicalizes. Opt-in.
      */
     public function canonicalizeJson(bool $canonicalize = true): self
@@ -290,7 +292,7 @@ final class PendingWebhook
 
     /**
      * The longest Retry-After wait this queue can hold a job for. A hint beyond it is
-     * waited out at the cap WITHOUT charging the delivery's retry budget, up to
+     * waited out at the cap without charging the delivery's retry budget, up to
      * $maxDeferrals times, so a long rate-limit window cannot exhaust the delivery
      * before the endpoint is ready for it.
      */
@@ -302,7 +304,7 @@ final class PendingWebhook
             $call->retryAfterMaxDeferrals = max(0, $maxDeferrals ?? $call->retryAfterMaxDeferrals);
 
             // Keep the schedule's Retry-After clamp in lockstep with the cap. The defer
-            // threshold (above) and the delay clamp are the SAME wait; the builder must
+            // threshold (above) and the delay clamp are the same wait; the builder must
             // move both, or a hint under the new cap would still be shortened to the old
             // one — released early, budget charged, back while the endpoint is still
             // rate-limiting. Config seeds both equal; only this builder can split them. A
@@ -389,7 +391,7 @@ final class PendingWebhook
         // The dispatch reads `if ($this->delaySeconds > 0)`, so 0 and -1 both mean "queue it
         // now".
         //
-        // The clamp stays because the PROPERTY should not carry a value the sender never
+        // The clamp stays because the property should not carry a value the sender never
         // meant. A negative hold stored as a negative number is one refactor away from being
         // passed to a queue driver that reads it literally.
         return tap(clone $this, fn (self $call): int => $call->delaySeconds = max(0, $seconds));
@@ -521,6 +523,16 @@ final class PendingWebhook
 
         if ($stream !== null) {
             StreamLedger::assertCanOrder($this->connection, $this->queue);
+        }
+
+        // A test that switched the fake on records the delivery here, after the refusals above
+        // and before anything is announced or queued.
+        $fake = WebhookFake::active();
+
+        if ($fake instanceof WebhookFake) {
+            $fake->record(FakedWebhook::sentThroughTheServer($data));
+
+            return $data;
         }
 
         event(new WebhookDeliveryDispatching($data));

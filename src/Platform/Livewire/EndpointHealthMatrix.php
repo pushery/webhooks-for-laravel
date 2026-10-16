@@ -219,7 +219,7 @@ final class EndpointHealthMatrix extends Component
     {
         $endpoints = $this->boardQuery()->get();
 
-        // One row beyond the cap is asked for so the truncation can be DETECTED, then dropped.
+        // One row beyond the cap is asked for so the truncation can be detected, then dropped.
         $truncated = $endpoints->count() > self::MAX_ROWS;
         $endpoints = $endpoints->take(self::MAX_ROWS);
 

@@ -8,7 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Pushery\Webhooks\Models\WebhookSubscription;
 
 /**
- * Fired when an endpoint's signing secret is rotated, naming WHO rotated it.
+ * Fired when an endpoint's signing secret is rotated, naming who rotated it.
  *
  * Rotating a signing secret is a security action taken by a person, and it is the one an
  * audit is most often reconstructed around: a secret changed, deliveries kept verifying

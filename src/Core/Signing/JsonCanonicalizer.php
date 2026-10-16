@@ -7,7 +7,7 @@ namespace Pushery\Webhooks\Core\Signing;
 use JsonException;
 
 /**
- * Opt-in canonical JSON serializer, applied to a payload array BEFORE it is
+ * Opt-in canonical JSON serializer, applied to a payload array before it is
  * signed so that the signed bytes and the sent bytes are always identical. Keys
  * are sorted recursively by their bytes and there is no insignificant whitespace,
  * giving a deterministic body regardless of the array's insertion order. Byte

@@ -20,7 +20,7 @@ use stdClass;
  * escape hatch) rather than the JS chart adapter, so it draws with no compiled
  * asset bundle and stays fully server-renderable and testable.
  *
- * `isolate: false` bundles this panel's lazy load with its siblings' into ONE request. Six
+ * `isolate: false` bundles this panel's lazy load with its siblings' into one request. Six
  * isolated ones each morph the shared parent, and on a window switch four of them arrive
  * while the components they name are being replaced — which is the `__lazyLoad not found`
  * race. See {@see WebhooksDashboardPage} for the
