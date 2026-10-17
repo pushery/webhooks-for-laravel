@@ -96,7 +96,7 @@ final readonly class DeliveryPipeline
             return AttemptOutcome::retryable(null, $exception);
         }
 
-        return match ($this->classifier->classify($response)) {
+        return match ($this->classifier->classify($response, $data->retryableProblemTypes())) {
             Disposition::Succeeded => AttemptOutcome::succeeded($response),
             Disposition::Retryable => AttemptOutcome::retryable($response, null),
             Disposition::FinalFailure => AttemptOutcome::finalFailure($response, null),

@@ -17,7 +17,10 @@ use Illuminate\Support\Facades\DB;
  * any renderer runs, so `for()` maps a guarded connection
  * and treats the PostgreSQL shape as the default.
  *
- * @internal
+ * Part of the public API, because the migrations this package publishes call it. Once published, a
+ * migration runs in the host's own namespace, and a host that analyzes its migrations reads every call
+ * there into a class the package marks internal as an error it cannot fix without editing a published
+ * file.
  */
 enum Dialect
 {

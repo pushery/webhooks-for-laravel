@@ -16,6 +16,10 @@ namespace Pushery\Webhooks\Database\Dialect\Sql;
  */
 final class ConditionalCount
 {
+    /**
+     * @param  literal-string  $condition
+     * @return literal-string
+     */
     public static function of(string $condition): string
     {
         return "count(case when {$condition} then 1 end)";

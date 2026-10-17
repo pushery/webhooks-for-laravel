@@ -50,7 +50,7 @@
         "symfony/http-foundation": "^7.0 || ^8.0"
     },
     "conflict": {
-        "pushery/wirekit": "<2.53"
+        "pushery/wirekit": "<2.67.0"
     },
     "autoload": {
         "psr-4": {

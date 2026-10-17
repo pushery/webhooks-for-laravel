@@ -6,6 +6,7 @@ namespace Pushery\Webhooks;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
@@ -19,7 +20,9 @@ use Pushery\Webhooks\Console\PartitionMaintenanceCommand;
 use Pushery\Webhooks\Console\PruneOrphanedPayloadsCommand;
 use Pushery\Webhooks\Console\RefreshEndpointHealthCommand;
 use Pushery\Webhooks\Console\RevokeRotatedSecretsCommand;
+use Pushery\Webhooks\Core\Ssrf\HostResolver;
 use Pushery\Webhooks\Database\OwnerKeyDeclaration;
+use Pushery\Webhooks\Facades\Webhooks;
 use Pushery\Webhooks\Listeners\WebhookServerEventSubscriber;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Platform\Delivery\SubscriptionDeliveryGate;
@@ -58,6 +61,13 @@ final class WebhooksServiceProvider extends ServiceProvider
         // SSRF vetting is the shared Core\Ssrf\SsrfGuard (bound by CoreServiceProvider),
         // so the manager auto-resolves it — no local guard binding here.
         $this->app->singleton(WebhookManager::class);
+
+        // The manager takes the guard when it is built, so a resolver bound again has to reach
+        // it too: it is forgotten, and so is the copy the facade keeps once it has been called.
+        $this->app->rebinding(HostResolver::class, static function (Application $app): void {
+            $app->forgetInstance(WebhookManager::class);
+            Webhooks::clearResolvedInstance(WebhookManager::class);
+        });
     }
 
     /**
