@@ -18,7 +18,10 @@ use Pushery\Webhooks\Database\Dialect\Dialect;
  * model, migration and raw query in the package resolves through here, so the whole package
  * follows one connection and never silently splits across two.
  *
- * @internal
+ * Part of the public API, because the migrations this package publishes call it. Once published, a
+ * migration runs in the host's own namespace, and a host that analyzes its migrations reads every call
+ * there into a class the package marks internal as an error it cannot fix without editing a published
+ * file.
  */
 final class WebhookConnection
 {

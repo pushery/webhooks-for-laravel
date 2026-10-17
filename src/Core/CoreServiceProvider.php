@@ -51,6 +51,15 @@ final class CoreServiceProvider extends ServiceProvider
             $this->stringList('webhooks.core.ssrf.allowed_hosts'),
             $this->stringList('webhooks.core.ssrf.blocked_hosts'),
         ));
+
+        // A resolver bound once the guard exists, a fixed one in an application's tests above all,
+        // has to reach what took the guard when it was built: the guard itself, and the JWKS key
+        // set that holds it. Both are forgotten when the resolver is bound again, and built from
+        // the new one the next time they are asked for.
+        $this->app->rebinding(HostResolver::class, static function (Application $app): void {
+            $app->forgetInstance(SsrfGuard::class);
+            $app->forgetInstance(JwksKeySet::class);
+        });
     }
 
     public function boot(): void

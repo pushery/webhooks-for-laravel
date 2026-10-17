@@ -23,7 +23,10 @@ use Pushery\Webhooks\Database\Dialect\Dialect;
  * Set once, before migrating, via `webhooks.platform.owner_key_type`; changing it on a
  * populated database is a schema migration, not a runtime toggle.
  *
- * @internal
+ * Part of the public API, because the migrations this package publishes call it. Once published, a
+ * migration runs in the host's own namespace, and a host that analyzes its migrations reads every call
+ * there into a class the package marks internal as an error it cannot fix without editing a published
+ * file.
  */
 enum OwnerKeyType: string
 {

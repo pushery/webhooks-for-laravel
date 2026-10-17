@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Pushery\Webhooks\Database\DatabaseRequirement;
 use Pushery\Webhooks\Database\Dialect\Dialect;
 use Pushery\Webhooks\Database\OwnerKeyType;
 use Pushery\Webhooks\Database\PartitionManager;
-use Pushery\Webhooks\Support\Settings;
 use Pushery\Webhooks\Support\WebhookConnection;
 
 return new class extends Migration
@@ -119,14 +119,16 @@ return new class extends Migration
         // $months) creates exactly $months consecutive months starting at $from, so from the
         // previous month it takes the months ahead plus two (the previous and the current month)
         // to reach the window the maintenance command keeps (`$monthsAhead + 1` from the current
-        // month). A fresh install and steady state then agree about the same setting.
+        // month). A fresh install and steady state then agree about the same setting. It is read
+        // from the configuration with the default the config reader carries, because a migration
+        // this package publishes calls no class the package keeps internal.
         //
         // The partition key is a timestamptz, so the months are UTC months — anchoring them to a
         // local calendar would shift every bound by the local offset and, since that offset
         // moves twice a year, leave a gap or an overlap between two adjacent partitions.
         $partitions->ensureWindow(
             CarbonImmutable::now('UTC')->startOfMonth()->subMonth(),
-            new Settings()->partitionMonthsAhead() + 2,
+            Config::integer('webhooks.platform.partition_months_ahead', 3) + 2,
         );
     }
 

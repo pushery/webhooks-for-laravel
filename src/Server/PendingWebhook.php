@@ -98,6 +98,9 @@ final class PendingWebhook
 
     private ?int $retryForSeconds = null;
 
+    /** @var list<string> */
+    private array $retryableProblemTypes = [];
+
     private ?string $orderingKey = null;
 
     private ?BackoffStrategy $backoff = null;
@@ -342,6 +345,27 @@ final class PendingWebhook
     }
 
     /**
+     * Retry a 4xx answer whose body is an RFC 9457 problem document of one of these types, the
+     * way a 5xx is retried: with the delivery's backoff, within its tries or its time to keep
+     * trying. For an endpoint that answers "not now" with a status that otherwise means "never",
+     * such as a paused account behind a 403. Every other 4xx keeps its classification, and so
+     * does a body cut at the capture limit. A type is a URI and is compared as written; an empty
+     * list retries no 4xx by its type again.
+     *
+     * @param  list<string>  $types
+     */
+    public function retryableProblemTypes(array $types): self
+    {
+        foreach ($types as $type) {
+            if (trim($type) === '') {
+                throw new InvalidArgumentException('A problem type is the `type` of a problem document, a URI, so it cannot be empty.');
+            }
+        }
+
+        return tap(clone $this, fn (self $call): array => $call->retryableProblemTypes = array_values(array_unique($types)));
+    }
+
+    /**
      * Send this delivery in order with every other delivery to the same URL under the same key:
      * one at a time, in the order they were dispatched, each only after the one before it
      * succeeded. A delivery that ends without success holds the stream until it is resent or
@@ -508,6 +532,7 @@ final class PendingWebhook
             retryUntil: $this->retryForSeconds === null
                 ? null
                 : Date::now()->getTimestamp() + $this->delaySeconds + $this->retryForSeconds,
+            retryableProblemTypes: $this->retryableProblemTypes,
         );
     }
 

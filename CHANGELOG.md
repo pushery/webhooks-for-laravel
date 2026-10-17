@@ -6,6 +6,23 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.19.0] - 2026-10-17
+
+### ✨ Added
+
+- **`WEBHOOKS_SERVER_TRIES` and `WEBHOOKS_PLATFORM_PARTITION_MONTHS_AHEAD` set `server.tries` and `platform.partition_months_ahead` from the environment.** Both read like the other bounds: a positive whole number, and anything else keeps the shipped `3`.
+- **A 4xx retried by its problem type.** `PendingWebhook::retryableProblemTypes([...])` names RFC 9457 problem types for one delivery: a `4xx` whose body is an `application/problem+json` document of one of them is retried the way a `5xx` is, with the delivery's backoff and within its tries or its `retryForSeconds()`. An endpoint that answers "not now" with a status that otherwise means "never", such as a paused account behind a `403`, is retried instead of given up on at its first answer. Every other `4xx` keeps its classification, and a body cut at the capture limit counts as no problem document.
+
+### 🔧 Changed
+
+- **The shipped screens need `pushery/wirekit` 2.67.0 or newer.** `conflict` refuses an older WireKit. 2.67.0 is the release this package's suite develops against, and no run proves an older one.
+
+### 🐛 Fixed
+
+- **A resolver an application binds in its tests reaches a guard that was already built.** Binding a `Core\Ssrf\HostResolver` with `$this->app->instance()` only reached what was built after it, so a guard built earlier, by a migration in a worker's first test for example, kept resolving hosts over public DNS, and so did the JWKS key set and the manager behind the `Webhooks` facade, which hold it. A new binding of the resolver now has all of them built again from it the next time they are asked for. A test that forgot the guard or the key set by hand after binding its resolver no longer needs to.
+
+- **The migrations the package publishes call no internal class any more.** `Support\TableLookup`, `Support\WebhookConnection`, `Database\Dialect\Dialect` and `Database\OwnerKeyType`, which those migrations call, are part of the public API now, and the deliveries migration reads `webhooks.platform.partition_months_ahead` from the configuration instead of through the internal config reader. Once published, a migration runs in the application's own namespace, and an application that analyzes its migrations with PHPStan reported every one of those calls as a call into an internal class, which it could not fix without editing a published file. A copy of the deliveries migration published before this release still names `Support\Settings` on one line; `Config::integer('webhooks.platform.partition_months_ahead', 3)` is what the shipped migration reads there now.
+
 ## [3.18.0] - 2026-10-16
 
 ### ✨ Added
@@ -3439,7 +3456,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.18.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.19.0...HEAD
+[3.19.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.18.0...v3.19.0
 [3.18.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.17.0...v3.18.0
 [3.17.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.16.1...v3.17.0
 [3.16.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.16.0...v3.16.1

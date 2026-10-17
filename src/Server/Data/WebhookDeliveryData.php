@@ -29,7 +29,8 @@ use Pushery\Webhooks\Server\Jobs\CallWebhookJob;
  * {@see self::$orderingKey} puts the delivery into a stream with every other delivery to
  * the same URL under the same key, {@see self::$retryForSeconds} replaces the number of
  * tries with a time to keep trying, and {@see self::$retryUntil} is the moment that time
- * ends. A job queued by an earlier version carries none of the three, nor
+ * ends. {@see self::$retryableProblemTypes} names the problem types a 4xx answer is retried
+ * for. A job queued by an earlier version carries none of these four, nor
  * {@see self::$streamWaits}: a readonly property the serialized job never had stays
  * uninitialized when it is unserialized, so they are read through the methods below, which
  * answer the defaults for such a job instead of throwing in the worker.
@@ -45,6 +46,7 @@ final readonly class WebhookDeliveryData
      * @param  ?int  $retryForSeconds  how long the delivery keeps trying, or null to count tries instead
      * @param  ?int  $retryUntil  the Unix time that keeping-trying ends at, or null
      * @param  ?int  $streamWaits  how often the delivery has waited for an earlier one of its stream, null for never
+     * @param  ?list<string>  $retryableProblemTypes  the problem types a 4xx answer is retried for, null for none
      */
     public function __construct(
         public string $messageId,
@@ -66,6 +68,7 @@ final readonly class WebhookDeliveryData
         public ?int $retryForSeconds = null,
         public ?int $retryUntil = null,
         public ?int $streamWaits = null,
+        public ?array $retryableProblemTypes = null,
     ) {}
 
     /**
@@ -111,6 +114,17 @@ final readonly class WebhookDeliveryData
     public function streamWaits(): int
     {
         return $this->streamWaits ?? 0;
+    }
+
+    /**
+     * The problem types a 4xx answer of this delivery is retried for, beside the statuses the
+     * configuration retries: the `type` of an `application/problem+json` body.
+     *
+     * @return list<string>
+     */
+    public function retryableProblemTypes(): array
+    {
+        return $this->retryableProblemTypes ?? [];
     }
 
     /**
@@ -173,6 +187,7 @@ final readonly class WebhookDeliveryData
             retryForSeconds: $this->retryForSeconds(),
             retryUntil: $retryUntil,
             streamWaits: $streamWaits,
+            retryableProblemTypes: $this->retryableProblemTypes(),
         );
     }
 }

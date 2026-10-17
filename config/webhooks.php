@@ -183,7 +183,7 @@ return [
         'http_verb' => 'post',
         'connect_timeout' => EnvLimit::ceiling(env('WEBHOOKS_SERVER_CONNECT_TIMEOUT'), 3),
         'timeout' => EnvLimit::ceiling(env('WEBHOOKS_SERVER_TIMEOUT'), 5),
-        'tries' => 3,
+        'tries' => EnvLimit::ceiling(env('WEBHOOKS_SERVER_TRIES'), 3),
 
         // The retry schedule. 'base' and 'cap' bound the jittered exponential delay. A retry
         // is a released job, which even SQS holds back for up to 12 hours, so the cap is the
@@ -406,7 +406,7 @@ return [
 
         'retention_months' => EnvLimit::ceiling(env('WEBHOOKS_PLATFORM_RETENTION_MONTHS'), 3),
 
-        'partition_months_ahead' => 3,
+        'partition_months_ahead' => EnvLimit::ceiling(env('WEBHOOKS_PLATFORM_PARTITION_MONTHS_AHEAD'), 3),
 
         // Let a tenant manage its own webhook endpoints (register, edit, rotate the
         // secret, delete) rather than only an operator. Off by default. The portal
