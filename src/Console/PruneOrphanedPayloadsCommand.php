@@ -84,7 +84,7 @@ final class PruneOrphanedPayloadsCommand extends Command
             ));
         }
 
-        // NOT Number::fileSize(): it reaches Illuminate\Support\Number::format(), which throws
+        // Not Number::fileSize(): it reaches Illuminate\Support\Number::format(), which throws
         // without ext-intl — an extension this package does not require. The call sits after the
         // deletion loop, so on such a host a run, scheduled by the host or started by hand, would
         // delete and then die without reporting what it had deleted.

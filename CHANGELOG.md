@@ -6,6 +6,32 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.20.0] - 2026-10-19
+
+### ✨ Added
+
+- **A delivery can ask for its secrets at each attempt.** `PendingWebhook::resolveSecretsUsing()` names a class that implements the new `ResolvesDeliverySecrets`, and every attempt, a resend through `DeliveryStreams` included, signs with the secrets it returns for that delivery at that moment. The delivery then carries no secret in the queue, so a receiver that rotates its secret while a delivery waits gets the new one on the next attempt, and an ordered stream does not stop behind a delivery signed with a secret the receiver has dropped. A delivery without it signs with the secrets it was queued with, as before.
+
+### 🔧 Changed
+
+- **Secondary actions are outlined by default.** `webhooks.ui.secondary_surface` ships `outline` instead of `ghost`, so "Endpoint health", "Back to endpoints", "Add include field" and the row actions read as buttons rather than as plain text. Set the key to `ghost` to keep the borderless look.
+
+- **The shipped screens need `pushery/wirekit` 2.68.0 or newer.** `conflict` refuses an older WireKit. 2.68.0 is the release this package's suite develops against, and no run proves an older one.
+
+  **Upgrade:** a host that renders the shipped screens updates `pushery/wirekit` to 2.68 or newer. A host without WireKit is not affected.
+
+- **The sample payload field of the transform editor is as tall as its content**, from 8 up to 100 rows, so a payload reads without scrolling inside the field.
+
+- **On a phone the self-service portal lists each endpoint as a card.** The table scrolled sideways there and hid the health column behind the screen's edge. Below the `sm` breakpoint each row now stands as a block with its health, events and status named in front of their values and its actions below them; from `sm` up the table is unchanged.
+
+### 🐛 Fixed
+
+- **On a phone the two date fields of the delivery filter stand one below the other.** Side by side, each field had half of the screen and cut its calendar control off at the edge.
+
+- **The dashboard no longer prints "Time window" above its time window control.** The label is the control's name for assistive technology and stays that.
+
+- **The table of the "Recent queue" card reaches the card's edges.** Its cells carry their own padding, and the card's padding on top of it set the table in from the edges.
+
 ## [3.19.0] - 2026-10-17
 
 ### ✨ Added
@@ -3456,7 +3482,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.19.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.20.0...HEAD
+[3.20.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.19.0...v3.20.0
 [3.19.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.18.0...v3.19.0
 [3.18.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.17.0...v3.18.0
 [3.17.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.16.1...v3.17.0

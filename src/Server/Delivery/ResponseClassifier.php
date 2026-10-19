@@ -15,7 +15,7 @@ use Pushery\Webhooks\Core\Http\TransportResponse;
  * - 5xx → retryable (transient server error).
  * - 4xx → final failure by default; a 400/410 will never pass, so retrying for
  *   hours is waste. The exceptions are the "come back later" codes 408, 425 and
- *   429, which ARE retried. `retryOn4xx` flips the whole 4xx class to retryable.
+ *   429, which are retried. `retryOn4xx` flips the whole 4xx class to retryable.
  *   A delivery can name problem types of its own: a 4xx whose body is an RFC 9457
  *   problem document of one of them is retried as well.
  * - 3xx and any other non-2xx → final failure. Redirects are never followed

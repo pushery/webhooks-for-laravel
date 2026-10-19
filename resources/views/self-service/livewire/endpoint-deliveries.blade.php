@@ -68,11 +68,13 @@
 
                  Visible labels, unlike the lists: a list names itself through its first option,
                  and two bare date fields say nothing about which one starts the range. On a phone
-                 the pair shares a row in two equal columns, and from `sm` up each keeps a width of
-                 its own. A date input without one takes the width its engine gives it, Chromium and
-                 WebKit disagree by up to 53 pixels, and that alone decided how this row wrapped:
-                 three rows in one engine, two in the other. --}}
-            <div class="grid grid-cols-2 items-end gap-[var(--padding-wk-x-md)] sm:contents">
+                 each field takes a row of its own: a date field needs room for the date and its
+                 calendar control, and in half of a 390px screen the control was cut off at the
+                 field's edge. From `sm` up each keeps a width of its own. A date input without one
+                 takes the width its engine gives it, Chromium and WebKit disagree by up to 53
+                 pixels, and that alone decided how this row wrapped: three rows in one engine, two
+                 in the other. --}}
+            <div class="grid grid-cols-1 items-end gap-[var(--padding-wk-x-md)] sm:contents">
                 <div class="min-w-0 sm:w-40">
                     <x-wirekit::input
                         type="date"
@@ -209,7 +211,7 @@
                                  and this one sends an HTTP request when picked wrong. --}}
                             <x-wirekit::button
                                 size="sm"
-                                surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}"
+                                surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
                                 wire:click="redeliver('{{ $delivery->id }}')"
                                 wire:loading.attr="disabled"
                                 {{-- Scoped like every sibling replay button. Without it the row

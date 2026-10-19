@@ -131,7 +131,7 @@ return [
     // DeliveryStatus value, which never changes, and read as outcomes rather than
     // states: a customer asking "did my order go out?" is not asking for an enum.
     // The one date pattern this namespace needs, and it exists for the accessible names rather
-    // than for the screen. A replay writes a NEW delivery row — same event type, same endpoint —
+    // than for the screen. A replay writes a new delivery row — same event type, same endpoint —
     // and `platform.self_service.replays_per_minute` allows ten a minute by default, so two rows
     // that differ only in their second are the ORDINARY outcome of a tenant pressing Send again.
     // `LLL` carries no seconds in any of the seven shipped locales, so two such rows would get

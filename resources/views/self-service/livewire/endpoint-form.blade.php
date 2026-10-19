@@ -93,7 +93,7 @@
                             <x-wirekit::button type="submit">
                                 {{ $endpointId === null ? __('webhooks::self-service.form.register') : __('webhooks::self-service.form.save') }}
                             </x-wirekit::button>
-                            <x-wirekit::button type="button" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" intent="neutral" wire:click="cancel">
+                            <x-wirekit::button type="button" surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" intent="neutral" wire:click="cancel">
                                 {{ __('webhooks::self-service.actions.cancel') }}
                             </x-wirekit::button>
                         </div>

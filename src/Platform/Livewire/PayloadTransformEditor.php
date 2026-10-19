@@ -169,7 +169,7 @@ final class PayloadTransformEditor extends Component
         // enforces the array, never its elements, so an entry that is not a string reached
         // the trim under strict_types and raised there.
         //
-        // Deliberately NOT Rule::in over the declared versions. PayloadVersionRegistry says in
+        // Deliberately not Rule::in over the declared versions. PayloadVersionRegistry says in
         // its own words that an unknown version is a supported state — "a version may exist
         // purely to stamp its id with no field changes" — so constraining the field to the
         // configured set would narrow documented behavior to fix a column width. The width is
@@ -272,6 +272,17 @@ final class PayloadTransformEditor extends Component
         // A scalar (`42`, `"x"`, `true`) is valid JSON but not a payload the transformer
         // can reshape, so it is refused with the same sentence as unparsable text.
         return __('webhooks::self-service.transform.invalid_json');
+    }
+
+    /**
+     * How many rows the sample field shows: one per line of the sample, so a tenant reads the
+     * whole payload without scrolling inside the field, and never fewer than 8 or more than 100.
+     * Below 8 the field would shrink to a sliver while a tenant clears it to paste their own;
+     * above 100 a pasted export would push both preview panes a long way down the page.
+     */
+    public function sampleRows(): int
+    {
+        return min(100, max(8, substr_count($this->sampleJson, "\n") + 1));
     }
 
     /**

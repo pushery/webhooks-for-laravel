@@ -20,8 +20,10 @@ use Pushery\Webhooks\Server\Data\DeliveryOptions;
 use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 use Pushery\Webhooks\Server\Events\WebhookDeliveryDispatching;
 use Pushery\Webhooks\Server\Exceptions\OrderedDeliveryUnavailable;
+use Pushery\Webhooks\Server\Exceptions\UnknownSecretsResolver;
 use Pushery\Webhooks\Server\Jobs\CallWebhookJob;
 use Pushery\Webhooks\Server\Signing\EncryptedSecretResolver;
+use Pushery\Webhooks\Server\Signing\ResolvesDeliverySecrets;
 use Pushery\Webhooks\Server\Streams\StreamLedger;
 use Pushery\Webhooks\Support\Settings;
 use Pushery\Webhooks\Testing\FakedWebhook;
@@ -57,6 +59,9 @@ final class PendingWebhook
     private string $contentType = 'application/json';
 
     private ?SecretSet $secrets = null;
+
+    /** @var ?class-string<ResolvesDeliverySecrets> */
+    private ?string $secretsResolver = null;
 
     private bool $doNotSign = false;
 
@@ -205,6 +210,25 @@ final class PendingWebhook
     public function useSecrets(string $current, string $previous): self
     {
         return tap(clone $this, fn (self $call): SecretSet => $call->secrets = SecretSet::rotating($current, $previous));
+    }
+
+    /**
+     * Sign every attempt with the secrets this class names at that moment, instead of the secrets of this call.
+     *
+     * The delivery then carries no secret in the queue: each attempt, and each resend, makes the class from the container
+     * and asks it, so a receiver that rotates its secret while the delivery waits gets the new one on the next attempt.
+     * It takes the place of `useSecret()` and `useSecrets()`, and `doNotSign()` still sends unsigned.
+     *
+     * @param  class-string  $resolver  a class implementing ResolvesDeliverySecrets; any other class is refused with
+     *                                  UnknownSecretsResolver
+     */
+    public function resolveSecretsUsing(string $resolver): self
+    {
+        if (! is_a($resolver, ResolvesDeliverySecrets::class, true)) {
+            throw UnknownSecretsResolver::for($resolver);
+        }
+
+        return tap(clone $this, fn (self $call): string => $call->secretsResolver = $resolver);
     }
 
     public function doNotSign(bool $doNotSign = true): self
@@ -520,7 +544,7 @@ final class PendingWebhook
             ),
             maxTries: $this->tries,
             eventType: $this->eventType,
-            encryptedSecret: $this->doNotSign || ! $this->secrets instanceof SecretSet
+            encryptedSecret: $this->doNotSign || $this->secretsResolver !== null || ! $this->secrets instanceof SecretSet
                 ? null
                 : EncryptedSecretResolver::seal($this->secrets),
             doNotSign: $this->doNotSign,
@@ -533,6 +557,7 @@ final class PendingWebhook
                 ? null
                 : Date::now()->getTimestamp() + $this->delaySeconds + $this->retryForSeconds,
             retryableProblemTypes: $this->retryableProblemTypes,
+            secretsResolver: $this->doNotSign ? null : $this->secretsResolver,
         );
     }
 

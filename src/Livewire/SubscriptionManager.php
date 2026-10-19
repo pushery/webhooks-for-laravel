@@ -55,7 +55,7 @@ use Pushery\Webhooks\Support\UiVariant;
  *   at the moment speed matters most. The old secret keeps verifying for the rotation
  *   window, so rotating does not take the integration down with it.
  * - **edit is the everyday one.** Without it, correcting a URL or an event selection means
- *   delete-and-recreate — which is not the same operation. The endpoint gets a NEW identity,
+ *   delete-and-recreate — which is not the same operation. The endpoint gets a new identity,
  *   and its delivery history, its health state and its active secret go with the old one.
  *
  * Not `final`, and deliberately so, for the same reason as {@see DeliveryLog}: a host subclasses
@@ -363,7 +363,7 @@ class SubscriptionManager extends Component
      * `wire:click="delete(1)"` into, and the button does nothing; re-publish the view, or change
      * that one line, to get it back there.
      *
-     * Deliberately NOT tagged `@deprecated`, and that is not an oversight. On PHP 8.4 the
+     * Deliberately not tagged `@deprecated`, and that is not an oversight. On PHP 8.4 the
      * code-style pass rewrites that tag into `#[\Deprecated]`, which raises E_USER_DEPRECATED
      * on every call — and a host that runs PHPUnit with `failOnDeprecation` would then have
      * this shim break the very tests it exists to keep working. A compatibility forwarder

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Date;
 use Pushery\Webhooks\Core\Signing\SignatureScheme;
 use Pushery\Webhooks\Server\Backoff\BackoffStrategy;
 use Pushery\Webhooks\Server\Jobs\CallWebhookJob;
+use Pushery\Webhooks\Server\Signing\ResolvesDeliverySecrets;
 
 /**
  * The immutable, queue-serializable context for one webhook delivery. Carries
@@ -30,7 +31,8 @@ use Pushery\Webhooks\Server\Jobs\CallWebhookJob;
  * the same URL under the same key, {@see self::$retryForSeconds} replaces the number of
  * tries with a time to keep trying, and {@see self::$retryUntil} is the moment that time
  * ends. {@see self::$retryableProblemTypes} names the problem types a 4xx answer is retried
- * for. A job queued by an earlier version carries none of these four, nor
+ * for, and {@see self::$secretsResolver} the class each attempt asks for its secrets in place
+ * of the sealed ones. A job queued by an earlier version carries none of these five, nor
  * {@see self::$streamWaits}: a readonly property the serialized job never had stays
  * uninitialized when it is unserialized, so they are read through the methods below, which
  * answer the defaults for such a job instead of throwing in the worker.
@@ -47,6 +49,8 @@ final readonly class WebhookDeliveryData
      * @param  ?int  $retryUntil  the Unix time that keeping-trying ends at, or null
      * @param  ?int  $streamWaits  how often the delivery has waited for an earlier one of its stream, null for never
      * @param  ?list<string>  $retryableProblemTypes  the problem types a 4xx answer is retried for, null for none
+     * @param  ?class-string<ResolvesDeliverySecrets>  $secretsResolver  the class each attempt asks for its secrets, or
+     *                                                                   null to sign with the sealed ones
      */
     public function __construct(
         public string $messageId,
@@ -69,6 +73,7 @@ final readonly class WebhookDeliveryData
         public ?int $retryUntil = null,
         public ?int $streamWaits = null,
         public ?array $retryableProblemTypes = null,
+        public ?string $secretsResolver = null,
     ) {}
 
     /**
@@ -125,6 +130,17 @@ final readonly class WebhookDeliveryData
     public function retryableProblemTypes(): array
     {
         return $this->retryableProblemTypes ?? [];
+    }
+
+    /**
+     * The class each attempt of this delivery asks for the secrets it signs with, or null where it signs with the
+     * secrets it was queued with.
+     *
+     * @return ?class-string<ResolvesDeliverySecrets>
+     */
+    public function secretsResolver(): ?string
+    {
+        return $this->secretsResolver ?? null;
     }
 
     /**
@@ -188,6 +204,7 @@ final readonly class WebhookDeliveryData
             retryUntil: $retryUntil,
             streamWaits: $streamWaits,
             retryableProblemTypes: $this->retryableProblemTypes(),
+            secretsResolver: $this->secretsResolver(),
         );
     }
 }

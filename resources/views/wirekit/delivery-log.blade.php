@@ -239,7 +239,7 @@
                                      are the pattern this follows. --}}
                                 <x-wirekit::alert-dialog :name="'redeliver-'.$delivery->id">
                                     <x-slot:trigger>
-                                        <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" :aria-label="__('webhooks::management.a11y.redeliver_delivery', ['label' => __('webhooks::management.deliveries.redeliver'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat('LLL')])">{{ __('webhooks::management.deliveries.redeliver') }}</x-wirekit::button>
+                                        <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" :aria-label="__('webhooks::management.a11y.redeliver_delivery', ['label' => __('webhooks::management.deliveries.redeliver'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat('LLL')])">{{ __('webhooks::management.deliveries.redeliver') }}</x-wirekit::button>
                                     </x-slot:trigger>
 
                                     <x-wirekit::alert-dialog.title>{{ __('webhooks::management.redeliver_dialog.title') }}</x-wirekit::alert-dialog.title>
@@ -256,7 +256,7 @@
                                  ability check applies to both, because it answers "may this
                                  reader act", not "is this action dangerous". --}}
                             @if ($canPing)
-                                <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" wire:click="ping({{ $delivery->subscription_id }})" wire:loading.attr="disabled" wire:target="ping" :aria-label="__('webhooks::management.a11y.ping_subscription', ['label' => __('webhooks::management.deliveries.ping'), 'url' => $delivery->subscription?->url ?? $delivery->subscription_id])">{{ __('webhooks::management.deliveries.ping') }}</x-wirekit::button>
+                                <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" wire:click="ping({{ $delivery->subscription_id }})" wire:loading.attr="disabled" wire:target="ping" :aria-label="__('webhooks::management.a11y.ping_subscription', ['label' => __('webhooks::management.deliveries.ping'), 'url' => $delivery->subscription?->url ?? $delivery->subscription_id])">{{ __('webhooks::management.deliveries.ping') }}</x-wirekit::button>
                             @endif
                         </x-wirekit::table.td>
                     </x-wirekit::table.row>
