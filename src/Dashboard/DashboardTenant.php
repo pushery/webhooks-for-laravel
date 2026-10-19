@@ -15,7 +15,7 @@ use Pushery\Webhooks\Support\TenantIdentity;
  * - **tenant** — a single tenant, matched on the whole owner morph pair.
  * - **global** — the owner-less rows only (`owner_type IS NULL AND owner_id IS NULL`): the
  *   endpoints an operator registers with a null owner, which no tenant scope can see. It is
- *   NOT "everything"; a tenant's private rows stay invisible.
+ *   not "everything"; a tenant's private rows stay invisible.
  * - **all tenants** — every row, owner-less and tenant-owned alike. This is the support /
  *   operator console view ("what did we send to this customer's endpoint?"), and seeing
  *   another tenant's data is a real permission level above seeing the global ones — so it

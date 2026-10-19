@@ -112,7 +112,7 @@
                                      may gray the replay buttons out. --}}
                                 <x-wirekit::button
                                     size="sm"
-                                    surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}"
+                                    surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
                                     wire:click="redeliver('{{ $delivery->id }}')"
                                     wire:loading.attr="disabled"
                                     wire:target="redeliver"

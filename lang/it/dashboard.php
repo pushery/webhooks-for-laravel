@@ -131,7 +131,7 @@ return [
         'delivered' => 'Consegnata',
         'payload' => 'Payload',
         'replay' => 'Reinvia consegna',
-        // Shown INSTEAD of the values when the payload ability denies the read. It has
+        // Shown instead of the values when the payload ability denies the read. It has
         // to say why: a panel that just stops after its heading reads as a defect.
         'payload_redacted' => 'I valori sono nascosti. Viene mostrata la struttura, così puoi verificare la forma del corpo senza leggere i dati che contiene.',
         'payload_offloaded' => 'Questo corpo era troppo grande per il log ed è stato spostato sul disco :disk. Quello che vedi qui è il frammento conservato dal log, non il corpo consegnato.',

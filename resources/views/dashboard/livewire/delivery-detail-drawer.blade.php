@@ -64,7 +64,7 @@
             <div x-ref="panel" tabindex="-1" class="relative flex h-full w-full max-w-md flex-col overflow-y-auto bg-[var(--color-wk-bg-elevated)] p-[var(--padding-wk-x-lg)] shadow-[var(--shadow-wk-lg)]">
                 <div class="mb-[var(--space-wk-sm)] flex items-start justify-between gap-[var(--padding-wk-x-md)]">
                     <x-wirekit::heading :level="2" size="md">{{ $delivery->event_type }}</x-wirekit::heading>
-                    <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" wire:click="close" :aria-label="__('webhooks::dashboard.a11y.close_details')">{{ __('webhooks::dashboard.drawer.close') }}</x-wirekit::button>
+                    <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" wire:click="close" :aria-label="__('webhooks::dashboard.a11y.close_details')">{{ __('webhooks::dashboard.drawer.close') }}</x-wirekit::button>
                 </div>
 
 @php($intent = $delivery->status->intent())

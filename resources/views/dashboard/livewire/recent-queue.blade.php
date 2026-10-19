@@ -6,7 +6,9 @@
         <x-wirekit::card.header>
             <x-wirekit::heading :level="2" size="sm">{{ __('webhooks::dashboard.recent.title') }}</x-wirekit::heading>
         </x-wirekit::card.header>
-        <x-wirekit::card.body class="@container">
+        {{-- Unpadded while the table shows: its cells carry their own padding, and the card's on top
+             of it set the table in from the card's edges. The empty state keeps the card's padding. --}}
+        <x-wirekit::card.body class="@container" :padded="$deliveries->isEmpty()">
             @if ($deliveries->isEmpty())
                 <x-wirekit::empty-state
                     icon="file-text"
@@ -66,7 +68,7 @@
                                              replay buttons out. --}}
                                         <x-wirekit::button
                                             size="sm"
-                                            surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}"
+                                            surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
                                             wire:click="redeliver('{{ $delivery->id }}')"
                                             wire:loading.attr="disabled"
                                             wire:target="redeliver"

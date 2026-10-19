@@ -74,7 +74,7 @@ return [
         //
         //   https_only             Refuse a plaintext http:// endpoint. An empty
         //                          WEBHOOKS_HTTPS_ONLY= counts as unset and keeps it on.
-        //   block_private_networks The guard itself. Set to false and NOTHING is
+        //   block_private_networks The guard itself. Set to false and nothing is
         //                          classified: private, loopback, link-local and
         //                          cloud-metadata (169.254.169.254) destinations all
         //                          become reachable, and no IP is pinned. Leave true.
@@ -711,7 +711,7 @@ return [
             //     // Both secrets verify at the same time, so the window has no gap in it:
             //     // every scheme walks the set and accepts the first that matches, current
             //     // first, so the normal case still costs one comparison. Closing the window
-            //     // is therefore a decision about the producer's timeline — and it IS
+            //     // is therefore a decision about the producer's timeline — and it is
             //     // observable: every verified delivery fires InboundWebhookVerified naming
             //     // the secret that matched, so the window closes on evidence rather than on
             //     // a guess. Listen for matchedKeyId === SecretSet::PREVIOUS.
@@ -734,12 +734,12 @@ return [
             //     // until its budget is gone. Pin 'kid' when the producer publishes more than two.
             //     'scheme' => \Pushery\Webhooks\Core\Signing\Ed25519Scheme::class,
             //     'jwks' => ['url' => env('STRIPE_JWKS_URL'), 'cache_ttl' => 3600, 'kid' => null],
-            //     // Authenticity that is NOT a signature over the bytes — a provider API
+            //     // Authenticity that is not a signature over the bytes — a provider API
             //     // callback (Mollie) or a cert chain (PayPal). A verifier is
             //     // container-resolved, takes precedence over 'scheme', and makes
             //     // 'secret' optional. See Pushery\Webhooks\Client\Verification\InboundVerifier.
             //     'verifier' => \App\Webhooks\MollieVerifier::class,
-            //     // Header names the producer uses. Applies to ANY header-overridable
+            //     // Header names the producer uses. Applies to any header-overridable
             //     // scheme, not just the two above — set 'signature' to bind e.g.
             //     // PlainHmacScheme to SendCloud's 'Sendcloud-Signature' from config alone.
             //     // A key you omit keeps the scheme's own default (GitHub's stays
@@ -1134,7 +1134,7 @@ return [
     | only 'auto' emits an inline script at all. If you keep 'auto' under a strict CSP, give
     | that script a nonce your policy allows — a static string in 'csp_nonce' below, or, for a
     | per-request nonce, register one from a service provider with
-    | UiTheme::resolveNonceUsing(fn () => Vite::cspNonce()). Do NOT put a closure in 'csp_nonce':
+    | UiTheme::resolveNonceUsing(fn () => Vite::cspNonce()). Do not put a closure in 'csp_nonce':
     | a closure in config makes `php artisan config:cache` throw.
     |
     | The Tailwind utilities these screens are built from are compiled by your app's
@@ -1173,28 +1173,17 @@ return [
         // not a closure here: a closure in config makes `php artisan config:cache` throw.
         'csp_nonce' => null,
 
-        // The WireKit surface every shipped screen draws its secondary actions with -- the two
-        // operator screens, the self-service panels and the dashboard alike. 'ghost' is what
-        // they have always used, so leaving this alone changes nothing.
+        // The WireKit surface the shipped screens draw their secondary actions with: the two
+        // operator screens, the self-service panels and the dashboard alike. 'outline' gives each
+        // such action a border, so it reads as a button beside the primary one. 'ghost' draws them
+        // without border or fill, the default before 3.20.0; beside a label with no icon, such a
+        // button reads as plain text. Any other surface WireKit knows works here as well.
         //
-        // It exists because a design system usually settles on one secondary style, and a
-        // borderless untinted button next to a tinted one reads as a third rank where there are
-        // two. Until this existed the only way to change it was to publish the view and carry the
-        // diff through every package update -- for a style choice.
-        //
-        // It covered only the two operator screens until 3.4.0, and the reason written down for
-        // that scope did not survive being checked. It read: the self-service views also use
-        // 'ghost', and several of those are icon-only controls in a table row, where a third rank
-        // is exactly right. All 21 of them were read, and not one is icon-only -- every single one
-        // renders a text label. So the premise that kept the self-service screens out did not
-        // describe them. A tenant on the portal saw a row of borderless text beside a solid green
-        // toggle, which is what a consuming application reported.
-        //
-        // One button stays hardwired, and it is not a secondary action: the active/inactive toggle
-        // in the endpoint list draws 'ghost' as the off half of a two-state control. That ghost is
-        // a state rather than a rank, and moving it with this key would make "disabled" look like
-        // every other button on the row.
-        'secondary_surface' => 'ghost',
+        // One button is not read from here, because it is not a secondary action: the
+        // active/inactive toggle in the endpoint list draws 'ghost' as the off half of a two-state
+        // control. That ghost is a state rather than a rank, and following this key would make
+        // "disabled" look like every other button on the row.
+        'secondary_surface' => 'outline',
 
         // The heading level of each full-page screen's title: the dashboard, the portal, the
         // health board and the transform editor. 1 by default, because on a page of its own the

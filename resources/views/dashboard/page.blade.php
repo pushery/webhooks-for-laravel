@@ -24,7 +24,7 @@
                          what a form would submit. --}}
                     name="window"
                     size="sm"
-                    :label="__('webhooks::dashboard.a11y.time_window')"
+                    :aria-label="__('webhooks::dashboard.a11y.time_window')"
                     :options="array_combine($windows, $windows)"
                     :value="$window"
                     wire:model.live="window"

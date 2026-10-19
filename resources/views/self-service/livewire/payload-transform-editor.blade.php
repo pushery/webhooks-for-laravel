@@ -15,7 +15,7 @@
                 {{-- Absent when this editor is embedded without the portal's own routes: there is
                      no endpoint page of ours to go back to. --}}
                 @if ($portalUrl !== null)
-                    <x-wirekit::button :href="$portalUrl" wire:navigate size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" intent="neutral">
+                    <x-wirekit::button :href="$portalUrl" wire:navigate size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" intent="neutral">
                         {{ __('webhooks::self-service.actions.back_to_endpoints') }}
                     </x-wirekit::button>
                 @endif
@@ -48,7 +48,7 @@
                          shows the empty "inherit" entry for an endpoint that is pinned.
 
                          That is the version which introduced the behavior, and nothing more.
-                         The declared floor is 2.67.0, enforced through composer.json's
+                         The declared floor is 2.68.0, enforced through composer.json's
                          `conflict`, and it sits higher for reasons that have nothing to do
                          with this control — the seven shipped locales, the overlay geometry
                          that keeps a destructive confirmation clickable without the host's
@@ -87,7 +87,7 @@
                                     <x-wirekit::button
                                         type="button"
                                         size="sm"
-                                        surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}"
+                                        surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
                                         intent="danger"
                                         wire:click="removeIncludeField({{ $i }})"
                                         :aria-label="__('webhooks::self-service.a11y.remove_include_field', ['number' => $i + 1])"
@@ -95,7 +95,7 @@
                                 </div>
                             @endforeach
                             <div>
-                                <x-wirekit::button type="button" size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" wire:click="addIncludeField">{{ __('webhooks::self-service.transform.add_include') }}</x-wirekit::button>
+                                <x-wirekit::button type="button" size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" wire:click="addIncludeField">{{ __('webhooks::self-service.transform.add_include') }}</x-wirekit::button>
                             </div>
                         </x-wirekit::stack>
                     </x-wirekit::field>
@@ -118,7 +118,7 @@
                                     <x-wirekit::button
                                         type="button"
                                         size="sm"
-                                        surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}"
+                                        surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
                                         intent="danger"
                                         wire:click="removeExcludeField({{ $i }})"
                                         :aria-label="__('webhooks::self-service.a11y.remove_exclude_field', ['number' => $i + 1])"
@@ -126,7 +126,7 @@
                                 </div>
                             @endforeach
                             <div>
-                                <x-wirekit::button type="button" size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" wire:click="addExcludeField">{{ __('webhooks::self-service.transform.add_exclude') }}</x-wirekit::button>
+                                <x-wirekit::button type="button" size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" wire:click="addExcludeField">{{ __('webhooks::self-service.transform.add_exclude') }}</x-wirekit::button>
                             </div>
                         </x-wirekit::stack>
                     </x-wirekit::field>
@@ -158,7 +158,7 @@
                                     <x-wirekit::button
                                         type="button"
                                         size="sm"
-                                        surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}"
+                                        surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
                                         intent="danger"
                                         wire:click="removeRenamePair({{ $i }})"
                                         :aria-label="__('webhooks::self-service.a11y.remove_rename_pair', ['number' => $i + 1])"
@@ -166,7 +166,7 @@
                                 </div>
                             @endforeach
                             <div>
-                                <x-wirekit::button type="button" size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" wire:click="addRenamePair">{{ __('webhooks::self-service.transform.add_rename') }}</x-wirekit::button>
+                                <x-wirekit::button type="button" size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" wire:click="addRenamePair">{{ __('webhooks::self-service.transform.add_rename') }}</x-wirekit::button>
                             </div>
                         </x-wirekit::stack>
                     </x-wirekit::field>
@@ -199,7 +199,7 @@
                         :label="__('webhooks::self-service.transform.sample_label')"
                         :hint="__('webhooks::self-service.transform.sample_hint')"
                         wire:model.live.debounce.400ms="sampleJson"
-                        rows="8"
+                        :rows="$this->sampleRows()"
                         :error="$this->sampleError()"
                     />
 

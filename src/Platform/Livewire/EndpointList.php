@@ -190,7 +190,7 @@ final class EndpointList extends Component
      * `wire:click="delete(1)"` into, and the button does nothing; re-publish the view, or change
      * that one line, to get it back there.
      *
-     * Deliberately NOT tagged `@deprecated`, and that is not an oversight. On PHP 8.4 the
+     * Deliberately not tagged `@deprecated`, and that is not an oversight. On PHP 8.4 the
      * code-style pass rewrites that tag into `#[\Deprecated]`, which raises E_USER_DEPRECATED
      * on every call — and a host that runs PHPUnit with `failOnDeprecation` would then have
      * this shim break the very tests it exists to keep working. A compatibility forwarder

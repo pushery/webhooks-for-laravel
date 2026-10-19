@@ -33,7 +33,7 @@ use Pushery\Webhooks\Support\UiVariant;
  * The tenant's own delivery log: what was sent to their endpoints, when, and what came
  * back. Newest first, paginated, optionally narrowed to one endpoint.
  *
- * Deliberately NOT lazy, unlike its sibling panels. It shares a page with the endpoint list,
+ * Deliberately not lazy, unlike its sibling panels. It shares a page with the endpoint list,
  * whose delete confirmation is an alert-dialog Alpine teleports to the body — and a lazy
  * mount is a Livewire round trip that lands whenever the reader happens to scroll. Landing
  * it while that dialog is open tears the teleport down and the dialog disappears mid-decision.

@@ -7,7 +7,7 @@ declare(strict_types=1);
 // not of a surface — a host that disagrees with one of them publishes this file and changes it
 // once, for everything.
 //
-// Date patterns are per-language as well and are NOT here. Each surface carries its own under
+// Date patterns are per-language as well and are not here. Each surface carries its own under
 // its own `formats` KEY — the dashboard's are in dashboard.php — because which pattern a column
 // wants depends on the column. The two names collide, so: this file is the numbers.
 //

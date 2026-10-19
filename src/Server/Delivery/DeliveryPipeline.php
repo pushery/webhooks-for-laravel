@@ -13,7 +13,9 @@ use Pushery\Webhooks\Core\Signing\SignatureScheme;
 use Pushery\Webhooks\Core\Signing\WebhookMessage;
 use Pushery\Webhooks\Core\Ssrf\SsrfGuard;
 use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
+use Pushery\Webhooks\Server\Exceptions\UnknownSecretsResolver;
 use Pushery\Webhooks\Server\Exceptions\UnknownSignatureScheme;
+use Pushery\Webhooks\Server\Signing\ResolvesDeliverySecrets;
 use Pushery\Webhooks\Server\Signing\SecretResolver;
 use Throwable;
 
@@ -112,7 +114,7 @@ final readonly class DeliveryPipeline
             return $data->headers;
         }
 
-        $secrets = $this->secrets->resolveFor($data);
+        $secrets = $this->secretsFor($data);
 
         if (! $secrets instanceof SecretSet) {
             return $data->headers;
@@ -127,5 +129,26 @@ final readonly class DeliveryPipeline
         $signature = $scheme->sign(WebhookMessage::for($data->rawBody, $data->messageId), $secrets);
 
         return array_merge($data->headers, $signature->toArray());
+    }
+
+    /**
+     * The secrets this attempt signs with: those the delivery's resolver names now, where it was dispatched with one,
+     * otherwise the ones it was queued with.
+     */
+    private function secretsFor(WebhookDeliveryData $data): ?SecretSet
+    {
+        $class = $data->secretsResolver();
+
+        if ($class === null) {
+            return $this->secrets->resolveFor($data);
+        }
+
+        $resolver = $this->container->make($class);
+
+        if (! $resolver instanceof ResolvesDeliverySecrets) {
+            throw UnknownSecretsResolver::for($class);
+        }
+
+        return $resolver->secretsFor($data);
     }
 }

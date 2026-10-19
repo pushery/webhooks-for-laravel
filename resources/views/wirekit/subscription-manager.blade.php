@@ -97,7 +97,7 @@
                             {{ $editingId === null ? __('webhooks::management.form.submit') : __('webhooks::management.form.submit_update') }}
                         </x-wirekit::button>
                         @if ($editingId !== null)
-                            <x-wirekit::button type="button" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" wire:click="cancel">
+                            <x-wirekit::button type="button" surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" wire:click="cancel">
                                 {{ __('webhooks::management.actions.cancel') }}
                             </x-wirekit::button>
                         @endif
@@ -237,7 +237,7 @@
                                 @if ($canEdit)
                                 <x-wirekit::button
                                     size="sm"
-                                    surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}"
+                                    surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
                                     wire:click="edit({{ $subscription->id }})"
                                     :aria-label="__('webhooks::management.a11y.edit_subscription', ['url' => $subscription->url])"
                                 >
@@ -266,7 +266,7 @@
                                         ? ($rowActionIcons['disable'] ?? null)
                                         : ($rowActionIcons['enable'] ?? null);
                                 @endphp
-                                <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}" wire:click="toggle({{ $subscription->id }})" wire:loading.attr="disabled" wire:target="toggle" :aria-label="__('webhooks::management.a11y.toggle_subscription', ['label' => $toggleLabel, 'url' => $subscription->url])">
+                                <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" wire:click="toggle({{ $subscription->id }})" wire:loading.attr="disabled" wire:target="toggle" :aria-label="__('webhooks::management.a11y.toggle_subscription', ['label' => $toggleLabel, 'url' => $subscription->url])">
                                     @if ($toggleIcon !== null)
                                         <x-slot:iconLeft><x-wirekit::icon :name="$toggleIcon" size="sm" /></x-slot:iconLeft>
                                     @endif
@@ -283,7 +283,7 @@
                                     <x-slot:trigger>
                                         <x-wirekit::button
                                             size="sm"
-                                            surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}"
+                                            surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
                                             :aria-label="__('webhooks::management.a11y.rotate_subscription', ['label' => __('webhooks::management.subscription.rotate'), 'url' => $subscription->url])"
                                         >
                                             @if (($rowActionIcons['rotate_secret'] ?? null) !== null)
@@ -338,7 +338,7 @@
                                     <x-slot:trigger>
                                         <x-wirekit::button
                                             size="sm"
-                                            surface="{{ config('webhooks.ui.secondary_surface', 'ghost') }}"
+                                            surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
                                             intent="danger"
                                             :aria-label="__('webhooks::management.a11y.delete_subscription', ['url' => $subscription->url])"
                                         >
