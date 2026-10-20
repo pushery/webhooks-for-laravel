@@ -17,6 +17,8 @@ use Pushery\Webhooks\Client\Events\UnreadableWebhookPayload;
 use Pushery\Webhooks\Client\Exceptions\InboundListenerFailed;
 use Pushery\Webhooks\Client\Http\RawBody;
 use Pushery\Webhooks\Client\Models\WebhookCall;
+use Pushery\Webhooks\Client\Tenancy\InboundTenant;
+use Pushery\Webhooks\Client\Tenancy\InboundTenantResolver;
 use Pushery\Webhooks\Client\Verification\InboundVerifier;
 use Pushery\Webhooks\Core\Http\HeaderRedactor;
 use Pushery\Webhooks\Core\Payload\PayloadSanitizer;
@@ -94,9 +96,16 @@ final readonly class WebhookProcessor
         // an installation that has not opted into a distinguishable answer sees no change.
         $keyLookupFailed = false;
 
+        // A config with a tenant resolver verifies each delivery with the secrets of the tenant the request names,
+        // looked up the way a JWKS document is: a step that can fail, and is refused like one when it does.
+        $tenants = null;
+        $tenant = null;
+
         if (! $verifier instanceof InboundVerifier) {
             try {
-                $secrets = $this->config->secrets();
+                $tenants = $this->config->tenantResolver();
+                $tenant = $tenants?->resolve($this->request, $this->config);
+                $secrets = $tenants instanceof InboundTenantResolver ? $tenant?->secrets() : $this->config->secrets();
             } catch (Throwable $keyLookupFailure) {
                 $keyLookupFailed = true;
 
@@ -116,6 +125,8 @@ final readonly class WebhookProcessor
         $result = match (true) {
             $verifier instanceof InboundVerifier => $this->verifiedBy($verifier),
             $keyLookupFailed => VerificationResult::undetermined(),
+            // A request that names no tenant this installation knows has no secret it could have been signed with.
+            $tenants instanceof InboundTenantResolver && ! $tenant instanceof InboundTenant => VerificationResult::invalid(),
             default => $this->config->scheme()->verify(
                 $rawBody,
                 $headers,
@@ -189,7 +200,7 @@ final readonly class WebhookProcessor
         // of one already counted — see countAgainstRateLimit().
         $this->refuseWhenRateLimited();
 
-        $webhookId = $this->config->webhookId($headers, $rawBody);
+        $webhookId = $this->config->webhookId($headers, $rawBody, $tenant?->key);
         $fastPathDedupe = $webhookId !== null && $this->config->usesFastPathDedupe();
 
         // Fast-path dedupe: a repeated delivery whose id was already stored and queued
@@ -239,7 +250,7 @@ final readonly class WebhookProcessor
             );
         }
 
-        $call = $this->store($rawBody, $webhookId, $message);
+        $call = $this->store($rawBody, $webhookId, $message, $tenant?->key);
 
         // Authoritative dedupe: the partial-unique insert returned nothing, so a concurrent
         // request already stored this id. Arm the fast path for the next retry and do not
@@ -420,7 +431,7 @@ final readonly class WebhookProcessor
      * covered by the index, so such a row always inserts. Returns null when a row
      * with the same (source, webhook_id) already exists.
      */
-    private function store(string $rawBody, ?string $webhookId, InboundMessage $message): ?WebhookCall
+    private function store(string $rawBody, ?string $webhookId, InboundMessage $message, ?string $tenant): ?WebhookCall
     {
         $id = (string) Str::uuid7();
         $headersJson = $this->redactedHeadersJson();
@@ -440,7 +451,7 @@ final readonly class WebhookProcessor
 
         $dialect = WebhookConnection::dialect();
         $sql = DedupeInsert::webhookCalls($dialect);
-        $bindings = [$id, $this->config->name, $webhookId, $message->type, $payloadJson, $storedBody, $disk, $path, hash('sha256', $rawBody), $headersJson];
+        $bindings = [$id, $this->config->name, $tenant, $webhookId, $message->type, $payloadJson, $storedBody, $disk, $path, hash('sha256', $rawBody), $headersJson];
 
         // PostgreSQL returns the inserted id (null on a duplicate); MySQL reports the outcome
         // through the affected-row count (1 inserted, 0 duplicate) and binds its timestamps from

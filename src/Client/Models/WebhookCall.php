@@ -29,6 +29,7 @@ use Pushery\Webhooks\Database\Factories\WebhookCallFactory;
  *
  * @property string $id
  * @property string $source
+ * @property string|null $tenant
  * @property string|null $webhook_id
  * @property string|null $event_type
  * @property array<array-key, mixed> $payload

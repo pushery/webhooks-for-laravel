@@ -6,6 +6,24 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.21.0] - 2026-10-20
+
+### ✨ Added
+
+- **One route can receive for many tenants.** A config's `tenant_resolver` names an `InboundTenantResolver`, which is asked with the request before the signature is checked and returns the `InboundTenant` the request is addressed to, with its current and previous secret; the scheme verifies with those. A request that names no known tenant is refused like a failed signature, and a resolver that throws like a verification that could not complete, with `undetermined_status` where one is set. The tenant is stored in a new nullable `tenant` column of `webhook_calls` and leads the dedupe key, so the same delivery id sent to two tenants is two deliveries. A config with a resolver needs no secret of its own, and it refuses a `verifier` or a `jwks` url beside the resolver, since each of those decides the key material itself. A host that publishes the client migrations rather than loading them copies `0001_01_01_000006_add_tenant_to_webhook_calls.php` from the package's `database/migrations/client/`.
+
+- **A dispatch can carry the id the host already keeps for the event.** `dispatch()`, `dispatchTo()` and `WebhookEvent::dispatch()` take `eventId`, which becomes the envelope's `id`, the `webhook-id` header and the delivery log's `event_id` for every endpoint of the fan-out and for a redelivery, so a receiver can match a webhook to the host's own record of the event. The id has to be a UUID and is stored in lower case. A UUIDv7 more than a minute ahead of the clock, and an id one of the endpoints has already received, are refused with an `InvalidArgumentException`.
+
+- **An endpoint's events can be read back as a feed.** `Webhooks::feed($subscription, $after, $limit)` reads the events one endpoint was sent out of the delivery log, a page at a time, for a receiver that missed a delivery and catches up. Each event has the envelope of its delivery with the same `id`, an event appears once however often it was redelivered, test pings are left out, and a delivery becomes readable a minute after it was logged. The page carries the events under `data` and `next_cursor` and `has_more` under `meta`. A cursor past the newest event returns an empty page; one from before the delivery log's retention window throws `FeedCursorExpired`, and one the feed did not hand out throws `InvalidFeedCursor`. The feed is served from a route of the application's own, which decides who may read which endpoint.
+
+### 🔧 Changed
+
+- **The shipped screens need `pushery/wirekit` 2.69.0 or newer.** `conflict` refuses an older WireKit. 2.69.0 is the release this package's suite develops against, and no run proves an older one.
+
+  **Upgrade:** a host that renders the shipped screens updates `pushery/wirekit` to 2.69 or newer. A host without WireKit is not affected.
+
+- **On a phone the endpoint list of the self-service portal is laid out by WireKit's stacked table rows.** Below `sm` each endpoint still stands as a card, now through the table's `stack-below` instead of classes of the portal's own: each value names its column the way every stacked WireKit table does, and the row actions stand at the foot of the card. A host that published the self-service views keeps its own copy.
+
 ## [3.20.0] - 2026-10-19
 
 ### ✨ Added
@@ -3482,7 +3500,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.20.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.21.0...HEAD
+[3.21.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.20.0...v3.21.0
 [3.20.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.19.0...v3.20.0
 [3.19.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.18.0...v3.19.0
 [3.18.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.17.0...v3.18.0

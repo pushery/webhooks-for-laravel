@@ -30,14 +30,14 @@ final class DedupeInsert
     {
         return match ($dialect) {
             Dialect::Pgsql => <<<'SQL'
-                INSERT INTO webhook_calls (id, source, webhook_id, event_type, payload, raw_body, payload_disk, payload_path, body_sha256, headers, status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?::jsonb, 'received', now(), now())
+                INSERT INTO webhook_calls (id, source, tenant, webhook_id, event_type, payload, raw_body, payload_disk, payload_path, body_sha256, headers, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?::jsonb, 'received', now(), now())
                 ON CONFLICT (source, webhook_id) WHERE webhook_id IS NOT NULL DO NOTHING
                 RETURNING id
                 SQL,
             Dialect::MySql => <<<'SQL'
-                INSERT INTO webhook_calls (id, source, webhook_id, event_type, payload, raw_body, payload_disk, payload_path, body_sha256, headers, status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, CAST(? AS JSON), ?, ?, ?, ?, CAST(? AS JSON), 'received', ?, ?)
+                INSERT INTO webhook_calls (id, source, tenant, webhook_id, event_type, payload, raw_body, payload_disk, payload_path, body_sha256, headers, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, CAST(? AS JSON), ?, ?, ?, ?, CAST(? AS JSON), 'received', ?, ?)
                 ON DUPLICATE KEY UPDATE id = id
                 SQL,
         };

@@ -173,6 +173,17 @@ and `redeliver()` (a replay of an existing delivery). An inactive endpoint, or o
 not subscribed to that type, raises `SubscriptionNotListening` rather than
 receiving it or being skipped in silence.
 
+**Keep the id the event already has.** When the application keeps its own id for
+the event (an outbox row, a domain event), pass it as `eventId` to `dispatch()`
+or `dispatchTo()`. It becomes the envelope's `id`, the `webhook-id` header and the
+delivery log's `event_id`, so a receiver can match a webhook to that record. It
+must be a UUID; a UUIDv7 more than a minute ahead of the clock, or an id an
+endpoint has already received, raises `InvalidArgumentException`.
+
+```php
+Webhooks::dispatch('invoice.paid', $payload, $team, eventId: $event->id);
+```
+
 **Receive and verify one.** Switch the Client layer on and describe the producer:
 
 ```php
