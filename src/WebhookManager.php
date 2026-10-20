@@ -30,6 +30,8 @@ use Pushery\Webhooks\Events\WebhookEndpointDisabled;
 use Pushery\Webhooks\Events\WebhookEndpointEnabled;
 use Pushery\Webhooks\Events\WebhookEndpointRegistered;
 use Pushery\Webhooks\Events\WebhookSecretRotated;
+use Pushery\Webhooks\Exceptions\FeedCursorExpired;
+use Pushery\Webhooks\Exceptions\InvalidFeedCursor;
 use Pushery\Webhooks\Exceptions\InvalidPayloadException;
 use Pushery\Webhooks\Exceptions\SubscriptionNotListening;
 use Pushery\Webhooks\Exceptions\TestPingThrottled;
@@ -38,6 +40,8 @@ use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Platform\AsyncApi\AsyncApiGenerator;
 use Pushery\Webhooks\Platform\Erasure\EventEraser;
 use Pushery\Webhooks\Platform\Erasure\ForgottenEvents;
+use Pushery\Webhooks\Platform\Feed\EventFeed;
+use Pushery\Webhooks\Platform\Feed\EventFeedPage;
 use Pushery\Webhooks\Platform\Support\EventTypeAbilities;
 use Pushery\Webhooks\Platform\Transform\PayloadTransformer;
 use Pushery\Webhooks\Platform\Transform\PayloadVersionRegistry;
@@ -366,12 +370,18 @@ final readonly class WebhookManager
      * validation is enabled, the payload is checked against the event type's
      * catalog schema first, so a malformed event is rejected before any delivery.
      *
+     * The event id is minted here, unless the host already has one for this event and passes
+     * it as `$eventId`. It then names the event everywhere the minted one would: the
+     * envelope's `id`, the `webhook-id` header and `event_id` in the delivery log, for every
+     * endpoint of the fan-out and for a redelivery. See eventIdFor() for what it has to be.
+     *
      * @param  array<array-key, mixed>  $payload
      * @return Collection<int, WebhookDelivery>
      *
      * @throws InvalidPayloadException
+     * @throws InvalidArgumentException when `$eventId` is not one this dispatch can carry
      */
-    public function dispatch(string $eventType, array $payload, ?Model $tenant = null): Collection
+    public function dispatch(string $eventType, array $payload, ?Model $tenant = null, ?string $eventId = null): Collection
     {
         $this->payloadValidator->validate($eventType, $payload);
 
@@ -381,14 +391,14 @@ final readonly class WebhookManager
         // identical — so a redelivery reproduces exactly what the endpoint first saw.
         $payload = PayloadSanitizer::scrub($payload);
 
-        $eventId = (string) Str::uuid7();
-
         $subscriptions = WebhookSubscription::model()::query()
             ->active()
             ->listeningFor($eventType)
             ->forTenant($tenant)
             ->get()
             ->values();
+
+        $eventId = $this->eventIdFor($eventId, $subscriptions);
 
         $faked = $this->recordedInstead($subscriptions, $eventType, $eventId, $payload);
 
@@ -444,8 +454,9 @@ final readonly class WebhookManager
      *
      * @throws InvalidPayloadException when the payload fails its catalog schema
      * @throws SubscriptionNotListening when the endpoint is inactive, or not subscribed
+     * @throws InvalidArgumentException when `$eventId` is not one this dispatch can carry
      */
-    public function dispatchTo(WebhookSubscription $subscription, string $eventType, array $payload): WebhookDelivery
+    public function dispatchTo(WebhookSubscription $subscription, string $eventType, array $payload, ?string $eventId = null): WebhookDelivery
     {
         $this->payloadValidator->validate($eventType, $payload);
 
@@ -480,7 +491,7 @@ final readonly class WebhookManager
         }
 
         $payload = PayloadSanitizer::scrub($payload);
-        $eventId = (string) Str::uuid7();
+        $eventId = $this->eventIdFor($eventId, new Collection([$subscription]));
 
         $faked = $this->recordedInstead(new Collection([$subscription]), $eventType, $eventId, $payload);
 
@@ -496,6 +507,66 @@ final readonly class WebhookManager
             null,
             $this->rateLimitDelayFor($subscription),
         );
+    }
+
+    /**
+     * The event id a dispatch carries: the host's own, checked, or a fresh UUIDv7.
+     *
+     * A host that already keeps an id for the event passes it, so a receiver that reads the
+     * host's own records and its webhooks can match the two. The id is stored in a UUID column
+     * on both engines, so it has to be a UUID, and it is written in lower case, the form the
+     * case-sensitive MySQL column and forgetEvents() compare.
+     *
+     * A time-ordered id may lie ahead of this clock by no more than the margin forgetEvents()
+     * allows: that method bounds its read by the moment such an id carries, and a row written
+     * before that moment would fall outside the bound and survive an erasure. An id older than
+     * the dispatch is fine, since the rows it names are written later. And an id one of these
+     * endpoints has already received is refused, because a second delivery under the same id is
+     * the duplicate a receiver drops.
+     *
+     * @param  Collection<int, WebhookSubscription>  $subscriptions
+     *
+     * @throws InvalidArgumentException
+     */
+    private function eventIdFor(?string $eventId, Collection $subscriptions): string
+    {
+        if ($eventId === null) {
+            return (string) Str::uuid7();
+        }
+
+        $id = strtolower($eventId);
+
+        if (preg_match('/\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/', $id) !== 1) {
+            throw new InvalidArgumentException(sprintf("An event id passed to a dispatch must be a UUID, got '%s'.", $eventId));
+        }
+
+        if ($id[14] === '7') {
+            $minted = intdiv((int) hexdec(substr(str_replace('-', '', $id), 0, 12)), 1000);
+
+            if ($minted > Date::now()->getTimestamp() + EventEraser::CLOCK_MARGIN_SECONDS) {
+                throw new InvalidArgumentException(sprintf(
+                    "The event id '%s' is a UUIDv7 minted at %s, ahead of this clock by more than %d seconds.",
+                    $id,
+                    gmdate('Y-m-d\TH:i:s\Z', $minted),
+                    EventEraser::CLOCK_MARGIN_SECONDS,
+                ));
+            }
+        }
+
+        $delivered = $subscriptions->isNotEmpty() && WebhookDelivery::model()::query()
+            ->withoutGlobalScopes()
+            ->whereIn('subscription_id', $subscriptions->modelKeys())
+            ->where('event_id', $id)
+            ->exists();
+
+        if ($delivered) {
+            throw new InvalidArgumentException(sprintf(
+                "The event id '%s' was already delivered to one of the endpoints of this dispatch, and a second delivery under it is a duplicate its receiver drops.",
+                $id,
+            ));
+        }
+
+        return $id;
     }
 
     /**
@@ -668,6 +739,30 @@ final readonly class WebhookManager
         }
 
         return $this->deliver($subscription, $delivery->event_type, $delivery->event_id, $payload);
+    }
+
+    /**
+     * The events one endpoint was sent, a page at a time, for a receiver that missed a delivery and
+     * catches up.
+     *
+     * Each event has the envelope the endpoint receives, with the same `id`, and its data reshaped by
+     * the endpoint's transform as it stands now, the way a redelivery reshapes it. An event appears
+     * once however often it was redelivered, a test ping not at all, and a delivery a minute after it
+     * was logged. Read from the start without `$after`, then pass each page's `nextCursor`. A cursor
+     * past the newest event returns an empty page, and the feed reaches back as far as the delivery
+     * log keeps its rows (`webhooks.platform.retention_months`).
+     *
+     * Serve it from a route of your own, where you decide who may read which endpoint: hand it only
+     * an endpoint the caller owns.
+     *
+     * @throws InvalidFeedCursor when `$after` is not a cursor the feed handed out
+     * @throws FeedCursorExpired when `$after` points before the delivery log's retention window
+     * @throws InvalidArgumentException when `$limit` is outside 1 to 1000
+     */
+    public function feed(WebhookSubscription $subscription, ?string $after = null, int $limit = 100): EventFeedPage
+    {
+        return new EventFeed($this->config->retentionMonths())
+            ->page($subscription, $after, $limit, fn (array $data): array => $this->transformFor($subscription, $data));
     }
 
     /**

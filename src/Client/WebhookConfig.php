@@ -15,6 +15,7 @@ use Pushery\Webhooks\Client\Profiles\ProcessEverythingWebhookProfile;
 use Pushery\Webhooks\Client\Profiles\WebhookProfile;
 use Pushery\Webhooks\Client\Responses\DefaultRespondsTo;
 use Pushery\Webhooks\Client\Responses\RespondsToWebhook;
+use Pushery\Webhooks\Client\Tenancy\InboundTenantResolver;
 use Pushery\Webhooks\Client\Verification\InboundVerifier;
 use Pushery\Webhooks\Core\Signing\AcceptsSignatureHeaders;
 use Pushery\Webhooks\Core\Signing\Ed25519Scheme;
@@ -136,6 +137,7 @@ final class WebhookConfig
         private readonly array $largePayload,
         private readonly ?array $rateLimit,
         private readonly ?SignatureEncoding $signatureEncoding = null,
+        private readonly ?string $tenantResolverClass = null,
     ) {}
 
     /**
@@ -400,7 +402,8 @@ final class WebhookConfig
      */
     private function shortestKeyBytes(): ?int
     {
-        if ($this->verifierClass !== null) {
+        // A tenant resolver's secrets live with the tenants, where nothing here can measure them.
+        if ($this->verifierClass !== null || $this->tenantResolverClass !== null) {
             return null;
         }
 
@@ -564,6 +567,23 @@ final class WebhookConfig
             : throw new InvalidArgumentException("The verifier for webhook client config [{$this->name}] did not resolve to an InboundVerifier.");
     }
 
+    /**
+     * The resolver that names the tenant of a request and the secrets signing for it, or null when the config verifies
+     * with its own secret.
+     */
+    public function tenantResolver(): ?InboundTenantResolver
+    {
+        if ($this->tenantResolverClass === null) {
+            return null;
+        }
+
+        $resolver = app()->make($this->tenantResolverClass);
+
+        return $resolver instanceof InboundTenantResolver
+            ? $resolver
+            : throw new InvalidArgumentException("The tenant resolver for webhook client config [{$this->name}] did not resolve to an InboundTenantResolver.");
+    }
+
     public function tolerance(): int
     {
         return $this->tolerance;
@@ -628,10 +648,20 @@ final class WebhookConfig
      * The body forms exist because real providers (Stripe, Mollie, SendCloud) carry no
      * delivery-id header, so a header-only key stays null — and a null never collides with
      * the partial-unique index, so dedupe silently does nothing for exactly those producers.
+     *
+     * A delivery addressed to a tenant keys on `<tenant>:<id>`, so the same id sent to two tenants of one config is
+     * two deliveries. The unique index stays on (source, webhook_id), which is why the tenant goes into the key
+     * rather than beside it.
      */
-    public function webhookId(SignatureHeaders $headers, string $rawBody = ''): ?string
+    public function webhookId(SignatureHeaders $headers, string $rawBody = '', ?string $tenant = null): ?string
     {
-        return $this->boundedWebhookId($this->resolvedWebhookId($headers, $rawBody));
+        $resolved = $this->resolvedWebhookId($headers, $rawBody);
+
+        if ($tenant !== null && $resolved !== null) {
+            $resolved = $tenant.':'.$resolved;
+        }
+
+        return $this->boundedWebhookId($resolved);
     }
 
     /**
@@ -883,6 +913,7 @@ final class WebhookConfig
     {
         $jwks = self::resolveJwks($name, $entry['jwks'] ?? null);
         $verifier = self::resolveVerifier($name, $entry['verifier'] ?? null);
+        $tenants = self::resolveTenantResolver($name, $entry['tenant_resolver'] ?? null, $jwks !== null, $verifier !== null);
 
         $secret = $entry['secret'] ?? null;
 
@@ -904,7 +935,8 @@ final class WebhookConfig
         // The value is not trimmed, only the emptiness question. A secret with meaningful
         // surrounding whitespace is unlikely, and silently rewriting somebody's credential is a
         // worse habit than refusing an unusable one.
-        if ($jwks === null && $verifier === null && (! is_string($secret) || trim($secret) === '')) {
+        // A tenant resolver supplies each tenant's secret from the request, so it needs none here either.
+        if ($jwks === null && $verifier === null && $tenants === null && (! is_string($secret) || trim($secret) === '')) {
             throw WebhookConfigCannotVerify::for($name, self::intOr($entry['invalid_status'] ?? null, 401));
         }
 
@@ -920,7 +952,7 @@ final class WebhookConfig
         // already published, so this config would verify every forged delivery while looking
         // exactly like a configured one. Refused here, where preflight can see it, rather than at
         // the first forged request, where nothing would say anything at all.
-        if ($jwks === null && $verifier === null && is_string($secret)
+        if ($jwks === null && $verifier === null && $tenants === null && is_string($secret)
             && is_a($scheme, StandardWebhooksScheme::class, true)
             && ! StandardWebhooksScheme::derivesUsableKey($secret)) {
             throw WebhookConfigCannotVerify::derivesNoKey($name, self::intOr($entry['invalid_status'] ?? null, 401));
@@ -973,6 +1005,7 @@ final class WebhookConfig
             largePayload: self::resolveLargePayload($entry['large_payload'] ?? null),
             rateLimit: self::resolveRateLimit($entry['rate_limit'] ?? null),
             signatureEncoding: self::resolveSignatureEncoding($name, $entry['signature_encoding'] ?? null, $scheme),
+            tenantResolverClass: $tenants,
         );
     }
 
@@ -1084,6 +1117,31 @@ final class WebhookConfig
         }
 
         throw new InvalidArgumentException("The webhook client config [{$name}] has an invalid 'verifier'; expected an InboundVerifier class-string.");
+    }
+
+    /**
+     * The tenant resolver class, or null when the config has none.
+     *
+     * Refused beside a 'jwks' url and beside a 'verifier': both decide the key material themselves, and a resolver
+     * that also named one would leave which of the two signs for a delivery to the order of a match arm.
+     *
+     * @return class-string<InboundTenantResolver>|null
+     */
+    private static function resolveTenantResolver(string $name, mixed $resolver, bool $hasJwks, bool $hasVerifier): ?string
+    {
+        if ($resolver === null) {
+            return null;
+        }
+
+        if (! is_string($resolver) || ! is_a($resolver, InboundTenantResolver::class, true)) {
+            throw new InvalidArgumentException("The webhook client config [{$name}] has an invalid 'tenant_resolver'; expected an InboundTenantResolver class-string.");
+        }
+
+        if ($hasJwks || $hasVerifier) {
+            throw new InvalidArgumentException("The webhook client config [{$name}] sets a 'tenant_resolver' beside a 'jwks' url or a 'verifier'; each decides the key material, so a config takes one of them.");
+        }
+
+        return $resolver;
     }
 
     /**

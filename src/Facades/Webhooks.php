@@ -14,6 +14,7 @@ use LogicException;
 use Pushery\Webhooks\Models\WebhookDelivery;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Platform\Erasure\ForgottenEvents;
+use Pushery\Webhooks\Platform\Feed\EventFeedPage;
 use Pushery\Webhooks\Support\TenantIdentity;
 use Pushery\Webhooks\Testing\FakedWebhook;
 use Pushery\Webhooks\Testing\WebhookFake;
@@ -33,12 +34,13 @@ use Pushery\Webhooks\WebhookManager;
  * @method static ForgottenEvents forgetEvents(array<array-key, string> $eventIds)
  * @method static WebhookSubscription enable(WebhookSubscription $subscription)
  * @method static WebhookSubscription disable(WebhookSubscription $subscription)
- * @method static Collection<int, WebhookDelivery> dispatch(string $eventType, array<array-key, mixed> $payload, ?Model $tenant = null)
- * @method static WebhookDelivery dispatchTo(WebhookSubscription $subscription, string $eventType, array<array-key, mixed> $payload)
+ * @method static Collection<int, WebhookDelivery> dispatch(string $eventType, array<array-key, mixed> $payload, ?Model $tenant = null, ?string $eventId = null)
+ * @method static WebhookDelivery dispatchTo(WebhookSubscription $subscription, string $eventType, array<array-key, mixed> $payload, ?string $eventId = null)
  * @method static WebhookDelivery ping(WebhookSubscription $subscription)
  * @method static string rotateSecret(WebhookSubscription $subscription)
  * @method static bool revokeExpiredSecret(WebhookSubscription $subscription)
  * @method static WebhookDelivery redeliver(WebhookDelivery $delivery)
+ * @method static EventFeedPage feed(WebhookSubscription $subscription, ?string $after = null, int $limit = 100)
  * @method static array<string, mixed> asyncApi(?string $title = null, string $version = '1.0.0')
  *
  * @see WebhookManager

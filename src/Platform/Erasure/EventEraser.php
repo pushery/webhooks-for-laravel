@@ -38,7 +38,7 @@ final class EventEraser
      * How far before the moment in a time-ordered event id a row of that event may carry its
      * created_at: the id is minted before the row is written, by the same clock.
      */
-    private const int CLOCK_MARGIN_SECONDS = 60;
+    public const int CLOCK_MARGIN_SECONDS = 60;
 
     /**
      * @param  array<array-key, mixed>  $eventIds

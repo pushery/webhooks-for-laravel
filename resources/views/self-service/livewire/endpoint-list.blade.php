@@ -21,12 +21,11 @@
          follows the row action, so one deletion keeps one symbol. A present null still drops it. --}}
     'delete_confirm' => config('webhooks.ui.row_action_icons.delete_confirm', config('webhooks.ui.row_action_icons.delete')),
 ])
-{{-- Below `sm` each row stands as a card: the table and its rows become blocks, the column headers leave
-     the screen and stay for assistive technology, and each value names its column in front of it. Five
-     columns and five row actions do not fit beside each other on a phone, and the sideways scroll that
-     answered it before put the health badge behind the screen's edge. The roles keep the table's
-     semantics in engines that drop them once a table element is displayed as a block. --}}
-@php($stackedCell = 'max-sm:flex max-sm:items-center max-sm:justify-between max-sm:gap-[var(--gap-wk-sm)] max-sm:py-1 max-sm:before:content-[attr(data-label)] max-sm:before:text-[color:var(--color-wk-text-muted)]')
+{{-- Below `sm` each row stands as a card, through the table's `stack-below`: the column headers leave the
+     screen and stay for assistive technology, each value names its column in front of it, and the row
+     actions stand as the card's foot. Five columns and five row actions do not fit beside each other on a
+     phone, and the sideways scroll that answered it before put the health badge behind the screen's edge.
+     The table writes its roles out, so it stays a table for a screen reader while its rows are cards. --}}
 <div class="wh-portal-list" wire:key="endpoint-list">
     <div class="mb-[var(--space-wk-sm)] flex flex-wrap items-center justify-between gap-[var(--padding-wk-x-md)]">
         <x-wirekit::heading :level="2" size="md">{{ __('webhooks::self-service.list.heading') }}</x-wirekit::heading>
@@ -59,27 +58,26 @@
             id="wh-portal-endpoints-table"
             tabindex="-1"
             hoverable
-            role="table"
-            class="max-sm:block"
+            stack-below="sm"
             :aria-label="__('webhooks::self-service.a11y.endpoints_table')"
             :table-label="__('webhooks::self-service.a11y.endpoints_table')"
         >
-            <x-wirekit::table.head role="rowgroup" class="max-sm:sr-only">
-                <x-wirekit::table.row role="row">
+            <x-wirekit::table.head>
+                <x-wirekit::table.row>
                     {{-- From `sm` up the floor is on the column that identifies the row, and only on
                          that one: a column free to collapse takes the squeeze in a table this wide, and
                          this is the column carrying the one string a tenant reads to tell two rows
                          apart. Squeezed, a real URL under `break-all` wraps into a dozen short lines
                          and the row stands taller than the screen. Below `sm` the row is a card, and
                          the cell spans it. --}}
-                    <x-wirekit::table.th role="columnheader" class="sm:min-w-64">{{ __('webhooks::self-service.table.endpoint') }}</x-wirekit::table.th>
-                    <x-wirekit::table.th role="columnheader">{{ __('webhooks::self-service.table.health') }}</x-wirekit::table.th>
-                    <x-wirekit::table.th role="columnheader">{{ __('webhooks::self-service.table.events') }}</x-wirekit::table.th>
-                    <x-wirekit::table.th role="columnheader">{{ __('webhooks::self-service.table.status') }}</x-wirekit::table.th>
-                    <x-wirekit::table.th role="columnheader" align="right">{{ __('webhooks::self-service.table.actions') }}</x-wirekit::table.th>
+                    <x-wirekit::table.th class="sm:min-w-64">{{ __('webhooks::self-service.table.endpoint') }}</x-wirekit::table.th>
+                    <x-wirekit::table.th>{{ __('webhooks::self-service.table.health') }}</x-wirekit::table.th>
+                    <x-wirekit::table.th>{{ __('webhooks::self-service.table.events') }}</x-wirekit::table.th>
+                    <x-wirekit::table.th>{{ __('webhooks::self-service.table.status') }}</x-wirekit::table.th>
+                    <x-wirekit::table.th align="right">{{ __('webhooks::self-service.table.actions') }}</x-wirekit::table.th>
                 </x-wirekit::table.row>
             </x-wirekit::table.head>
-            <x-wirekit::table.body role="rowgroup" class="max-sm:block">
+            <x-wirekit::table.body>
                 @foreach ($endpoints as $endpoint)
                     @php($healthIntent = match ($endpoint->health_status) {
                         'healthy' => 'success',
@@ -90,8 +88,8 @@
                     {{-- The badge label is translated for display; the key is the stored
                          health_status value, which never changes. --}}
                     @php($healthLabel = __('webhooks::self-service.health.'.($endpoint->health_status ?? 'unknown')))
-                    <x-wirekit::table.row wire:key="ep-{{ $endpoint->id }}" role="row" class="max-sm:block max-sm:py-[var(--padding-wk-y-md)]">
-                        <x-wirekit::table.th headerScope="row" role="rowheader" class="max-sm:block sm:min-w-64">
+                    <x-wirekit::table.row wire:key="ep-{{ $endpoint->id }}">
+                        <x-wirekit::table.th headerScope="row" class="sm:min-w-64">
                             <x-wirekit::stack gap="none">
                                 @if ($endpoint->name !== null)
                                     <x-wirekit::text weight="medium">{{ $endpoint->name }}</x-wirekit::text>
@@ -99,15 +97,15 @@
                                 <x-wirekit::text size="sm" intent="muted" class="break-all">{{ $endpoint->url }}</x-wirekit::text>
                             </x-wirekit::stack>
                         </x-wirekit::table.th>
-                        <x-wirekit::table.td role="cell" :data-label="__('webhooks::self-service.table.health')" class="{{ $stackedCell }}">
+                        <x-wirekit::table.td :label="__('webhooks::self-service.table.health')">
                             <x-wirekit::badge :intent="$healthIntent">
                                 {{ $healthLabel }}@if ($endpoint->health_score !== null) · {{ $endpoint->health_score }}@endif
                             </x-wirekit::badge>
                         </x-wirekit::table.td>
-                        <x-wirekit::table.td role="cell" :data-label="__('webhooks::self-service.table.events')" class="{{ $stackedCell }}">
+                        <x-wirekit::table.td :label="__('webhooks::self-service.table.events')">
                             <x-wirekit::text size="sm">{{ implode(', ', $endpoint->eventTypeNames()) ?: '—' }}</x-wirekit::text>
                         </x-wirekit::table.td>
-                        <x-wirekit::table.td role="cell" :data-label="__('webhooks::self-service.table.status')" class="{{ $stackedCell }}">
+                        <x-wirekit::table.td :label="__('webhooks::self-service.table.status')">
                             <x-wirekit::button
                                 size="sm"
                                 :surface="$endpoint->is_active ? 'filled' : 'ghost'"
@@ -124,7 +122,7 @@
                                 ])"
                             >{{ $endpoint->is_active ? __('webhooks::self-service.list.active') : __('webhooks::self-service.list.disabled') }}</x-wirekit::button>
                         </x-wirekit::table.td>
-                        <x-wirekit::table.td role="cell" align="right" class="max-sm:block max-sm:pt-[var(--padding-wk-y-sm)] max-sm:text-left">
+                        <x-wirekit::table.td align="right">
                             <div class="inline-flex items-center gap-[var(--gap-wk-sm)] max-sm:flex max-sm:flex-wrap">
                                 {{-- First, and the order is the point: this is the action a
                                      tenant reaches for most and the only one that costs

@@ -739,6 +739,13 @@ return [
             //     // container-resolved, takes precedence over 'scheme', and makes
             //     // 'secret' optional. See Pushery\Webhooks\Client\Verification\InboundVerifier.
             //     'verifier' => \App\Webhooks\MollieVerifier::class,
+            //     // One route for many tenants, each signing with a secret of its own: the
+            //     // resolver names the tenant the request is addressed to (a path segment,
+            //     // say) and hands back its current and previous secret. It makes 'secret'
+            //     // optional, stores the tenant with the delivery and keeps the same
+            //     // delivery id apart per tenant. Not beside a 'verifier' or a 'jwks' url.
+            //     // See Pushery\Webhooks\Client\Tenancy\InboundTenantResolver.
+            //     'tenant_resolver' => \App\Webhooks\WorkspaceConnections::class,
             //     // Header names the producer uses. Applies to any header-overridable
             //     // scheme, not just the two above — set 'signature' to bind e.g.
             //     // PlainHmacScheme to SendCloud's 'Sendcloud-Signature' from config alone.
@@ -755,7 +762,8 @@ return [
             //     'signature_encoding' => 'hex',
             //     'tolerance_seconds' => 300,
             //     'invalid_status' => 401,
-            //     // Reached by a 'verifier' whose provider callback did not answer,
+            //     // Reached by a 'verifier' whose provider callback did not answer, by a
+            //     // 'tenant_resolver' that threw,
             //     // and by a 'jwks' key set that could not be fetched: a signature over
             //     // a key at hand always reaches a verdict. Unset, such a delivery is
             //     // answered exactly like a rejected one. Set it (503 is the usual

@@ -48,7 +48,7 @@
                          shows the empty "inherit" entry for an endpoint that is pinned.
 
                          That is the version which introduced the behavior, and nothing more.
-                         The declared floor is 2.68.0, enforced through composer.json's
+                         The declared floor is 2.69.0, enforced through composer.json's
                          `conflict`, and it sits higher for reasons that have nothing to do
                          with this control — the seven shipped locales, the overlay geometry
                          that keeps a destructive confirmation clickable without the host's
