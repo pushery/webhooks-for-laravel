@@ -23,7 +23,15 @@ use Pushery\Webhooks\Client\Verification\InboundVerifier;
 use Pushery\Webhooks\Core\Http\HeaderRedactor;
 use Pushery\Webhooks\Core\Payload\PayloadSanitizer;
 use Pushery\Webhooks\Core\Payload\PayloadStore;
+use Pushery\Webhooks\Core\Signing\Ed25519Scheme;
+use Pushery\Webhooks\Core\Signing\GitHubScheme;
+use Pushery\Webhooks\Core\Signing\PlainHmacScheme;
+use Pushery\Webhooks\Core\Signing\SecretSet;
 use Pushery\Webhooks\Core\Signing\SignatureHeaders;
+use Pushery\Webhooks\Core\Signing\SignatureScheme;
+use Pushery\Webhooks\Core\Signing\StandardWebhooksScheme;
+use Pushery\Webhooks\Core\Signing\StripeScheme;
+use Pushery\Webhooks\Core\Signing\StripeStyleScheme;
 use Pushery\Webhooks\Core\Signing\VerificationResult;
 use Pushery\Webhooks\Core\Signing\VerificationStatus;
 use Pushery\Webhooks\Database\Dialect\Dialect;
@@ -57,6 +65,22 @@ final readonly class WebhookProcessor
      * retries is absorbed by the fast path without ever reaching the database.
      */
     private const int SEEN_TTL_BUFFER = 300;
+
+    /**
+     * The schemes of this package, the ones asked again key by key for the keys that confirm a
+     * delivery. A host's own scheme cannot be classified from here, so it is called once per
+     * delivery, as it always was.
+     *
+     * @var list<class-string<SignatureScheme>>
+     */
+    private const array BUILT_IN_SCHEMES = [
+        Ed25519Scheme::class,
+        GitHubScheme::class,
+        PlainHmacScheme::class,
+        StandardWebhooksScheme::class,
+        StripeScheme::class,
+        StripeStyleScheme::class,
+    ];
 
     public function __construct(
         private Request $request,
@@ -157,6 +181,7 @@ final readonly class WebhookProcessor
                     $this->request->ip(),
                     $this->request->path(),
                     $this->request->userAgent(),
+                    $tenant?->key,
                 );
             } catch (Throwable $listenerFailure) {
                 try {
@@ -184,7 +209,14 @@ final readonly class WebhookProcessor
         // verified, so a broken ledger must not answer the producer 500 and ask it to retry
         // something that succeeded.
         try {
-            InboundWebhookVerified::dispatch($this->config->name, $result->matchedKeyId);
+            InboundWebhookVerified::dispatch(
+                $this->config->name,
+                $result->matchedKeyId,
+                $tenant?->key,
+                $verifier instanceof InboundVerifier
+                    ? $this->matchedKeyIds($result)
+                    : $this->confirmingKeyIds($rawBody, $headers, $secrets ?? $this->config->secrets(), $result),
+            );
         } catch (Throwable $listenerFailure) {
             try {
                 report(InboundListenerFailed::for('verified', $this->config->name, $listenerFailure));
@@ -264,7 +296,7 @@ final readonly class WebhookProcessor
         //
         //   A stores its row and has not dispatched yet
         //   B lands here, arms the marker, answers 200
-        //   A's dispatch throws -> A deletes its row, leaving the id "UNSEEN" per its comment
+        //   A's dispatch throws -> A deletes its row, leaving the id "unseen" per its comment
         //   the producer retries -> the marker answers 200, and no row exists
         //
         // A verified delivery, acknowledged with a bare success, stored nowhere and handled by
@@ -298,7 +330,7 @@ final readonly class WebhookProcessor
             throw $e;
         }
 
-        // Stored AND queued: only now arm the fast path, so a store that succeeded but
+        // Stored and queued: only now arm the fast path, so a store that succeeded but
         // whose dispatch failed never marks the id seen. A producer retry within the
         // window then short-circuits to the success response without another database
         // round-trip.
@@ -418,7 +450,7 @@ final readonly class WebhookProcessor
                 Cache::forget($this->cacheKey($webhookId));
             } catch (Throwable) {
                 // This runs inside the rollback that then re-raises, so an exception here would
-                // REPLACE the failure being reported with a cache error -- hiding the reason the
+                // replace the failure being reported with a cache error -- hiding the reason the
                 // rollback happened at all. And a store that cannot forget could not have been
                 // marked either, so there is nothing left behind to withdraw.
             }
@@ -744,6 +776,49 @@ final readonly class WebhookProcessor
     private function respond(): Response
     {
         return $this->config->response()->respond($this->request);
+    }
+
+    /**
+     * Every key that confirms a verified delivery on its own, current first.
+     *
+     * A scheme stops at the first key that matches, so the result names one key even when the
+     * producer signed with both. Each key is tried alone for that reason, and only during a
+     * rotation: with one key the one that matched is the whole answer.
+     *
+     * Only the schemes of this package are asked again. A host's own scheme may watch what it
+     * verifies, and a second call would show up there as a delivery that never arrived, so for
+     * one the key that matched is the answer.
+     *
+     * @return list<string>
+     */
+    private function confirmingKeyIds(string $rawBody, SignatureHeaders $headers, SecretSet $secrets, VerificationResult $result): array
+    {
+        $keys = $secrets->all();
+        $scheme = $this->config->scheme();
+
+        if (count($keys) < 2 || ! in_array($scheme::class, self::BUILT_IN_SCHEMES, true)) {
+            return $this->matchedKeyIds($result);
+        }
+
+        $confirming = [];
+
+        foreach ($keys as $id => $key) {
+            if ($scheme->verify($rawBody, $headers, SecretSet::fromCurrent($key), $this->config->tolerance())->isValid()) {
+                $confirming[] = $id;
+            }
+        }
+
+        return $confirming;
+    }
+
+    /**
+     * The key that matched, as the list `confirmingKeyIds` carries, or none when no key is named.
+     *
+     * @return list<string>
+     */
+    private function matchedKeyIds(VerificationResult $result): array
+    {
+        return $result->matchedKeyId === null ? [] : [$result->matchedKeyId];
     }
 
     /**

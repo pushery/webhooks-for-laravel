@@ -3,7 +3,7 @@
  *
  * Every shipped Blade view — the dashboard, the self-service portal, the pagination
  * control and the publishable stubs — is styled with Tailwind utilities over WireKit's
- * design tokens. Those utilities are compiled by the HOST application's Tailwind build:
+ * design tokens. Those utilities are compiled by the host application's Tailwind build:
  * this package ships no compiled stylesheet, and WireKit's dist stylesheet carries the
  * token definitions, not the utilities that consume them.
  *
@@ -15,7 +15,7 @@
  * https://docs.pushery.com/webhooks-for-laravel/guides/styling-the-ui has the exact
  * copy-pasteable block; both globs are required.
  *
- * The path below is resolved relative to THIS file, so it keeps pointing at the
+ * The path below is resolved relative to this file, so it keeps pointing at the
  * package's views wherever Composer installs it.
  */
 

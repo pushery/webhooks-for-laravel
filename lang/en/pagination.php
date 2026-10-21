@@ -21,7 +21,7 @@ return [
     // it is not a shorter phrasing of the line above.
     'summary_of_unknown_total' => 'Showing :first to :last',
 
-    // What a filter change ANNOUNCES. A live-bound filter swaps the table and says nothing:
+    // What a filter change announces. A live-bound filter swaps the table and says nothing:
     // the count is in the document -- the summary above renders it -- but as a plain paragraph
     // outside any live region, so a reader has to travel back down and read to find out
     // whether the change produced three rows, two hundred or none (WCAG 4.1.3).

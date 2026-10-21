@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pushery\Webhooks\Client\Events;
 
 use Illuminate\Foundation\Events\Dispatchable;
+use Pushery\Webhooks\Client\Tenancy\InboundTenant;
 use Pushery\Webhooks\Client\Verification\InboundVerifier;
 use Pushery\Webhooks\Core\Signing\VerificationStatus;
 
@@ -49,6 +50,12 @@ use Pushery\Webhooks\Core\Signing\VerificationStatus;
  * triage question — a scanner, or our own producer misconfigured by the last deploy.
  * A listener that needs more of the request has it: it runs during the request, so
  * `request()` is right there. That listener must not be queued.
+ *
+ * {@see self::$tenant} is the key of the {@see InboundTenant} a config's `tenant_resolver` found
+ * for the request, and null when it found none, when it failed, and on a config without one. The
+ * signature did not verify, so it is the tenant the request names, not one it proved to come
+ * from. Anyone can send a request that names a tenant: a listener that acts on it, such as one
+ * that tells the tenant about the refused delivery, limits how often it does so per tenant.
  */
 final class InvalidWebhookSignature
 {
@@ -60,5 +67,6 @@ final class InvalidWebhookSignature
         public ?string $ip,
         public string $path,
         public ?string $userAgent,
+        public ?string $tenant = null,
     ) {}
 }

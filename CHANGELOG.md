@@ -6,6 +6,16 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.22.0] - 2026-10-21
+
+### ✨ Added
+
+- **`Support\MigrationLocks::bound()` bounds how long a migration waits for a lock.** A migration of this package that alters a table calls it first in `up()` and `down()`: on PostgreSQL the transaction then waits three seconds for its lock and holds it thirty at most, on MySQL the session waits three seconds. An ALTER that cannot take its lock fails instead of stalling every query behind it, and running the migration again is the remedy. It is part of the public API, because a published copy of such a migration calls it from the application's namespace.
+
+- **Both verification events name the tenant, and the verified one every key that confirms the delivery.** On a config with a `tenant_resolver`, `InboundWebhookVerified` and `InvalidWebhookSignature` carry the key of the tenant as `tenant`. `InboundWebhookVerified` also lists in `confirmingKeyIds` each key that confirms the delivery on its own, current first, so a host retires a previous secret on the first delivery the producer signs with the new one only, without verifying the request again. The package asks only its own schemes a second time; with a scheme of the host's own, which may watch what it verifies, the list holds the key that matched. `InvalidWebhookSignature` names the tenant the refused request named, which anyone can send.
+
+- **A regional locale reads the package's catalog of its language.** The catalogs ship per language, and Laravel's translator asks for the given locale and then for `app.fallback_locale`, so an application running `pt-BR` or `pt-PT` showed the package's screens and messages in the fallback language. The package now wraps the translation loader so that a regional locale of the `webhooks` namespace reads its language, `pt-BR` from `pt` and `en-GB` from `en`, a region nobody listed included. A catalog published for the region under `lang/vendor/webhooks/` wins over the language key by key. Every other namespace keeps Laravel's lookup.
+
 ## [3.21.0] - 2026-10-20
 
 ### ✨ Added
@@ -3500,7 +3510,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.21.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.22.0...HEAD
+[3.22.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.21.0...v3.22.0
 [3.21.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.20.0...v3.21.0
 [3.20.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.19.0...v3.20.0
 [3.19.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.18.0...v3.19.0

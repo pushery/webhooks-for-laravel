@@ -127,13 +127,13 @@ return [
         'output' => 'Salida',
     ],
 
-    // The tenant's own delivery log. The status labels are keyed by the STORED
+    // The tenant's own delivery log. The status labels are keyed by the stored
     // DeliveryStatus value, which never changes, and read as outcomes rather than
     // states: a customer asking "did my order go out?" is not asking for an enum.
     // The one date pattern this namespace needs, and it exists for the accessible names rather
     // than for the screen. A replay writes a new delivery row — same event type, same endpoint —
     // and `platform.self_service.replays_per_minute` allows ten a minute by default, so two rows
-    // that differ only in their second are the ORDINARY outcome of a tenant pressing Send again.
+    // that differ only in their second are the ordinary outcome of a tenant pressing Send again.
     // `LLL` carries no seconds in any of the seven shipped locales, so two such rows would get
     // names that agree in every part.
     //
@@ -199,7 +199,7 @@ return [
             // selected — the others may be busy.
             'filtered' => 'Todavía no se ha enviado nada a este endpoint. Las entregas más antiguas que el periodo de retención se eliminan, así que una anterior pudo estar aquí y ya no estar.',
             // A third state, and each of the three has to be TRUE. The two above are
-            // claims about what was SENT; this one is a claim about the filters, which is
+            // claims about what was sent; this one is a claim about the filters, which is
             // the only honest thing to say when a reader narrowed by outcome or by date.
             'no_match' => 'Ninguna entrega coincide con los filtros aplicados. Quita uno para ver más.',
         ],
@@ -218,7 +218,7 @@ return [
     // Contención, no el límite: otro registro simultáneo del mismo tenant retuvo el bloqueo.
     'limit_busy' => 'Otro registro tuyo sigue en curso. Vuelve a intentarlo.',
 
-    // El límite de frecuencia, no el cupo: aquí importa la VELOCIDAD, y se libera solo.
+    // El límite de frecuencia, no el cupo: aquí importa la velocidad, y se libera solo.
     'registration_throttled' => 'Estás registrando endpoints demasiado rápido. Espera un momento y vuelve a intentarlo.',
 
     'toast' => [

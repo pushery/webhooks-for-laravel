@@ -6,6 +6,7 @@ namespace Pushery\Webhooks\Client\Events;
 
 use Illuminate\Foundation\Events\Dispatchable;
 use Pushery\Webhooks\Client\Exceptions\InboundListenerFailed;
+use Pushery\Webhooks\Client\Tenancy\InboundTenant;
 use Pushery\Webhooks\Client\Verification\InboundVerifier;
 use Pushery\Webhooks\Core\Signing\SecretSet;
 use Pushery\Webhooks\Core\Signing\VerificationResult;
@@ -29,6 +30,18 @@ use Pushery\Webhooks\Core\Signing\VerificationResult;
  * a pinned `kid` the one key is `current`. It is null only when a verifier authenticated the
  * request without naming a key.
  *
+ * `confirmingKeyIds` lists every key that confirms the delivery on its own, current first. A
+ * scheme stops at the first key that matches, so `matchedKeyId` cannot tell a producer that
+ * signs with both secrets from one that signs with the new one alone, and that difference is
+ * the end of a rotation: the first delivery the previous key no longer confirms says the
+ * producer has moved on, and the previous secret can go. With one key, with a custom
+ * {@see InboundVerifier}, and with a scheme of the host's own, which the package does not call a
+ * second time, the list holds `matchedKeyId`, or nothing when that is null.
+ *
+ * `tenant` is the key of the {@see InboundTenant} a config's `tenant_resolver` named for the
+ * delivery, and null on a config without one. Its secrets verified the delivery, so the tenant
+ * is proven, not claimed.
+ *
  * It fires on every verified delivery, not only when the previous key matched, and that is the
  * design rather than a default anyone can trim. Firing only on `previous` makes silence
  * ambiguous: no events means either the migration finished or no traffic arrived at all, and
@@ -50,8 +63,13 @@ final class InboundWebhookVerified
 {
     use Dispatchable;
 
+    /**
+     * @param  list<string>  $confirmingKeyIds
+     */
     public function __construct(
         public string $source,
         public ?string $matchedKeyId,
+        public ?string $tenant = null,
+        public array $confirmingKeyIds = [],
     ) {}
 }

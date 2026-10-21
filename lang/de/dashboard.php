@@ -27,7 +27,7 @@ return [
         'retry_rate' => 'Wiederholungsrate',
     ],
 
-    // Datumsmuster werden mitübersetzt, nicht nur die Monatsnamen: die REIHENFOLGE
+    // Datumsmuster werden mitübersetzt, nicht nur die Monatsnamen: die Reihenfolge
     // unterscheidet sich je Sprache (Englisch führt mit dem Monat, Deutsch mit dem Tag).
     'formats' => [
         'hour_bucket' => 'j. M H:i',

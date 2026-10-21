@@ -86,7 +86,7 @@ return [
         //                          server is not.
         //   allowed_hosts          A dangerous opt-out, not an allowlist. A host named
         //                          here skips DNS resolution, skips the private /
-        //                          loopback / metadata IP classification AND skips IP
+        //                          loopback / metadata IP classification and skips IP
         //                          pinning — so that host may resolve to an internal
         //                          address and its DNS record may rebind between the
         //                          check and the connection. Use it only for a known
@@ -815,7 +815,7 @@ return [
             //     // 'dedupe_id' => 'header:X-GitHub-Delivery',
             //     // 'event_type' => 'body:data.kind',
             //     // A resolver is the form GitHub actually wants, because the useful type is
-            //     // the header AND `action` together ('release.published'):
+            //     // the header and `action` together ('release.published'):
             //     // 'event_type' => \App\Webhooks\GitHubEventType::class, // an EventTypeResolver
             //     'store_headers' => [],
             //     'redact' => ['Authorization', 'Cookie'],

@@ -167,7 +167,7 @@ return [
     'validation' => [
         'event_types' => [
             'string' => 'Um tipo de evento tem de ser um nome, não um número nem uma lista.',
-            // An operator registers a GLOBAL endpoint here, so a type nothing publishes
+            // An operator registers a global endpoint here, so a type nothing publishes
             // costs every tenant's events for it rather than one tenant's.
             'in' => 'Este tipo de evento não é publicado por esta aplicação.',
             // Only reachable for a type whose catalog entry names an ability.

@@ -189,7 +189,7 @@
                             </x-wirekit::stack>
                         </x-wirekit::table.th>
                         <x-wirekit::table.td>{{ implode(', ', $subscription->eventTypeNames()) }}</x-wirekit::table.td>
-                        {{-- Switched OFF outranks every health band: an endpoint nobody is
+                        {{-- Switched off outranks every health band: an endpoint nobody is
                              delivering to has no current health, and reporting a stale one as
                              if it were live is the same confusion in the other direction.
                              Everything below that mirrors the self-service health matrix —
