@@ -78,7 +78,7 @@ final class ServerServiceProvider extends ServiceProvider
     }
 
     /**
-     * The Server delivery engine boots when its own switch is on OR when the Platform
+     * The Server delivery engine boots when its own switch is on or when the Platform
      * layer is on: Platform fan-out dispatches every delivery through this engine, so
      * enabling the Platform layer forces the Server on even when webhooks.server.enabled
      * is false. When both switches are off the whole layer no-ops — no delivery

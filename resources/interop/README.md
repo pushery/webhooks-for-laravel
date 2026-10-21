@@ -72,7 +72,7 @@ entry verifies. Verifiers must ignore entries whose version tag they do not impl
     }
   ],
 
-  // Vectors that MUST FAIL to verify. Each carries its "dialect" ("v1" or "v1a"),
+  // Vectors that must fail to verify. Each carries its "dialect" ("v1" or "v1a"),
   // the key to verify under ("secret" or "public_key"), and a "reason".
   "negative_vectors": [
     {

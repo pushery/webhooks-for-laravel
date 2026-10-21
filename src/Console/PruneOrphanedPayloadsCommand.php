@@ -26,13 +26,13 @@ use Pushery\Webhooks\Support\PayloadReclaimer;
  * can be chunked away, so an operator should know the size before starting, not after a run
  * dies:
  *
- *   - The DATABASE side is a full scan of both offload logs. `payload_disk` carries no index on
+ *   - The database side is a full scan of both offload logs. `payload_disk` carries no index on
  *     either engine, and no bound on `created_at` means no partition pruning either. That is a
  *     deliberate trade: an index on that column would cost the delivery log's hot insert path
  *     permanently, for a sweep that is manual and rare. The rows are streamed in chunks, so the
  *     scan is slow rather than memory-hungry.
  *   - The resident set is every still-referenced object key for the disk, held at once. It has to
- *     be — an object is an orphan only when NO row references it, so the answer needs the whole
+ *     be — an object is an orphan only when no row references it, so the answer needs the whole
  *     set. Roughly the key length times the number of offloaded rows.
  *
  * The disk listing is the third: it enumerates every object under the prefix. On object storage

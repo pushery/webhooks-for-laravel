@@ -128,13 +128,13 @@ return [
         'output' => 'Output',
     ],
 
-    // The tenant's own delivery log. The status labels are keyed by the STORED
+    // The tenant's own delivery log. The status labels are keyed by the stored
     // DeliveryStatus value, which never changes, and read as outcomes rather than
     // states: a customer asking "did my order go out?" is not asking for an enum.
     // The one date pattern this namespace needs, and it exists for the accessible names rather
     // than for the screen. A replay writes a new delivery row — same event type, same endpoint —
     // and `platform.self_service.replays_per_minute` allows ten a minute by default, so two rows
-    // that differ only in their second are the ORDINARY outcome of a tenant pressing Send again.
+    // that differ only in their second are the ordinary outcome of a tenant pressing Send again.
     // `LLL` carries no seconds in any of the seven shipped locales, so two such rows would get
     // names that agree in every part.
     //
@@ -200,7 +200,7 @@ return [
             // selected — the others may be busy.
             'filtered' => 'Nothing has been sent to this endpoint yet. Deliveries older than the retention window are removed, so an older one may have been here and gone.',
             // A third state, and each of the three has to be TRUE. The two above are
-            // claims about what was SENT; this one is a claim about the filters, which is
+            // claims about what was sent; this one is a claim about the filters, which is
             // the only honest thing to say when a reader narrowed by outcome or by date.
             'no_match' => 'No delivery matches the filters you set. Clear one to see more.',
         ],
@@ -220,7 +220,7 @@ return [
     // lock past the wait. Naming the cap here would be a lie the reader cannot act on.
     'limit_busy' => 'Another registration of yours is still in progress. Please try again.',
 
-    // The allowance, which is not the cap: this one is about SPEED, and it clears on its own.
+    // The allowance, which is not the cap: this one is about speed, and it clears on its own.
     'registration_throttled' => 'You are registering endpoints too quickly. Please wait a moment and try again.',
 
     'toast' => [

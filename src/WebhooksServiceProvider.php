@@ -7,6 +7,7 @@ namespace Pushery\Webhooks;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\Translation\Loader;
 use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
@@ -31,6 +32,7 @@ use Pushery\Webhooks\Platform\Policies\WebhookSubscriptionPolicy;
 use Pushery\Webhooks\Platform\Transform\DeclarativePayloadTransformer;
 use Pushery\Webhooks\Platform\Transform\PayloadTransformer;
 use Pushery\Webhooks\Server\Delivery\DeliveryGate;
+use Pushery\Webhooks\Support\LanguageFallbackLoader;
 use Pushery\Webhooks\Support\MergesPackageConfig;
 use Pushery\Webhooks\Support\ScheduleCadence;
 
@@ -52,6 +54,10 @@ final class WebhooksServiceProvider extends ServiceProvider
     #[Override]
     public function register(): void
     {
+        // A regional locale reads this package's catalog of its language, `pt-BR` from `pt`, in this package's
+        // namespace only. Registered here so it wraps the loader before the translator is built from it.
+        $this->app->extend('translation.loader', static fn (Loader $loader): Loader => new LanguageFallbackLoader($loader, 'webhooks'));
+
         $this->mergePackageConfig();
 
         // The declarative payload transformer is the safe, data-driven default the

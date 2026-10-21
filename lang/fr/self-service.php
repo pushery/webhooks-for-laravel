@@ -127,13 +127,13 @@ return [
         'output' => 'Sortie',
     ],
 
-    // The tenant's own delivery log. The status labels are keyed by the STORED
+    // The tenant's own delivery log. The status labels are keyed by the stored
     // DeliveryStatus value, which never changes, and read as outcomes rather than
     // states: a customer asking "did my order go out?" is not asking for an enum.
     // The one date pattern this namespace needs, and it exists for the accessible names rather
     // than for the screen. A replay writes a new delivery row — same event type, same endpoint —
     // and `platform.self_service.replays_per_minute` allows ten a minute by default, so two rows
-    // that differ only in their second are the ORDINARY outcome of a tenant pressing Send again.
+    // that differ only in their second are the ordinary outcome of a tenant pressing Send again.
     // `LLL` carries no seconds in any of the seven shipped locales, so two such rows would get
     // names that agree in every part.
     //
@@ -199,7 +199,7 @@ return [
             // selected — the others may be busy.
             'filtered' => 'Rien n\'a encore été envoyé à cet endpoint. Les livraisons plus anciennes que la période de rétention sont supprimées : une plus ancienne a donc pu passer ici et disparaître.',
             // A third state, and each of the three has to be TRUE. The two above are
-            // claims about what was SENT; this one is a claim about the filters, which is
+            // claims about what was sent; this one is a claim about the filters, which is
             // the only honest thing to say when a reader narrowed by outcome or by date.
             'no_match' => 'Aucune livraison ne correspond aux filtres définis. Retirez-en un pour en voir davantage.',
         ],
@@ -218,7 +218,7 @@ return [
     // Contention, pas la limite : un enregistrement simultané du même tenant a gardé le verrou.
     'limit_busy' => 'Un autre de tes enregistrements est encore en cours. Réessaie.',
 
-    // La cadence, pas le quota : ici c'est la VITESSE qui compte, et elle se libère seule.
+    // La cadence, pas le quota : ici c'est la vitesse qui compte, et elle se libère seule.
     'registration_throttled' => 'Tu enregistres des endpoints trop vite. Attends un instant et réessaie.',
 
     'toast' => [

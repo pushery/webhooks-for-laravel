@@ -26,7 +26,7 @@
      * so the difference shows on macOS alone.
      *
      * So the pressed control wins when nothing else has focus, when focus sits on an element that
-     * CONTAINS the pressed control, or when the press is the newer of the two events. A keyboard
+     * contains the pressed control, or when the press is the newer of the two events. A keyboard
      * reader never presses, so their focus decides.
      */
     var lastPressed = null;
@@ -139,13 +139,13 @@
         });
 
         /*
-         * Focus and announcement for a panel Livewire opens IN PLACE.
+         * Focus and announcement for a panel Livewire opens in place.
          *
          * The endpoint form is not a dialog -- it appears inline, and in the page's markup it
          * sits BEFORE the list, so the new content is inserted above the button that asked for
          * it. Nothing moves, nothing scrolls and nothing is announced: a sighted reader looks
          * at the list where the button was; a screen-reader user is still after the trigger,
-         * which is now after the whole form; a keyboard user tabs FORWARD out of the list
+         * which is now after the whole form; a keyboard user tabs forward out of the list
          * rather than into the thing they just opened.
          *
          * Deliberately NOT the focus trap above. This is not modal -- the list behind it stays

@@ -127,13 +127,13 @@ return [
         'output' => 'Uscita',
     ],
 
-    // The tenant's own delivery log. The status labels are keyed by the STORED
+    // The tenant's own delivery log. The status labels are keyed by the stored
     // DeliveryStatus value, which never changes, and read as outcomes rather than
     // states: a customer asking "did my order go out?" is not asking for an enum.
     // The one date pattern this namespace needs, and it exists for the accessible names rather
     // than for the screen. A replay writes a new delivery row — same event type, same endpoint —
     // and `platform.self_service.replays_per_minute` allows ten a minute by default, so two rows
-    // that differ only in their second are the ORDINARY outcome of a tenant pressing Send again.
+    // that differ only in their second are the ordinary outcome of a tenant pressing Send again.
     // `LLL` carries no seconds in any of the seven shipped locales, so two such rows would get
     // names that agree in every part.
     //
@@ -199,7 +199,7 @@ return [
             // selected — the others may be busy.
             'filtered' => 'A questo endpoint non è ancora stato inviato nulla. Le consegne più vecchie del periodo di conservazione vengono rimosse, quindi una precedente può essere passata di qui ed essere già sparita.',
             // A third state, and each of the three has to be TRUE. The two above are
-            // claims about what was SENT; this one is a claim about the filters, which is
+            // claims about what was sent; this one is a claim about the filters, which is
             // the only honest thing to say when a reader narrowed by outcome or by date.
             'no_match' => 'Nessuna consegna corrisponde ai filtri impostati. Rimuovine uno per vederne altre.',
         ],
@@ -218,7 +218,7 @@ return [
     // Contesa, non il limite: una registrazione simultanea dello stesso tenant ha tenuto il lock.
     'limit_busy' => 'Un\'altra tua registrazione è ancora in corso. Riprova.',
 
-    // La cadenza, non il tetto: qui conta la VELOCITÀ, e si sblocca da sola.
+    // La cadenza, non il tetto: qui conta la velocità, e si sblocca da sola.
     'registration_throttled' => 'Stai registrando endpoint troppo in fretta. Aspetta un momento e riprova.',
 
     'toast' => [

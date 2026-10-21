@@ -34,7 +34,7 @@ final class HourlyActivityChart extends Component
     use InteractsWithDashboard;
 
     /**
-     * The window this panel counts over. LOCKED because it is a mount parameter and nothing else — no `wire:model` binds it, and a public
+     * The window this panel counts over. Locked because it is a mount parameter and nothing else — no `wire:model` binds it, and a public
      * Livewire property that nothing binds is still client input. The page decides the
      * window, screens it against the configured set, and remounts every panel on it through
      * the wire:key; a panel that also accepted the value from the browser re-opened the hole

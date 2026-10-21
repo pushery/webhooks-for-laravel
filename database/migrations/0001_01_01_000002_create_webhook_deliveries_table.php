@@ -83,7 +83,7 @@ return new class extends Migration
         // them tiny even as succeeded rows pile up.
         DB::statement("CREATE INDEX webhook_deliveries_open_idx ON webhook_deliveries (subscription_id, created_at) WHERE status IN ('pending', 'failed')");
         // The health/scoring aggregate range-scans one subscription's recent history
-        // across all statuses, so it needs a NON-partial (subscription_id, created_at)
+        // across all statuses, so it needs a non-partial (subscription_id, created_at)
         // index: the partial open index above cannot serve an all-status read, and
         // without this the planner falls back to the event index below and scans the
         // endpoint's entire history to filter the window.

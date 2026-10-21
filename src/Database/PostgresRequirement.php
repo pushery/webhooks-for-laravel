@@ -15,7 +15,7 @@ use RuntimeException;
  * SQLite — so running it against another driver would otherwise fail with a cryptic SQL
  * syntax error deep inside a raw statement. This turns that into one clear message up front.
  *
- * The package itself runs on PostgreSQL 13+ OR MySQL 8.4+; this guard only rejects the
+ * The package itself runs on PostgreSQL 13+ or MySQL 8.4+; this guard only rejects the
  * PostgreSQL migration profile on a non-PostgreSQL driver. A host on MySQL re-publishes the
  * migrations to get the MySQL schema (see {@see DatabaseRequirement}). On Laravel Cloud
  * either the first-party MySQL 8.4 database or Neon (PostgreSQL) works — run the migration

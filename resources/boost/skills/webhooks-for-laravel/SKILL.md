@@ -242,7 +242,7 @@ has a stable alias, and a host that mounts its own page usually does not want th
 portal's URLs beside it:
 
 ```php
-// bootstrap/providers.php — FIRST, or the alias below does not exist
+// bootstrap/providers.php — first, or the alias below does not exist
 Pushery\Webhooks\Platform\SelfServicePortalServiceProvider::class,
 ```
 

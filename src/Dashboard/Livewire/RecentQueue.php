@@ -31,7 +31,7 @@ final class RecentQueue extends Component
     use InteractsWithDashboard;
 
     /**
-     * The row budget. LOCKED because it is a mount parameter and nothing else: no
+     * The row budget. Locked because it is a mount parameter and nothing else: no
      * `wire:model` binds it, and a public Livewire property that nothing binds is still
      * client input — Livewire applies an update for any public property declared on the
      * subclass, and a reader who set it to -1 got a query with no LIMIT clause at all,

@@ -170,7 +170,7 @@ final class EndpointDeliveries extends Component
      * looks exactly like a filter somebody cleared. Nothing goes red, no test fails, and the
      * rows are real -- they answer a different question than the one that was asked.
      *
-     * #[Locked] because the dangerous direction here is turning it OFF. Every other narrowing
+     * #[Locked] because the dangerous direction here is turning it off. Every other narrowing
      * property on this class may only ever narrow further, so a value from the browser can
      * cost the reader information but never hand them any; this one is the opposite, and a
      * plain public property would let the browser widen exactly what the host switched on to

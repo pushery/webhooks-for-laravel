@@ -30,7 +30,7 @@ final class TopEvents extends Component
     use InteractsWithDashboard;
 
     /**
-     * The window this panel counts over. LOCKED for the reason $limit is locked beside it:
+     * The window this panel counts over. Locked for the reason $limit is locked beside it:
      * it is a mount parameter and nothing else — no `wire:model` binds it, and a public
      * Livewire property that nothing binds is still client input. The page decides the
      * window, screens it against the configured set, and remounts every panel on it through
@@ -44,7 +44,7 @@ final class TopEvents extends Component
     public string $window = '24h';
 
     /**
-     * The row budget. LOCKED because it is a mount parameter and nothing else: no
+     * The row budget. Locked because it is a mount parameter and nothing else: no
      * `wire:model` binds it, and a public Livewire property that nothing binds is still
      * client input — Livewire applies an update for any public property declared on the
      * subclass, and a reader who set it to -1 got a query with no LIMIT clause at all,
