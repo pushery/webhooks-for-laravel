@@ -6,6 +6,20 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.23.0] - 2026-10-23
+
+### ✨ Added
+
+- **A transactional outbox writes a webhook in the transaction of the change it reports.** `Server\Outbox::record()` takes a `PendingWebhook` and stores it as a row of `webhook_outbox` in the transaction open on the package's connection, so the change and its webhook commit together or not at all. A queued job sends the entry after the commit, and the `webhooks:outbox` sweep, scheduled every minute, sends what such a job missed and every retry that has come due. An ordering key keeps the entries of a stream in commit order, and a refused entry holds its stream until `Outbox::resend()` or `Outbox::skip()`. `WebhookOutboxEntryRefused`, `WebhookOutboxEntryGivenUp` and `WebhookOutboxEntryOverdue` report what only the outbox decides. Switched on with `server.outbox.enabled` (`WEBHOOKS_SERVER_OUTBOX_ENABLED`), which also migrates the two tables; off by default. If you publish the migrations rather than load them, copy `2026_10_21_000001_create_webhook_outbox_tables.php` from the package's `database/migrations/outbox/`.
+
+- **The calls of each tenant can sit under row level security.** A config with a `tenant_resolver` takes a `tenant_scope`, a `Client\Tenancy\InboundTenantScope` whose `run()` opens a transaction on the package's connection and sets what your policy reads, local to that transaction. The package then reaches a tenant's call only inside `run()` for that tenant: it stores the call and reads it back in the request, reads it back from the queue, runs the handler and records the outcome in the job, and records a call that failed for good. The prune after `delete_after_days` and `webhooks:prune-orphaned-payloads` visit every tenant the scope's `tenants()` lists, so a policy neither keeps a tenant's calls past their window nor lets the sweep delete an offloaded body only a tenant's call points at. A setting local to the transaction ends with it, so it holds behind a pooler in transaction mode.
+
+- **`webhooks:reencrypt` encrypts the endpoint secrets and the outbox entries again under the current `APP_KEY`, so a previous key can leave `APP_PREVIOUS_KEYS`.** Laravel encrypts under the new key only what it writes, and an endpoint's secret was written again only when the endpoint rotated it, so the old key had to stay listed for good. The command reads each endpoint and each outbox entry again under a lock and writes only the encrypted columns: the values decrypt to the same bytes, `updated_at` keeps its moment, and an outbox entry has its signing secrets, its proxy and its client certificate passphrase encrypted again along with the delivery. A value already under the current key is left as it is, so a second run tells whether anything is left, and a value no configured key decrypts is named with its row while the command exits with 1. `WebhookDeliveryData::resealed()` and `DeliveryOptions::resealed()` hand each sealed value of a delivery to a callback. The security page lists the steps of a rotation, the wait for deliveries already in the queue included.
+
+### 🐛 Fixed
+
+- **A pretended migration no longer asks the database server anything.** `php artisan migrate --pretend` runs no query, so the storage check read a MySQL session's SQL mode as empty and refused a strict server as lax before any statement was shown, and reading the server version opened a connection a pretended run should not need. Under pretend the check now judges what the configuration states, the table prefix, the driver and the FOUND_ROWS option, and the migration that runs checks the server.
+
 ## [3.22.0] - 2026-10-21
 
 ### ✨ Added
@@ -3510,7 +3524,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.22.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.23.0...HEAD
+[3.23.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.22.0...v3.23.0
 [3.22.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.21.0...v3.22.0
 [3.21.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.20.0...v3.21.0
 [3.20.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.19.0...v3.20.0

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Client;
 
+use Closure;
 use Illuminate\Database\Connection;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Http\Request;
@@ -19,6 +20,7 @@ use Pushery\Webhooks\Client\Http\RawBody;
 use Pushery\Webhooks\Client\Models\WebhookCall;
 use Pushery\Webhooks\Client\Tenancy\InboundTenant;
 use Pushery\Webhooks\Client\Tenancy\InboundTenantResolver;
+use Pushery\Webhooks\Client\Tenancy\InboundTenantScope;
 use Pushery\Webhooks\Client\Verification\InboundVerifier;
 use Pushery\Webhooks\Core\Http\HeaderRedactor;
 use Pushery\Webhooks\Core\Payload\PayloadSanitizer;
@@ -282,7 +284,9 @@ final readonly class WebhookProcessor
             );
         }
 
-        $call = $this->store($rawBody, $webhookId, $message, $tenant?->key);
+        // A config with a tenant scope stores and reads back the call in the context of its tenant, which is what a row
+        // level security policy on the tenant column needs to admit the insert and to show the row it wrote.
+        $call = $this->inTenantScope($tenant?->key, fn (): ?WebhookCall => $this->store($rawBody, $webhookId, $message, $tenant?->key));
 
         // Authoritative dedupe: the partial-unique insert returned nothing, so a concurrent
         // request already stored this id. Arm the fast path for the next retry and do not
@@ -316,7 +320,7 @@ final readonly class WebhookProcessor
         try {
             $this->dispatchProcessing($call, $message);
         } catch (Throwable $e) {
-            $call->delete();
+            $this->inTenantScope($tenant?->key, static fn (): ?bool => $call->delete());
 
             // And the marker, which this request may not have set. A concurrent duplicate can have
             // armed it against the row being deleted right here — it saw the row, it could not see
@@ -546,6 +550,26 @@ final readonly class WebhookProcessor
         }
 
         return $call;
+    }
+
+    /**
+     * Run work on the call of a tenant in the config's tenant scope, or directly when the config has none or the
+     * delivery names no tenant.
+     *
+     * @template TResult
+     *
+     * @param  Closure(): TResult  $work
+     * @return TResult
+     */
+    private function inTenantScope(?string $tenant, Closure $work): mixed
+    {
+        if ($tenant === null) {
+            return $work();
+        }
+
+        $scope = $this->config->tenantScope();
+
+        return $scope instanceof InboundTenantScope ? $scope->run($tenant, $work) : $work();
     }
 
     /**

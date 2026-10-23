@@ -113,7 +113,7 @@ final class PostgresRequirement
     public static function ensureIdentity(string $name, ConnectionInterface $connection): void
     {
         // A pretended migration runs no select and reads no rows, so there is no banner to judge.
-        // ensure() still reads the version from the connection, and the real migration asks again.
+        // DatabaseRequirement::ensure() asks nothing under pretend, and the real migration asks again.
         if ($connection instanceof Connection && $connection->pretending()) {
             return;
         }

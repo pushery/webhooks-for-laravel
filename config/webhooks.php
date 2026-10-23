@@ -259,6 +259,26 @@ return [
             'enabled' => false,
         ],
 
+        // The transactional outbox, for Pushery\Webhooks\Server\Outbox::record(): a delivery is
+        // written as a row in the transaction of the change it reports and sent once that
+        // transaction has committed, so the two exist together or not at all. The rows live in
+        // the webhook_outbox table on the package's connection, which the Server layer migrates
+        // while this is on, and the change has to run on that same connection. A queued job sends
+        // each entry after its commit; the webhooks:outbox sweep, scheduled every minute, sends what
+        // such a job missed and every retry that has come due.
+        //
+        // max_attempts ends an entry after that many failed attempts; null, the default, keeps
+        // trying until the receiver takes it or refuses it for good. alarm_after_hours raises
+        // WebhookOutboxEntryOverdue once for an entry still not delivered after that long, and 0
+        // switches the alarm off. Delivered and skipped entries are pruned after prune_after_days;
+        // a refused one stays, because it holds its stream until it is sent again or skipped.
+        'outbox' => [
+            'enabled' => filter_var(env('WEBHOOKS_SERVER_OUTBOX_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+            'max_attempts' => EnvLimit::optionalCeiling(env('WEBHOOKS_SERVER_OUTBOX_MAX_ATTEMPTS'), null),
+            'alarm_after_hours' => EnvLimit::ceiling(env('WEBHOOKS_SERVER_OUTBOX_ALARM_AFTER_HOURS'), 72, zeroSwitchesOff: true),
+            'prune_after_days' => EnvLimit::ceiling(env('WEBHOOKS_SERVER_OUTBOX_PRUNE_AFTER_DAYS'), 14),
+        ],
+
         // A payload larger than 'threshold' bytes is written to 'disk', and the delivery log keeps
         // a stub and a pointer instead. The queued job still carries the whole body it signs and
         // sends; the sending guide says what that means on SQS.
@@ -746,6 +766,12 @@ return [
             //     // delivery id apart per tenant. Not beside a 'verifier' or a 'jwks' url.
             //     // See Pushery\Webhooks\Client\Tenancy\InboundTenantResolver.
             //     'tenant_resolver' => \App\Webhooks\WorkspaceConnections::class,
+            //     // Beside a resolver, for a 'webhook_calls' under row level security on its
+            //     // tenant column: the package stores, reads back, handles and prunes each
+            //     // tenant's calls inside the scope's run(), which opens a transaction and sets
+            //     // the tenant's context local to it.
+            //     // See Pushery\Webhooks\Client\Tenancy\InboundTenantScope.
+            //     'tenant_scope' => \App\Webhooks\WorkspaceScope::class,
             //     // Header names the producer uses. Applies to any header-overridable
             //     // scheme, not just the two above — set 'signature' to bind e.g.
             //     // PlainHmacScheme to SendCloud's 'Sendcloud-Signature' from config alone.
@@ -1410,6 +1436,7 @@ return [
         // \Pushery\Webhooks\Models\WebhookSubscription::class => \App\Models\WebhookSubscription::class,
         // \Pushery\Webhooks\Models\WebhookDelivery::class => \App\Models\WebhookDelivery::class,
         // \Pushery\Webhooks\Server\Models\WebhookServerDelivery::class => \App\Models\WebhookServerDelivery::class,
+        // \Pushery\Webhooks\Server\Models\WebhookOutboxEntry::class => \App\Models\WebhookOutboxEntry::class,
         // \Pushery\Webhooks\Client\Models\WebhookCall::class => \App\Models\WebhookCall::class,
     ],
 

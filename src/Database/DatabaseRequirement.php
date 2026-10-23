@@ -59,7 +59,17 @@ final class DatabaseRequirement
             throw self::prefixRejected($name, $resolved->getTablePrefix());
         }
 
+        // A pretended migration executes nothing, so nothing below asks the server: Laravel answers
+        // every select with an empty set, and even the version needs a connection, which a linter
+        // capturing the migration without a server does not have. Under pretend only what the
+        // configuration states is judged, and the migration that runs asks the server.
+        $pretending = $resolved->pretending();
+
         if ($driver === 'pgsql') {
+            if ($pretending) {
+                return;
+            }
+
             // The same floor the PostgreSQL-only guard applies, read from one place, so a pgsql
             // server is checked here as a MySQL one is below — see PostgresRequirement::MIN_VERSION.
             PostgresRequirement::ensureVersion($name, $resolved->getServerVersion());
@@ -75,13 +85,13 @@ final class DatabaseRequirement
             throw self::unsupportedDriver($name, $driver);
         }
 
-        if ($resolved->isMaria()) {
+        if (! $pretending && $resolved->isMaria()) {
             throw self::mariadbRejected($name);
         }
 
         $reason = self::mysqlRejection(
-            $resolved->getServerVersion(),
-            self::sqlMode($resolved),
+            $pretending ? null : $resolved->getServerVersion(),
+            $pretending ? null : self::sqlMode($resolved),
             self::foundRowsEnabled($resolved),
         );
 
@@ -94,10 +104,13 @@ final class DatabaseRequirement
      * The reason a genuine (non-MariaDB) MySQL server cannot be used, or null when it can.
      * Pure by design: it decides from the three values alone, so the version floor and the
      * strict and FOUND_ROWS checks need no connection to an old or misconfigured server.
+     *
+     * A null version or mode is one nobody asked the server for, under pretend, and goes unjudged.
+     * An empty mode is one the server answered, and it is not strict.
      */
-    public static function mysqlRejection(string $version, string $sqlMode, bool $foundRows): ?string
+    public static function mysqlRejection(?string $version, ?string $sqlMode, bool $foundRows): ?string
     {
-        if (version_compare($version, self::MIN_MYSQL_VERSION, '<')) {
+        if ($version !== null && version_compare($version, self::MIN_MYSQL_VERSION, '<')) {
             return sprintf(
                 'it reports version %s, but this package requires MySQL %s+ — the LTS it is built and '
                 .'tested against. Upgrade the server, or use PostgreSQL.',
@@ -106,7 +119,7 @@ final class DatabaseRequirement
             );
         }
 
-        if (! str_contains($sqlMode, 'STRICT_TRANS_TABLES') && ! str_contains($sqlMode, 'STRICT_ALL_TABLES')) {
+        if ($sqlMode !== null && ! str_contains($sqlMode, 'STRICT_TRANS_TABLES') && ! str_contains($sqlMode, 'STRICT_ALL_TABLES')) {
             return 'strict SQL mode is off (@@session.sql_mode carries neither STRICT_TRANS_TABLES nor '
                 .'STRICT_ALL_TABLES). Without it an over-long webhook body is truncated on write and its '
                 .'stored SHA-256 no longer matches. Enable strict mode — it is the MySQL 8.4 default.';
