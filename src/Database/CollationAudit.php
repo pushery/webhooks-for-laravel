@@ -40,6 +40,8 @@ final class CollationAudit
         'webhook_deliveries',
         'webhook_calls',
         'webhook_delivery_streams',
+        'webhook_outbox',
+        'webhook_outbox_streams',
         'webhook_server_deliveries',
         'webhook_subscriptions',
         'webhook_delivery_hourly',

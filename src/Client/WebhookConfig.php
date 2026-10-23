@@ -16,6 +16,7 @@ use Pushery\Webhooks\Client\Profiles\WebhookProfile;
 use Pushery\Webhooks\Client\Responses\DefaultRespondsTo;
 use Pushery\Webhooks\Client\Responses\RespondsToWebhook;
 use Pushery\Webhooks\Client\Tenancy\InboundTenantResolver;
+use Pushery\Webhooks\Client\Tenancy\InboundTenantScope;
 use Pushery\Webhooks\Client\Verification\InboundVerifier;
 use Pushery\Webhooks\Core\Signing\AcceptsSignatureHeaders;
 use Pushery\Webhooks\Core\Signing\Ed25519Scheme;
@@ -138,6 +139,7 @@ final class WebhookConfig
         private readonly ?array $rateLimit,
         private readonly ?SignatureEncoding $signatureEncoding = null,
         private readonly ?string $tenantResolverClass = null,
+        private readonly ?string $tenantScopeClass = null,
     ) {}
 
     /**
@@ -584,6 +586,23 @@ final class WebhookConfig
             : throw new InvalidArgumentException("The tenant resolver for webhook client config [{$this->name}] did not resolve to an InboundTenantResolver.");
     }
 
+    /**
+     * The scope the package reaches this config's calls through, in the context of each call's tenant, or null when
+     * it reaches them directly.
+     */
+    public function tenantScope(): ?InboundTenantScope
+    {
+        if ($this->tenantScopeClass === null) {
+            return null;
+        }
+
+        $scope = app()->make($this->tenantScopeClass);
+
+        return $scope instanceof InboundTenantScope
+            ? $scope
+            : throw new InvalidArgumentException("The tenant scope for webhook client config [{$this->name}] did not resolve to an InboundTenantScope.");
+    }
+
     public function tolerance(): int
     {
         return $this->tolerance;
@@ -914,6 +933,7 @@ final class WebhookConfig
         $jwks = self::resolveJwks($name, $entry['jwks'] ?? null);
         $verifier = self::resolveVerifier($name, $entry['verifier'] ?? null);
         $tenants = self::resolveTenantResolver($name, $entry['tenant_resolver'] ?? null, $jwks !== null, $verifier !== null);
+        $tenantScope = self::resolveTenantScope($name, $entry['tenant_scope'] ?? null, $tenants !== null);
 
         $secret = $entry['secret'] ?? null;
 
@@ -1006,6 +1026,7 @@ final class WebhookConfig
             rateLimit: self::resolveRateLimit($entry['rate_limit'] ?? null),
             signatureEncoding: self::resolveSignatureEncoding($name, $entry['signature_encoding'] ?? null, $scheme),
             tenantResolverClass: $tenants,
+            tenantScopeClass: $tenantScope,
         );
     }
 
@@ -1142,6 +1163,31 @@ final class WebhookConfig
         }
 
         return $resolver;
+    }
+
+    /**
+     * The tenant scope class, or null when the config has none.
+     *
+     * Refused without a 'tenant_resolver': only a resolver stores a call with a tenant, so a scope beside a config
+     * without one would never be asked for anything.
+     *
+     * @return class-string<InboundTenantScope>|null
+     */
+    private static function resolveTenantScope(string $name, mixed $scope, bool $hasTenantResolver): ?string
+    {
+        if ($scope === null) {
+            return null;
+        }
+
+        if (! is_string($scope) || ! is_a($scope, InboundTenantScope::class, true)) {
+            throw new InvalidArgumentException("The webhook client config [{$name}] has an invalid 'tenant_scope'; expected an InboundTenantScope class-string.");
+        }
+
+        if (! $hasTenantResolver) {
+            throw new InvalidArgumentException("The webhook client config [{$name}] sets a 'tenant_scope' without a 'tenant_resolver'; only a resolver stores a call with the tenant a scope runs it for.");
+        }
+
+        return $scope;
     }
 
     /**

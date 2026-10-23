@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Server\Data;
 
+use Closure;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Encryption\Encrypter;
 use Illuminate\Support\Facades\Crypt;
 use Pushery\Webhooks\Core\Http\TransportOptions;
 use Pushery\Webhooks\Support\Settings;
@@ -53,6 +55,33 @@ final readonly class DeliveryOptions
         public int $retryAfterCap = 900,
         public int $retryAfterMaxDeferrals = 6,
     ) {}
+
+    /**
+     * The same options with the two values sealed with the application key, the proxy and the
+     * client certificate's passphrase, replaced by what $reseal returns for each. A proxy in the
+     * clear, as a job queued before the proxy was sealed carries it, stays as it is.
+     *
+     * @param  Closure(string): string  $reseal
+     */
+    public function resealed(Closure $reseal): self
+    {
+        return new self(
+            verb: $this->verb,
+            connectTimeout: $this->connectTimeout,
+            timeout: $this->timeout,
+            verifySsl: $this->verifySsl,
+            proxy: $this->proxy === null || ! Encrypter::appearsEncrypted($this->proxy) ? $this->proxy : $reseal($this->proxy),
+            clientCert: $this->clientCert,
+            clientKey: $this->clientKey,
+            clientCertPassphrase: $this->clientCertPassphrase === null ? null : $reseal($this->clientCertPassphrase),
+            contentType: $this->contentType,
+            responseCaptureBytes: $this->responseCaptureBytes,
+            largePayloadThreshold: $this->largePayloadThreshold,
+            respectRetryAfter: $this->respectRetryAfter,
+            retryAfterCap: $this->retryAfterCap,
+            retryAfterMaxDeferrals: $this->retryAfterMaxDeferrals,
+        );
+    }
 
     /**
      * Adapt to the Core transport options at send time. The client-cert passphrase is

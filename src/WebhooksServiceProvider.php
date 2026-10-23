@@ -19,6 +19,7 @@ use Pushery\Webhooks\Console\AsyncApiCommand;
 use Pushery\Webhooks\Console\EgressIpsCommand;
 use Pushery\Webhooks\Console\PartitionMaintenanceCommand;
 use Pushery\Webhooks\Console\PruneOrphanedPayloadsCommand;
+use Pushery\Webhooks\Console\ReencryptCommand;
 use Pushery\Webhooks\Console\RefreshEndpointHealthCommand;
 use Pushery\Webhooks\Console\RevokeRotatedSecretsCommand;
 use Pushery\Webhooks\Core\Ssrf\HostResolver;
@@ -107,13 +108,16 @@ final class WebhooksServiceProvider extends ServiceProvider
             $this->registerPublishing();
             $this->reportOwnerKeyDeclarationDriftAfterMigrating();
 
-            // Two commands serve a host without the Platform layer as much as one with it: a
+            // Three commands serve a host without the Platform layer as much as one with it: a
             // receive-only host that offloads inbound bodies reclaims them with the prune
-            // command, and a send-only host behind an egress proxy publishes its addresses with
-            // the other. Neither reads anything the Platform layer owns.
+            // command, a send-only host behind an egress proxy publishes its addresses with the
+            // second, and a send-only host with the outbox encrypts its entries again with the
+            // third after a key rotation. The third reads the endpoint secrets only while the
+            // Platform layer is on; the other two read nothing the Platform layer owns.
             $this->commands([
                 PruneOrphanedPayloadsCommand::class,
                 EgressIpsCommand::class,
+                ReencryptCommand::class,
             ]);
         }
 

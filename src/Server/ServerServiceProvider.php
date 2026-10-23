@@ -9,12 +9,14 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Override;
+use Pushery\Webhooks\Console\RelayOutboxCommand;
 use Pushery\Webhooks\Server\Delivery\DeliveryGate;
 use Pushery\Webhooks\Server\Delivery\OpenDeliveryGate;
 use Pushery\Webhooks\Server\Delivery\ResponseClassifier;
 use Pushery\Webhooks\Server\Events\WebhookAttemptsExhausted;
 use Pushery\Webhooks\Server\Events\WebhookAttemptSucceeded;
 use Pushery\Webhooks\Server\Listeners\PersistServerDelivery;
+use Pushery\Webhooks\Server\Models\WebhookOutboxEntry;
 use Pushery\Webhooks\Server\Models\WebhookServerDelivery;
 use Pushery\Webhooks\Server\Signing\EncryptedSecretResolver;
 use Pushery\Webhooks\Server\Signing\SecretResolver;
@@ -35,9 +37,9 @@ final class ServerServiceProvider extends ServiceProvider
     use MergesPackageConfig;
 
     /**
-     * Whether the Server layer's migrations are registered automatically when persistence or
-     * ordered delivery is enabled. Disable with self::ignoreMigrations() to publish and
-     * manage them in the host app instead.
+     * Whether the Server layer's migrations are registered automatically when persistence,
+     * ordered delivery or the outbox is enabled. Disable with self::ignoreMigrations() to publish
+     * and manage them in the host app instead.
      */
     public static bool $runsMigrations = true;
 
@@ -146,6 +148,61 @@ final class ServerServiceProvider extends ServiceProvider
                     ->onOneServer();
             });
         }
+
+        // The sweep's command is there whether or not the outbox is on, so a host that runs it by
+        // hand, or from its own tenant loop, is told the outbox is off instead of meeting a command
+        // that does not exist.
+        if ($this->app->runningInConsole()) {
+            $this->commands([RelayOutboxCommand::class]);
+        }
+
+        if ($this->keepsAnOutbox()) {
+            $this->bootOutbox();
+        }
+    }
+
+    /**
+     * Whether the transactional outbox may run: its entries and the counters of its streams live in
+     * two tables of this layer, migrated only while this is on. Exposed so the conditional itself is
+     * directly testable.
+     */
+    public function keepsAnOutbox(): bool
+    {
+        return Config::boolean('webhooks.server.outbox.enabled', false);
+    }
+
+    /**
+     * The outbox's two tables and the schedule of its sweep and its pruning. The tables come from a
+     * directory of their own, so an app that uses the delivery log or ordered delivery and no outbox
+     * gains neither.
+     */
+    private function bootOutbox(): void
+    {
+        if (self::$runsMigrations) {
+            $this->loadMigrationsFrom(__DIR__.'/../../database/migrations/outbox');
+        }
+
+        // schedule-gate-ok: a host that runs this layer's migrations itself still needs its outbox swept and pruned.
+        $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
+            if (! Config::boolean('webhooks.schedule.enabled', true)) {
+                return;
+            }
+
+            // Every minute, so an entry whose own job never ran waits a minute at most. A turn stops
+            // starting attempts after fifty seconds, and the attempt it started last runs its HTTP
+            // budget at most, so a five-minute lock is past any real turn, and one left behind by a
+            // hard kill costs a few skipped sweeps rather than a stalled outbox.
+            $schedule->command('webhooks:outbox')
+                ->everyMinute()
+                ->withoutOverlapping(5)
+                ->onOneServer();
+
+            // Daily, guarded for the same reasons as the delivery log's prune above.
+            $schedule->command('model:prune', ['--model' => [WebhookOutboxEntry::class]])
+                ->daily()
+                ->withoutOverlapping(360)
+                ->onOneServer();
+        });
     }
 
     /**

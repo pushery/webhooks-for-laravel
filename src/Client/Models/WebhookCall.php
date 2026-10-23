@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Date;
 use Override;
 use Pushery\Webhooks\Client\Exceptions\CorruptRawBody;
+use Pushery\Webhooks\Client\Tenancy\TenantScopes;
 use Pushery\Webhooks\Client\WebhookCallStatus;
 use Pushery\Webhooks\Core\Payload\PayloadStore;
 use Pushery\Webhooks\Database\Concerns\HasZonedTimestamps;
@@ -50,7 +51,9 @@ class WebhookCall extends Model
 
     use HasUuids;
     use HasZonedTimestamps;
-    use MassPrunable;
+    use MassPrunable {
+        pruneAll as private pruneVisible;
+    }
     use Replaceable;
     use ScopesByTimestamp;
     use UsesWebhookConnection;
@@ -93,6 +96,24 @@ class WebhookCall extends Model
             '<=',
             $this->boundTimestamp(Date::now()->subDays(Config::integer('webhooks.client.delete_after_days', 30))),
         );
+    }
+
+    /**
+     * Prune every row past the window that the connection sees, then the rows of each tenant a tenant scope lists,
+     * in that tenant's context: a row level security policy on the tenant column hides them from the first pass.
+     * Without such a policy the visits find nothing the first pass left.
+     */
+    public function pruneAll(int $chunkSize = 1000): int
+    {
+        $total = $this->pruneVisible($chunkSize);
+
+        foreach (TenantScopes::all() as $scope) {
+            foreach ($scope->tenants() as $tenant) {
+                $total += $scope->run((string) $tenant, fn (): int => $this->pruneVisible($chunkSize));
+            }
+        }
+
+        return $total;
     }
 
     /**

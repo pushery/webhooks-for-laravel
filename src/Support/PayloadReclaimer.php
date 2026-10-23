@@ -8,6 +8,7 @@ use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
 use League\Flysystem\FileAttributes;
+use Pushery\Webhooks\Client\Tenancy\TenantScopes;
 
 /**
  * Deletes offloaded payload objects on a Storage disk that no log row still points at.
@@ -177,17 +178,39 @@ final class PayloadReclaimer
         }
 
         if (TableLookup::exists('webhook_calls', WebhookConnection::name())) {
-            WebhookConnection::db()->table('webhook_calls')
-                ->where('payload_disk', $disk)
-                ->select(['id', 'payload_path'])
-                ->lazyById(self::CHUNK)
-                ->each(function (object $row) use (&$referenced): void {
-                    if (is_string($row->payload_path)) {
-                        $referenced[$row->payload_path] = true;
-                    }
-                });
+            $this->collectCallPaths($disk, $referenced);
+
+            // A config with a tenant scope keeps its calls where a row level security policy can hide them from a
+            // connection without a tenant context, and an object only those rows reference would be deleted under
+            // them. So each tenant's rows are read again in that tenant's context.
+            foreach (TenantScopes::all() as $scope) {
+                foreach ($scope->tenants() as $tenant) {
+                    $scope->run((string) $tenant, function () use ($disk, &$referenced): void {
+                        $this->collectCallPaths($disk, $referenced);
+                    });
+                }
+            }
         }
 
         return $referenced;
+    }
+
+    /**
+     * Add every path the call log references on $disk to the set, as far as the connection's current context shows
+     * the log's rows.
+     *
+     * @param  array<string, true>  $referenced
+     */
+    private function collectCallPaths(string $disk, array &$referenced): void
+    {
+        WebhookConnection::db()->table('webhook_calls')
+            ->where('payload_disk', $disk)
+            ->select(['id', 'payload_path'])
+            ->lazyById(self::CHUNK)
+            ->each(function (object $row) use (&$referenced): void {
+                if (is_string($row->payload_path)) {
+                    $referenced[$row->payload_path] = true;
+                }
+            });
     }
 }

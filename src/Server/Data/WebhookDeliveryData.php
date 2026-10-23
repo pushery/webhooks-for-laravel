@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Server\Data;
 
+use Closure;
 use Illuminate\Support\Facades\Date;
 use Pushery\Webhooks\Core\Signing\SignatureScheme;
 use Pushery\Webhooks\Server\Backoff\BackoffStrategy;
@@ -150,7 +151,14 @@ final readonly class WebhookDeliveryData
      */
     public function deferred(int $attemptsMade): self
     {
-        return $this->continued($attemptsMade, $this->retryAfterDeferrals + 1, $this->streamWaits(), $this->retryUntil());
+        return $this->continued(
+            $attemptsMade,
+            $this->retryAfterDeferrals + 1,
+            $this->streamWaits(),
+            $this->retryUntil(),
+            $this->encryptedSecret,
+            $this->options,
+        );
     }
 
     /**
@@ -167,6 +175,8 @@ final readonly class WebhookDeliveryData
             $this->retryAfterDeferrals,
             $this->streamWaits() + 1,
             $seconds === null ? null : Date::now()->getTimestamp() + $delay + $seconds,
+            $this->encryptedSecret,
+            $this->options,
         );
     }
 
@@ -178,21 +188,58 @@ final readonly class WebhookDeliveryData
     {
         $seconds = $this->retryForSeconds();
 
-        return $this->continued(0, 0, 0, $seconds === null ? null : Date::now()->getTimestamp() + $seconds);
+        return $this->continued(
+            0,
+            0,
+            0,
+            $seconds === null ? null : Date::now()->getTimestamp() + $seconds,
+            $this->encryptedSecret,
+            $this->options,
+        );
     }
 
-    private function continued(int $attemptOffset, int $retryAfterDeferrals, int $streamWaits, ?int $retryUntil): self
+    /**
+     * The same delivery with each value it carries sealed with the application key replaced by
+     * what $reseal returns for it: the signing secrets, and the proxy and the client certificate's
+     * passphrase of its options. Everything else stays as it is, the progress of its attempts
+     * included.
+     *
+     * A value sealed under a key that has left `app.previous_keys` can no longer be opened, so a
+     * delivery kept at rest across a key rotation is sealed again under the current key before
+     * the old one goes.
+     *
+     * @param  Closure(string): string  $reseal
+     */
+    public function resealed(Closure $reseal): self
     {
+        return $this->continued(
+            $this->attemptOffset,
+            $this->retryAfterDeferrals,
+            $this->streamWaits(),
+            $this->retryUntil(),
+            $this->encryptedSecret === null ? null : $reseal($this->encryptedSecret),
+            $this->options->resealed($reseal),
+        );
+    }
+
+    private function continued(
+        int $attemptOffset,
+        int $retryAfterDeferrals,
+        int $streamWaits,
+        ?int $retryUntil,
+        ?string $encryptedSecret,
+        DeliveryOptions $options,
+    ): self {
         return new self(
             messageId: $this->messageId,
             url: $this->url,
             rawBody: $this->rawBody,
             schemeClass: $this->schemeClass,
             backoff: $this->backoff,
-            options: $this->options,
+            options: $options,
             maxTries: $this->maxTries,
             eventType: $this->eventType,
-            encryptedSecret: $this->encryptedSecret,
+            encryptedSecret: $encryptedSecret,
             doNotSign: $this->doNotSign,
             meta: $this->meta,
             tags: $this->tags,

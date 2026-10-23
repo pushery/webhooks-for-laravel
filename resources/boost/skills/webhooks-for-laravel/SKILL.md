@@ -314,13 +314,15 @@ moving.
 | `webhooks:revoke-rotated-secrets` | Hourly: clears every endpoint secret whose rotation window has closed |
 | `webhooks:refresh-endpoint-health` | `platform.health.refresh`, every fifteen minutes by default, only while `platform.health.enabled` |
 | `webhooks:refresh-metrics` | `dashboard.metrics.refresh`, every five minutes by default, with the Dashboard layer |
+| `webhooks:outbox` | Every minute, only while `server.outbox.enabled`: sends the outbox entries that are due |
 
 `model:prune` runs daily as well: on the inbound call log while the Client layer is
-on, and on the standalone delivery log while `server.persistence.enabled`. An
+on, on the standalone delivery log while `server.persistence.enabled`, and on the
+outbox while `server.outbox.enabled`. An
 application with a database per tenant sets `schedule.enabled` to `false` and runs
 these commands from its own tenant loop.
 
-Five more are for the application to run when it needs them:
+Six more are for the application to run when it needs them:
 
 - `webhooks:preflight` checks that the database the persistent layers use is
   supported, that the schema agrees with the configuration, and, with the Client
@@ -335,6 +337,11 @@ Five more are for the application to run when it needs them:
   `large_payload` setting, on the server or on an inbound client config, offloads
   bodies to a disk, schedule it yourself or give the disk a lifecycle policy.
   `--dry-run` reports what it would delete.
+- `webhooks:reencrypt` encrypts the endpoint secrets and the outbox entries again
+  under the current `APP_KEY`. Run it after moving the old key to
+  `APP_PREVIOUS_KEYS`, and remove that key once a second run has nothing left to
+  encrypt and the deliveries queued before the rotation have been sent. It exits
+  non-zero for a value no configured key can decrypt.
 - `webhooks:import-calls`, with the Client layer on, backfills the `webhook_calls`
   log from the inbound-webhook table the application used before this package. It
   can run again without duplicating rows.

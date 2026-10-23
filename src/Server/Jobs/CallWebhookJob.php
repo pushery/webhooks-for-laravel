@@ -478,25 +478,6 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
             return null;
         }
 
-        if ($response->status !== 429 && $response->status !== 503) {
-            return null;
-        }
-
-        return RetryAfter::parse($this->retryAfterHeader($response));
-    }
-
-    /**
-     * The response's Retry-After header value, matched case-insensitively per RFC
-     * 9110, or null when the endpoint sent none.
-     */
-    private function retryAfterHeader(TransportResponse $response): ?string
-    {
-        foreach ($response->headers as $name => $values) {
-            if (strtolower($name) === 'retry-after') {
-                return $values[0] ?? null;
-            }
-        }
-
-        return null;
+        return RetryAfter::from($response);
     }
 }

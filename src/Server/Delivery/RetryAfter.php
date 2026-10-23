@@ -7,6 +7,7 @@ namespace Pushery\Webhooks\Server\Delivery;
 use DateTimeImmutable;
 use DateTimeZone;
 use Illuminate\Support\Facades\Date;
+use Pushery\Webhooks\Core\Http\TransportResponse;
 
 /**
  * Parses an HTTP `Retry-After` header into a whole number of seconds to wait. Per
@@ -20,6 +21,27 @@ use Illuminate\Support\Facades\Date;
  */
 final class RetryAfter
 {
+    /**
+     * The wait a response asks for: the parsed `Retry-After` of a 429 or a 503, matched
+     * case-insensitively per RFC 9110, or null for any other status, a missing header or one that
+     * does not parse. Only those two statuses mean "come back later"; a Retry-After on anything
+     * else is not a request to wait for this delivery.
+     */
+    public static function from(TransportResponse $response): ?int
+    {
+        if ($response->status !== 429 && $response->status !== 503) {
+            return null;
+        }
+
+        foreach ($response->headers as $name => $values) {
+            if (strtolower($name) === 'retry-after') {
+                return self::parse($values[0] ?? null);
+            }
+        }
+
+        return null;
+    }
+
     public static function parse(?string $header): ?int
     {
         if ($header === null) {
