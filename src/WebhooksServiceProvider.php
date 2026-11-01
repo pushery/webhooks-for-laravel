@@ -17,6 +17,7 @@ use Illuminate\Support\ServiceProvider;
 use Override;
 use Pushery\Webhooks\Console\AsyncApiCommand;
 use Pushery\Webhooks\Console\EgressIpsCommand;
+use Pushery\Webhooks\Console\OwnerKeyTypeCommand;
 use Pushery\Webhooks\Console\PartitionMaintenanceCommand;
 use Pushery\Webhooks\Console\PruneOrphanedPayloadsCommand;
 use Pushery\Webhooks\Console\ReencryptCommand;
@@ -247,6 +248,7 @@ final class WebhooksServiceProvider extends ServiceProvider
                 AsyncApiCommand::class,
                 RefreshEndpointHealthCommand::class,
                 RevokeRotatedSecretsCommand::class,
+                OwnerKeyTypeCommand::class,
             ]);
         }
     }

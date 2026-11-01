@@ -146,6 +146,7 @@
                     <x-wirekit::table.th>{{ __('webhooks::self-service.deliveries.event') }}</x-wirekit::table.th>
                     <x-wirekit::table.th>{{ __('webhooks::self-service.deliveries.outcome') }}</x-wirekit::table.th>
                     <x-wirekit::table.th>{{ __('webhooks::self-service.deliveries.response_code') }}</x-wirekit::table.th>
+                    <x-wirekit::table.th align="right">{{ __('webhooks::self-service.deliveries.attempts') }}</x-wirekit::table.th>
                     @if ($showsErrors)
                         {{-- A floor on this column, for the reason the endpoint list gives its URL
                              one: the table scrolls sideways on a narrow screen, and a column free to
@@ -193,6 +194,11 @@
                                  of the template ships uncompiled. Naming those two directives in
                                  prose here does it too, which is why this paragraph does not. --}}
                             <x-wirekit::text size="sm" intent="muted">{{ $delivery->response_code === null ? '—' : $delivery->response_code.($delivery->duration_ms === null ? '' : ' · '.__('webhooks::self-service.deliveries.duration', ['ms' => \Pushery\Webhooks\Support\LocalizedNumber::format($delivery->duration_ms)])) }}</x-wirekit::text>
+                        </x-wirekit::table.td>
+                        {{-- How often the package has sent this one, so a reader tells a delivery that already went
+                             out again from one that went out once before deciding to send it again. --}}
+                        <x-wirekit::table.td align="right">
+                            <x-wirekit::text size="sm" intent="muted">{{ \Pushery\Webhooks\Support\LocalizedNumber::format($delivery->attempt) }}</x-wirekit::text>
                         </x-wirekit::table.td>
                         @if ($showsErrors)
                             {{-- Blade escapes it, so markup a receiver wrote back is text. --}}

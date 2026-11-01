@@ -4,29 +4,26 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Platform\Livewire;
 
-use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\View as ViewFactory;
-use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use Pushery\Webhooks\Core\Http\Exceptions\BlockedDestination;
-use Pushery\Webhooks\Core\Http\Exceptions\HostUnresolvable;
-use Pushery\Webhooks\Facades\Webhooks;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
 use Pushery\Webhooks\Platform\Support\EventTypeAbilities;
+use Pushery\Webhooks\Platform\Support\SelfServiceEndpoints;
 use Pushery\Webhooks\Platform\Support\SubscriptionScope;
-use Pushery\Webhooks\Support\EventTypeList;
 use Pushery\Webhooks\Support\Settings;
 
 /**
  * Create or edit a single endpoint. Opened by the list via the new-endpoint /
  * edit-endpoint events; a save either registers a fresh endpoint (generating and
  * storing its signing secret through the manager's existing scheme, then revealing it
- * once) or updates an owned one. The URL is SSRF-vetted before it is stored on both
- * paths, so a tenant can never register or repoint an endpoint at an internal address.
+ * once) or updates an owned one, both through {@see SelfServiceEndpoints}. The URL is
+ * SSRF-vetted before it is stored on both paths, so a tenant can never register or
+ * repoint an endpoint at an internal address.
  *
  * Every mutation re-authorizes: create against the manage ability, edit against the
  * row-level policy for the owned endpoint.
@@ -98,278 +95,49 @@ final class EndpointForm extends Component
     }
 
     /**
-     * Validate and persist. A new endpoint is registered through the manager; an
-     * existing one is updated in place. A blocked destination is surfaced as a URL
-     * error rather than an exception, so the form re-renders with the message.
+     * Validate and persist through {@see SelfServiceEndpoints}, the class a host's own API saves through as well: a new
+     * endpoint is registered for the tenant in scope, an existing one is changed in place. Every refusal it raises is a
+     * ValidationException on its field, which Livewire turns into the form's errors, so the form re-renders with the
+     * message.
      *
-     * The messages and attribute names come from the package's own translations rather
-     * than the framework's default lines, so a refused save speaks the reader's language
-     * on a host that never translated Laravel's validation file.
+     * Each path authorizes first: create against the manage ability and the tenant in scope, edit against the
+     * row-level policy for the owned endpoint.
      */
     public function save(): void
     {
-        $accepted = new Settings()->acceptedEventTypes();
-
-        // Read once: each read loads the endpoint row again.
-        $stored = $this->storedEventTypes();
-
-        if ($accepted !== null && $stored !== []) {
-            // array_unique matters here: the list also sets the cap EventTypeList::maxCount() puts
-            // on a save, and without it a type both declared and already held would count twice,
-            // raising the cap by one for each. array_values cannot change an outcome, since
-            // neither that count nor Rule::in reads a key; it stays because the value is passed on
-            // as a list.
-            $accepted = array_values(array_unique([...$accepted, ...$stored]));
-        }
-
-        $maxBytes = EventTypeList::maxBytes($stored);
-
-        $this->validate(
-            // Four items in this list are redundant against the property declarations:
-            //
-            // 'name' => 'nullable' $name is a typed string property; never null 'name' => 'string'
-            // same, the type already enforces it 'eventTypes' => 'array' $eventTypes is a typed
-            // array property 'eventTypes' => 'min:1' masked by 'required', which already rejects []
-            //
-            // Three restate what the type system enforces one layer up, so no input reaches them;
-            // the fourth is redundant against its neighbor. They stay: this list is the form's
-            // written contract, and a subclass widening a property's type walks straight into the
-            // case the type stops covering.
-            //
-            // 'required', 'url', 'max:2048' and 'max:255' are reachable, each by an input of its own.
-            [
-                'name' => ['nullable', 'string', 'max:255'],
-                // Bound the URL length so it stores identically on every supported
-                // engine: the column is varchar(2048) on MySQL (a hard 1406 error past
-                // it) but unbounded text on Postgres, so without this cap the same long
-                // URL would 500 on one engine and store on the other. Surfaced as a
-                // field error the tenant can act on instead.
-                // `url:http,https`, not a bare `url`. Laravel's bare rule answers through
-                // Str::isUrl(), which checks a built-in list of over 200 schemes: ftp, file, data
-                // and chrome all pass it. The narrowing has been the supported spelling since 9.44.
-                //
-                // Without it a foreign scheme was refused only by the SSRF guard, which sits after
-                // the registration rate limiter has already spent a token, the lock has been taken
-                // and the endpoint cap queried. So a typo cost the tenant part of their
-                // registration budget and returned the generic "cannot be used as an endpoint"
-                // instead of the field message that exists for exactly this. The guard stays the
-                // authority; the rule only takes from it the cases that never needed to reach it.
-                'url' => ['required', 'url:http,https', 'max:2048'],
-                // Constrained to the catalog, and only when the host keeps one. The catalog
-                // ships empty, so an `in` rule applied unconditionally would refuse every
-                // registration the day an application upgrades; null means "no catalog, no
-                // constraint".
-                //
-                // What a populated catalog constrains is registration, not dispatch: the
-                // fan-out never consults it, so an application can still emit a type it does
-                // not document. What it buys is that this form stops accepting a type it
-                // never offered — a typo like `user.registred` produced an endpoint that
-                // looked configured, stayed silent, and was indistinguishable from a correct
-                // registration until someone noticed weeks of nothing arriving.
-                //
-                // Bounded either way. Without a catalog nothing else limits what a hand-written
-                // request stores per endpoint, and MySQL refuses a type longer than its index.
-                // MySQL's index also bounds the bytes of all the types together, with or without
-                // a catalog, so on MySQL a longer selection is a field error here rather than a
-                // server error from the insert.
-                'eventTypes' => [
-                    'required',
-                    'array',
-                    'min:1',
-                    'max:'.EventTypeList::maxCount($accepted, $stored),
-                    EventTypeList::fitsTheMySqlIndex($maxBytes, (string) __(
-                        'webhooks::self-service.validation.event_types.bytes',
-                        ['max' => $maxBytes],
-                    )),
-                ],
-                'eventTypes.*' => $accepted === null
-                    ? ['string', 'max:'.EventTypeList::MAX_LENGTH]
-                    : ['string', Rule::in($accepted)],
-            ],
-            [
-                'name.max' => __('webhooks::self-service.validation.name.max'),
-                'url.required' => __('webhooks::self-service.validation.url.required'),
-                'url.url' => __('webhooks::self-service.validation.url.url'),
-                'url.max' => __('webhooks::self-service.validation.url.max'),
-                'eventTypes.required' => __('webhooks::self-service.validation.event_types.required'),
-                'eventTypes.min' => __('webhooks::self-service.validation.event_types.min'),
-                'eventTypes.max' => __('webhooks::self-service.validation.event_types.max'),
-                // Named explicitly, like every other message here, so a refused save does not
-                // fall back to the framework's untranslated ":attribute is invalid".
-                //
-                // The line below was the one rule of this set that had no message, so the paragraph
-                // above was false for exactly it. A non-string element rendered "The eventTypes.0
-                // field must be a string.", in English whatever the locale, and carrying a raw
-                // field path into a screen a customer reads.
-                //
-                // The three attribute labels below could not soften it either: Laravel does not
-                // resolve an indexed key onto its parent's label, so the path appeared as written.
-                // See the note beside them.
-                'eventTypes.*.string' => __('webhooks::self-service.validation.event_types.string'),
-                'eventTypes.*.in' => __('webhooks::self-service.validation.event_types.in'),
-                'eventTypes.*.max' => __('webhooks::self-service.validation.event_types.length'),
-            ],
-            // These three are inert today: every message above is written without `:attribute`, so
-            // no label is ever interpolated.
-            //
-            // They are kept, not deleted, because the set of messages above is what makes
-            // them inert, and that set is edited: the moment a rule here loses its own message, the
-            // framework's default fires and asks for exactly these. What they cannot do is rescue
-            // an indexed key — `eventTypes.0` does not resolve onto the `eventTypes` label — which
-            // is why the rule above needed its own message instead.
-            [
-                'name' => __('webhooks::self-service.form.name_label'),
-                'url' => __('webhooks::self-service.form.url_label'),
-                'eventTypes' => __('webhooks::self-service.form.event_types_label'),
-            ],
-        );
-
-        // Before the registration brake and the lock, so a refused topic costs the tenant nothing.
-        // Only the types this save adds: one the endpoint already carries stays through an edit by
-        // somebody without the ability, and removing it asks nothing.
-        $refused = new EventTypeAbilities()->refused(
-            array_values(array_diff($this->eventTypes, $stored)),
-            Auth::user(),
-        );
-
-        if ($refused !== []) {
-            $this->addError('eventTypes', __('webhooks::self-service.validation.event_types.ability', ['types' => implode(', ', $refused)]));
-
-            return;
-        }
+        $endpoints = new SelfServiceEndpoints;
 
         if ($this->endpointId === null) {
-            $this->createEndpoint();
+            $this->authorize('create', WebhookSubscription::class);
+
+            $subscription = $endpoints->register(
+                // The create policy has just refused a reader without a tenant in scope.
+                SubscriptionScope::currentOwner() ?? throw new AuthorizationException,
+                $this->url,
+                $this->eventTypes,
+                $this->name,
+                $this->isActive,
+                Auth::user(),
+            );
+
+            $this->finish(__('webhooks::self-service.toast.endpoint_registered'));
+
+            // Reveal the freshly generated secret once, subject to the reveal TTL.
+            $this->dispatch('reveal-secret', id: $subscription->id);
 
             return;
         }
 
-        $this->updateEndpoint();
-    }
-
-    private function createEndpoint(): void
-    {
-        $this->authorize('create', WebhookSubscription::class);
-
-        // Before the lock, not inside it: a tenant that is already over its allowance has
-        // no business making everyone behind it wait for a lock it will be refused under.
-        if ($this->registrationRateExceeded()) {
-            $this->addError('url', __('webhooks::self-service.registration_throttled'));
-
-            return;
-        }
-
-        try {
-            // The cap check moved inside the lock, and that is the whole point: read
-            // outside it, the count is a fact about a moment that has already passed by
-            // the time the insert runs, and two concurrent registrations both pass it.
-            //
-            // Each refusal names itself on the field where it happens and returns null, so
-            // the caller only has to distinguish "registered" from "did not" — and the two
-            // reasons cannot be confused for one another on the way out.
-            $subscription = $this->withRegistrationLock(function (): ?WebhookSubscription {
-                $refusal = $this->registrationRefusal(__('webhooks::self-service.limit_reached'));
-
-                if ($refusal !== null) {
-                    $this->addError('url', $refusal);
-
-                    return null;
-                }
-
-                try {
-                    // Register through the manager so the URL is SSRF-vetted and the signing
-                    // secret is generated and encrypted-at-rest by the existing scheme. The
-                    // new endpoint is owned by the same tenant identity the read scope
-                    // resolves, so create and filter can never diverge onto different owner
-                    // columns.
-                    return Webhooks::subscribe(
-                        SubscriptionScope::currentOwner(),
-                        $this->url,
-                        array_values($this->eventTypes),
-                        $this->name !== '' ? $this->name : null,
-                    );
-                } catch (BlockedDestination|HostUnresolvable) {
-                    $this->addError('url', $this->blockedUrlMessage());
-
-                    return null;
-                }
-            });
-        } catch (LockTimeoutException) {
-            // Another registration of this tenant's held the lock past the wait. Not the
-            // cap — saying "you are at your limit" here would be a lie the tenant cannot
-            // act on, and the honest instruction is simply to try again.
-            $this->addError('url', __('webhooks::self-service.limit_busy'));
-
-            return;
-        }
-
-        if (! $subscription instanceof WebhookSubscription) {
-            return;
-        }
-
-        if (! $this->isActive) {
-            Webhooks::disable($subscription);
-        }
-
-        $this->finish(__('webhooks::self-service.toast.endpoint_registered'));
-
-        // Reveal the freshly generated secret once, subject to the reveal TTL.
-        $this->dispatch('reveal-secret', id: $subscription->id);
-    }
-
-    private function updateEndpoint(): void
-    {
-        // The cast answers the declared `?int` and the null check above it, not the value: past
-        // that check the property is already an int. It changes no lookup.
-        $subscription = $this->findOwnedEndpoint((int) $this->endpointId);
+        $subscription = $this->findOwnedEndpoint($this->endpointId);
         // Redundant with the boot gate, and deliberately kept: {@see InteractsWithEndpoints}
         // states the rule and its measurement -- the gate reads the same ability this policy
         // consults, and the ownership it adds is already enforced by the scoped lookup. This is
         // what still refuses if a future caller reaches the action without that lookup.
         $this->authorize('update', $subscription);
 
-        try {
-            // Re-vet the (possibly changed) URL before repointing the endpoint.
-            $this->ssrfGuard()->resolveAndPin($this->url);
-        } catch (BlockedDestination|HostUnresolvable) {
-            $this->addError('url', $this->blockedUrlMessage());
-
-            return;
-        }
-
-        $subscription->name = $this->name !== '' ? $this->name : null;
-        $subscription->url = $this->url;
-        $subscription->event_types = array_values($this->eventTypes);
-        $subscription->save();
-
-        // The activation flag goes through the manager, never through this form's own
-        // assignment: switching an endpoint back on has to clear the circuit-breaker
-        // streak too, or the next final failure disables it again immediately. An
-        // unchanged flag is left alone, so re-saving a disabled endpoint keeps the
-        // disabled_at stamp it already carries.
-        if ($this->isActive !== $subscription->is_active) {
-            $this->isActive
-                ? Webhooks::enable($subscription)
-                : Webhooks::disable($subscription);
-        }
+        $endpoints->change($subscription, $this->url, $this->eventTypes, $this->name, $this->isActive, Auth::user());
 
         $this->finish(__('webhooks::self-service.toast.endpoint_updated'));
-    }
-
-    /**
-     * The URL error a tenant reads when the SSRF guard refuses the destination. The
-     * guard's own message names the resolved host and address, which would turn this
-     * form into a probe oracle; the tenant is told the one thing it can act on — the
-     * endpoint must be a publicly reachable https URL — in its own language. The
-     * guard's precise reason still reaches the operator through the exception itself.
-     *
-     * A host that resolves to nothing gets the same sentence. Told apart, the two answers
-     * would say which internal names exist: one that resolves to a private address is
-     * refused as blocked, one that does not resolve would be refused differently.
-     */
-    private function blockedUrlMessage(): string
-    {
-        return __('webhooks::self-service.validation.url.blocked');
     }
 
     private function finish(string $message): void
@@ -387,7 +155,9 @@ final class EndpointForm extends Component
     }
 
     /**
-     * What the endpoint currently being edited already holds, read from the row.
+     * What the endpoint currently being edited already holds, read from the row, for the list
+     * of types the form offers. A save reads it from the row again, in
+     * {@see SelfServiceEndpoints::change()}.
      *
      * Not a property, and that is the whole point. Every public property of a Livewire
      * component is writable from the browser, so a remembered set kept in component state
@@ -408,11 +178,8 @@ final class EndpointForm extends Component
             return [];
         }
 
-        // Removing this cannot change an outcome: every caller either tests the value for emptiness
-        // or spreads it into a list that is re-indexed again, so the keys never reach anything that
-        // reads them. It is kept for the same reason as the pair above — it is what makes the
-        // return value a list, which is how its type is declared and how every reader will treat
-        // it.
+        // eventTypeNames() hands back a list, which is how this method's type is declared and how
+        // the render below treats it.
         return $this->findOwnedEndpoint($this->endpointId)->eventTypeNames();
     }
 

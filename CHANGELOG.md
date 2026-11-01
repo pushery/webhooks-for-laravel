@@ -6,6 +6,72 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.24.0] - 2026-11-01
+
+### ✨ Added
+
+- **Partition maintenance can run its schema changes on a connection of their own.** `webhooks.database.ddl_connection` (`WEBHOOKS_DB_DDL_CONNECTION`) names the connection `webhooks:partition-maintenance` creates, attaches and drops partitions through, and drains the default partition with. PostgreSQL lets only the owner of the delivery log add a partition, so where the role the application connects as at runtime owns no tables, as under Row Level Security, the key names the owner, and every runtime query stays on `webhooks.database.connection`. Unset, the command uses that connection as before. `WebhookConnection::ddlName()` and `ddl()` resolve the key, and `PartitionManager::forSchemaChanges()` returns a manager that runs on it.
+
+  **Upgrade:** nothing to do. Set the key where the application's runtime role does not own the delivery log.
+
+- **`webhooks:reencrypt --dry-run` says what a run would encrypt again, and writes nothing.** It walks the endpoint secrets and the outbox entries the way a run does, decrypts every value, and prints the same lines with "would be encrypted again" in place of the count a run writes. A value that no configured key opens fails it with exit code 1, as it fails a run, so a host can check a rotation before the previous key leaves `APP_PREVIOUS_KEYS`.
+
+  **Upgrade:** nothing to do.
+
+- **The secrets a queued delivery carries can be read without knowing how they are sealed.** `WebhookDeliveryData::sealedSecrets()` returns them as a `SecretSet`, the previous secret beside the current one during a rotation window, so a test of the application can check what a delivery signs with. It is null for an unsigned delivery and for one that asks for its secrets at each attempt, which carries none.
+
+  **Upgrade:** nothing to do.
+
+- **A call between two services can be signed over its method, its target and its body.** A delivery is signed over its body, which is not enough for a call to an API: its address names what it acts on, and a signature over the body alone would let a call that was seen once be sent again to every other address of the connection until its timestamp runs out. `Core\Signing\SignsRequests` is a middleware for Laravel's HTTP client that signs a call over its method, a space, its target, a line feed and its body under any shipped scheme, and refuses a call that would follow a redirect. `Client\Http\VerifySignedRequest` verifies such a call on a route of the application's own API with a config of `webhooks.client.configs`: its secret, its keys or the secrets its tenant resolver names, and a verifier when it implements `Client\Verification\VerifiesSignedRequests`. A refused call is answered like a refused delivery and announced with `InvalidWebhookSignature`. `Core\Signing\SignedRequest::content()` builds the signed content, and the page on signatures states its form.
+
+  **Upgrade:** nothing to do.
+
+- **The delivery log of the self-service portal shows how often each delivery was sent.** The panel read the event, the outcome, the response code, the duration and the time, but not the attempts the package had made, so a customer could not tell a delivery that had already gone out again from one that went out once before choosing **send again**. A column beside the response now shows the count, in all seven languages.
+
+  **Upgrade:** nothing to do. A published copy of the panel's view keeps its old columns until it is published again.
+
+- **A host's own API can register and change a tenant's endpoint under the portal's rules.** `Platform\Support\SelfServiceEndpoints::register()` and `change()` hold a registration or a change to everything the portal's form does: its validation and messages, the topic permissions of the acting user passed in, the registration brake, the cap and a `RegistrationLimit` under the per-tenant lock, and the check of the URL against internal addresses. A refusal is a `ValidationException` on its field, so a JSON request is answered `422` with the portal's translated message on `name`, `url` or `eventTypes`. The portal's form saves through the same class now.
+
+  **Upgrade:** nothing to do.
+
+- **A host's own API can read a tenant's delivery log and replay a delivery under the portal's rules.** `SelfServiceEndpoints::deliveries()` returns a query of the deliveries whose own owner columns name the tenant, within `webhooks.platform.deliveries.window_days`, newest first, never with the payload and with the stored error only while `webhooks.platform.deliveries.show_errors` is on. One endpoint of the tenant, one outcome and a later lower bound narrow it, and an endpoint of another tenant is not found. `redeliver()` sends one of the tenant's deliveries again under the replay allowance the portal and the tenant dashboard spend (`webhooks.platform.self_service.replays_per_minute`), and refuses a disabled endpoint or a spent allowance with a `ValidationException` on `delivery` that carries the portal's sentence.
+
+  **Upgrade:** nothing to do.
+
+- **An installation migrated before it chose `platform.owner_key_type` can still change it, while its tables are empty.** `php artisan webhooks:owner-key-type` changes the `owner_id` columns of the subscriptions table, the delivery log and the dashboard rollup to the configured type, which is what an application needs that keys its webhook endpoints by a UUID workspace after its first deploy. On PostgreSQL the rollup view is dropped and created again from its own definition, in one transaction with the column changes; on MySQL the rollup table keeps its sentinel and collation. With a row in any of the tables it changes nothing and exits with 1, and `--dry-run` reports what a run would change.
+
+  **Upgrade:** nothing to do.
+
+- **A URL can be asked where it leads, under the SSRF guard and without reading its body.** `GuardedFetch::lead()` sends a GET and ends the transfer as soon as the headers are in, so a page of any length, or one that never ends, costs neither the status nor the time, where `get()` ends such a page with `ResponseTooLarge` and no status. It holds what `get()` holds: the URL vetted and the connection pinned, no redirect followed, no proxy, nothing inflated, TLS verified. A plaintext `http://` URL is taken even while `webhooks.core.ssrf.https_only` holds webhook endpoints to `https`: the guard vets the URL in its `https` form, and the connection is pinned to the same addresses on the plaintext port. An informational answer such as `103 Early Hints` is passed over for the response it precedes.
+
+  **Upgrade:** nothing to do.
+
+### 🔧 Changed
+
+- **`composer.json` suggests `ext-pdo_mysql`.** The database requirement check reads the found-rows attribute through the MySQL driver's class, which only `pdo_mysql` provides; the suggestion names the extension a host that keeps the delivery tables on MySQL already loads. Nothing else changes.
+
+### 🐛 Fixed
+
+- **`webhooks:preflight` no longer names a receiving route whose path the forgery middleware lets through.** The check asked only whether a route runs behind `PreventRequestForgery`, a subclass of it or the `web` group, and never read the paths the middleware excepts. A host that lists its webhook paths in `preventRequestForgery(except: [...])` in `bootstrap/app.php`, or in the `$except` of its own subclass, got a failing preflight for routes that answer every delivery. The exceptions are now matched against the route's path with the rule the middleware applies to a request; a full URL in the list is not read and the route is still named.
+
+  **Upgrade:** nothing to do.
+
+- **A switch that is set but empty keeps its default.** `env()` returns `WEBHOOKS_SERVER_ENABLED=` as an empty string, and the config read that as off: outbound delivery stopped, and `WEBHOOKS_PLATFORM_ENABLED=` took the Platform layer down, without a message either time. Every boolean switch of the shipped config now reads through `EnvFlag::protection()`, which takes an empty or blank value as not set. `false`, `off`, `no` and `0` still switch off. The same held for a switch a published copy turns on: written as `filter_var(env('WEBHOOKS_CLIENT_ENABLED', true), …) ?? true`, an empty value removed the inbound route, and every webhook was answered with 404.
+
+  **Upgrade:** a published copy of the config takes the new reader over for each switch it sets to `true`, as `EnvFlag::protection(env('WEBHOOKS_…', true), true)`, the line the configuration reference shows. Without a published copy there is nothing to do.
+
+### 🔒 Security
+
+- **The per-minute brakes hold when a tenant's requests arrive together.** The replay allowance of the portal and the tenant dashboard, the test-ping limit of an endpoint and its destination, the registration brake and the two recompute brakes read how much was spent and counted afterwards, so requests that arrived at the same moment all read the last free unit and all spent it, and the number of workers was the only bound. Each now counts first and judges the count its own charge returns, and a refused request gives back what it counted, so it still spends nothing.
+
+  **Upgrade:** nothing to do.
+
+### 📚 Documentation
+
+- **The README and the Boost skill describe the guarded fetch.** `GuardedFetch::get()` reads a URL a customer entered, a status or metrics endpoint for one, under the SSRF guard the deliveries use: the connection is pinned to the validated address, no redirect is followed, the body stops at the byte limit of the call, and the headers and both timeouts are set per call. It shipped in 3.18.0 and was described on the documentation site only.
+
+  **Upgrade:** nothing to do.
+
 ## [3.23.0] - 2026-10-23
 
 ### ✨ Added
@@ -3524,7 +3590,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.23.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.24.0...HEAD
+[3.24.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.23.0...v3.24.0
 [3.23.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.22.0...v3.23.0
 [3.22.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.21.0...v3.22.0
 [3.21.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.20.0...v3.21.0

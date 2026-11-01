@@ -49,6 +49,7 @@ use Pushery\Webhooks\Search\SearchIndexer;
 use Pushery\Webhooks\Server\Exceptions\DeliveryRefused;
 use Pushery\Webhooks\Server\PendingWebhook;
 use Pushery\Webhooks\Support\PayloadValidator;
+use Pushery\Webhooks\Support\PerMinuteBrake;
 use Pushery\Webhooks\Support\Settings;
 use Pushery\Webhooks\Support\TenantIdentity;
 use Pushery\Webhooks\Support\Timestamp;
@@ -602,9 +603,9 @@ final readonly class WebhookManager
      *
      * Refused, not deferred: a real event that arrives two minutes late still means what
      * it meant, while a test ping that does has already failed at the only thing it was
-     * for. The buckets are only hit once the ping is allowed through. On the bucket that
-     * refused, counting the refusal would move nothing, because the fixed window does not grow
-     * with its count. But a ping the destination bucket refuses would otherwise open the
+     * for. Both buckets are counted first and judged by the counts they return, so two pings
+     * that arrive together cannot both take the last one. A refused ping gives back what it
+     * counted in both: a ping the destination bucket refuses would otherwise open the
      * endpoint's own minute, and keep the endpoint shut a full minute after the refusal, long
      * after the destination had opened again.
      *
@@ -618,16 +619,10 @@ final readonly class WebhookManager
             return;
         }
 
-        $keys = $this->testPingKeys($subscription);
+        $refused = PerMinuteBrake::spend($this->testPingKeys($subscription), $max, self::RATE_LIMIT_WINDOW);
 
-        foreach ($keys as $key) {
-            if (RateLimiter::tooManyAttempts($key, $max)) {
-                throw new TestPingThrottled($subscription, RateLimiter::availableIn($key));
-            }
-        }
-
-        foreach ($keys as $key) {
-            RateLimiter::hit($key, self::RATE_LIMIT_WINDOW);
+        if ($refused !== null) {
+            throw new TestPingThrottled($subscription, RateLimiter::availableIn($refused));
         }
     }
 

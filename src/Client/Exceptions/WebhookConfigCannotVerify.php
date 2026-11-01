@@ -88,6 +88,26 @@ final class WebhookConfigCannotVerify extends InvalidArgumentException
     }
 
     /**
+     * The config verifies with a verifier that checks the body of a delivery, on a route that verifies a call over its
+     * method, its target and its body.
+     *
+     * A verifier is asked with the request and checks what it reads of it, the body for a delivery. A call signed over
+     * more than its body cannot be verified that way, and a check of the body alone would accept the signature of one
+     * call for every other address. The same refusal and the same status, because it is the same fact about the
+     * request: it cannot be accepted as authentic.
+     */
+    public static function verifierReadsOnlyTheBody(string $name, string $verifier, int $status): self
+    {
+        return new self(
+            $name,
+            $status,
+            "The webhook client config [{$name}] verifies with [{$verifier}], which does not implement "
+            .'VerifiesSignedRequests, so it cannot verify a call over its method, its target and its body. '
+            .'Implement the interface on the verifier, or guard the route with a config that names a secret.',
+        );
+    }
+
+    /**
      * There is no entry of that name at all, which is the same fact carried further.
      *
      * The route does not vanish with the entry. It hangs on the macro, and the macro on

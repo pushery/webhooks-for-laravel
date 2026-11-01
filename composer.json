@@ -76,6 +76,7 @@
         "blade-ui-kit/blade-icons": "Renders the icons the shipped screens ask WireKit for (empty states, primary actions), together with the icon set your WireKit preset resolves them into: blade-ui-kit/blade-heroicons for the default preset (`composer require blade-ui-kit/blade-icons blade-ui-kit/blade-heroicons`), or the set of the preset you configured. Without them the screens draw WireKit's inert placeholder where an icon belongs; they render either way. `webhooks:preflight` names what is missing.",
         "blade-ui-kit/blade-heroicons": "The icon set of WireKit's default preset, which the shipped screens are drawn against unless you configured another one. On a lucide, phosphor or tabler preset, install that preset's set instead; this one is then not needed.",
         "spatie/laravel-health": "Runs `Pushery\\Webhooks\\Health\\DeliveryEngineCheck`, a health check over the delivery log: it fails above a failure rate and warns while an endpoint is switched off.",
-        "symfony/yaml": "Enables `--format=yaml` on `webhooks:asyncapi`. The command defaults to JSON and reports a clear error when this package is absent, so it stays entirely optional."
+        "symfony/yaml": "Enables `--format=yaml` on `webhooks:asyncapi`. The command defaults to JSON and reports a clear error when this package is absent, so it stays entirely optional.",
+        "ext-pdo_mysql": "Reads the found-rows attribute of a MySQL connection, which the delivery tables need off when they live on MySQL."
     }
 }

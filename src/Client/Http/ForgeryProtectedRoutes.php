@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Client\Http;
 
+use Illuminate\Container\Container;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Str;
 
 /**
  * The receiving routes a host has put behind CSRF protection, where no delivery can ever arrive.
@@ -57,7 +59,9 @@ final class ForgeryProtectedRoutes
         $faults = [];
 
         foreach (ReceivingRoutes::all($router) as $route) {
-            if (! self::isForgeryProtected($route)) {
+            $middleware = self::forgeryMiddleware($route);
+
+            if ($middleware === null || self::excepts($middleware, $route)) {
                 continue;
             }
 
@@ -74,7 +78,12 @@ final class ForgeryProtectedRoutes
         return $faults;
     }
 
-    private static function isForgeryProtected(Route $route): bool
+    /**
+     * The forgery middleware the route runs behind, or null where it runs behind none.
+     *
+     * @return class-string<PreventRequestForgery>|null
+     */
+    private static function forgeryMiddleware(Route $route): ?string
     {
         // No `is_string()` skip here: nothing can put a non-string in this list for one of our
         // routes. `Route::middleware()` casts every entry it
@@ -96,9 +105,43 @@ final class ForgeryProtectedRoutes
             // but as its own branch it would be a line no run can enter, which is the shape the
             // comment above rejects. On one condition it is a short-circuit within a line that
             // already runs.
-            if ($middleware === self::FORGERY
-                || $middleware === 'web'
-                || (is_string($middleware) && is_subclass_of($middleware, self::FORGERY))) {
+            if ($middleware === self::FORGERY || $middleware === 'web') {
+                return self::FORGERY;
+            }
+
+            if (is_string($middleware) && is_subclass_of($middleware, self::FORGERY)) {
+                return $middleware;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether the middleware lets the route's path through without a token anyway.
+     *
+     * The rule is the one its own `handle()` applies: every path in `getExcludedPaths()`, which holds
+     * what `preventRequestForgery(except: [...])` in `bootstrap/app.php` added and what a host subclass
+     * lists in `$except`, trimmed of its slashes and matched with `Str::is()` against the path, as
+     * `Request::is()` matches it. A route has no request yet, so it is matched against the route's
+     * own URI. A full URL in the list is not read here: there is no host to compare it with, and the
+     * route is reported rather than passed on a guess.
+     *
+     * @param  class-string<PreventRequestForgery>  $middleware
+     */
+    private static function excepts(string $middleware, Route $route): bool
+    {
+        $path = trim($route->uri(), '/');
+        $path = $path === '' ? '/' : $path;
+
+        // Static analysis knows what `make()` returns only for a class name written as a constant.
+        // This one is read from the route and names the middleware or a subclass of it, and that is
+        // what the container builds.
+        /** @var PreventRequestForgery $forgery */
+        $forgery = Container::getInstance()->make($middleware);
+
+        foreach ($forgery->getExcludedPaths() as $except) {
+            if (is_string($except) && Str::is($except === '/' ? $except : trim($except, '/'), $path)) {
                 return true;
             }
         }

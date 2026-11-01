@@ -181,6 +181,15 @@ final class OwnerKeyDeclaration
     }
 
     /**
+     * Which of the three declarable types a column spelling is, or null for none of them: the same
+     * reading this check applies, for the conversion that brings the columns to the declared type.
+     */
+    public static function typeOf(string $columnType): ?OwnerKeyType
+    {
+        return self::classify($columnType);
+    }
+
+    /**
      * Which of the three declarable types a column spelling actually is.
      *
      * Read from the engine's own rendering rather than a table of expected spellings, because

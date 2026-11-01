@@ -32,7 +32,7 @@ use RuntimeException;
  * locks the parent while rows move. {@see self::drainDefaultPartitionInto()} states
  * the locks the attach takes and what a reader of the log sees meanwhile.
  */
-final class PartitionManager
+final readonly class PartitionManager
 {
     private const string TABLE = 'webhook_deliveries';
 
@@ -61,9 +61,27 @@ final class PartitionManager
      */
     public const string LOCK_TIMEOUT = '2s';
 
+    public function __construct(
+        private bool $schemaOwner = false,
+    ) {}
+
+    /**
+     * A manager that runs every statement on the connection for schema changes,
+     * webhooks.database.ddl_connection, instead of the package connection.
+     *
+     * webhooks:partition-maintenance works through one, because only the owner of the delivery
+     * log may add or drop its partitions. Its reads run there as well: the count that decides
+     * whether a month's partition can be created shares a transaction with the lock it is taken
+     * under, and a lock held on one connection makes a read on another wait for it.
+     */
+    public static function forSchemaChanges(): self
+    {
+        return new self(schemaOwner: true);
+    }
+
     private function db(): ConnectionInterface
     {
-        return WebhookConnection::db();
+        return $this->schemaOwner ? WebhookConnection::ddl() : WebhookConnection::db();
     }
 
     /**
