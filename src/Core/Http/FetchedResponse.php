@@ -6,7 +6,7 @@ namespace Pushery\Webhooks\Core\Http;
 
 /**
  * What a {@see GuardedFetch} brought back: the status, the response headers, the body, never
- * longer than the limit the fetch was given, and how long the transfer took.
+ * longer than the limit the fetch was given and empty for a lead, and how long the transfer took.
  */
 final readonly class FetchedResponse
 {

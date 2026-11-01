@@ -20,10 +20,20 @@ return [
     | supports (PostgreSQL or MySQL 8.4+); `php artisan webhooks:preflight` checks
     | it, and reads this connection unless `--connection` names another.
     |
+    | 'ddl_connection' is the connection webhooks:partition-maintenance creates,
+    | attaches and drops partitions of the delivery log through, and drains its
+    | default partition with. Null uses the connection above. Set it where the
+    | application's runtime role does not own the tables, as under Row Level
+    | Security: PostgreSQL lets only the owner of a partitioned table add a
+    | partition, and every query the application makes at runtime stays on the
+    | connection above. It also lets the maintenance use a direct endpoint while
+    | the application uses a pooled one.
+    |
     */
 
     'database' => [
         'connection' => env('WEBHOOKS_DB_CONNECTION'),
+        'ddl_connection' => env('WEBHOOKS_DB_DDL_CONNECTION'),
     ],
 
     /*
@@ -111,7 +121,7 @@ return [
         // is not enforced through a proxy. The operator's proxy
         // must enforce egress control itself. Off by default.
         'egress' => [
-            'enabled' => filter_var(env('WEBHOOKS_EGRESS_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+            'enabled' => EnvFlag::protection(env('WEBHOOKS_EGRESS_ENABLED', false), false),
             'published_ips' => [],
             'proxy' => env('WEBHOOKS_EGRESS_PROXY'),
         ],
@@ -152,8 +162,9 @@ return [
     'server' => [
         // The outbound delivery engine. Note: the Platform layer delivers its fan-out
         // through this engine, so platform.enabled => true boots the Server regardless
-        // of this switch. To stop outbound delivery entirely, set both to false.
-        'enabled' => filter_var(env('WEBHOOKS_SERVER_ENABLED', true), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true,
+        // of this switch. To stop outbound delivery entirely, set both to false. An empty
+        // value counts as not set here, as it does for every switch in this file.
+        'enabled' => EnvFlag::protection(env('WEBHOOKS_SERVER_ENABLED', true), true),
         'queue' => env('WEBHOOKS_SERVER_QUEUE', 'default'),
         'connection' => env('WEBHOOKS_SERVER_CONNECTION'),
 
@@ -173,7 +184,7 @@ return [
         // is already correct, and turning this on changes the wire body, so a
         // receiver comparing raw bytes must canonicalize too. Deliberately conservative.
         'signing' => [
-            'canonicalize' => filter_var(env('WEBHOOKS_CANONICALIZE_JSON', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+            'canonicalize' => EnvFlag::protection(env('WEBHOOKS_CANONICALIZE_JSON', false), false),
             'ed25519' => [
                 'enabled' => false,
                 'secret_key' => env('WEBHOOKS_ED25519_SECRET_KEY'),
@@ -246,7 +257,7 @@ return [
         // the scheduled model:prune command. Off by default; nothing is created or
         // written while disabled.
         'persistence' => [
-            'enabled' => filter_var(env('WEBHOOKS_SERVER_PERSISTENCE_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+            'enabled' => EnvFlag::protection(env('WEBHOOKS_SERVER_PERSISTENCE_ENABLED', false), false),
             'prune_after_days' => EnvLimit::ceiling(env('WEBHOOKS_SERVER_PERSISTENCE_PRUNE_AFTER_DAYS'), 30),
         ],
 
@@ -273,7 +284,7 @@ return [
         // switches the alarm off. Delivered and skipped entries are pruned after prune_after_days;
         // a refused one stays, because it holds its stream until it is sent again or skipped.
         'outbox' => [
-            'enabled' => filter_var(env('WEBHOOKS_SERVER_OUTBOX_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+            'enabled' => EnvFlag::protection(env('WEBHOOKS_SERVER_OUTBOX_ENABLED', false), false),
             'max_attempts' => EnvLimit::optionalCeiling(env('WEBHOOKS_SERVER_OUTBOX_MAX_ATTEMPTS'), null),
             'alarm_after_hours' => EnvLimit::ceiling(env('WEBHOOKS_SERVER_OUTBOX_ALARM_AFTER_HOURS'), 72, zeroSwitchesOff: true),
             'prune_after_days' => EnvLimit::ceiling(env('WEBHOOKS_SERVER_OUTBOX_PRUNE_AFTER_DAYS'), 14),
@@ -324,7 +335,7 @@ return [
     */
 
     'platform' => [
-        'enabled' => filter_var(env('WEBHOOKS_PLATFORM_ENABLED', true), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true,
+        'enabled' => EnvFlag::protection(env('WEBHOOKS_PLATFORM_ENABLED', true), true),
 
         // The primary-key type of the models that own webhook subscriptions: 'bigint'
         // (default), 'uuid' or 'ulid'. It fixes the storage type of the denormalized
@@ -469,7 +480,7 @@ return [
         // the health board, the back link) rather than failing to render, so what you get is
         // the list, the form and the secret panel, working.
         'self_service' => [
-            'enabled' => filter_var(env('WEBHOOKS_SELF_SERVICE_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+            'enabled' => EnvFlag::protection(env('WEBHOOKS_SELF_SERVICE_ENABLED', false), false),
             'middleware' => ['web', 'auth'],
             'route_prefix' => 'webhooks/endpoints',
             'register_routes' => true,
@@ -566,7 +577,7 @@ return [
         // everyThirtyMinutes, hourly, …); an unknown token falls back to fifteen
         // minutes rather than silently never running.
         'health' => [
-            'enabled' => filter_var(env('WEBHOOKS_HEALTH_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+            'enabled' => EnvFlag::protection(env('WEBHOOKS_HEALTH_ENABLED', false), false),
             'refresh' => 'everyFifteenMinutes',
             'window_hours' => 24,
             'latency_budget_ms' => 2000,
@@ -599,7 +610,7 @@ return [
         // reusable default rule sets an endpoint can inherit by naming a version instead
         // of storing its own transform.
         'payload_versioning' => [
-            'enabled' => filter_var(env('WEBHOOKS_PAYLOAD_VERSIONING_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+            'enabled' => EnvFlag::protection(env('WEBHOOKS_PAYLOAD_VERSIONING_ENABLED', false), false),
             'versions' => [
                 // 'v2' => [
                 //     'exclude' => ['internal_note'],
@@ -671,7 +682,7 @@ return [
     */
 
     'client' => [
-        'enabled' => filter_var(env('WEBHOOKS_CLIENT_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+        'enabled' => EnvFlag::protection(env('WEBHOOKS_CLIENT_ENABLED', false), false),
 
         // Keep true. A middleware is prepended to the global stack so the exact received
         // bytes are captured before any other middleware can parse or re-encode the body;
@@ -936,7 +947,7 @@ return [
     'dashboard' => [
         // Requires the Platform layer: the dashboard reads Platform's delivery log
         // (see 'source_model'), whose table exists only while platform.enabled is true.
-        'enabled' => filter_var(env('WEBHOOKS_DASHBOARD_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+        'enabled' => EnvFlag::protection(env('WEBHOOKS_DASHBOARD_ENABLED', false), false),
         'prefix' => 'webhooks',
         'middleware' => ['web', 'auth', 'can:view-webhook-dashboard'],
         // Operator mode: read the global, owner-less endpoints (subscriptions registered with
@@ -944,7 +955,7 @@ return [
         // operator dashboard over your own global endpoints; leave it off (the default) for a
         // per-tenant customer dashboard. It shows global rows to everyone the
         // view-webhook-dashboard gate admits, so gate that ability to operators.
-        'operator' => filter_var(env('WEBHOOKS_DASHBOARD_OPERATOR', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+        'operator' => EnvFlag::protection(env('WEBHOOKS_DASHBOARD_OPERATOR', false), false),
 
         'deliveries' => [
             // How many days back the delivery table reads. A ceiling, not merely a default:
@@ -969,7 +980,7 @@ return [
         // rather than quietly falling back to a narrower scope — a support screen that
         // silently shrinks to the handful of owner-less rows is the failure this exists to
         // prevent, and it shows no error while doing it.
-        'all_tenants' => filter_var(env('WEBHOOKS_DASHBOARD_ALL_TENANTS', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+        'all_tenants' => EnvFlag::protection(env('WEBHOOKS_DASHBOARD_ALL_TENANTS', false), false),
         // The ability guarding cross-tenant reads. Required while 'all_tenants' is on: leave it
         // undefined and the dashboard refuses to load rather than reading every tenant's data.
         // Operator mode can default open because it shows only your own owner-less rows; this
@@ -1069,7 +1080,7 @@ return [
     */
 
     'pulse' => [
-        'enabled' => filter_var(env('WEBHOOKS_PULSE_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+        'enabled' => EnvFlag::protection(env('WEBHOOKS_PULSE_ENABLED', false), false),
     ],
 
     /*
@@ -1103,7 +1114,7 @@ return [
     */
 
     'search' => [
-        'enabled' => filter_var(env('WEBHOOKS_SEARCH_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+        'enabled' => EnvFlag::protection(env('WEBHOOKS_SEARCH_ENABLED', false), false),
 
         // Whether the delivery body is copied into the index. Off, and off is the only
         // safe default, because an index is not a screen.
@@ -1119,7 +1130,7 @@ return [
         // Turn it on only where the index is as protected as the database it mirrors, and
         // read `security.md` first. With it off the index still carries everything a
         // search actually needs: event type, url, status, the owner pair and the timestamp.
-        'index_payload' => filter_var(env('WEBHOOKS_SEARCH_INDEX_PAYLOAD', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+        'index_payload' => EnvFlag::protection(env('WEBHOOKS_SEARCH_INDEX_PAYLOAD', false), false),
 
         'payload_excerpt_chars' => 500,
     ],
@@ -1141,7 +1152,7 @@ return [
     */
 
     'otel' => [
-        'enabled' => filter_var(env('WEBHOOKS_OTEL_ENABLED', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false,
+        'enabled' => EnvFlag::protection(env('WEBHOOKS_OTEL_ENABLED', false), false),
     ],
 
     /*

@@ -34,17 +34,23 @@ use Pushery\Webhooks\Support\WebhookConnection;
  * key. Only the framework's encrypter can be asked which key a value is under; with an encrypter
  * of the host's own, every value is written again on every run.
  *
+ * `--dry-run` walks the same rows the same way and writes nothing: every value is decrypted, a
+ * value no configured key opens fails the run as it would, and the counts are the ones the next
+ * run would write. A host checks a rotation with it before the previous key leaves the list.
+ *
  * @internal
  */
 final class ReencryptCommand extends Command
 {
-    protected $signature = 'webhooks:reencrypt';
+    protected $signature = 'webhooks:reencrypt
+        {--dry-run : Read every value and count what a run would encrypt again, without writing anything}';
 
     protected $description = 'Encrypt the endpoint secrets and the outbox entries again under the current APP_KEY, so a previous key can be removed.';
 
     public function handle(Encrypter $encrypter): int
     {
         $failed = false;
+        $write = $this->option('dry-run') !== true;
 
         if (Config::boolean('webhooks.platform.enabled', true)) {
             // The `encrypted` cast encrypts with the encrypter a host set through
@@ -52,8 +58,9 @@ final class ReencryptCommand extends Command
             $failed = $this->summarize(
                 'Endpoint secrets',
                 'endpoints',
-                $this->reencryptSecrets(Model::$encrypter ?? $encrypter),
+                $this->reencryptSecrets(Model::$encrypter ?? $encrypter, $write),
                 'without that key those secrets are lost, and the endpoints have to be registered again',
+                $write,
             );
         } else {
             $this->info('The Platform layer is switched off (webhooks.platform.enabled), so there are no endpoint secrets to encrypt again.');
@@ -63,8 +70,9 @@ final class ReencryptCommand extends Command
             $failed = $this->summarize(
                 'Outbox entries',
                 'entries',
-                $this->reencryptOutbox($encrypter),
+                $this->reencryptOutbox($encrypter, $write),
                 'without that key those entries can never be sent',
+                $write,
             ) || $failed;
         } else {
             $this->info('The transactional outbox is switched off (webhooks.server.outbox.enabled), so there are no outbox entries to encrypt again.');
@@ -78,9 +86,9 @@ final class ReencryptCommand extends Command
     /**
      * @return array{again: int, already: int, unreadable: list<string>}
      */
-    private function reencryptSecrets(Encrypter $encrypter): array
+    private function reencryptSecrets(Encrypter $encrypter, bool $write): array
     {
-        return $this->eachRow(WebhookSubscription::model(), function (WebhookSubscription $subscription) use ($encrypter): array {
+        return $this->eachRow(WebhookSubscription::model(), $write, function (WebhookSubscription $subscription) use ($encrypter): array {
             $changes = [];
 
             foreach (['secret', 'previous_secret'] as $column) {
@@ -104,9 +112,9 @@ final class ReencryptCommand extends Command
      *
      * @return array{again: int, already: int, unreadable: list<string>}
      */
-    private function reencryptOutbox(Encrypter $encrypter): array
+    private function reencryptOutbox(Encrypter $encrypter, bool $write): array
     {
-        return $this->eachRow(WebhookOutboxEntry::model(), function (WebhookOutboxEntry $entry) use ($encrypter): array {
+        return $this->eachRow(WebhookOutboxEntry::model(), $write, function (WebhookOutboxEntry $entry) use ($encrypter): array {
             $sealed = $entry->getRawOriginal('delivery');
             $data = $entry->deliveryData();
 
@@ -138,7 +146,8 @@ final class ReencryptCommand extends Command
 
     /**
      * Walks every row of $model's table and writes the columns $reseal returns for it, each row
-     * read again under a lock in a transaction of its own.
+     * read again under a lock in a transaction of its own. Without $write the walk is the same and
+     * the write is left out, so the count is the one a run would write.
      *
      * The global scopes of a host's subclass are left out: a row such a scope hides holds its
      * values under the previous key all the same, and they are lost with that key.
@@ -149,7 +158,7 @@ final class ReencryptCommand extends Command
      * @param  Closure(TModel): array<string, string>  $reseal  the encrypted columns to write, none when every value is under the current key
      * @return array{again: int, already: int, unreadable: list<string>}
      */
-    private function eachRow(string $model, Closure $reseal): array
+    private function eachRow(string $model, bool $write, Closure $reseal): array
     {
         /** @var array{again: int, already: int, unreadable: list<string>} $tally */
         $tally = ['again' => 0, 'already' => 0, 'unreadable' => []];
@@ -157,11 +166,11 @@ final class ReencryptCommand extends Command
         $model::query()
             ->withoutGlobalScopes()
             ->select(new $model()->getKeyName())
-            ->eachById(function (Model $row) use ($model, $reseal, &$tally): void {
+            ->eachById(function (Model $row) use ($model, $write, $reseal, &$tally): void {
                 $key = $row->getKey();
 
                 try {
-                    $written = WebhookConnection::db()->transaction(static function () use ($model, $key, $reseal): ?bool {
+                    $written = WebhookConnection::db()->transaction(static function () use ($model, $key, $write, $reseal): ?bool {
                         $locked = $model::query()->withoutGlobalScopes()->whereKey($key)->lockForUpdate()->first();
 
                         // Deleted since the walk read its key: nothing left to encrypt.
@@ -177,7 +186,9 @@ final class ReencryptCommand extends Command
 
                         // Past the model on purpose: an update through it would stamp updated_at
                         // and fire the model's events for a row whose values did not change.
-                        $model::query()->withoutGlobalScopes()->whereKey($key)->toBase()->update($changes);
+                        if ($write) {
+                            $model::query()->withoutGlobalScopes()->whereKey($key)->toBase()->update($changes);
+                        }
 
                         return true;
                     });
@@ -229,14 +240,20 @@ final class ReencryptCommand extends Command
     }
 
     /**
-     * Writes what one kind of row came to.
+     * Writes what one kind of row came to, or would come to on a dry run.
      *
      * @param  array{again: int, already: int, unreadable: list<string>}  $tally
      * @return bool whether a row could not be decrypted
      */
-    private function summarize(string $kind, string $rows, array $tally, string $consequence): bool
+    private function summarize(string $kind, string $rows, array $tally, string $consequence, bool $written): bool
     {
-        $this->info(sprintf('%s: %d encrypted again under the current key, %d already under it.', $kind, $tally['again'], $tally['already']));
+        $this->info(sprintf(
+            '%s: %d %s again under the current key, %d already under it.',
+            $kind,
+            $tally['again'],
+            $written ? 'encrypted' : 'would be encrypted',
+            $tally['already'],
+        ));
 
         if ($tally['unreadable'] === []) {
             return false;

@@ -40,11 +40,15 @@ final class PartitionMaintenanceCommand extends Command
      */
     private const int PRUNE_CHUNK = 1000;
 
-    public function handle(PartitionManager $partitions, Settings $config): int
+    public function handle(Settings $config): int
     {
         if (WebhookConnection::dialect() === Dialect::MySql) {
             return $this->pruneByChunkedDelete($config);
         }
+
+        // The schema changes run on webhooks.database.ddl_connection where one is set: only the
+        // owner of the delivery log may add or drop its partitions.
+        $partitions = PartitionManager::forSchemaChanges();
 
         $monthsAhead = $config->partitionMonthsAhead();
 

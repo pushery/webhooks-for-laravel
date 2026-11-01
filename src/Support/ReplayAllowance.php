@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Pushery\Webhooks\Support;
 
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\RateLimiter;
 
 /**
  * The replay allowance one tenant spends on every tenant-facing surface that can replay a
@@ -54,15 +53,7 @@ final class ReplayAllowance
             return true;
         }
 
-        $key = self::key($owner);
-
-        if (RateLimiter::tooManyAttempts($key, $max)) {
-            return false;
-        }
-
-        RateLimiter::hit($key, self::WINDOW);
-
-        return true;
+        return PerMinuteBrake::spend([self::key($owner)], $max, self::WINDOW) === null;
     }
 
     /**

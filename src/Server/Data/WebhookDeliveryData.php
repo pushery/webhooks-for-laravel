@@ -6,10 +6,13 @@ namespace Pushery\Webhooks\Server\Data;
 
 use Closure;
 use Illuminate\Support\Facades\Date;
+use Pushery\Webhooks\Core\Signing\SecretSet;
 use Pushery\Webhooks\Core\Signing\SignatureScheme;
 use Pushery\Webhooks\Server\Backoff\BackoffStrategy;
 use Pushery\Webhooks\Server\Jobs\CallWebhookJob;
+use Pushery\Webhooks\Server\Signing\EncryptedSecretResolver;
 use Pushery\Webhooks\Server\Signing\ResolvesDeliverySecrets;
+use RuntimeException;
 
 /**
  * The immutable, queue-serializable context for one webhook delivery. Carries
@@ -142,6 +145,20 @@ final readonly class WebhookDeliveryData
     public function secretsResolver(): ?string
     {
         return $this->secretsResolver ?? null;
+    }
+
+    /**
+     * The secrets this delivery carries, unsealed: the current one and, during a rotation window, the previous one
+     * beside it. Null for an unsigned delivery and for one whose {@see self::secretsResolver()} names a class, which
+     * carries no secret and signs each attempt with what that class returns.
+     *
+     * A consumer reads them here to check what a delivery signs with, without knowing how they are sealed.
+     *
+     * @throws RuntimeException when the sealed value is not a set of secrets
+     */
+    public function sealedSecrets(): ?SecretSet
+    {
+        return new EncryptedSecretResolver()->resolveFor($this);
     }
 
     /**

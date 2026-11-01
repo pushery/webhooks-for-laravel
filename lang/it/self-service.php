@@ -151,6 +151,7 @@ return [
         'event' => 'Evento',
         'outcome' => 'Esito',
         'response_code' => 'Risposta',
+        'attempts' => 'Tentativi',
         // The unit sits in the translation because the ORDER can differ, not because 'ms'
         // does: a locale that writes the unit first has somewhere to say so.
         'duration' => ':ms ms',

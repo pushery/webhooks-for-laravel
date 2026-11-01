@@ -259,6 +259,28 @@ With `register_routes` false the provider registers the components and none of
 the portal's pages (the secret panel's script route stays), and the panels drop the
 links they cannot resolve rather than failing to render. The `manage-webhook-endpoints` gate still applies on every request.
 
+**Offer endpoints, the delivery log and replays through the application's own API.**
+`Pushery\Webhooks\Platform\Support\SelfServiceEndpoints` keeps the portal's rules, so
+a controller does not rebuild them. Decide who may act for the tenant before each call:
+
+```php
+use Pushery\Webhooks\Platform\Support\SelfServiceEndpoints;
+use Pushery\Webhooks\Support\TenantIdentity;
+
+$tenant = TenantIdentity::fromModel($team);
+$endpoints = app(SelfServiceEndpoints::class);
+
+$endpoint = $endpoints->register($tenant, $url, ['order.created'], 'Orders', actor: $user);
+$endpoints->change($endpoint, $url, ['order.created', 'order.shipped'], 'Orders', actor: $user);
+$page = $endpoints->deliveries($tenant, endpoint: $endpoint->id)->cursorPaginate(50);
+$replay = $endpoints->redeliver($tenant, $deliveryId);
+```
+
+A refusal is a `ValidationException` on `name`, `url`, `eventTypes` or `delivery`
+(`422`), and an endpoint or a delivery of another tenant is a `ModelNotFoundException`
+(`404`). The log never selects the payload, and the replay spends the tenant's
+`replays_per_minute` like the portal does.
+
 **Check the operator console per action.** `Pushery\Webhooks\Livewire\SubscriptionManager`
 and `DeliveryLog` are unscoped across every tenant and must sit behind an
 operator-only gate of the host's. That page gate does not re-run on each Livewire
@@ -322,7 +344,7 @@ outbox while `server.outbox.enabled`. An
 application with a database per tenant sets `schedule.enabled` to `false` and runs
 these commands from its own tenant loop.
 
-Six more are for the application to run when it needs them:
+Seven more are for the application to run when it needs them:
 
 - `webhooks:preflight` checks that the database the persistent layers use is
   supported, that the schema agrees with the configuration, and, with the Client
@@ -341,7 +363,12 @@ Six more are for the application to run when it needs them:
   under the current `APP_KEY`. Run it after moving the old key to
   `APP_PREVIOUS_KEYS`, and remove that key once a second run has nothing left to
   encrypt and the deliveries queued before the rotation have been sent. It exits
-  non-zero for a value no configured key can decrypt.
+  non-zero for a value no configured key can decrypt. `--dry-run` decrypts every
+  value and reports what a run would encrypt again, without writing.
+- `webhooks:owner-key-type` changes the `owner_id` columns of the subscriptions
+  table, the delivery log and the dashboard rollup to `platform.owner_key_type`, for
+  an installation migrated before it chose the type. It runs only while those
+  tables are empty and exits non-zero otherwise; `--dry-run` reports what would change.
 - `webhooks:import-calls`, with the Client layer on, backfills the `webhook_calls`
   log from the inbound-webhook table the application used before this package. It
   can run again without duplicating rows.
@@ -380,6 +407,30 @@ class NotifyInvoicePaid
 Platform stays on, so the delivery is recorded in the log and the customer's
 endpoint gets health scoring for free. Turning Platform off as well would drop
 the tables and keep the sender.
+
+A monitoring application that reads a status endpoint each customer enters, with the
+customer's token:
+
+```php
+use Pushery\Webhooks\Core\Http\GuardedFetch;
+
+$response = app(GuardedFetch::class)->get(
+    $customer->status_url,
+    maxBytes: 64 * 1024,
+    headers: ['Authorization' => 'Bearer '.$customer->status_token],
+    connectTimeout: 3,
+    timeout: 10,
+);
+
+$healthy = $response->status === 200;
+```
+
+`get()` checks the address with the SSRF guard and pins the connection to it, so an
+address the guard refuses throws `BlockedDestination` before a request leaves. A
+redirect comes back as the response instead of being followed, and a body past
+`maxBytes` throws `ResponseTooLarge` as soon as it passes the limit. Do not reach for
+Laravel's HTTP client on a URL a customer typed; it follows redirects and resolves the
+name again on every request.
 
 ## Anti-Patterns
 

@@ -80,6 +80,10 @@ Everything ships under the `Pushery\Webhooks\` namespace.
 - **Security by default** — every outbound URL is SSRF-vetted and the connection pinned
   to the validated IP, secrets are encrypted at rest, and sensitive inbound headers are
   redacted before storage.
+- **A guarded fetch** — `GuardedFetch::get()` reads a URL your customer entered, a health
+  or metrics endpoint for one, under the same SSRF guard: the connection is pinned to the
+  validated address, no redirect is followed, TLS is verified, the body stops at the byte
+  limit you set, and the headers and both timeouts are set per call.
 - **Seven languages** — every string the shipped UI renders is translated, and the
   translations are publishable.
 - **A fake for your tests** — `Webhooks::fake()` records every webhook instead of sending

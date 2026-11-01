@@ -513,7 +513,9 @@ final class EndpointDeliveries extends Component
         // duration_ms rides along with response_code because it is only ever rendered beside
         // one: a duration with no answer behind it is the time spent failing to get one, and
         // reading it as latency would be wrong in the direction that looks reassuring.
-        $columns = ['id', 'event_type', 'status', 'response_code', 'duration_ms', 'created_at'];
+        // attempt is how a reader tells a delivery that already went out again from one that did not,
+        // and so whether sending it again is theirs to do.
+        $columns = ['id', 'event_type', 'status', 'response_code', 'duration_ms', 'attempt', 'created_at'];
 
         if ($this->showsErrors()) {
             $columns[] = 'error';

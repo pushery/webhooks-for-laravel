@@ -53,6 +53,36 @@ final class WebhookConnection
     }
 
     /**
+     * The configured connection for the package's schema changes, or the package connection's
+     * name when none is configured.
+     *
+     * webhooks:partition-maintenance creates, attaches and drops the partitions of the delivery
+     * log and drains its default partition through it. PostgreSQL lets only the owner of a
+     * partitioned table add a partition, so a host whose runtime role does not own the tables,
+     * as under Row Level Security, points this at the owner, and every query the application
+     * makes at runtime stays on {@see self::name()}.
+     */
+    public static function ddlName(): ?string
+    {
+        // Config::get for the reason given in name(): an unset variable leaves a null value.
+        $connection = Config::get('webhooks.database.ddl_connection');
+
+        if (is_string($connection) && $connection !== '') {
+            return $connection;
+        }
+
+        return self::name();
+    }
+
+    /**
+     * The resolved connection for the package's schema changes.
+     */
+    public static function ddl(): ConnectionInterface
+    {
+        return DB::connection(self::ddlName());
+    }
+
+    /**
      * The SQL dialect of the resolved webhook connection — the engine the package's tables
      * physically live on (the side-car, when one is configured), never the application default.
      *
