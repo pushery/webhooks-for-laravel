@@ -1231,9 +1231,10 @@ return [
         // "disabled" look like every other button on the row.
         'secondary_surface' => 'outline',
 
-        // A `data-*` attribute the secret panel puts on the element that shows a plaintext
-        // signing secret, the current one and the previous one, so a screenshot redactor can
-        // blank it while the heading, the notice and the buttons stay readable. For
+        // A `data-*` attribute put on every element that shows a plaintext signing secret: the
+        // current and the previous one in the secret panel, and the new one the operator console
+        // shows after a registration or a rotation. A screenshot redactor can then blank the
+        // secret while the heading, the notice and the buttons stay readable. For
         // visual-feedback that is `data-visual-feedback-redact`. Null, the default, marks nothing,
         // and a name that is not `data-*` marks nothing either.
         'sensitive_attribute' => env('WEBHOOKS_UI_SENSITIVE_ATTRIBUTE'),

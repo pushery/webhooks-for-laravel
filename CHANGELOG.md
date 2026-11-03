@@ -6,6 +6,14 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.25.1] - 2026-11-03
+
+### 🔒 Security
+
+- **The operator console marks its one-time signing secret for a screenshot redactor.** After a registration and after a rotation, the console showed the new secret without the attribute `ui.sensitive_attribute` names, which the self-service secret panel already carries. A screenshot taken in that moment, such as a bug report through visual-feedback, therefore held the secret. Both console views now put the attribute on the value alone, so the heading and the controls stay readable.
+
+  **Upgrade:** a host that published the console views publishes them again, or adds the attribute to the element that shows the secret the way the shipped views do.
+
 ## [3.25.0] - 2026-11-03
 
 ### ✨ Added
@@ -3630,7 +3638,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.25.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.25.1...HEAD
+[3.25.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.25.0...v3.25.1
 [3.25.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.24.0...v3.25.0
 [3.24.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.23.0...v3.24.0
 [3.23.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.22.0...v3.23.0
