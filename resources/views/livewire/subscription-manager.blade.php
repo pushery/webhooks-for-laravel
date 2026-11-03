@@ -10,6 +10,10 @@
     $canToggle = $canToggle ?? true;
     $canRotate = $canRotate ?? true;
     $canDelete = $canDelete ?? true;
+
+    // The attribute `ui.sensitive_attribute` names, on the one-time secret only, so a screenshot
+    // redactor blanks the value and leaves the heading and the controls around it readable.
+    $sensitive = \Pushery\Webhooks\Support\SensitiveAttribute::bag();
 @endphp
 <div class="wh-subscriptions space-y-8">
     {{-- The form is the create action until a row is opened, and the edit action after. --}}
@@ -119,6 +123,7 @@
                 class="wh-new-secret-value mt-2 w-full break-all font-mono text-sm"
                 type="text"
                 readonly
+                {{ $sensitive }}
                 value="{{ $newSecret }}"
             >
         </div>

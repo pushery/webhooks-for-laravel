@@ -47,6 +47,10 @@
     $canToggle = $canToggle ?? true;
     $canRotate = $canRotate ?? true;
     $canDelete = $canDelete ?? true;
+
+    // The attribute `ui.sensitive_attribute` names, on the one-time secret only, so a screenshot
+    // redactor blanks the value and leaves the heading and the controls around it readable.
+    $sensitive = \Pushery\Webhooks\Support\SensitiveAttribute::bag();
 @endphp
 <x-wirekit::stack gap="lg" class="wh-subscriptions">
     {{-- The form is the create action until a row is opened, and the edit action after. --}}
@@ -121,7 +125,7 @@
              wrong. --}}
         <x-wirekit::alert intent="success" :title="$rotated ? __('webhooks::management.secret.rotated_heading') : __('webhooks::management.secret.heading')">
             <div class="flex flex-wrap items-center gap-[var(--gap-wk-sm)]">
-                <x-wirekit::code class="wh-new-secret break-all">{{ $newSecret }}</x-wirekit::code>
+                <x-wirekit::code class="wh-new-secret break-all" :attributes="$sensitive">{{ $newSecret }}</x-wirekit::code>
                 {{-- A labeled button, not an icon-only one: its accessible name then comes from
                      the visible text, so the name and the label cannot drift apart. The pair that
                      has to hold together is the name and the value — passing the secret as an
