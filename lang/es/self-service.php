@@ -169,6 +169,11 @@ return [
         'error' => 'Error',
         'replay' => 'Enviar de nuevo',
         'replay_sr' => ':label — :event · :at',
+        'replay_dialog' => [
+            'title' => '¿Enviar de nuevo esta entrega?',
+            'description' => 'El evento se envía de nuevo a tu endpoint con su identificador original. Un receptor que deduplica lo tratará como uno que ya ha visto.',
+            'confirm' => 'Enviar de nuevo',
+        ],
         'endpoint_disabled' => 'Este endpoint está desactivado, así que no se le puede enviar nada.',
         'replay_throttled' => 'Has reenviado mucho en poco tiempo. Espera un minuto e inténtalo otra vez.',
         'status' => [

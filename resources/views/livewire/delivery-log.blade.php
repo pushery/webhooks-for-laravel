@@ -137,7 +137,8 @@
         </thead>
         <tbody>
             @foreach ($deliveries as $delivery)
-                @php($when = $delivery->created_at->settings(['locale' => app()->getLocale()]))
+                {{-- In the display zone of `webhooks.dashboard.timezone`, as on every dashboard surface. --}}
+                @php($when = \Pushery\Webhooks\Dashboard\DashboardTimezone::apply($delivery->created_at)->settings(['locale' => app()->getLocale()]))
                 <tr wire:key="del-{{ $delivery->id }}" class="border-t">
                     <th scope="row" class="px-3 py-2">{{ $delivery->event_type }}</th>
                     {{-- Name, then url, then the bare id -- the same ladder both action names

@@ -170,6 +170,11 @@ return [
         'error' => 'Error',
         'replay' => 'Send again',
         'replay_sr' => ':label — :event · :at',
+        'replay_dialog' => [
+            'title' => 'Send this delivery again?',
+            'description' => 'The event is sent to your endpoint again, under its original id. A receiver that deduplicates will treat it as one it has already seen.',
+            'confirm' => 'Send again',
+        ],
         'endpoint_disabled' => 'This endpoint is switched off, so nothing can be sent to it.',
         'replay_throttled' => 'You have sent a lot of replays just now. Give it a minute and try again.',
         'status' => [

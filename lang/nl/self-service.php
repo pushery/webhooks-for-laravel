@@ -169,6 +169,11 @@ return [
         'error' => 'Fout',
         'replay' => 'Opnieuw versturen',
         'replay_sr' => ':label — :event · :at',
+        'replay_dialog' => [
+            'title' => 'Deze levering opnieuw versturen?',
+            'description' => 'De gebeurtenis wordt opnieuw naar je endpoint verstuurd onder haar oorspronkelijke id. Een ontvanger die dedupliceert, behandelt haar als een die al is gezien.',
+            'confirm' => 'Opnieuw versturen',
+        ],
         'endpoint_disabled' => 'Dit endpoint staat uit, er kan dus niets naartoe worden gestuurd.',
         'replay_throttled' => 'Je hebt zojuist veel opnieuw verstuurd. Wacht een minuut en probeer het nog eens.',
         'status' => [

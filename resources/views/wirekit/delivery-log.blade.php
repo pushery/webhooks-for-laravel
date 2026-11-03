@@ -100,28 +100,34 @@
             </x-wirekit::select>
         </div>
 
-        {{-- Debounced like the event-type field: a date input reports every keystroke while a
-             reader types the year, and each one would be a round trip and a query.
+        {{-- Two datetime pickers, so a bound is a moment: a day picked alone takes its first
+             minute for From and its last for Until, and a time from the list narrows it to the
+             minute. Each is handed what the property holds through FilterBound::shown(), since the
+             default window and a link still name a day, which the picker cannot show. A view
+             rendered through View::make() with the data render() passes has no component, and
+             with it no property: there the pickers start empty.
 
-             The two dates carry visible labels, unlike the lists beside them. A list names itself
-             through its first option; two bare date fields side by side say nothing about which one
-             starts the range. Each also sits in a box of its own width: a date input without one
-             takes the width its engine gives it, Chromium and WebKit disagree by up to 53 pixels,
-             and that alone decides how the row wraps. --}}
-        <div class="w-full sm:w-40">
-            <x-wirekit::input
-                type="date"
+             The two carry visible labels, unlike the lists beside them. A list names itself through
+             its first option; two bare fields side by side say nothing about which one starts the
+             range. Each sits in a box wide enough for a moment, its clear button and its chevron. --}}
+        <div class="w-full sm:w-72">
+            <x-wirekit::datetime-picker
                 name="from"
-                wire:model.live.debounce.500ms="from"
+                :value="\Pushery\Webhooks\Support\FilterBound::shown($from ?? '', false)"
+                wire:model.live="from"
+                default-time="00:00"
+                clearable
                 :label="__('webhooks::management.filters.from')"
             />
         </div>
 
-        <div class="w-full sm:w-40">
-            <x-wirekit::input
-                type="date"
+        <div class="w-full sm:w-72">
+            <x-wirekit::datetime-picker
                 name="until"
-                wire:model.live.debounce.500ms="until"
+                :value="\Pushery\Webhooks\Support\FilterBound::shown($until ?? '', true)"
+                wire:model.live="until"
+                default-time="23:59"
+                clearable
                 :label="__('webhooks::management.filters.until')"
             />
         </div>
@@ -178,7 +184,9 @@
                         // same amber it uses for pending -- so the worst outcome a delivery has
                         // read one step too harmless on precisely the view a host copies.
                         $intent = $delivery->status->intent();
-                        $when = $delivery->created_at->settings(['locale' => app()->getLocale()]);
+                        // In the display zone of `webhooks.dashboard.timezone`, as on every
+                        // dashboard surface: one screen showing two clocks is worse than one.
+                        $when = \Pushery\Webhooks\Dashboard\DashboardTimezone::apply($delivery->created_at)->settings(['locale' => app()->getLocale()]);
                     @endphp
                     <x-wirekit::table.row wire:key="del-{{ $delivery->id }}">
                         <x-wirekit::table.th headerScope="row">{{ $delivery->event_type }}</x-wirekit::table.th>
@@ -237,7 +245,8 @@
                                      away in a list of twenty identical-looking actions. The
                                      rotate and delete confirmations in the subscription manager
                                      are the pattern this follows. --}}
-                                <x-wirekit::alert-dialog :name="'redeliver-'.$delivery->id">
+                                {{-- It closes with the re-render its action causes, and says so, so an application that turns close-on-confirm on for every dialog does not ask this one for a confirm control. --}}
+                                <x-wirekit::alert-dialog :name="'redeliver-'.$delivery->id" :close-on-confirm="false">
                                     <x-slot:trigger>
                                         <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" :aria-label="__('webhooks::management.a11y.redeliver_delivery', ['label' => __('webhooks::management.deliveries.redeliver'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat('LLL')])">{{ __('webhooks::management.deliveries.redeliver') }}</x-wirekit::button>
                                     </x-slot:trigger>

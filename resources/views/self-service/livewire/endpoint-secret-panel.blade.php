@@ -26,6 +26,9 @@
 @endassets
 @php($secret = $this->visibleCurrentSecret)
 @php($previous = $this->visiblePreviousSecret)
+{{-- The attribute `ui.sensitive_attribute` names, on the two values only, so a screenshot redactor
+     blanks the secret and leaves the rest of the card readable. --}}
+@php($sensitive = \Pushery\Webhooks\Support\SensitiveAttribute::bag())
 {{-- `contents` while closed, so the panel forms no box of its own. Both panels render their
      root unconditionally -- the live region above has to be in the DOM before its text appears,
      which is the whole reason it is permanent -- and a root that renders is a flex child of the
@@ -130,7 +133,7 @@
                     </div>
 
                     <div class="flex flex-wrap items-center gap-[var(--gap-wk-sm)]">
-                        <x-wirekit::code class="wh-portal-secret-value break-all">{{ $secret }}</x-wirekit::code>
+                        <x-wirekit::code class="wh-portal-secret-value break-all" :attributes="$sensitive">{{ $secret }}</x-wirekit::code>
                         <x-wirekit::clipboard-button
                             :value="$secret"
                             :copied-text="__('webhooks::self-service.secret.copied')"
@@ -141,7 +144,7 @@
                         <div class="flex flex-col gap-[var(--padding-wk-y-sm)]">
                             <x-wirekit::text size="sm" weight="medium">{{ __('webhooks::self-service.secret.previous') }}</x-wirekit::text>
                             <div class="flex flex-wrap items-center gap-[var(--gap-wk-sm)]">
-                                <x-wirekit::code class="wh-portal-previous-secret break-all">{{ $previous }}</x-wirekit::code>
+                                <x-wirekit::code class="wh-portal-previous-secret break-all" :attributes="$sensitive">{{ $previous }}</x-wirekit::code>
                                 <x-wirekit::clipboard-button
                                     :value="$previous"
                                     :copied-text="__('webhooks::self-service.secret.copied')"

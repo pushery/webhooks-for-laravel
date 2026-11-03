@@ -169,6 +169,11 @@ return [
         'error' => 'Erreur',
         'replay' => 'Renvoyer',
         'replay_sr' => ':label — :event · :at',
+        'replay_dialog' => [
+            'title' => 'Renvoyer cette livraison ?',
+            'description' => 'L\'événement est renvoyé à ton endpoint sous son identifiant d\'origine. Un destinataire qui déduplique le traitera comme un événement déjà reçu.',
+            'confirm' => 'Renvoyer',
+        ],
         'endpoint_disabled' => 'Cet endpoint est désactivé, rien ne peut lui être envoyé.',
         'replay_throttled' => 'Tu viens de renvoyer beaucoup d\'éléments. Attends une minute et réessaie.',
         'status' => [
