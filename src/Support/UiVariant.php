@@ -156,10 +156,10 @@ final class UiVariant
      * render an `<x-wirekit::…>` tag, so choosing its markup would produce the unstyled
      * screen this class exists to prevent — with the config now claiming otherwise.
      *
-     * There is deliberately no version comparison here. `composer.json` already refuses
-     * `pushery/wirekit <2.69.0` outright, so a resolvable install is a tested one, and the
-     * check happens where a version problem can still be fixed. A second copy of the floor
-     * would drift from the constraint and would fail at render time, on a screen.
+     * There is deliberately no version comparison here. `composer.json` already refuses a
+     * `pushery/wirekit` below the floor its `conflict` names outright, so a resolvable install is a
+     * tested one, and the check happens where a version problem can still be fixed. A second copy
+     * of the floor would drift from the constraint and would fail at render time, on a screen.
      */
     private static function rendersWireKit(): bool
     {

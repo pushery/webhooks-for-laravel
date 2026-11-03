@@ -279,7 +279,8 @@
                                      follow — so it is confirmed through the same alert-dialog as the
                                      destructive action beside it, never a bare click. --}}
                                 @if ($canRotate)
-                                <x-wirekit::alert-dialog :name="'rotate-subscription-' . $subscription->id">
+                                {{-- It closes with the re-render its action causes, and says so, so an application that turns close-on-confirm on for every dialog does not ask this one for a confirm control. --}}
+                                <x-wirekit::alert-dialog :name="'rotate-subscription-' . $subscription->id" :close-on-confirm="false">
                                     <x-slot:trigger>
                                         <x-wirekit::button
                                             size="sm"
@@ -331,9 +332,11 @@
                                      declaring a target there would REPLACE that with a jump to the
                                      table — worse than doing nothing. --}}
                                 @if ($canDelete)
+                                {{-- It closes with the re-render its action causes, and says so, so an application that turns close-on-confirm on for every dialog does not ask this one for a confirm control. --}}
                                 <x-wirekit::alert-dialog
                                     :name="'delete-subscription-' . $subscription->id"
                                     focus-return-to="#wh-subscriptions-table"
+                                    :close-on-confirm="false"
                                 >
                                     <x-slot:trigger>
                                         <x-wirekit::button

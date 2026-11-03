@@ -200,9 +200,11 @@
                                          first. Note the counter-case there: the rotate dialog
                                          deliberately declares no target, because its row survives
                                          and focus returns to the trigger by itself. --}}
+                                    {{-- It closes with the re-render its action causes, and says so, so an application that turns close-on-confirm on for every dialog does not ask this one for a confirm control. --}}
                                     <x-wirekit::alert-dialog
                                         :name="'delete-endpoint-' . $endpoint->id"
                                         focus-return-to="#wh-portal-endpoints-table"
+                                        :close-on-confirm="false"
                                     >
                                         <x-slot:trigger>
                                             <x-wirekit::button

@@ -169,6 +169,11 @@ return [
         'error' => 'Fehler',
         'replay' => 'Erneut senden',
         'replay_sr' => ':label — :event · :at',
+        'replay_dialog' => [
+            'title' => 'Diese Zustellung erneut senden?',
+            'description' => 'Das Ereignis wird unter seiner ursprünglichen Id erneut an deinen Endpunkt gesendet. Ein Empfänger, der dedupliziert, behandelt es als eines, das er bereits kennt.',
+            'confirm' => 'Erneut senden',
+        ],
         'endpoint_disabled' => 'Dieser Endpunkt ist abgeschaltet, es kann nichts an ihn gesendet werden.',
         'replay_throttled' => 'Du hast gerade viel erneut gesendet. Warte eine Minute und versuch es noch einmal.',
         'status' => [

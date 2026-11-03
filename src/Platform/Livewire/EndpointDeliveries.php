@@ -25,7 +25,7 @@ use Pushery\Webhooks\Platform\Support\ReadableEndpoints;
 use Pushery\Webhooks\Platform\Support\ReplayableEndpoints;
 use Pushery\Webhooks\Platform\Support\SubscriptionScope;
 use Pushery\Webhooks\Server\Exceptions\DeliveryRefused;
-use Pushery\Webhooks\Support\CalendarDay;
+use Pushery\Webhooks\Support\FilterBound;
 use Pushery\Webhooks\Support\TenantIdentity;
 use Pushery\Webhooks\Support\UiVariant;
 
@@ -212,7 +212,8 @@ final class EndpointDeliveries extends Component
     public string $status = '';
 
     /**
-     * Inclusive lower and upper day bounds, `YYYY-MM-DD`, or '' for unbounded.
+     * Inclusive lower and upper bounds, a day `YYYY-MM-DD` or a moment `YYYY-MM-DDTHH:MM`, or ''
+     * for unbounded, read in the zone the list shows its times in ({@see FilterBound}).
      *
      * These cannot widen the window, because they are added to it rather than used instead of it.
      * The window's own lower bound stays on the query unconditionally, so a `from` older than the
@@ -624,8 +625,8 @@ final class EndpointDeliveries extends Component
         // Narrowed by outcome or by date: the only honest sentence is about the filters. Both
         // others are claims about what was sent, and both are false here.
         if (DeliveryStatus::tryFrom($this->status) instanceof DeliveryStatus
-            || CalendarDay::start($this->from) instanceof CarbonInterface
-            || CalendarDay::endExclusive($this->until) instanceof CarbonInterface
+            || FilterBound::start($this->from) instanceof CarbonInterface
+            || FilterBound::endExclusive($this->until) instanceof CarbonInterface
             || $this->windowNarrowed()) {
             return 'no_match';
         }
@@ -663,13 +664,13 @@ final class EndpointDeliveries extends Component
     {
         $query = $this->deliveryQuery();
 
-        $from = CalendarDay::start($this->from);
+        $from = FilterBound::start($this->from);
 
         if ($from instanceof CarbonInterface) {
             $query->createdAfter($from);
         }
 
-        $until = CalendarDay::endExclusive($this->until);
+        $until = FilterBound::endExclusive($this->until);
 
         if ($until instanceof CarbonInterface) {
             $query->createdBefore($until);

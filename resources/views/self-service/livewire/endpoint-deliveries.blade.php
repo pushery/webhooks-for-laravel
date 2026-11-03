@@ -61,33 +61,35 @@
                 </x-wirekit::select>
             </div>
 
-            {{-- Debounced, because a date input reports every keystroke while a reader types
-                 the year and each one is a round trip and a query. The pair narrows within
-                 the window above and can never reach past it — the window's own bound stays
-                 on the query, so the older of the two bounds simply loses.
+            {{-- Two datetime pickers, so a bound is a moment: a day picked alone takes its first
+                 minute for From and its last for Until, and a time from the list narrows it to the
+                 minute. Each is handed what the property holds through FilterBound::shown(), since
+                 a link or a host may still pass a day, which the picker cannot show. The pair
+                 narrows within the window above and can never reach past it — the window's own
+                 bound stays on the query, so the older of the two bounds simply loses.
 
                  Visible labels, unlike the lists: a list names itself through its first option,
-                 and two bare date fields say nothing about which one starts the range. On a phone
-                 each field takes a row of its own: a date field needs room for the date and its
-                 calendar control, and in half of a 390px screen the control was cut off at the
-                 field's edge. From `sm` up each keeps a width of its own. A date input without one
-                 takes the width its engine gives it, Chromium and WebKit disagree by up to 53
-                 pixels, and that alone decided how this row wrapped: three rows in one engine, two
-                 in the other. --}}
+                 and two bare fields say nothing about which one starts the range. On a phone each
+                 picker takes a row of its own, and from `sm` up each keeps a width that holds a
+                 moment, its clear button and its chevron. --}}
             <div class="grid grid-cols-1 items-end gap-[var(--padding-wk-x-md)] sm:contents">
-                <div class="min-w-0 sm:w-40">
-                    <x-wirekit::input
-                        type="date"
+                <div class="min-w-0 sm:w-72">
+                    <x-wirekit::datetime-picker
                         name="from"
-                        wire:model.live.debounce.500ms="from"
+                        :value="\Pushery\Webhooks\Support\FilterBound::shown($from, false)"
+                        wire:model.live="from"
+                        default-time="00:00"
+                        clearable
                         :label="__('webhooks::self-service.deliveries.from')"
                     />
                 </div>
-                <div class="min-w-0 sm:w-40">
-                    <x-wirekit::input
-                        type="date"
+                <div class="min-w-0 sm:w-72">
+                    <x-wirekit::datetime-picker
                         name="until"
-                        wire:model.live.debounce.500ms="until"
+                        :value="\Pushery\Webhooks\Support\FilterBound::shown($until, true)"
+                        wire:model.live="until"
+                        default-time="23:59"
+                        clearable
                         :label="__('webhooks::self-service.deliveries.until')"
                     />
                 </div>
@@ -164,7 +166,9 @@
                          not warning. Two surfaces disagreeing about which outcome is grave
                          is a difference a reader would have to learn. --}}
                     @php($intent = $delivery->status->intent())
-                    @php($when = $delivery->created_at->settings(['locale' => app()->getLocale()]))
+                    {{-- In the display zone of `webhooks.dashboard.timezone`, which a host resolves per
+                         reader, so the time reads as every other time of the application. --}}
+                    @php($when = \Pushery\Webhooks\Dashboard\DashboardTimezone::apply($delivery->created_at)->settings(['locale' => app()->getLocale()]))
                     <x-wirekit::table.row wire:key="d-{{ $delivery->id }}">
                         {{-- The row header is the event, not the outcome badge: announcing
                              "Failed" tells a screen-reader user nothing about which
@@ -215,17 +219,33 @@
                             {{-- Named for the row it belongs to. Twenty buttons all called
                                  "Send again" leave a screen-reader user picking at random,
                                  and this one sends an HTTP request when picked wrong. --}}
-                            <x-wirekit::button
-                                size="sm"
-                                surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
-                                wire:click="redeliver('{{ $delivery->id }}')"
-                                wire:loading.attr="disabled"
-                                {{-- Scoped like every sibling replay button. Without it the row
-                                     grays out on any commit of this component, a filter change
-                                     included. --}}
-                                wire:target="redeliver"
-                                :aria-label="__('webhooks::self-service.deliveries.replay_sr', ['label' => __('webhooks::self-service.deliveries.replay'), 'event' => $delivery->event_type, 'at' => $when->isoFormat(__('webhooks::self-service.formats.precise'))])"
-                            >{{ __('webhooks::self-service.deliveries.replay') }}</x-wirekit::button>
+                            {{-- Asked once before it goes, as the operator console asks: the
+                                 delivery reaches the customer's receiver again, under its
+                                 original id, and the wrong row is one click away in a list of
+                                 identical buttons. The button opens the dialog and carries no
+                                 action of its own; only the confirmation sends. It closes with
+                                 the re-render its action causes, and says so, so an application
+                                 that turns close-on-confirm on for every dialog does not ask
+                                 this one for a confirm control. --}}
+                            <x-wirekit::alert-dialog :name="'replay-'.$delivery->id" :close-on-confirm="false">
+                                <x-slot:trigger>
+                                    <x-wirekit::button
+                                        size="sm"
+                                        surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
+                                        :aria-label="__('webhooks::self-service.deliveries.replay_sr', ['label' => __('webhooks::self-service.deliveries.replay'), 'event' => $delivery->event_type, 'at' => $when->isoFormat(__('webhooks::self-service.formats.precise'))])"
+                                    >{{ __('webhooks::self-service.deliveries.replay') }}</x-wirekit::button>
+                                </x-slot:trigger>
+
+                                <x-wirekit::alert-dialog.title>{{ __('webhooks::self-service.deliveries.replay_dialog.title') }}</x-wirekit::alert-dialog.title>
+                                <x-wirekit::alert-dialog.description>{{ __('webhooks::self-service.deliveries.replay_dialog.description') }}</x-wirekit::alert-dialog.description>
+                                <x-wirekit::alert-dialog.actions>
+                                    <x-wirekit::alert-dialog.cancel />
+                                    {{-- Scoped like every sibling replay button. Without it the
+                                         row grays out on any commit of this component, a filter
+                                         change included. --}}
+                                    <x-wirekit::button wire:click="redeliver('{{ $delivery->id }}')" wire:loading.attr="disabled" wire:target="redeliver">{{ __('webhooks::self-service.deliveries.replay_dialog.confirm') }}</x-wirekit::button>
+                                </x-wirekit::alert-dialog.actions>
+                            </x-wirekit::alert-dialog>
                         </x-wirekit::table.td>
                     </x-wirekit::table.row>
                 @endforeach

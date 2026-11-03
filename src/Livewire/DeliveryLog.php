@@ -16,7 +16,7 @@ use Pushery\Webhooks\Facades\Webhooks;
 use Pushery\Webhooks\Livewire\Concerns\AuthorizesOperatorActions;
 use Pushery\Webhooks\Models\WebhookDelivery;
 use Pushery\Webhooks\Models\WebhookSubscription;
-use Pushery\Webhooks\Support\CalendarDay;
+use Pushery\Webhooks\Support\FilterBound;
 use Pushery\Webhooks\Support\Settings;
 use Pushery\Webhooks\Support\UiVariant;
 
@@ -101,9 +101,9 @@ class DeliveryLog extends Component
     public string $subscriptionId = '';
 
     /**
-     * Inclusive window bounds as 'Y-m-d', or '' for unbounded. Read in the application's
-     * timezone: this stub is the operator's own console, not the tenant-facing dashboard,
-     * so it has no business resolving a per-tenant zone.
+     * Inclusive window bounds, a day 'Y-m-d' or a moment 'Y-m-d\TH:i', or '' for unbounded.
+     * The plain rendering's date fields send a day, the WireKit rendering's datetime pickers a
+     * moment, and either is read in the zone the log shows its times in ({@see FilterBound}).
      */
     public string $from = '';
 
@@ -156,7 +156,7 @@ class DeliveryLog extends Component
         $days = Config::integer('webhooks.ui.deliveries.default_window_days', self::DEFAULT_WINDOW_DAYS);
 
         if ($days > 0) {
-            $this->from = now()->subDays($days)->toDateString();
+            $this->from = now(FilterBound::zone())->subDays($days)->toDateString();
         }
     }
 
@@ -299,12 +299,12 @@ class DeliveryLog extends Component
 
     public function render(): View
     {
-        // {@see CalendarDay} rather than a parse here: the same three defenses are needed by
-        // the portal's own delivery panel, and a second copy of them is a second copy that
-        // drifts. The upper bound is the start of the day after the one named, compared
+        // {@see FilterBound} rather than a parse here: the same defenses are needed by the
+        // portal's own delivery panel, and a second copy of them is a second copy that drifts.
+        // The upper bound is the first instant after the day or the minute named, compared
         // strictly, so "up to the 20th" means the whole 20th.
-        $from = CalendarDay::start($this->from);
-        $until = CalendarDay::endExclusive($this->until);
+        $from = FilterBound::start($this->from);
+        $until = FilterBound::endExclusive($this->until);
 
         $endpoints = WebhookSubscription::model()::query()
             ->select(['id', 'name', 'url'])

@@ -1019,8 +1019,9 @@ return [
             'denied' => env('WEBHOOKS_DASHBOARD_PAYLOAD_DENIED', 'redacted'),
         ],
         'source_model' => WebhookDelivery::class,
-        // The zone the dashboard renders timestamps in, which is a different question from
-        // the zone they are stored or read in. Null (the default) changes nothing: every
+        // The zone the dashboard, the delivery log and the endpoint panel of the self-service
+        // portal render timestamps in, which is a different question from the zone they are
+        // stored or read in. Null (the default) changes nothing: every
         // value stays in app.timezone, and the absolute format ends in `z` so the reader can
         // see which clock they are being shown.
         //
@@ -1229,6 +1230,13 @@ return [
         // control. That ghost is a state rather than a rank, and following this key would make
         // "disabled" look like every other button on the row.
         'secondary_surface' => 'outline',
+
+        // A `data-*` attribute the secret panel puts on the element that shows a plaintext
+        // signing secret, the current one and the previous one, so a screenshot redactor can
+        // blank it while the heading, the notice and the buttons stay readable. For
+        // visual-feedback that is `data-visual-feedback-redact`. Null, the default, marks nothing,
+        // and a name that is not `data-*` marks nothing either.
+        'sensitive_attribute' => env('WEBHOOKS_UI_SENSITIVE_ATTRIBUTE'),
 
         // The heading level of each full-page screen's title: the dashboard, the portal, the
         // health board and the transform editor. 1 by default, because on a page of its own the

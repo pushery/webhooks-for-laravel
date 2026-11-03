@@ -6,6 +6,46 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.25.0] - 2026-11-03
+
+### ✨ Added
+
+- **`GuardedFetch::follow()` follows a chain of redirects, each station vetted and pinned.** Each `Location` is resolved against the URL that answered and goes through the SSRF guard and a new pin, as the first URL does. The caller sets the most redirects, a scope (`RedirectScope::Anywhere`, `SameHost`, or `SameDomain`, the same name with or without `www.` and its subdomains), and whether `https` may step down to `http`. The answer is a `FetchedChain` of every station with its status and `Location`, the last response, and, where the chain ended at a redirect, why (`RedirectStop`) and the target it did not go to. Without `maxBytes` the stations are asked like `lead()`, with it like `get()`.
+
+- **The delivery lists filter to the minute, with WireKit's datetime picker.** From and Until of the portal's deliveries and of the WireKit rendering of the operator log are datetime pickers now, and a bound is a day, `YYYY-MM-DD`, or a moment, `YYYY-MM-DDTHH:MM`. A day still means the whole day and a moment the whole of that minute, both ends included, so a link or an embedding that names days filters as before. The plain rendering of the operator log keeps its two date fields.
+
+  **Upgrade:** a host that published the self-service or the dashboard views publishes them again for the pickers. A published view with the date fields keeps working.
+
+### 🔧 Changed
+
+- **The endpoint panel of the self-service portal asks before it sends a delivery again.** Its "Send again" button sent the delivery to the customer's receiver on the first click, where the operator console asked first. It now opens the same alert-dialog the console uses, with its own words under `webhooks::self-service.deliveries.replay_dialog`, and only the confirmation sends.
+
+  **Upgrade:** a host that published the self-service views publishes them again, or wraps its replay button in the dialog the way the shipped view does.
+
+- **The shipped screens need `pushery/wirekit` 2.71.0 or newer.** `conflict` refuses an older WireKit. 2.71.0 is the release this package's suite develops against, and no run proves an older one.
+
+  **Upgrade:** a host that renders the shipped screens updates `pushery/wirekit` to 2.71 or newer. A host without WireKit is not affected.
+
+### 🐛 Fixed
+
+- **The delivery log and the endpoint panel show a delivery's time in the reader's zone.** Both read the time in `app.timezone` and set only the language, while every dashboard surface already read it through `webhooks.dashboard.timezone`. The operator console, its WireKit view and the endpoint panel of the self-service portal now read it the same way, so a resolver that answers the reader's zone reaches every screen that shows a delivery.
+
+- **The alert-dialogs of the shipped screens render where an application closes every dialog on confirm.** Since WireKit 2.70.0 an alert-dialog refuses `close-on-confirm` without a confirm control, and a dialog that declares nothing takes the application's default. The four dialogs here declared nothing, so under `wirekit.components.alert-dialog.close-on-confirm` set to `true` they threw on the console and fell back with a warning in a request. Each closes with the re-render its action causes, and now declares `:close-on-confirm="false"`.
+
+  **Upgrade:** a host that published the WireKit views publishes them again, or adds the attribute to its copies.
+
+- **A delivery filter bound is read on the clock the list shows.** With `webhooks.dashboard.timezone` set, the delivery lists showed each row in that zone and read From and Until in the application's, so a bound moved by the offset between the two. Both now name the clock beside each row; without a display zone nothing changes.
+
+### 🔒 Security
+
+- **The secret panel can mark the revealed secret for a screenshot redactor.** `ui.sensitive_attribute` names a `data-*` attribute that the panel puts on the element showing the current and the previous signing secret, `data-visual-feedback-redact` for visual-feedback, so a bug report filed while the reveal window is open carries no plaintext secret. The heading, the notice and the buttons stay readable, and the closed panel still takes no space.
+
+### 📚 Documentation
+
+- **The styling guide names the WireKit floor through the `conflict` in `composer.json` instead of a copy of the number.** Packagist lists that conflict beside every version, and the number now lives in that one place.
+
+  **Upgrade:** nothing to do.
+
 ## [3.24.0] - 2026-11-01
 
 ### ✨ Added
@@ -3590,7 +3630,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.24.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.25.0...HEAD
+[3.25.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.24.0...v3.25.0
 [3.24.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.23.0...v3.24.0
 [3.23.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.22.0...v3.23.0
 [3.22.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.21.0...v3.22.0

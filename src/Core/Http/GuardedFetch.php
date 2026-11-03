@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Core\Http;
 
+use GuzzleHttp\Psr7\Uri;
+use GuzzleHttp\Psr7\UriResolver;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -26,7 +28,8 @@ use Throwable;
  * The URL is vetted by the shared {@see SsrfGuard}, and the connection is pinned to the addresses
  * it vetted, so a DNS record that changes between the check and the connect still reaches the
  * address that was checked. A redirect is handed back rather than followed, because its target
- * was never vetted. A proxy named in the environment is bypassed, because a proxy resolves the
+ * was never vetted; {@see self::follow()} follows a chain of them, vetting and pinning each
+ * station as the first. A proxy named in the environment is bypassed, because a proxy resolves the
  * host itself and the pin would not reach the connection. A compressed body is handed back as it
  * arrived and never inflated, and TLS is verified.
  *
@@ -36,9 +39,92 @@ use Throwable;
  */
 final readonly class GuardedFetch
 {
+    /** The statuses that send the client on to their `Location`. */
+    private const array REDIRECTS = [301, 302, 303, 307, 308];
+
     public function __construct(
         private SsrfGuard $guard,
     ) {}
+
+    /**
+     * Follow where a URL leads, each redirect vetted and pinned as the first request is, and hand back
+     * every station.
+     *
+     * Every station is a GET: a 303 asks for a GET by definition, and a 307 or a 308, which keep the
+     * method, keep this one. Without `$maxBytes` each station is asked through {@see self::lead()},
+     * which reads no body and takes a plaintext URL; with it, through {@see self::get()} under that
+     * limit, so the last response carries its body, under the guard's rules for a URL, `https_only`
+     * included.
+     *
+     * A 301, 302, 303, 307 or 308 with a `Location` is followed. The target is resolved against the
+     * URL that answered, a relative and a protocol-relative one included, its fragment dropped, and
+     * the chain goes on to it only where it is an `http` or `https` URL with a host, no plaintext
+     * after `https` unless `$allowDowngrade` says so, within `$scope` of the first host, no URL the
+     * chain reached before, fewer than `$maxRedirects` redirects followed so far, and a destination
+     * the guard lets through. Otherwise the chain ends at that redirect, with the reason and the
+     * target in the chain rather than thrown: a chain that runs into the guard is an answer about
+     * the site, not a failure of the fetch.
+     *
+     * @param  int  $maxRedirects  the most redirects followed, 0 for none
+     * @param  ?int  $maxBytes  the longest body accepted at each station, or null to read none
+     * @param  array<string, string>  $headers  request headers sent to every station
+     *
+     * @throws BlockedDestination when the guard refuses the first URL
+     * @throws HostUnresolvable when the first URL's host resolves to no address
+     * @throws ResponseTooLarge when a body is longer than `$maxBytes`
+     * @throws MalformedResponseFraming when a response declares its length and is chunked as well
+     * @throws ConnectionException when a connection fails or a timeout strikes
+     */
+    public function follow(string $url, int $maxRedirects = 5, ?int $maxBytes = null, RedirectScope $scope = RedirectScope::Anywhere, bool $allowDowngrade = false, array $headers = [], int $connectTimeout = 3, int $timeout = 10): FetchedChain
+    {
+        if ($maxRedirects < 0) {
+            throw new InvalidArgumentException('The redirect limit of a follow is never negative.');
+        }
+
+        $first = strtolower((string) parse_url($url, PHP_URL_HOST));
+        $response = $this->station($url, $maxBytes, $headers, $connectTimeout, $timeout);
+        $hops = [new RedirectHop($url, $response->status, $response->header('Location'), $response->durationMs)];
+        // Keyed the way a target is written, so a redirect back to the first URL is a loop however
+        // that URL was spelled. station() let the URL through, so it is an http or https URL with
+        // a host, which target() always resolves; the URL itself only stands in for the type.
+        $visited = [($this->target($url, $url) ?? $url) => true];
+        $current = $url;
+
+        while (in_array($response->status, self::REDIRECTS, true) && trim($response->header('Location') ?? '') !== '') {
+            $target = $this->target($current, $response->header('Location'));
+
+            if ($target === null) {
+                return new FetchedChain($hops, $response, RedirectStop::InvalidTarget, $response->header('Location'));
+            }
+
+            $stop = match (true) {
+                ! $allowDowngrade && $this->schemeOf($current) === 'https' && $this->schemeOf($target) === 'http' => RedirectStop::Downgrade,
+                ! $scope->allows($first, strtolower((string) parse_url($target, PHP_URL_HOST))) => RedirectStop::OutOfScope,
+                isset($visited[$target]) => RedirectStop::Loop,
+                count($hops) - 1 >= $maxRedirects => RedirectStop::TooManyRedirects,
+                default => null,
+            };
+
+            if ($stop instanceof RedirectStop) {
+                return new FetchedChain($hops, $response, $stop, $target);
+            }
+
+            try {
+                $next = $this->station($target, $maxBytes, $headers, $connectTimeout, $timeout);
+            } catch (BlockedDestination) {
+                return new FetchedChain($hops, $response, RedirectStop::Refused, $target);
+            } catch (HostUnresolvable) {
+                return new FetchedChain($hops, $response, RedirectStop::Unresolvable, $target);
+            }
+
+            $hops[] = new RedirectHop($target, $next->status, $next->header('Location'), $next->durationMs);
+            $visited[$target] = true;
+            $response = $next;
+            $current = $target;
+        }
+
+        return new FetchedChain($hops, $response);
+    }
 
     /**
      * GET a URL and hand back the response, with a body of at most `$maxBytes` bytes.
@@ -163,6 +249,40 @@ final readonly class GuardedFetch
             body: '',
             durationMs: $durationMs,
         );
+    }
+
+    /**
+     * One station of a chain: a lead without a body limit, a fetch under one.
+     *
+     * @param  array<string, string>  $headers
+     */
+    private function station(string $url, ?int $maxBytes, array $headers, int $connectTimeout, int $timeout): FetchedResponse
+    {
+        return $maxBytes === null
+            ? $this->lead($url, $headers, $connectTimeout, $timeout)
+            : $this->get($url, $maxBytes, $headers, $connectTimeout, $timeout);
+    }
+
+    /**
+     * Where a `Location` leads from the URL that named it, as RFC 3986 resolves a reference, without
+     * its fragment; null where that is no `http` or `https` URL with a host.
+     */
+    private function target(string $base, string $location): ?string
+    {
+        try {
+            $resolved = UriResolver::resolve(new Uri($base), new Uri(trim($location)))->withFragment('');
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+
+        return in_array(strtolower($resolved->getScheme()), ['http', 'https'], true) && $resolved->getHost() !== ''
+            ? (string) $resolved
+            : null;
+    }
+
+    private function schemeOf(string $url): string
+    {
+        return strtolower((string) parse_url($url, PHP_URL_SCHEME));
     }
 
     /**

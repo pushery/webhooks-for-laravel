@@ -48,8 +48,8 @@
                          shows the empty "inherit" entry for an endpoint that is pinned.
 
                          That is the version which introduced the behavior, and nothing more.
-                         The declared floor is 2.69.0, enforced through composer.json's
-                         `conflict`, and it sits higher for reasons that have nothing to do
+                         The declared floor is the one composer.json's
+                         `conflict` names, and it sits higher for reasons that have nothing to do
                          with this control — the seven shipped locales, the overlay geometry
                          that keeps a destructive confirmation clickable without the host's
                          Tailwind build, an icon whose set is not registered degrading to
