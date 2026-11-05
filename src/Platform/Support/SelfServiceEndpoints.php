@@ -137,10 +137,8 @@ final class SelfServiceEndpoints
             throw $this->refusal('url', $this->blockedUrlMessage());
         }
 
-        $endpoint->name = $this->nameOrNull($name);
-        $endpoint->url = $url;
-        $endpoint->event_types = array_values($eventTypes);
-        $endpoint->save();
+        // Through the manager, so the edit is recorded with its actor exactly like one a host makes on its own screen.
+        Webhooks::update($endpoint, $url, $eventTypes, $this->nameOrNull($name));
 
         // The activation flag goes through the manager, never through an assignment: switching an endpoint back on has to
         // clear the circuit-breaker streak too, or the next final failure disables it again immediately. An unchanged

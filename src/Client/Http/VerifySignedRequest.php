@@ -8,6 +8,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Pushery\Webhooks\Client\Events\InvalidWebhookSignature;
 use Pushery\Webhooks\Client\Exceptions\InboundListenerFailed;
+use Pushery\Webhooks\Client\Exceptions\SignedRequestRefused;
 use Pushery\Webhooks\Client\Exceptions\WebhookConfigCannotVerify;
 use Pushery\Webhooks\Client\Tenancy\InboundTenantResolver;
 use Pushery\Webhooks\Client\Verification\InboundVerifier;
@@ -37,6 +38,8 @@ use Throwable;
  *
  * A refused call is answered with the config's `invalid_status`, or with its `undetermined_status` when the check could
  * not complete, and announced with {@see InvalidWebhookSignature}, as a refused delivery is. It never reaches the route.
+ * The answer is a {@see SignedRequestRefused}, an HttpException with that status, which the application renders as it
+ * renders any other unless it shapes the answer to a refused call itself.
  */
 final readonly class VerifySignedRequest
 {
@@ -53,7 +56,7 @@ final readonly class VerifySignedRequest
             // the configuration fault it is.
             $this->reportWithoutFailing($cannotVerify);
 
-            abort($cannotVerify->status);
+            throw SignedRequestRefused::unverifiable($cannotVerify);
         }
 
         if (! $result->isValid()) {
@@ -64,7 +67,11 @@ final readonly class VerifySignedRequest
                 $this->reportWithoutFailing(InboundListenerFailed::for('invalid-signature', $config, $listenerFailure));
             }
 
-            abort($result->status === VerificationStatus::Undetermined ? $entry->undeterminedStatus() : $entry->invalidStatus());
+            throw SignedRequestRefused::because(
+                $config,
+                $result,
+                $result->status === VerificationStatus::Undetermined ? $entry->undeterminedStatus() : $entry->invalidStatus(),
+            );
         }
 
         return $next($request);

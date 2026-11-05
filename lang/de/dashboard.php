@@ -29,14 +29,16 @@ return [
 
     // Datumsmuster werden mitübersetzt, nicht nur die Monatsnamen: die Reihenfolge
     // unterscheidet sich je Sprache (Englisch führt mit dem Monat, Deutsch mit dem Tag).
+    // Und Deutsch schreibt „Uhr“ hinter eine Uhrzeit: im ISO-Muster als `[Uhr]`, im Muster von
+    // `translatedFormat()` als `\U\h\r`.
     'formats' => [
-        'hour_bucket' => 'j. M H:i',
-        'absolute' => 'LLL z',
+        'hour_bucket' => 'j. M H:i \U\h\r',
+        'absolute' => 'LLL [Uhr] z',
 
         // 'precise' is a second pattern because 'absolute' cannot separate two rows and the
         // accessible names need it to. lang/en/dashboard.php states the case in full, including
         // what it still does not cover.
-        'precise' => 'LL LTS z',
+        'precise' => 'LL LTS [Uhr] z',
     ],
 
     'api' => [

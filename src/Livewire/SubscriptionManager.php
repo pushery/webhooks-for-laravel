@@ -416,10 +416,8 @@ class SubscriptionManager extends Component
             return;
         }
 
-        $subscription->name = $this->name !== '' ? $this->name : null;
-        $subscription->url = $this->url;
-        $subscription->event_types = array_values($this->eventTypes);
-        $subscription->save();
+        // Through the manager, so the edit is recorded with its actor like every other one.
+        Webhooks::update($subscription, $this->url, $this->eventTypes, $this->name !== '' ? $this->name : null);
 
         // The activation flag goes through the manager, never through this form's own
         // assignment: switching an endpoint back on has to clear the circuit-breaker

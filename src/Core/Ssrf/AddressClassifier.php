@@ -32,10 +32,13 @@ namespace Pushery\Webhooks\Core\Ssrf;
  * deprecated IPv4-compatible form (`::a.b.c.d`) — is unwrapped first so a private
  * IPv4 cannot be smuggled in v6 clothing.
  *
+ * The SSRF guard asks it about every address it vets, and an application asks it the
+ * same way about an address it holds, the literal target of a link it stores for one.
+ * It resolves nothing and reads no configuration: `https_only`, `allowed_hosts` and
+ * `block_private_networks` are the guard's policy and leave its answer as it is.
+ *
  * @see https://www.rfc-editor.org/rfc/rfc5735 (IPv4 special-use)
  * @see https://www.rfc-editor.org/rfc/rfc6890 (special-purpose registries)
- *
- * @internal
  */
 final class AddressClassifier
 {
@@ -97,6 +100,12 @@ final class AddressClassifier
         'ff00::/8',           // multicast
     ];
 
+    /**
+     * Whether the address lies in a range the guard refuses. Anything that is not an IP
+     * address counts as blocked, a host name among them, because the classifier resolves
+     * nothing and cannot vouch for it. An IPv6 address is passed without the brackets a
+     * URL puts around it.
+     */
     public function isBlocked(string $ip): bool
     {
         $ip = $this->unwrapMappedIp($ip);

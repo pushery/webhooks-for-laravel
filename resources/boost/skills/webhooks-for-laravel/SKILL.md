@@ -155,6 +155,11 @@ PendingWebhook::create()
 across retries and is the correlation key to record against the application's own
 log. Use `->dispatchSync()` to send inline instead of queueing.
 
+The queued job is encrypted with `APP_KEY`, its body included, while it waits and
+in `failed_jobs` (`webhooks.server.encrypt_jobs`, on by default). A listener of an
+attempt event that implements `ShouldQueue` writes a job of its own with the
+delivery in it, so give it `ShouldBeEncrypted` as well.
+
 **Fan an event out, or aim it at one endpoint.** With the Platform layer on,
 `Webhooks::dispatch($type, $payload, $tenant)` delivers to every active endpoint
 subscribed to that type. Its third argument narrows to a **tenant**, not to an
@@ -431,6 +436,13 @@ redirect comes back as the response instead of being followed, and a body past
 `maxBytes` throws `ResponseTooLarge` as soon as it passes the limit. Do not reach for
 Laravel's HTTP client on a URL a customer typed; it follows redirects and resolves the
 name again on every request.
+
+To judge an address the application stores rather than fetches, the literal target of a
+link for one, ask the classifier the guard uses,
+`Pushery\Webhooks\Core\Ssrf\AddressClassifier`: `app(AddressClassifier::class)->isBlocked($ip)`.
+It resolves nothing and ignores `https_only`, `allowed_hosts` and `block_private_networks`.
+Do not use `filter_var()` with `FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE` for
+this; it passes carrier-grade NAT, site-local IPv6 and `::7f00:1` as public.
 
 ## Anti-Patterns
 

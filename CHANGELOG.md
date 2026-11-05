@@ -6,6 +6,32 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.26.0] - 2026-11-05
+
+### ✨ Added
+
+- **An audit learns who changed or deleted an endpoint and who saw its signing secret.** The package named the actor when an endpoint was registered, switched or had its secret rotated, but the portal changed and deleted endpoints and showed their secrets without a word to the application, and the model's own events carry no actor. `WebhookEndpointUpdated` names the endpoint, the attributes that changed (`event_types`, `name` or `url`, never their values) and the actor, `WebhookEndpointDeleted` the key, name and URL of the endpoint and the actor, and `WebhookSecretRevealed` the endpoint and the actor, without the secret. `Webhooks::update()` is the new way to change an endpoint; it vets a changed URL as a registration does, and the portal and the operator console go through it, as they go through `Webhooks::unsubscribe()` to delete. See [Events](https://docs.pushery.com/webhooks-for-laravel/events).
+
+- **A fetch tells a slow answer from a connection that never came about.** `GuardedFetch::get()`, `lead()` and `follow()` threw the same `ConnectionException` for both, and only the text of curl's message told them apart. A timeout that strikes after the server accepted the connection now throws `ResponseTimedOut`, a `ConnectionException`, so a `catch` of that still takes it; a connection that is refused or not made in time stays a plain `ConnectionException`. The answer is the same under guzzle 7 and 8.
+
+- **An application can shape the answer to a refused signed call.** `VerifySignedRequest` refused a call with `abort()`, so the exception handler saw a bare status and could not tell a refused signature from any other 401. The middleware now throws `SignedRequestRefused`, an `HttpException` with the same status and no message, which carries the name of the config and the reason: the verdict `InvalidWebhookSignature` announces, or `unverifiable` for a config that cannot verify any call. An application that renders nothing of its own answers as before, and every refused call is still announced. `composer.json` names `symfony/http-kernel`, where the class comes from, beside `symfony/http-foundation`; `laravel/framework` already requires both, so no installation changes.
+
+  **Upgrade:** nothing to do. A config that answers a refusal with 404 now throws `SignedRequestRefused` where `abort()` threw a `NotFoundHttpException`, and both render the same answer.
+
+- **An application can classify an address with the list the SSRF guard uses.** `Core\Ssrf\AddressClassifier` is public API: `isBlocked()` says whether an address lies in a range the guard refuses, and `canonical()` gives the one spelling of an address. It resolves nothing and reads none of the guard's configuration, so the literal target of a link is judged by its address alone, an `http://` one included. Until now an application had only PHP's `filter_var()` with its range flags, which passes carrier-grade NAT, benchmarking, site-local IPv6 and `::7f00:1` as public. See [Security](https://docs.pushery.com/webhooks-for-laravel/security).
+
+### 🐛 Fixed
+
+- **German times end in "Uhr".** The dashboard, the delivery log of the operator console and the self-service portal wrote `3. November 2026 16:58` where German writes `3. November 2026 16:58 Uhr`. Every absolute time now takes its pattern from the lang files, including the hover of the delivery log and of the portal's deliveries, which wrote a fixed `LLL`: `management.formats.moment` and `self-service.formats.moment` are new and carry no zone, like the screens around them. The other six locales read as before.
+
+  **Upgrade:** a host that published the lang files publishes them again, or adds the two `moment` keys and `[Uhr]` to its German patterns. A host that published the delivery log or the portal's views publishes them again.
+
+### 🔒 Security
+
+- **A queued delivery no longer holds its body in the clear.** `CallWebhookJob` carried the whole delivery into the queue, its body included, and the body is where a sender's personal data travels: a name, an address, a bank account. It stood in Redis or the `jobs` table while the delivery waited, through every retry, and in `failed_jobs` once it gave up. With `webhooks.server.encrypt_jobs`, on by default, Laravel encrypts the job with `APP_KEY` in all three places, as the signing secret inside it already was. A job queued before the update is still read. A queued listener of an attempt event writes its own job and needs `ShouldBeEncrypted` to keep the body out of the queue as well.
+
+  **Upgrade:** nothing to do. A queue worker needs the same `APP_KEY` as the application that sends, which opening the signing secret already required. `WEBHOOKS_SERVER_ENCRYPT_JOBS=false` writes the job as before.
+
 ## [3.25.1] - 2026-11-03
 
 ### 🔒 Security
@@ -3638,7 +3664,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.25.1...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.26.0...HEAD
+[3.26.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.25.1...v3.26.0
 [3.25.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.25.0...v3.25.1
 [3.25.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.24.0...v3.25.0
 [3.24.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.23.0...v3.24.0

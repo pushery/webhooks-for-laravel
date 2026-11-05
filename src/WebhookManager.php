@@ -26,9 +26,11 @@ use Pushery\Webhooks\Core\Ssrf\SsrfGuard;
 use Pushery\Webhooks\Database\OwnerKeyType;
 use Pushery\Webhooks\Enums\DeliveryStatus;
 use Pushery\Webhooks\Events\WebhookDeliveryRateLimited;
+use Pushery\Webhooks\Events\WebhookEndpointDeleted;
 use Pushery\Webhooks\Events\WebhookEndpointDisabled;
 use Pushery\Webhooks\Events\WebhookEndpointEnabled;
 use Pushery\Webhooks\Events\WebhookEndpointRegistered;
+use Pushery\Webhooks\Events\WebhookEndpointUpdated;
 use Pushery\Webhooks\Events\WebhookSecretRotated;
 use Pushery\Webhooks\Exceptions\FeedCursorExpired;
 use Pushery\Webhooks\Exceptions\InvalidFeedCursor;
@@ -155,7 +157,47 @@ final readonly class WebhookManager
      */
     public function unsubscribe(WebhookSubscription $subscription): void
     {
+        $id = $subscription->id;
+        $name = $subscription->name;
+        $url = $subscription->url;
+
         $subscription->delete();
+
+        // Fired here rather than in the portal's list, so a host that deletes endpoints through its own screen or
+        // service layer gets the same record. The row is gone, so the event carries what names it.
+        Event::dispatch(new WebhookEndpointDeleted($id, $name, $url, $this->actor()));
+    }
+
+    /**
+     * Point an endpoint at another URL, other event types or another name.
+     *
+     * A changed URL is vetted against the shared SSRF policy before the endpoint is repointed, and refused the
+     * way a registration refuses it, so an edit is no way around the guard that vets one. The activation flag is
+     * not part of this: {@see self::enable()} and {@see self::disable()} own it, with what switching an endpoint
+     * back on has to clear.
+     *
+     * Fires {@see WebhookEndpointUpdated} with the attributes that changed, when any did.
+     *
+     * @param  array<array-key, string>  $eventTypes
+     */
+    public function update(WebhookSubscription $subscription, string $url, array $eventTypes, ?string $name = null): WebhookSubscription
+    {
+        if ($url !== $subscription->url) {
+            $this->guard->resolveAndPin($url);
+        }
+
+        $subscription->name = $name;
+        $subscription->url = $url;
+        $subscription->event_types = array_values($eventTypes);
+        $subscription->save();
+
+        $changed = array_values(array_intersect(['event_types', 'name', 'url'], array_keys($subscription->getChanges())));
+
+        if ($changed !== []) {
+            Event::dispatch(new WebhookEndpointUpdated($subscription, $changed, $this->actor()));
+        }
+
+        return $subscription;
     }
 
     /**

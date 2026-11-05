@@ -157,7 +157,7 @@
                     {{-- Relative in the cell, absolute on hover — both in the reader's locale,
                          never the raw stored timestamp. --}}
                     <td class="px-3 py-2">
-                        <time datetime="{{ $delivery->created_at->toIso8601String() }}" title="{{ $when->isoFormat('LLL') }}">{{ $when->diffForHumans() }}</time>
+                        <time datetime="{{ $delivery->created_at->toIso8601String() }}" title="{{ $when->isoFormat(__('webhooks::management.formats.moment')) }}">{{ $when->diffForHumans() }}</time>
                     </td>
                     <td class="px-3 py-2 text-right">
                         {{-- Both go over the wire and both do something: a second redeliver
@@ -191,7 +191,7 @@
                                 wire:loading.attr="disabled"
                                 wire:target="redeliver"
                                 class="text-indigo-600"
-                                aria-label="{{ __('webhooks::management.a11y.redeliver_delivery', ['label' => __('webhooks::management.deliveries.redeliver'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat('LLL')]) }}"
+                                aria-label="{{ __('webhooks::management.a11y.redeliver_delivery', ['label' => __('webhooks::management.deliveries.redeliver'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat(__('webhooks::management.formats.moment'))]) }}"
                             >{{ __('webhooks::management.deliveries.redeliver') }}</button>
                         @endif
 
