@@ -211,7 +211,7 @@
                             </x-wirekit::table.td>
                         @endif
                         <x-wirekit::table.td align="right">
-                            <time datetime="{{ $delivery->created_at->toIso8601String() }}" title="{{ $when->isoFormat('LLL') }}">
+                            <time datetime="{{ $delivery->created_at->toIso8601String() }}" title="{{ $when->isoFormat(__('webhooks::self-service.formats.moment')) }}">
                                 <x-wirekit::text size="sm" intent="muted">{{ $when->diffForHumans() }}</x-wirekit::text>
                             </time>
                         </x-wirekit::table.td>

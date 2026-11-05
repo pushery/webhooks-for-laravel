@@ -141,6 +141,8 @@ return [
     // ORDER differs by locale, and `z` names the clock the reader is being shown.
     'formats' => [
         'precise' => 'LL LTS z',
+        // The moment on hover beside the relative time, without a zone like the rest of the list.
+        'moment' => 'LLL',
     ],
 
     'deliveries' => [

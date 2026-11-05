@@ -109,6 +109,13 @@ return [
         ],
     ],
 
+    // The absolute moment beside a relative one, on hover and in the name of a row's action.
+    // Without a zone, like everything else on these screens: one zoned value would be the
+    // only one on the page.
+    'formats' => [
+        'moment' => 'LLL [Uhr]',
+    ],
+
     'deliveries' => [
         'redeliver' => 'Erneut senden',
         'ping' => 'Test senden',

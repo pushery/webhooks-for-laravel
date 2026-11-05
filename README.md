@@ -71,6 +71,11 @@ Everything ships under the `Pushery\Webhooks\` namespace.
   validation and prefix wildcards.
 - **A self-service portal** — real, full-page screens where a customer manages its own
   endpoints, rotates its signing secret and inspects endpoint health.
+- **Events for an audit log** — registering, changing, disabling, enabling and deleting an
+  endpoint, and rotating or revealing its signing secret, each fire an event that names the
+  actor: `WebhookEndpointRegistered`, `WebhookEndpointUpdated`, `WebhookEndpointDisabled`,
+  `WebhookEndpointEnabled`, `WebhookEndpointDeleted`, `WebhookSecretRotated` and
+  `WebhookSecretRevealed`.
 - **An observability dashboard** — KPI cards, latency percentiles, a server-rendered
   activity chart, a filterable delivery table with one-click redelivery, and an
   optional JSON metrics endpoint.

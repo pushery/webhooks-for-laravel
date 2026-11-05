@@ -140,7 +140,9 @@ return [
     // Translated rather than a literal for the reason the dashboard's own patterns are: the
     // ORDER differs by locale, and `z` names the clock the reader is being shown.
     'formats' => [
-        'precise' => 'LL LTS z',
+        'precise' => 'LL LTS [Uhr] z',
+        // The moment on hover beside the relative time, without a zone like the rest of the list.
+        'moment' => 'LLL [Uhr]',
     ],
 
     'deliveries' => [

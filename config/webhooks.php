@@ -167,6 +167,11 @@ return [
         'enabled' => EnvFlag::protection(env('WEBHOOKS_SERVER_ENABLED', true), true),
         'queue' => env('WEBHOOKS_SERVER_QUEUE', 'default'),
         'connection' => env('WEBHOOKS_SERVER_CONNECTION'),
+        // A queued delivery carries its body, and the body is where a sender's personal data travels: a
+        // name, an address, a bank account. With this on, the job is encrypted with the application key in
+        // the queue while it waits and in `failed_jobs` once it gives up, as its signing secret already is.
+        // A queue worker needs the same APP_KEY, which opening that secret already asks of it.
+        'encrypt_jobs' => EnvFlag::protection(env('WEBHOOKS_SERVER_ENCRYPT_JOBS', true), true),
 
         // Asymmetric Ed25519 (v1a) signing, off by default. When enabled every outbound
         // delivery is signed with this one base64 Ed25519 secret key instead of the

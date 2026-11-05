@@ -212,7 +212,7 @@
                         <x-wirekit::table.td>
                             {{-- Relative in the cell, absolute on hover — both in the reader's
                                  locale, never the raw stored timestamp. --}}
-                            <time datetime="{{ $delivery->created_at->toIso8601String() }}" title="{{ $when->isoFormat('LLL') }}">{{ $when->diffForHumans() }}</time>
+                            <time datetime="{{ $delivery->created_at->toIso8601String() }}" title="{{ $when->isoFormat(__('webhooks::management.formats.moment')) }}">{{ $when->diffForHumans() }}</time>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td align="right">
                             {{-- Named per ROW. Twenty buttons all reading "Redeliver" are twenty
@@ -248,7 +248,7 @@
                                 {{-- It closes with the re-render its action causes, and says so, so an application that turns close-on-confirm on for every dialog does not ask this one for a confirm control. --}}
                                 <x-wirekit::alert-dialog :name="'redeliver-'.$delivery->id" :close-on-confirm="false">
                                     <x-slot:trigger>
-                                        <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" :aria-label="__('webhooks::management.a11y.redeliver_delivery', ['label' => __('webhooks::management.deliveries.redeliver'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat('LLL')])">{{ __('webhooks::management.deliveries.redeliver') }}</x-wirekit::button>
+                                        <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" :aria-label="__('webhooks::management.a11y.redeliver_delivery', ['label' => __('webhooks::management.deliveries.redeliver'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat(__('webhooks::management.formats.moment'))])">{{ __('webhooks::management.deliveries.redeliver') }}</x-wirekit::button>
                                     </x-slot:trigger>
 
                                     <x-wirekit::alert-dialog.title>{{ __('webhooks::management.redeliver_dialog.title') }}</x-wirekit::alert-dialog.title>

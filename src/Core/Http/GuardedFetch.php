@@ -15,6 +15,7 @@ use Psr\Http\Message\StreamInterface;
 use Pushery\Webhooks\Core\Http\Exceptions\BlockedDestination;
 use Pushery\Webhooks\Core\Http\Exceptions\HostUnresolvable;
 use Pushery\Webhooks\Core\Http\Exceptions\MalformedResponseFraming;
+use Pushery\Webhooks\Core\Http\Exceptions\ResponseTimedOut;
 use Pushery\Webhooks\Core\Http\Exceptions\ResponseTooLarge;
 use Pushery\Webhooks\Core\Ssrf\PinnedEndpoint;
 use Pushery\Webhooks\Core\Ssrf\SsrfGuard;
@@ -36,6 +37,10 @@ use Throwable;
  * The body is held to a limit the caller names. Past it the transfer ends, whether the server
  * declared a length or sends without end, and the fetch throws {@see ResponseTooLarge}. A caller
  * that needs only the status and the headers asks {@see self::lead()}, which reads no body at all.
+ *
+ * A timeout that strikes after the server accepted the connection throws {@see ResponseTimedOut},
+ * a `ConnectionException`, so a caller can tell a slow answer from a connection that never came
+ * about, which stays a plain `ConnectionException`.
  */
 final readonly class GuardedFetch
 {
@@ -73,7 +78,8 @@ final readonly class GuardedFetch
      * @throws HostUnresolvable when the first URL's host resolves to no address
      * @throws ResponseTooLarge when a body is longer than `$maxBytes`
      * @throws MalformedResponseFraming when a response declares its length and is chunked as well
-     * @throws ConnectionException when a connection fails or a timeout strikes
+     * @throws ResponseTimedOut when a server accepted the connection and its answer took longer than `$timeout`
+     * @throws ConnectionException when a connection fails, or a timeout strikes while it is made
      */
     public function follow(string $url, int $maxRedirects = 5, ?int $maxBytes = null, RedirectScope $scope = RedirectScope::Anywhere, bool $allowDowngrade = false, array $headers = [], int $connectTimeout = 3, int $timeout = 10): FetchedChain
     {
@@ -142,7 +148,8 @@ final readonly class GuardedFetch
      * @throws HostUnresolvable when the host resolves to no address
      * @throws ResponseTooLarge when the body is longer than `$maxBytes`
      * @throws MalformedResponseFraming when the response declares its length and is chunked as well
-     * @throws ConnectionException when the connection fails or a timeout strikes
+     * @throws ResponseTimedOut when the server accepted the connection and its answer took longer than `$timeout`
+     * @throws ConnectionException when the connection fails, or a timeout strikes while it is made
      */
     public function get(string $url, int $maxBytes, array $headers = [], int $connectTimeout = 3, int $timeout = 10): FetchedResponse
     {
@@ -172,7 +179,7 @@ final readonly class GuardedFetch
                 throw ResponseTooLarge::over($maxBytes, $exception);
             }
 
-            throw $exception;
+            throw ResponseTimedOut::refine($exception);
         }
 
         $durationMs = intdiv(hrtime(true) - $start, 1_000_000);
@@ -214,7 +221,8 @@ final readonly class GuardedFetch
      * @throws BlockedDestination when the guard refuses the URL
      * @throws HostUnresolvable when the host resolves to no address
      * @throws MalformedResponseFraming when the response declares its length and is chunked as well
-     * @throws ConnectionException when the connection fails or a timeout strikes before the headers are in
+     * @throws ResponseTimedOut when the server accepted the connection and its headers took longer than `$timeout`
+     * @throws ConnectionException when the connection fails, or a timeout strikes while it is made
      */
     public function lead(string $url, array $headers = [], int $connectTimeout = 3, int $timeout = 10): FetchedResponse
     {
@@ -236,7 +244,7 @@ final readonly class GuardedFetch
         } catch (Throwable $exception) {
             // The transfer ends right after the head, by design. Without a head the failure
             // came first, and it is the answer.
-            $psr = $head->response() ?? throw $exception;
+            $psr = $head->response() ?? throw ResponseTimedOut::refine($exception);
         }
 
         $durationMs = intdiv(hrtime(true) - $start, 1_000_000);

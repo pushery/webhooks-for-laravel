@@ -176,7 +176,8 @@ final class EndpointList extends Component
         $subscription = $this->findOwnedEndpoint($id);
         $this->authorize('delete', $subscription);
 
-        $subscription->delete();
+        // Through the manager, so the deletion is recorded with its actor like one on a host's own screen.
+        Webhooks::unsubscribe($subscription);
 
         $this->resetPage();
         $this->dispatch('endpoint-deleted');

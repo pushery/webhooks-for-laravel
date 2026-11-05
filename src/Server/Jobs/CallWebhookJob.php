@@ -27,6 +27,7 @@ use Pushery\Webhooks\Server\Exceptions\DeliveryRefused;
 use Pushery\Webhooks\Server\Exceptions\QueueCannotRetry;
 use Pushery\Webhooks\Server\Streams\StreamLedger;
 use Pushery\Webhooks\Server\Streams\Turn;
+use Pushery\Webhooks\Support\EnvFlag;
 use Throwable;
 
 /**
@@ -99,10 +100,19 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
 
     public bool $failOnTimeout = true;
 
+    /**
+     * Whether the queue holds this job encrypted with the application key: in the queue while the
+     * delivery waits, and in `failed_jobs` once it gives up. Laravel reads it when it writes the job.
+     * The body of a delivery is where a sender's personal data travels, so `webhooks.server.encrypt_jobs`
+     * seals it unless an application switches it off.
+     */
+    public bool $shouldBeEncrypted;
+
     public function __construct(
         public readonly WebhookDeliveryData $data,
     ) {
         $this->tries = max(1, $data->maxTries);
+        $this->shouldBeEncrypted = EnvFlag::protection(config('webhooks.server.encrypt_jobs'), true);
 
         // The job timeout must always sit above the HTTP timeout it wraps, or the worker
         // kills the job mid-request: no lifecycle event fires, the delivery row is left

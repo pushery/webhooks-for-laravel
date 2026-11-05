@@ -6,11 +6,14 @@ namespace Pushery\Webhooks\Platform\Livewire;
 
 use Illuminate\Container\Container;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\View as ViewFactory;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use Pushery\Webhooks\Events\WebhookSecretRevealed;
 use Pushery\Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
 use Pushery\Webhooks\WebhookManager;
 
@@ -85,6 +88,9 @@ final class EndpointSecretPanel extends Component
         $this->previousSecret = $subscription->previous_secret;
         $this->expiresAt = now()->addSeconds($this->secretRevealTtl())->getTimestamp();
         $this->hidden = false;
+
+        // The secret is on the tenant's screen from here on, so an audit learns who saw it.
+        Event::dispatch(new WebhookSecretRevealed($subscription, Auth::user()));
     }
 
     /**
