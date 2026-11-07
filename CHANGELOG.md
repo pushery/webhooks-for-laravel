@@ -6,6 +6,14 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.27.0] - 2026-11-07
+
+### 🔧 Changed
+
+- **The shipped screens need `pushery/wirekit` 2.71.1 or newer.** `conflict` refuses an older WireKit. 2.71.1 is the release this package's suite develops against, and no run proves an older one.
+
+  **Upgrade:** a host that renders the shipped screens updates `pushery/wirekit` to 2.71.1 or newer. A host without WireKit is not affected.
+
 ## [3.26.0] - 2026-11-05
 
 ### ✨ Added
@@ -3664,7 +3672,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.26.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.27.0...HEAD
+[3.27.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.26.0...v3.27.0
 [3.26.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.25.1...v3.26.0
 [3.25.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.25.0...v3.25.1
 [3.25.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.24.0...v3.25.0
