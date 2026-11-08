@@ -7,6 +7,9 @@ namespace Pushery\Webhooks\Core\Http;
 /**
  * What a {@see GuardedFetch} brought back: the status, the response headers, the body, never
  * longer than the limit the fetch was given and empty for a lead, and how long the transfer took.
+ *
+ * `$truncated` says the body is only the head of a longer one, which a fetch hands back where the
+ * caller asked for that with `truncate: true`. Without that option a longer body throws instead.
  */
 final readonly class FetchedResponse
 {
@@ -18,6 +21,7 @@ final readonly class FetchedResponse
         public array $headers,
         public string $body,
         public int $durationMs,
+        public bool $truncated = false,
     ) {}
 
     /** The first value of a header, its name matched in any case, or null when the response has none. */

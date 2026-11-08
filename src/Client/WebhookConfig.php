@@ -24,6 +24,7 @@ use Pushery\Webhooks\Core\Signing\GitHubScheme;
 use Pushery\Webhooks\Core\Signing\Jwks\JwksKeySet;
 use Pushery\Webhooks\Core\Signing\PlainHmacScheme;
 use Pushery\Webhooks\Core\Signing\SecretSet;
+use Pushery\Webhooks\Core\Signing\SecretTokenScheme;
 use Pushery\Webhooks\Core\Signing\SignatureEncoding;
 use Pushery\Webhooks\Core\Signing\SignatureHeaders;
 use Pushery\Webhooks\Core\Signing\SignatureScheme;
@@ -63,7 +64,7 @@ final class WebhookConfig
      * them can never return expired and `tolerance_seconds` is inert.
      *
      * A hand-written list. Every built-in scheme that checks a window reports even a fresh
-     * signature as expired at a tolerance of -1, and these two are the ones that still return
+     * signature as expired at a tolerance of -1, and these three are the ones that still return
      * valid.
      *
      * A host's own scheme cannot be classified from here, so it is left alone rather than
@@ -74,6 +75,7 @@ final class WebhookConfig
     private const array SCHEMES_WITHOUT_A_REPLAY_WINDOW = [
         GitHubScheme::class,
         PlainHmacScheme::class,
+        SecretTokenScheme::class,
     ];
 
     /**
@@ -94,6 +96,7 @@ final class WebhookConfig
     private const array SCHEMES_WITHOUT_A_DELIVERY_ID_HEADER = [
         GitHubScheme::class,
         PlainHmacScheme::class,
+        SecretTokenScheme::class,
         StripeStyleScheme::class,
         StripeScheme::class,
     ];
@@ -431,7 +434,7 @@ final class WebhookConfig
      * supplies the key, null otherwise.
      *
      * `idHeader` defaults to the Standard Webhooks name whatever the scheme is, so an unset
-     * `dedupe_id` looks for a header four of the six built-in dialects never send. A configured
+     * `dedupe_id` looks for a header five of the seven built-in dialects never send. A configured
      * `dedupe_id` answers it, and a 'verifier' puts the whole question out of scope.
      */
     public function schemeWithoutDeliveryIdHeader(): ?string
@@ -450,9 +453,9 @@ final class WebhookConfig
      * cover and nothing stops an authentic delivery from coming back under another type, null
      * otherwise.
      *
-     * The two dialects without a replay window sign the body alone, so a header there is the
-     * sender's to choose: resent with the same body and signature, a captured delivery verifies
-     * again. A dedupe key read from the body stops that, because the body is the one part the
+     * The dialects without a replay window sign the body alone or, sending a secret token, nothing
+     * at all, so a header there is the sender's to choose: resent with the same body and signature,
+     * a captured delivery verifies again. A dedupe key read from the body stops that, because the body is the one part the
      * sender cannot change; a key read from a header does not, and a resolver cannot be classified
      * from here, so it is left alone. A 'verifier' replaces the scheme and is out of scope.
      */
@@ -475,7 +478,7 @@ final class WebhookConfig
      * The scheme class when this source's dialect signs no timestamp and it configures no
      * `dedupe_id`, null otherwise.
      *
-     * A dialect with a signed timestamp bounds a replay with `tolerance_seconds`; the two that
+     * A dialect with a signed timestamp bounds a replay with `tolerance_seconds`; the three that
      * carry none say so in their own docblocks, and a verification through them never returns
      * expired. A configured `dedupe_id` takes a source out of this answer, and not because it
      * bounds a replay: it answers the retry half. On these dialects a key read from a header is

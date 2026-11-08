@@ -6,6 +6,7 @@ namespace Pushery\Webhooks\Core\Http;
 
 use GuzzleHttp\Psr7\StreamDecoratorTrait;
 use GuzzleHttp\Psr7\Utils;
+use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
 use Pushery\Webhooks\Core\Http\Exceptions\ResponseTooLarge;
 
@@ -19,6 +20,9 @@ use Pushery\Webhooks\Core\Http\Exceptions\ResponseTooLarge;
  * a length. The delivery transport accepts every write instead, because there an oversized answer
  * still belongs to a delivered webhook. A fetch has no use for a body it may not keep.
  *
+ * With `$keepHead` the transfer ends at the limit all the same, but the bytes up to it are kept,
+ * for a fetch whose caller reads the head of a longer body, as a crawler reads a `robots.txt`.
+ *
  * @internal
  */
 final class LimitedSink implements StreamInterface
@@ -31,8 +35,11 @@ final class LimitedSink implements StreamInterface
 
     private bool $overflowed = false;
 
+    private ?ResponseInterface $response = null;
+
     public function __construct(
         private readonly int $limit,
+        private readonly bool $keepHead = false,
     ) {
         $this->stream = Utils::streamFor('');
     }
@@ -41,6 +48,11 @@ final class LimitedSink implements StreamInterface
     {
         if ($this->received + strlen($string) > $this->limit) {
             $this->overflowed = true;
+
+            // The transfer ends with this write, so the bytes up to the limit are the last kept.
+            if ($this->keepHead) {
+                $this->stream->write(substr($string, 0, $this->limit - $this->received));
+            }
 
             // Fewer bytes than curl handed over, so curl ends the transfer here.
             return 0;
@@ -72,5 +84,29 @@ final class LimitedSink implements StreamInterface
     public function overflowed(): bool
     {
         return $this->overflowed;
+    }
+
+    /** The bytes kept so far, the head of the body where it passed the limit and `$keepHead` holds. */
+    public function kept(): string
+    {
+        $this->stream->rewind();
+
+        return $this->stream->getContents();
+    }
+
+    /**
+     * Keep the status and the headers of the response the body belongs to, for a transfer the limit
+     * ends in an exception. An informational answer, such as `103 Early Hints`, may come first; the
+     * final response follows it before any byte of the body and takes its place.
+     */
+    public function keepResponse(ResponseInterface $response): void
+    {
+        $this->response = $response;
+    }
+
+    /** The response kept, or null while none has arrived. */
+    public function response(): ?ResponseInterface
+    {
+        return $this->response;
     }
 }

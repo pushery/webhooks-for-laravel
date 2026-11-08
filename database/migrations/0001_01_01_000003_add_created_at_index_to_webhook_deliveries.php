@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Pushery\SQLens\Attributes\NoSqlOnDriver;
 use Pushery\Webhooks\Database\DatabaseRequirement;
 use Pushery\Webhooks\Database\Dialect\Dialect;
 use Pushery\Webhooks\Support\WebhookConnection;
@@ -34,7 +35,9 @@ use Pushery\Webhooks\Support\WebhookConnection;
  * partition, then `ALTER INDEX … ATTACH PARTITION`. Do that by hand first if the window matters
  * — this migration is then a no-op, because it only creates the index when it is missing.
  */
-return new class extends Migration
+return new
+#[NoSqlOnDriver('mysql', reason: 'the MySQL table has carried webhook_deliveries_created_idx since it was created, so only PostgreSQL needs it added')]
+class extends Migration
 {
     public function getConnection(): ?string
     {

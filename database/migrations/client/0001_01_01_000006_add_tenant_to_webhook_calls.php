@@ -50,6 +50,18 @@ return new class extends Migration
             return;
         }
 
+        // up() leaves the column standing where it already existed, so a rollback cannot know it removes only what its
+        // own up() added. The tenant is the record of whom a received call was for, so the rollback refuses while any
+        // call carries one, and drops the column of a table that holds none.
+        $tenanted = $schema->getConnection()->table('webhook_calls')->whereNotNull('tenant')->count();
+
+        if ($tenanted > 0) {
+            throw new RuntimeException(sprintf(
+                'Refusing to roll back the tenant of webhook calls: %d call(s) record the tenant they were for, and dropping the column would delete that record. Export the calls and remove the column by hand if it has to go.',
+                $tenanted,
+            ));
+        }
+
         $this->boundLocks();
 
         $schema->table('webhook_calls', function (Blueprint $table): void {

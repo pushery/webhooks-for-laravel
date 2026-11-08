@@ -29,6 +29,7 @@ use Pushery\Webhooks\Core\Signing\Ed25519Scheme;
 use Pushery\Webhooks\Core\Signing\GitHubScheme;
 use Pushery\Webhooks\Core\Signing\PlainHmacScheme;
 use Pushery\Webhooks\Core\Signing\SecretSet;
+use Pushery\Webhooks\Core\Signing\SecretTokenScheme;
 use Pushery\Webhooks\Core\Signing\SignatureHeaders;
 use Pushery\Webhooks\Core\Signing\SignatureScheme;
 use Pushery\Webhooks\Core\Signing\StandardWebhooksScheme;
@@ -79,6 +80,7 @@ final readonly class WebhookProcessor
         Ed25519Scheme::class,
         GitHubScheme::class,
         PlainHmacScheme::class,
+        SecretTokenScheme::class,
         StandardWebhooksScheme::class,
         StripeScheme::class,
         StripeStyleScheme::class,

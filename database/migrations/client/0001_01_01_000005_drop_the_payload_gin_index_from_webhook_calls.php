@@ -6,6 +6,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Pushery\SQLens\Attributes\NoSqlOnDriver;
 use Pushery\Webhooks\Database\DatabaseRequirement;
 use Pushery\Webhooks\Database\Dialect\Dialect;
 use Pushery\Webhooks\Support\TableLookup;
@@ -30,7 +31,9 @@ use Pushery\Webhooks\Support\WebhookConnection;
  * A host that searches inside stored payloads by containment keeps the index with a migration of its
  * own; `down()` runs the statement that builds it.
  */
-return new class extends Migration
+return new
+#[NoSqlOnDriver('mysql', reason: 'MySQL never had the GIN index; it is a PostgreSQL index type')]
+class extends Migration
 {
     private const string INDEX = 'webhook_calls_payload_gin';
 

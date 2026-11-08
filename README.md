@@ -72,10 +72,11 @@ Everything ships under the `Pushery\Webhooks\` namespace.
 - **A self-service portal** — real, full-page screens where a customer manages its own
   endpoints, rotates its signing secret and inspects endpoint health.
 - **Events for an audit log** — registering, changing, disabling, enabling and deleting an
-  endpoint, and rotating or revealing its signing secret, each fire an event that names the
-  actor: `WebhookEndpointRegistered`, `WebhookEndpointUpdated`, `WebhookEndpointDisabled`,
-  `WebhookEndpointEnabled`, `WebhookEndpointDeleted`, `WebhookSecretRotated` and
-  `WebhookSecretRevealed`.
+  endpoint, changing the payload version or transform its deliveries are shaped by, and
+  rotating or revealing its signing secret, each fire an event that names the actor:
+  `WebhookEndpointRegistered`, `WebhookEndpointUpdated`, `WebhookEndpointPayloadUpdated`,
+  `WebhookEndpointDisabled`, `WebhookEndpointEnabled`, `WebhookEndpointDeleted`,
+  `WebhookSecretRotated` and `WebhookSecretRevealed`.
 - **An observability dashboard** — KPI cards, latency percentiles, a server-rendered
   activity chart, a filterable delivery table with one-click redelivery, and an
   optional JSON metrics endpoint.
@@ -88,7 +89,8 @@ Everything ships under the `Pushery\Webhooks\` namespace.
 - **A guarded fetch** — `GuardedFetch::get()` reads a URL your customer entered, a health
   or metrics endpoint for one, under the same SSRF guard: the connection is pinned to the
   validated address, no redirect is followed, TLS is verified, the body stops at the byte
-  limit you set, and the headers and both timeouts are set per call.
+  limit you set, refused past it or handed back as its head where you ask for that, and the
+  headers and both timeouts are set per call.
 - **Seven languages** — every string the shipped UI renders is translated, and the
   translations are publishable.
 - **A fake for your tests** — `Webhooks::fake()` records every webhook instead of sending

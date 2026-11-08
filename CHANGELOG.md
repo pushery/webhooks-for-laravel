@@ -6,6 +6,34 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.28.0] - 2026-11-08
+
+### ✨ Added
+
+- **An audit learns who changed the payload version or the transform of an endpoint.** The version decides in which form a delivery arrives, the transform which fields it carries, leaves out or renames, so a change there changes what the receiver gets, as a changed URL does. The portal's payload editor saved both past every event of the package. `WebhookManager::updatePayload()`, also on the `Webhooks` facade, sets them and fires `WebhookEndpointPayloadUpdated` with the endpoint, the attributes that changed and the person who changed them, and the editor saves through it. A transform is compared as a rule set, so the same rules with their keys in another order fire nothing.
+- **A guarded fetch can hand back the head of a body past its limit.** `GuardedFetch::get()` and `follow()` take `truncate: true`. The transfer still ends at `maxBytes`, and the response comes back with the bytes up to the limit, its status and its headers, marked `FetchedResponse::$truncated`, instead of throwing `ResponseTooLarge`. A declared length past the limit is then read up to the limit. A crawler reads a `robots.txt` that way, Google up to 500 KiB, and a chain read only for where it leads, such as a sitemap that moved, can name a small limit. Without the option a longer body is refused as before.
+- **A producer that sends its secret as a token is verified, as GitLab does in `X-Gitlab-Token`.** `SecretTokenScheme` compares the header with the current and the previous secret, in constant time and without revealing the secret's length. Another header comes from `signature_headers.signature`. It signs nothing: the token travels with every delivery and covers no body, so a producer's signature is the better choice wherever it offers one.
+
+### 🔧 Changed
+
+- **The shipped screens need `pushery/wirekit` 2.72.0 or newer.** `conflict` refuses an older WireKit. 2.72.0 is the release this package's suite develops against, and no run proves an older one.
+
+  **Upgrade:** a host that renders the shipped screens updates `pushery/wirekit` to 2.72.0 or newer. A host without WireKit is not affected.
+
+### 🐛 Fixed
+
+- **A rollback no longer deletes the tenant webhook calls were received for.** Migration `0001_01_01_000006` adds `tenant` to `webhook_calls` only where the column is missing, and its `down()` dropped it unconditionally, so `migrate:rollback` could take with it a column an earlier install had already filled. The `down()` now refuses with a `RuntimeException` that names how many calls carry a tenant, while any does, and drops the column of a table that holds none.
+
+  **Upgrade:** nothing to do. A rollback that has to remove the column is done by hand after exporting the calls.
+
+- **The migrations that run nothing on one engine say so to SQLens.** Seven migrations return before they emit anything on one engine, by design: four change a character set, a collation or a primary key only a MySQL table has, and three change an index or a view only PostgreSQL has. Without `#[NoSqlOnDriver]` naming that engine, SQLens read each of them as a migration that ran and produced nothing, and `sqlens:predeploy` stopped the first deploy of an application on that engine at `CAP.L0.NOT_CAPTURABLE`. Each one names its engine now, with the reason.
+
+  **Upgrade:** nothing to do. `pushery/sqlens-for-laravel` is suggested now, because it is what reads the attributes.
+
+### 📚 Documentation
+
+- **The failure notification example in the scheduled maintenance guide names `routes/console.php`.** The block calls `Schedule::command()` at the top level, which runs as written only there. Its comment named `app/Console/Kernel.php`, which a Laravel 13 application does not have by default, or `bootstrap/app.php`, where the block would run before the application boots.
+
 ## [3.27.0] - 2026-11-07
 
 ### 🔧 Changed
@@ -3672,7 +3700,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.27.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.28.0...HEAD
+[3.28.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.27.0...v3.28.0
 [3.27.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.26.0...v3.27.0
 [3.26.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.25.1...v3.26.0
 [3.25.1]: https://github.com/pushery/webhooks-for-laravel/compare/v3.25.0...v3.25.1

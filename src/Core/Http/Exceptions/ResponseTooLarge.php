@@ -12,7 +12,9 @@ use Throwable;
  * passed that limit, or before its first byte where the server declared a longer length.
  *
  * Nothing of the body is handed back. A body cut off at the limit is a broken image or a half
- * document, never the response the caller asked for, so the fetch refuses it as a whole.
+ * document, never the response the caller asked for, so the fetch refuses it as a whole. A caller
+ * that reads the head of a longer body, as a crawler reads a `robots.txt`, asks the fetch with
+ * `truncate: true` and is handed that head instead of this exception.
  */
 final class ResponseTooLarge extends RuntimeException
 {

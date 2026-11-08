@@ -6,6 +6,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Pushery\SQLens\Attributes\NoSqlOnDriver;
 use Pushery\Webhooks\Database\DatabaseRequirement;
 use Pushery\Webhooks\Database\Dialect\Dialect;
 use Pushery\Webhooks\Support\TableLookup;
@@ -26,7 +27,9 @@ use Pushery\Webhooks\Support\WebhookConnection;
  * column's character set rebuilds the table, so on such a database this migration takes as long as
  * copying the delivery log once; anywhere else it changes nothing.
  */
-return new class extends Migration
+return new
+#[NoSqlOnDriver('pgsql', reason: 'only a MySQL delivery log can hold columns on a character set other than the connection\'s; PostgreSQL stores every text column in the database encoding')]
+class extends Migration
 {
     public function getConnection(): ?string
     {

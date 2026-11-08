@@ -29,6 +29,7 @@ use Pushery\Webhooks\Events\WebhookDeliveryRateLimited;
 use Pushery\Webhooks\Events\WebhookEndpointDeleted;
 use Pushery\Webhooks\Events\WebhookEndpointDisabled;
 use Pushery\Webhooks\Events\WebhookEndpointEnabled;
+use Pushery\Webhooks\Events\WebhookEndpointPayloadUpdated;
 use Pushery\Webhooks\Events\WebhookEndpointRegistered;
 use Pushery\Webhooks\Events\WebhookEndpointUpdated;
 use Pushery\Webhooks\Events\WebhookSecretRotated;
@@ -195,6 +196,42 @@ final readonly class WebhookManager
 
         if ($changed !== []) {
             Event::dispatch(new WebhookEndpointUpdated($subscription, $changed, $this->actor()));
+        }
+
+        return $subscription;
+    }
+
+    /**
+     * Set the payload version and the transform that shape what an endpoint receives.
+     *
+     * The version decides in which form a delivery arrives, the transform which fields it carries,
+     * leaves out or renames. A null transform inherits the rules the version declares, and a null
+     * version is the package's default form.
+     *
+     * Fires {@see WebhookEndpointPayloadUpdated} with the attributes that changed, when any did.
+     *
+     * @param  array<string, mixed>|null  $transform
+     */
+    public function updatePayload(WebhookSubscription $subscription, ?string $payloadVersion, ?array $transform): WebhookSubscription
+    {
+        $changed = [];
+
+        if ($payloadVersion !== $subscription->payload_version) {
+            $changed[] = 'payload_version';
+        }
+
+        // Compared as rule sets: a database that keeps the transform as jsonb hands its keys back in
+        // an order of its own, and the rules a tenant saved unchanged would read as a change.
+        if (self::ruleSet($transform) !== self::ruleSet($subscription->transform)) {
+            $changed[] = 'transform';
+        }
+
+        $subscription->payload_version = $payloadVersion;
+        $subscription->transform = $transform;
+        $subscription->save();
+
+        if ($changed !== []) {
+            Event::dispatch(new WebhookEndpointPayloadUpdated($subscription, $changed, $this->actor()));
         }
 
         return $subscription;
@@ -939,6 +976,25 @@ final readonly class WebhookManager
         }
 
         return $this->transformer->transform($data, $rules, $version);
+    }
+
+    /**
+     * A transform with the keys of every level in one order, so two rule sets compare equal exactly
+     * when they hold the same pairs. A list is sorted by its keys as well, which moves two lists of
+     * one length the same way and leaves them as equal or as different as they were.
+     *
+     * @param  array<array-key, mixed>|null  $rules
+     * @return array<array-key, mixed>|null
+     */
+    private static function ruleSet(?array $rules): ?array
+    {
+        if ($rules === null) {
+            return null;
+        }
+
+        ksort($rules, SORT_STRING);
+
+        return array_map(static fn (mixed $rule): mixed => is_array($rule) ? self::ruleSet($rule) : $rule, $rules);
     }
 
     /**

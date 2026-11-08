@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Pushery\SQLens\Attributes\NoSqlOnDriver;
 use Pushery\Webhooks\Database\DatabaseRequirement;
 use Pushery\Webhooks\Database\Dialect\Dialect;
 use Pushery\Webhooks\Support\TableLookup;
@@ -26,7 +27,9 @@ use Pushery\Webhooks\Support\WebhookConnection;
  * The column is derived data — `webhooks:refresh-metrics` rebuilds every row — so no content is
  * at risk here. What the ALTER protects is the unique index the refresh inserts against.
  */
-return new class extends Migration
+return new
+#[NoSqlOnDriver('pgsql', reason: 'the collation of the rollup table is a MySQL question; on PostgreSQL the rollup is a materialized view')]
+class extends Migration
 {
     public function getConnection(): ?string
     {
