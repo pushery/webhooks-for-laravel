@@ -51,7 +51,7 @@
         "symfony/http-kernel": "^7.0 || ^8.0"
     },
     "conflict": {
-        "pushery/wirekit": "<2.71.1"
+        "pushery/wirekit": "<2.72.0"
     },
     "autoload": {
         "psr-4": {
@@ -73,6 +73,7 @@
         "laravel/pulse": "Enables the opt-in internal-ops delivery monitor (Pushery\\Webhooks\\Pulse\\WebhookPulseServiceProvider) — a Pulse recorder and card for throughput, failure rate and latency.",
         "laravel/scout": "Enables the opt-in searchable delivery and inbound-call logs (use the ready-made Pushery\\Webhooks\\Search\\SearchableWebhookDelivery / SearchableWebhookCall models — or apply the Pushery\\Webhooks\\Search\\SearchableDelivery / SearchableCall traits to your own — and set webhooks.search.enabled).",
         "livewire/livewire": "Required to render any UI this package ships: the observability dashboard, the self-service endpoint portal, and the optional management components (Pushery\\Webhooks\\WebhooksUiServiceProvider).",
+        "pushery/sqlens-for-laravel": "Reads the #[NoSqlOnDriver] attributes on the migrations, which say why a migration runs no SQL on an engine. Without it they are never read.",
         "pushery/wirekit": "Required to render the dashboard and the self-service portal AS SHIPPED — their views are built from WireKit components. A host on another UI kit must publish the views (--tag=webhooks-dashboard-views / --tag=webhooks-self-service-views) and restyle them instead.",
         "blade-ui-kit/blade-icons": "Renders the icons the shipped screens ask WireKit for (empty states, primary actions), together with the icon set your WireKit preset resolves them into: blade-ui-kit/blade-heroicons for the default preset (`composer require blade-ui-kit/blade-icons blade-ui-kit/blade-heroicons`), or the set of the preset you configured. Without them the screens draw WireKit's inert placeholder where an icon belongs; they render either way. `webhooks:preflight` names what is missing.",
         "blade-ui-kit/blade-heroicons": "The icon set of WireKit's default preset, which the shipped screens are drawn against unless you configured another one. On a lucide, phosphor or tabler preset, install that preset's set instead; this one is then not needed.",

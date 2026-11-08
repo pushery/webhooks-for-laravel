@@ -6,6 +6,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Pushery\SQLens\Attributes\NoSqlOnDriver;
 use Pushery\Webhooks\Database\DatabaseRequirement;
 use Pushery\Webhooks\Database\Dialect\Dialect;
 use Pushery\Webhooks\Support\TableLookup;
@@ -26,7 +27,9 @@ use Pushery\Webhooks\Support\WebhookConnection;
  * The rows are unique on those columns already, which is what the index guaranteed, so the key can
  * be added without touching a row.
  */
-return new class extends Migration
+return new
+#[NoSqlOnDriver('pgsql', reason: 'on PostgreSQL the rollup is a materialized view, which takes no primary key')]
+class extends Migration
 {
     public function getConnection(): ?string
     {

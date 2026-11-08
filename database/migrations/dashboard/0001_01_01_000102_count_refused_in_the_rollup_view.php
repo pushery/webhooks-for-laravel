@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Pushery\SQLens\Attributes\NoSqlOnDriver;
 use Pushery\Webhooks\Dashboard\Metrics\TdigestExtension;
 use Pushery\Webhooks\Database\DatabaseRequirement;
 use Pushery\Webhooks\Database\Dialect\Dialect;
@@ -34,7 +35,9 @@ use Pushery\Webhooks\Support\WebhookConnection;
  * the next scheduled run would take the dashboard down for the whole interval. The reasoning is
  * spelled out at the statement itself.
  */
-return new class extends Migration
+return new
+#[NoSqlOnDriver('mysql', reason: 'the MySQL rollup query already counts a refused delivery; only the PostgreSQL materialized view left it out')]
+class extends Migration
 {
     public function getConnection(): ?string
     {

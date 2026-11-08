@@ -32,6 +32,7 @@ use Pushery\Webhooks\WebhookManager;
  * @method static WebhookSubscription subscribe(Model|TenantIdentity|null $owner, string $url, array<array-key, string> $eventTypes, ?string $name = null)
  * @method static void unsubscribe(WebhookSubscription $subscription)
  * @method static WebhookSubscription update(WebhookSubscription $subscription, string $url, array<array-key, string> $eventTypes, ?string $name = null)
+ * @method static WebhookSubscription updatePayload(WebhookSubscription $subscription, ?string $payloadVersion, array<string, mixed>|null $transform)
  * @method static ForgottenEvents forgetEvents(array<array-key, string> $eventIds)
  * @method static WebhookSubscription enable(WebhookSubscription $subscription)
  * @method static WebhookSubscription disable(WebhookSubscription $subscription)

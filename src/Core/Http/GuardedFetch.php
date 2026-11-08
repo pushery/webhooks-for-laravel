@@ -36,7 +36,9 @@ use Throwable;
  *
  * The body is held to a limit the caller names. Past it the transfer ends, whether the server
  * declared a length or sends without end, and the fetch throws {@see ResponseTooLarge}. A caller
- * that needs only the status and the headers asks {@see self::lead()}, which reads no body at all.
+ * that reads the head of a longer body, as a crawler reads a `robots.txt`, passes `truncate: true`
+ * and gets the bytes up to the limit, marked {@see FetchedResponse::$truncated}. A caller that
+ * needs only the status and the headers asks {@see self::lead()}, which reads no body at all.
  *
  * A timeout that strikes after the server accepted the connection throws {@see ResponseTimedOut},
  * a `ConnectionException`, so a caller can tell a slow answer from a connection that never came
@@ -70,25 +72,30 @@ final readonly class GuardedFetch
      * target in the chain rather than thrown: a chain that runs into the guard is an answer about
      * the site, not a failure of the fetch.
      *
+     * With `$truncate` and a `$maxBytes`, a body longer than the limit at any station is cut to it
+     * instead of refused, as {@see self::get()} does with the option, and every station keeps its
+     * status and its `Location`. A chain read only for where it leads can so name a small limit.
+     *
      * @param  int  $maxRedirects  the most redirects followed, 0 for none
      * @param  ?int  $maxBytes  the longest body accepted at each station, or null to read none
      * @param  array<string, string>  $headers  request headers sent to every station
+     * @param  bool  $truncate  hand back the head of a longer body instead of refusing it
      *
      * @throws BlockedDestination when the guard refuses the first URL
      * @throws HostUnresolvable when the first URL's host resolves to no address
-     * @throws ResponseTooLarge when a body is longer than `$maxBytes`
+     * @throws ResponseTooLarge when a body is longer than `$maxBytes` and `$truncate` is false
      * @throws MalformedResponseFraming when a response declares its length and is chunked as well
      * @throws ResponseTimedOut when a server accepted the connection and its answer took longer than `$timeout`
      * @throws ConnectionException when a connection fails, or a timeout strikes while it is made
      */
-    public function follow(string $url, int $maxRedirects = 5, ?int $maxBytes = null, RedirectScope $scope = RedirectScope::Anywhere, bool $allowDowngrade = false, array $headers = [], int $connectTimeout = 3, int $timeout = 10): FetchedChain
+    public function follow(string $url, int $maxRedirects = 5, ?int $maxBytes = null, RedirectScope $scope = RedirectScope::Anywhere, bool $allowDowngrade = false, array $headers = [], int $connectTimeout = 3, int $timeout = 10, bool $truncate = false): FetchedChain
     {
         if ($maxRedirects < 0) {
             throw new InvalidArgumentException('The redirect limit of a follow is never negative.');
         }
 
         $first = strtolower((string) parse_url($url, PHP_URL_HOST));
-        $response = $this->station($url, $maxBytes, $headers, $connectTimeout, $timeout);
+        $response = $this->station($url, $maxBytes, $headers, $connectTimeout, $timeout, $truncate);
         $hops = [new RedirectHop($url, $response->status, $response->header('Location'), $response->durationMs)];
         // Keyed the way a target is written, so a redirect back to the first URL is a loop however
         // that URL was spelled. station() let the URL through, so it is an http or https URL with
@@ -116,7 +123,7 @@ final readonly class GuardedFetch
             }
 
             try {
-                $next = $this->station($target, $maxBytes, $headers, $connectTimeout, $timeout);
+                $next = $this->station($target, $maxBytes, $headers, $connectTimeout, $timeout, $truncate);
             } catch (BlockedDestination) {
                 return new FetchedChain($hops, $response, RedirectStop::Refused, $target);
             } catch (HostUnresolvable) {
@@ -139,30 +146,45 @@ final readonly class GuardedFetch
      * header among them. Only a refused destination, a body past the limit and a failed transfer
      * throw.
      *
+     * With `$truncate` a body past the limit is not refused: the transfer still ends at the limit,
+     * and the response comes back with the bytes up to it, its status and its headers, marked
+     * {@see FetchedResponse::$truncated}. A declared length past the limit is then read up to the
+     * limit rather than refused before its first byte. Google reads a `robots.txt` that way, up to
+     * 500 KiB, and ignores what follows.
+     *
      * @param  int  $maxBytes  the longest body accepted, in bytes
      * @param  array<string, string>  $headers  request headers, such as `Accept`
      * @param  int  $connectTimeout  seconds to wait for the connection
      * @param  int  $timeout  seconds the whole transfer may take
+     * @param  bool  $truncate  hand back the head of a longer body instead of refusing it
      *
      * @throws BlockedDestination when the guard refuses the URL
      * @throws HostUnresolvable when the host resolves to no address
-     * @throws ResponseTooLarge when the body is longer than `$maxBytes`
+     * @throws ResponseTooLarge when the body is longer than `$maxBytes` and `$truncate` is false
      * @throws MalformedResponseFraming when the response declares its length and is chunked as well
      * @throws ResponseTimedOut when the server accepted the connection and its answer took longer than `$timeout`
      * @throws ConnectionException when the connection fails, or a timeout strikes while it is made
      */
-    public function get(string $url, int $maxBytes, array $headers = [], int $connectTimeout = 3, int $timeout = 10): FetchedResponse
+    public function get(string $url, int $maxBytes, array $headers = [], int $connectTimeout = 3, int $timeout = 10, bool $truncate = false): FetchedResponse
     {
         if ($maxBytes < 0) {
             throw new InvalidArgumentException('The byte limit of a fetch is never negative.');
         }
 
         $endpoint = $this->guard->resolveAndPin($url);
-        $sink = new LimitedSink($maxBytes);
+        $sink = new LimitedSink($maxBytes, keepHead: $truncate);
 
         $options = $this->transportOptions($endpoint, $connectTimeout, $timeout) + [
             'sink' => $sink,
-            'on_headers' => static function (ResponseInterface $response) use ($sink): void {
+            'on_headers' => static function (ResponseInterface $response) use ($sink, $truncate): void {
+                // A cut transfer ends in an exception, so the sink keeps the status and the headers
+                // of the response its head belongs to.
+                if ($truncate) {
+                    $sink->keepResponse($response);
+
+                    return;
+                }
+
                 $sink->refuseDeclaredLength($response->getHeaderLine('Content-Length'));
             },
         ];
@@ -175,6 +197,20 @@ final readonly class GuardedFetch
                 ->withHeaders($headers)
                 ->get($endpoint->url);
         } catch (Throwable $exception) {
+            $head = $sink->response();
+
+            if ($sink->overflowed() && $head instanceof ResponseInterface) {
+                $this->refuseContradictoryFraming($head);
+
+                return new FetchedResponse(
+                    status: $head->getStatusCode(),
+                    headers: $this->headersOf($head),
+                    body: $sink->kept(),
+                    durationMs: intdiv(hrtime(true) - $start, 1_000_000),
+                    truncated: true,
+                );
+            }
+
             if ($sink->overflowed()) {
                 throw ResponseTooLarge::over($maxBytes, $exception);
             }
@@ -187,11 +223,14 @@ final readonly class GuardedFetch
 
         $this->refuseContradictoryFraming($psr);
 
+        [$body, $truncated] = $this->bodyOf($psr->getBody(), $maxBytes, $truncate);
+
         return new FetchedResponse(
             status: $response->status(),
             headers: $this->headersOf($psr),
-            body: $this->bodyOf($psr->getBody(), $maxBytes),
+            body: $body,
             durationMs: $durationMs,
+            truncated: $truncated,
         );
     }
 
@@ -264,11 +303,11 @@ final readonly class GuardedFetch
      *
      * @param  array<string, string>  $headers
      */
-    private function station(string $url, ?int $maxBytes, array $headers, int $connectTimeout, int $timeout): FetchedResponse
+    private function station(string $url, ?int $maxBytes, array $headers, int $connectTimeout, int $timeout, bool $truncate): FetchedResponse
     {
         return $maxBytes === null
             ? $this->lead($url, $headers, $connectTimeout, $timeout)
-            : $this->get($url, $maxBytes, $headers, $connectTimeout, $timeout);
+            : $this->get($url, $maxBytes, $headers, $connectTimeout, $timeout, $truncate);
     }
 
     /**
@@ -375,10 +414,15 @@ final readonly class GuardedFetch
     }
 
     /**
-     * The body, refused here as well when it is longer than the limit: a faked response in a test
-     * never passes through the sink, and the limit holds for it all the same.
+     * The body, and whether it was cut to the limit. It is held to the limit here as well, because
+     * a faked response in a test never passes through the sink: refused where it is longer, or cut
+     * to the limit where the caller asked for the head.
+     *
+     * @return array{0: string, 1: bool}
+     *
+     * @throws ResponseTooLarge when the body is longer than the limit and `$truncate` is false
      */
-    private function bodyOf(StreamInterface $stream, int $maxBytes): string
+    private function bodyOf(StreamInterface $stream, int $maxBytes, bool $truncate): array
     {
         if ($stream->isSeekable()) {
             $stream->rewind();
@@ -386,10 +430,14 @@ final readonly class GuardedFetch
 
         $body = $stream->getContents();
 
-        if (strlen($body) > $maxBytes) {
+        if (strlen($body) <= $maxBytes) {
+            return [$body, false];
+        }
+
+        if (! $truncate) {
             throw ResponseTooLarge::over($maxBytes);
         }
 
-        return $body;
+        return [substr($body, 0, $maxBytes), true];
     }
 }

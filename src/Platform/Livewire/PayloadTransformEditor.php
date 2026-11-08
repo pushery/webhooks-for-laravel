@@ -17,6 +17,7 @@ use Pushery\Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
 use Pushery\Webhooks\Platform\Support\PortalRoutes;
 use Pushery\Webhooks\Platform\Transform\DeclarativePayloadTransformer;
 use Pushery\Webhooks\Platform\Transform\PayloadVersionRegistry;
+use Pushery\Webhooks\WebhookManager;
 
 /**
  * A structured editor for one endpoint's payload version and declarative transform.
@@ -200,9 +201,13 @@ final class PayloadTransformEditor extends Component
 
         $rules = $this->buildRules();
 
-        $subscription->transform = $rules === [] ? null : $rules;
-        $subscription->payload_version = $this->payloadVersion !== '' ? $this->payloadVersion : null;
-        $subscription->save();
+        // Through the manager, so the change fires WebhookEndpointPayloadUpdated with the person who
+        // made it, as it does for a host's own screen that calls updatePayload().
+        Container::getInstance()->make(WebhookManager::class)->updatePayload(
+            $subscription,
+            $this->payloadVersion !== '' ? $this->payloadVersion : null,
+            $rules === [] ? null : $rules,
+        );
 
         $this->dispatch('wirekit-toast', variant: 'success', message: __('webhooks::self-service.toast.transform_saved'));
     }

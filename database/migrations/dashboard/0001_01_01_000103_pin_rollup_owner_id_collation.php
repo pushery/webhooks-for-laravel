@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Pushery\SQLens\Attributes\NoSqlOnDriver;
 use Pushery\Webhooks\Database\DatabaseRequirement;
 use Pushery\Webhooks\Database\Dialect\Dialect;
 use Pushery\Webhooks\Database\OwnerKeyType;
@@ -26,7 +27,9 @@ use Pushery\Webhooks\Support\WebhookConnection;
  * collation is not a string column, whatever the config says now, and is left alone. The column
  * holds derived data that `webhooks:refresh-metrics` rebuilds, so no content is at risk here.
  */
-return new class extends Migration
+return new
+#[NoSqlOnDriver('pgsql', reason: 'the collation of the rollup table is a MySQL question; on PostgreSQL the rollup is a materialized view')]
+class extends Migration
 {
     public function getConnection(): ?string
     {

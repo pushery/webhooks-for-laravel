@@ -790,7 +790,9 @@ return [
             //     'tenant_scope' => \App\Webhooks\WorkspaceScope::class,
             //     // Header names the producer uses. Applies to any header-overridable
             //     // scheme, not just the two above — set 'signature' to bind e.g.
-            //     // PlainHmacScheme to SendCloud's 'Sendcloud-Signature' from config alone.
+            //     // PlainHmacScheme to SendCloud's 'Sendcloud-Signature' from config alone,
+            //     // or SecretTokenScheme to the header a producer sends its token in
+            //     // (GitLab's X-Gitlab-Token is its default).
             //     // A key you omit keeps the scheme's own default (GitHub's stays
             //     // X-Hub-Signature-256); StripeScheme's header is fixed and ignores this.
             //     'signature_headers' => [
