@@ -16,7 +16,7 @@
                 {{-- Keyed by the event type, never by position: the ranking re-orders between
                      polls, and a positional key would make the morph rewrite each row in place
                      instead of moving it. --}}
-                <ul class="wh-dash-top-events-list flex flex-col gap-[var(--padding-wk-y-sm)]">
+                <ul class="wh-dash-top-events-list flex flex-col gap-[var(--padding-wk-y-sm)]" role="list">
                     @foreach ($events as $event)
                         <li class="flex items-center justify-between gap-[var(--padding-wk-x-md)]" wire:key="te-{{ $event->event_type }}">
                             <x-wirekit::text weight="medium" truncate>{{ $event->event_type }}</x-wirekit::text>

@@ -79,6 +79,7 @@ return [
         // where its grammar wants it; the countdown re-renders it from this same string
         // on every tick.
         'countdown' => 'Deze sleutel wordt over :seconds s automatisch verborgen.',
+        'countdown_until' => 'Deze sleutel wordt om :time automatisch verborgen.',
         'countdown_warning' => 'De ondertekeningssleutel wordt over 10 seconden verborgen.',
         'copy' => 'Kopiëren',
         'copied' => 'Gekopieerd!',

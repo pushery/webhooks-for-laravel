@@ -70,20 +70,40 @@
             return {
                 remaining: 0,
                 announce: '',
+                label: '',
                 countdown: '',
                 warning: '',
                 tick: null,
                 init() {
                     const config = JSON.parse(this.$el.dataset.webhooksCountdown ?? '{}');
                     this.remaining = config.remaining ?? 0;
-                    this.countdown = config.countdown ?? '';
                     this.warning = config.warning ?? '';
+                    // A view published from an earlier release binds the counting sentence.
+                    this.countdown = config.countdown ?? '';
 
                     this.tick = setInterval(() => {
                         this.remaining = Math.max(0, this.remaining - 1);
                         if (this.remaining === 10) this.announce = this.warning;
                         if (this.remaining <= 0) { this.stop(); this.$wire.hide(); }
                     }, 1000);
+
+                    // The moment the secret hides, worked out once on the reader's own clock and
+                    // left standing: a line that changed every second beside the secret gave the
+                    // reader no way to stop it (WCAG 2.2.2). The timer above still hides the
+                    // secret on time, and it starts first, so no wording can keep it from running.
+                    this.label = (config.until ?? '').replace(':time', this.moment(this.remaining));
+                },
+                moment(seconds) {
+                    const until = new Date(Date.now() + seconds * 1000);
+                    const shape = { hour: '2-digit', minute: '2-digit', second: '2-digit' };
+
+                    try {
+                        return until.toLocaleTimeString(document.documentElement.lang || undefined, shape);
+                    } catch {
+                        // A lang attribute that is no language tag, en_US for one, is refused with
+                        // a RangeError, and the reader's own locale stands in for it.
+                        return until.toLocaleTimeString(undefined, shape);
+                    }
                 },
                 stop() {
                     if (this.tick !== null) { clearInterval(this.tick); this.tick = null; }

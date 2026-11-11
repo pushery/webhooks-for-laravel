@@ -6,6 +6,24 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.29.0] - 2026-11-11
+
+### 🔧 Changed
+
+- **The shipped screens need `pushery/wirekit` 2.73.0 or newer.** `conflict` refuses an older WireKit. 2.73.0 is the release this package's suite develops against, and no run proves an older one.
+
+  **Upgrade:** a host that renders the shipped screens updates `pushery/wirekit` to 2.73.0 or newer. A host without WireKit is not affected.
+
+### 🐛 Fixed
+
+- **The first deploy of an application that installs webhooks on MySQL no longer stops `sqlens:predeploy` at the migration that pins the collation of the rollup table.** `dashboard/0001_01_01_000103_pin_rollup_owner_id_collation` alters only a table migrated before the create migration pinned the collation, so on a fresh install it ends before its first statement, which SQLens reads as a migration that ran and produced nothing. It now names MySQL in `#[NoSqlOnDriver]` beside PostgreSQL, with the reason.
+- **The ranking of the most frequent events on the dashboard is announced as a list.** An application stylesheet such as Tailwind's Preflight takes the markers off the list, and VoiceOver on iPhone and iPad reads a list without markers as plain text, saying neither that its entries form a list nor how many there are. The list carries `role="list"` now.
+- **The secret panel of the self-service portal names the time a revealed secret hides at, instead of counting down beside it.** The line counted the seconds down beside the secret for the whole window, 60 seconds by default, with no way to stop it (WCAG 2.2.2). It now reads the moment once on the reader's clock and leaves it standing, and the secret still hides on time, through the timer and on the server. **Upgrade:** an application that published `webhooks-self-service-views` keeps the counting line until it publishes them again, and the script still serves that view. A test that waits for the number to go down asks for the secret to be gone at the end of the window instead.
+
+### 📚 Documentation
+
+- **The dashboard, the self-service portal and the operator console are shown on their pages.** Each image is rendered from the package itself, over a week of deliveries to three endpoints, nothing in it drawn by hand.
+
 ## [3.28.0] - 2026-11-08
 
 ### ✨ Added
@@ -3700,7 +3718,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.28.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.29.0...HEAD
+[3.29.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.28.0...v3.29.0
 [3.28.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.27.0...v3.28.0
 [3.27.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.26.0...v3.27.0
 [3.26.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.25.1...v3.26.0

@@ -51,7 +51,7 @@
         "symfony/http-kernel": "^7.0 || ^8.0"
     },
     "conflict": {
-        "pushery/wirekit": "<2.72.0"
+        "pushery/wirekit": "<2.73.0"
     },
     "autoload": {
         "psr-4": {

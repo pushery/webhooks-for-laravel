@@ -79,6 +79,7 @@ return [
         // where its grammar wants it; the countdown re-renders it from this same string
         // on every tick.
         'countdown' => 'Dieser Schlüssel wird in :seconds s automatisch ausgeblendet.',
+        'countdown_until' => 'Dieser Schlüssel wird um :time automatisch ausgeblendet.',
         'countdown_warning' => 'Der Signaturschlüssel wird in 10 Sekunden ausgeblendet.',
         'copy' => 'Kopieren',
         'copied' => 'Kopiert!',
