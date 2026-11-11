@@ -79,6 +79,7 @@ return [
         // where its grammar wants it; the countdown re-renders it from this same string
         // on every tick.
         'countdown' => 'This secret hides automatically in :seconds s.',
+        'countdown_until' => 'This secret hides automatically at :time.',
         'countdown_warning' => 'Signing secret hides in 10 seconds.',
         'copy' => 'Copy',
         'copied' => 'Copied!',

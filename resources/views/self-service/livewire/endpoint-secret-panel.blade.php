@@ -113,21 +113,22 @@
                         x-data="webhooksSecretCountdown()"
                         data-webhooks-countdown="{{ json_encode([
                             'remaining' => $this->remainingSeconds(),
-                            'countdown' => __('webhooks::self-service.secret.countdown'),
+                            'until' => __('webhooks::self-service.secret.countdown_until'),
                             'warning' => __('webhooks::self-service.secret.countdown_warning'),
                         ], JSON_THROW_ON_ERROR) }}"
                     >
-                        {{-- Visible countdown. aria-hidden so the per-second tick is not
-                             announced; the impending-expiry cue is carried by the polite
-                             live region below instead. tabular-nums sits on the whole line
-                             (it only reshapes digits), so the seconds stop jittering wherever
-                             a locale's grammar puts them. --}}
+                        {{-- The moment the secret hides. The server writes the seconds of the
+                             window, and the script replaces them once with the time on the
+                             reader's clock, which then stands: nothing beside the secret changes
+                             every second. aria-hidden because the polite live region below
+                             carries the impending-expiry cue. tabular-nums keeps the digits of
+                             the time from shifting wherever a locale's grammar puts them. --}}
                         <x-wirekit::text
                             size="sm"
                             intent="muted"
                             class="tabular-nums"
                             aria-hidden="true"
-                            x-text="countdown.replace(':seconds', remaining)"
+                            x-text="label"
                         >{{ __('webhooks::self-service.secret.countdown', ['seconds' => $this->remainingSeconds()]) }}</x-wirekit::text>
                         <x-wirekit::visually-hidden aria-live="polite" x-text="announce" />
                     </div>

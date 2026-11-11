@@ -29,6 +29,7 @@ use Pushery\Webhooks\Support\WebhookConnection;
  */
 return new
 #[NoSqlOnDriver('pgsql', reason: 'the collation of the rollup table is a MySQL question; on PostgreSQL the rollup is a materialized view')]
+#[NoSqlOnDriver('mysql', reason: 'the create migration pins the collation of a fresh rollup table, so only a table migrated before it is altered here')]
 class extends Migration
 {
     public function getConnection(): ?string

@@ -79,6 +79,7 @@ return [
         // where its grammar wants it; the countdown re-renders it from this same string
         // on every tick.
         'countdown' => 'Esta clave se oculta automáticamente en :seconds s.',
+        'countdown_until' => 'Esta clave se oculta automáticamente a las :time.',
         'countdown_warning' => 'La clave de firma se oculta en 10 segundos.',
         'copy' => 'Copiar',
         'copied' => '¡Copiada!',
