@@ -254,6 +254,16 @@ final class Settings
     }
 
     /**
+     * Whether the Platform layer's deliveries go out through the transactional outbox, each recorded in one transaction
+     * with its row in the delivery log. Off by default. It needs `server.outbox.enabled`, and the outbox refuses to
+     * record while that is off, so the misconfiguration shows at the first dispatch rather than as lost calls later.
+     */
+    public function platformDeliversThroughTheOutbox(): bool
+    {
+        return Config::boolean('webhooks.platform.outbox', false);
+    }
+
+    /**
      * Whether the Server signs its deliveries asymmetrically with its own Ed25519
      * keypair. Off by default; while off, deliveries are signed with the symmetric
      * per-endpoint secret under the configured scheme.

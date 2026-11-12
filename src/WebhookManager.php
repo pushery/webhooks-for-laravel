@@ -50,6 +50,7 @@ use Pushery\Webhooks\Platform\Transform\PayloadTransformer;
 use Pushery\Webhooks\Platform\Transform\PayloadVersionRegistry;
 use Pushery\Webhooks\Search\SearchIndexer;
 use Pushery\Webhooks\Server\Exceptions\DeliveryRefused;
+use Pushery\Webhooks\Server\Outbox;
 use Pushery\Webhooks\Server\PendingWebhook;
 use Pushery\Webhooks\Support\PayloadValidator;
 use Pushery\Webhooks\Support\PerMinuteBrake;
@@ -874,6 +875,29 @@ final readonly class WebhookManager
         // outbound bytes, without ever transforming an already-transformed body twice.
         $logged ??= $this->loggedPayload($data);
 
+        // Queued after the commit, a call can still be lost: a process that dies between the commit and the push, or a
+        // push the queue refuses, leaves the row pending with no call behind it, and nothing would ever send it. Through
+        // the outbox, the row and its call are written in one transaction, so they exist together or not at all, and
+        // the outbox's sweep sends a call whose own job never ran.
+        $delivery = $this->config->platformDeliversThroughTheOutbox()
+            ? WebhookConnection::db()->transaction(fn (): WebhookDelivery => $this->written($subscription, $eventType, $eventId, $data, $logged, $delaySeconds, true))
+            : $this->written($subscription, $eventType, $eventId, $data, $logged, $delaySeconds, false);
+
+        if ($delaySeconds > 0) {
+            Event::dispatch(new WebhookDeliveryRateLimited($delivery, $delaySeconds));
+        }
+
+        return $delivery;
+    }
+
+    /**
+     * The delivery written to the log and its call sent on its way: queued, or recorded into the outbox.
+     *
+     * @param  array<array-key, mixed>  $data
+     * @param  array{payload: array<array-key, mixed>, disk: string|null, path: string|null, sha256: string|null}  $logged
+     */
+    private function written(WebhookSubscription $subscription, string $eventType, string $eventId, array $data, array $logged, int $delaySeconds, bool $outboxed): WebhookDelivery
+    {
         $delivery = $this->newDelivery($subscription, $eventType, $eventId, $logged);
         $delivery->save();
 
@@ -889,11 +913,7 @@ final readonly class WebhookManager
         // large payload leaves the delivery itself unchanged.
         $outbound = $this->transformFor($subscription, $data);
 
-        $this->dispatchCall($subscription, $delivery, $eventType, $eventId, $outbound, $delaySeconds);
-
-        if ($delaySeconds > 0) {
-            Event::dispatch(new WebhookDeliveryRateLimited($delivery, $delaySeconds));
-        }
+        $this->dispatchCall($subscription, $delivery, $eventType, $eventId, $outbound, $delaySeconds, $outboxed);
 
         return $delivery;
     }
@@ -1046,7 +1066,7 @@ final readonly class WebhookManager
     /**
      * @param  array<array-key, mixed>  $data
      */
-    private function dispatchCall(WebhookSubscription $subscription, WebhookDelivery $delivery, string $eventType, string $eventId, array $data, int $delaySeconds = 0): void
+    private function dispatchCall(WebhookSubscription $subscription, WebhookDelivery $delivery, string $eventType, string $eventId, array $data, int $delaySeconds, bool $outboxed): void
     {
         $envelope = [
             'id' => $eventId,
@@ -1103,6 +1123,14 @@ final readonly class WebhookManager
             $call = $subscription->previous_secret !== null
                 ? $call->useSecrets($subscription->secret, $subscription->previous_secret)
                 : $call->useSecret($subscription->secret);
+        }
+
+        // Recorded into the outbox inside the transaction deliver() opened for it, so the entry and the row commit
+        // together. The delay of the rate limit becomes the moment the entry is due.
+        if ($outboxed) {
+            new Outbox()->record($call);
+
+            return;
         }
 
         $call->dispatch();
