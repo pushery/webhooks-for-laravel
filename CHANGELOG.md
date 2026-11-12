@@ -6,6 +6,16 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.30.0] - 2026-11-12
+
+### ✨ Added
+
+- **The Platform layer's deliveries can go out through the transactional outbox.** With `platform.outbox` on, beside `server.outbox.enabled`, every delivery of `dispatch()`, `dispatchTo()`, a ping and a redelivery is recorded into the outbox in one transaction with its row in the delivery log, and the outbox's sweep sends a call whose own job never got onto the queue. Without it, a push that fails after the commit, or a process that dies before it, leaves the row `pending` with no call behind it. A delivery the rate limit holds back becomes an entry due that much later, and the outbox's retries decide its attempts. Off by default, so an installation that has the outbox on for `Outbox::record()` alone keeps its queued deliveries as they are.
+
+### 🐛 Fixed
+
+- **`Outbox::record()` keeps the delay a webhook was given.** A webhook told to wait with `delayInSeconds()` went out at once when it was recorded into the outbox. Its entry is now due that many seconds later, and the job of its first turn waits as long.
+
 ## [3.29.0] - 2026-11-11
 
 ### 🔧 Changed
@@ -3718,7 +3728,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.29.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.30.0...HEAD
+[3.30.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.29.0...v3.30.0
 [3.29.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.28.0...v3.29.0
 [3.28.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.27.0...v3.28.0
 [3.27.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.26.0...v3.27.0

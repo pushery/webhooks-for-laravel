@@ -410,6 +410,16 @@ return [
             'max_per_minute' => EnvLimit::ceiling(env('WEBHOOKS_PLATFORM_RATE_LIMIT_MAX_PER_MINUTE'), 60),
         ],
 
+        // Every delivery this layer writes, a fan-out of dispatch(), dispatchTo(), a ping and a
+        // redelivery, goes out through the transactional outbox of the Server layer, recorded in
+        // one transaction with its row in the delivery log. A call whose push fails after the
+        // commit is then sent by the outbox's sweep; without it, such a row stays pending with no
+        // call behind it. Off by default, and it needs server.outbox.enabled: the outbox's own
+        // retry policy then decides the attempts, server.outbox.max_attempts among them, in place
+        // of the queued job's tries. A delivery the rate limit holds back becomes an entry due
+        // that much later.
+        'outbox' => EnvFlag::protection(env('WEBHOOKS_PLATFORM_OUTBOX', false), false),
+
         // A brake on the manual test ping (Webhooks::ping), which the shaping above
         // deliberately does not touch — a ping bypasses the allowance on purpose, so an
         // operator can prove an endpoint works while it is over its budget. That exemption

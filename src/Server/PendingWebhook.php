@@ -445,6 +445,12 @@ final class PendingWebhook
         return tap(clone $this, fn (self $call): int => $call->delaySeconds = max(0, $seconds));
     }
 
+    /** The seconds the delivery waits before it is due, as {@see self::delayInSeconds()} set them; 0 for at once. */
+    public function delaySeconds(): int
+    {
+        return $this->delaySeconds;
+    }
+
     public function onQueue(?string $queue): self
     {
         return tap(clone $this, fn (self $call): ?string => $call->queue = $queue);

@@ -59,7 +59,8 @@ final readonly class Outbox
      *
      * It goes out once that transaction commits: a job for it is queued after the commit, onto the
      * queue and connection the Server layer is configured with, and the scheduled sweep sends what
-     * such a job missed. A rollback takes the entry with it, and nothing is sent.
+     * such a job missed. A rollback takes the entry with it, and nothing is sent. A webhook told to
+     * wait with `delayInSeconds()` is due that many seconds after it was recorded, and goes out then.
      *
      * An ordering key puts the entry into a stream with every other entry to the same URL under
      * the same key. The entries of a stream go out in the order their transactions committed, each
@@ -88,14 +89,14 @@ final readonly class Outbox
         if ($fake instanceof WebhookFake) {
             $fake->record(FakedWebhook::sentThroughTheServer($data));
 
-            return $this->entryFor($data, null);
+            return $this->entryFor($data, null, $webhook->delaySeconds());
         }
 
         $stream = $data->stream();
-        $entry = $this->entryFor($data, $stream === null ? null : $this->nextSequence($stream));
+        $entry = $this->entryFor($data, $stream === null ? null : $this->nextSequence($stream), $webhook->delaySeconds());
         $entry->save();
 
-        $this->relay($entry);
+        $this->relay($entry, $webhook->delaySeconds());
 
         return $entry;
     }
@@ -148,12 +149,17 @@ final readonly class Outbox
      * when it has none. The job leaves after the open transaction commits, and with it when it is
      * rolled back.
      */
-    private function relay(WebhookOutboxEntry $entry): void
+    private function relay(WebhookOutboxEntry $entry, int $delay = 0): void
     {
         $settings = new Settings;
         $job = new RelayOutboxJob($entry->stream, $entry->stream === null ? $entry->message_id : null);
         $job->onQueue($settings->queue());
         $job->onConnection($settings->connection());
+
+        // A turn before the entry is due would find nothing to send, so it waits as long as the entry does.
+        if ($delay > 0) {
+            $job->delay($delay);
+        }
 
         dispatch($job);
     }
@@ -180,10 +186,10 @@ final readonly class Outbox
     }
 
     /**
-     * A new, unsaved entry for the delivery: pending and due at once, with the delivery sealed
-     * under the application key and the URL stored without the credentials it may carry.
+     * A new, unsaved entry for the delivery: pending and due after its delay, at once without one, with
+     * the delivery sealed under the application key and the URL stored without the credentials it may carry.
      */
-    private function entryFor(WebhookDeliveryData $data, ?int $sequence): WebhookOutboxEntry
+    private function entryFor(WebhookDeliveryData $data, ?int $sequence, int $delay): WebhookOutboxEntry
     {
         $entry = WebhookOutboxEntry::resolve();
 
@@ -197,7 +203,7 @@ final readonly class Outbox
             'delivery' => Crypt::encrypt($data),
             'state' => OutboxEntryState::Pending,
             'attempts' => 0,
-            'next_attempt_at' => Date::now(),
+            'next_attempt_at' => Date::now()->addSeconds($delay),
         ]);
 
         return $entry;
