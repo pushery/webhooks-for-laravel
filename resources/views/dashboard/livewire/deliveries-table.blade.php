@@ -37,6 +37,24 @@
         />
     </div>
 
+    {{-- Below sm the deliveries stand as cards and the header row is out of sight, with the buttons
+         that sort the columns, so the sort stands above the cards. From sm up the headers sort. --}}
+    <div class="mb-[var(--space-wk-sm)] grid grid-cols-2 items-start gap-[var(--padding-wk-x-md)] sm:hidden" data-wh-sort-fields>
+        <x-wirekit::select name="sortField" wire:model.live="sortField" :label="__('webhooks::dashboard.sort.field')">
+            <option value="created_at">{{ __('webhooks::dashboard.table.when') }}</option>
+            <option value="event_type">{{ __('webhooks::dashboard.table.event') }}</option>
+            <option value="status">{{ __('webhooks::dashboard.table.status') }}</option>
+            <option value="attempt">{{ __('webhooks::dashboard.table.attempt') }}</option>
+            <option value="response_code">{{ __('webhooks::dashboard.table.code') }}</option>
+            <option value="duration_ms">{{ __('webhooks::dashboard.table.duration') }}</option>
+        </x-wirekit::select>
+
+        <x-wirekit::select name="sortDirection" wire:model.live="sortDirection" :label="__('webhooks::dashboard.sort.direction')">
+            <option value="asc">{{ __('webhooks::dashboard.sort.ascending') }}</option>
+            <option value="desc">{{ __('webhooks::dashboard.sort.descending') }}</option>
+        </x-wirekit::select>
+    </div>
+
     @if ($deliveries->isEmpty())
         {{-- Outlined: this empty state stands on its own in the page body, not inside a
              card, so it needs its own chrome to read as a placeholder. --}}
@@ -47,8 +65,12 @@
             :description="__('webhooks::dashboard.empty.no_deliveries_found.description')"
         />
     @else
+        {{-- Below sm each delivery stands as a card and each value as a line that names its column: as a
+             table its seven columns needed a sideways scroll on a phone. --}}
         <x-wirekit::table
+            id="wh-dash-deliveries-table"
             hoverable
+            stack-below="sm"
             :aria-label="__('webhooks::dashboard.a11y.deliveries_table')"
             :table-label="__('webhooks::dashboard.a11y.deliveries_table')"
         >
@@ -81,13 +103,13 @@
                                 {{ $delivery->event_type }}
                             </button>
                         </x-wirekit::table.th>
-                        <x-wirekit::table.td>
+                        <x-wirekit::table.td :label="__('webhooks::dashboard.table.status')">
                             <x-wirekit::badge :intent="$intent">{{ __('webhooks::dashboard.status.'.$delivery->status->value) }}</x-wirekit::badge>
                         </x-wirekit::table.td>
-                        <x-wirekit::table.td>{{ $delivery->attempt }}</x-wirekit::table.td>
-                        <x-wirekit::table.td>{{ $delivery->response_code ?? '—' }}</x-wirekit::table.td>
-                        <x-wirekit::table.td>{{ $delivery->duration_ms !== null ? $delivery->duration_ms . ' ms' : '—' }}</x-wirekit::table.td>
-                        <x-wirekit::table.td>
+                        <x-wirekit::table.td :label="__('webhooks::dashboard.table.attempt')">{{ $delivery->attempt }}</x-wirekit::table.td>
+                        <x-wirekit::table.td :label="__('webhooks::dashboard.table.code')">{{ $delivery->response_code ?? '—' }}</x-wirekit::table.td>
+                        <x-wirekit::table.td :label="__('webhooks::dashboard.table.duration')">{{ $delivery->duration_ms !== null ? $delivery->duration_ms . ' ms' : '—' }}</x-wirekit::table.td>
+                        <x-wirekit::table.td :label="__('webhooks::dashboard.table.when')">
                             {{-- Relative in the cell an operator scans, absolute on hover — both
                                  in the reader's locale and in the dashboard's display zone,
                                  never the raw stored timestamp. The datetime attribute stays
@@ -102,7 +124,7 @@
                                  `dashboard.timezone` set, a sighted operator hovering this column
                                  saw a time with nothing saying which clock it was, while a
                                  screen-reader user on the same row was told. --}}
-                            <time datetime="{{ $delivery->created_at->toIso8601String() }}" title="{{ $when->isoFormat(__('webhooks::dashboard.formats.absolute')) }}">{{ $when->diffForHumans() }}</time>
+                            <time datetime="{{ $delivery->created_at->toIso8601String() }}" title="{{ $when->isoFormat(__('webhooks::dashboard.formats.absolute')) }}" class="whitespace-nowrap">{{ $when->diffForHumans() }}</time>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td align="right">
                             @can('redeliver', $delivery)
@@ -112,7 +134,7 @@
                                      may gray the replay buttons out. --}}
                                 <x-wirekit::button
                                     size="sm"
-                                    surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
+                                    surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral"
                                     wire:click="redeliver('{{ $delivery->id }}')"
                                     wire:loading.attr="disabled"
                                     wire:target="redeliver"

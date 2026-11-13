@@ -20,9 +20,9 @@
     <div class="mb-[var(--space-wk-sm)] flex flex-wrap items-center justify-between gap-[var(--padding-wk-x-md)]">
         <x-wirekit::heading :level="2" size="md">{{ __('webhooks::self-service.deliveries.heading') }}</x-wirekit::heading>
 
-        <div class="grid w-full gap-[var(--padding-wk-x-md)] sm:flex sm:w-auto sm:flex-wrap sm:items-end">
+        <div class="grid w-full gap-[var(--padding-wk-x-md)] sm:flex sm:w-auto sm:flex-wrap sm:items-start">
             {{-- The two lists pair up on a phone and dissolve into the row from `sm` up. --}}
-            <div class="grid grid-cols-2 items-end gap-[var(--padding-wk-x-md)] sm:contents">
+            <div class="grid grid-cols-2 items-start gap-[var(--padding-wk-x-md)] sm:contents">
             @if ($windowChoices !== [])
                 {{-- Both filters are WireKit's own select. On WireKit before 2.37, a select bound
                      with wire:model.live on this page left the endpoint list's delete confirmation
@@ -34,7 +34,6 @@
                     name="windowDays"
                     wire:model.live="windowDays"
                     :label="__('webhooks::self-service.deliveries.window_label')"
-                    hideLabel
                 >
                     @foreach ($windowChoices as $choice)
                         <option value="{{ $choice }}">{{ __('webhooks::self-service.deliveries.window_days', ['days' => $choice]) }}</option>
@@ -52,7 +51,6 @@
                     name="status"
                     wire:model.live="status"
                     :label="__('webhooks::self-service.deliveries.status_label')"
-                    hideLabel
                 >
                     <option value="">{{ __('webhooks::self-service.deliveries.all_statuses') }}</option>
                     @foreach ($statusChoices as $choice)
@@ -68,11 +66,12 @@
                  narrows within the window above and can never reach past it — the window's own
                  bound stays on the query, so the older of the two bounds simply loses.
 
-                 Visible labels, unlike the lists: a list names itself through its first option,
-                 and two bare fields say nothing about which one starts the range. On a phone each
+                 Every filter of the row shows its label, the lists as well as the two pickers,
+                 and the row lines them up at the top: with a label above each control the controls
+                 stand on one line, whatever room a picker keeps below its own. On a phone each
                  picker takes a row of its own, and from `sm` up each keeps a width that holds a
                  moment, its clear button and its chevron. --}}
-            <div class="grid grid-cols-1 items-end gap-[var(--padding-wk-x-md)] sm:contents">
+            <div class="grid grid-cols-1 items-start gap-[var(--padding-wk-x-md)] sm:contents">
                 <div class="min-w-0 sm:w-72">
                     <x-wirekit::datetime-picker
                         name="from"
@@ -100,7 +99,6 @@
                 name="endpointId"
                 wire:model.live="endpointId"
                 :label="__('webhooks::self-service.deliveries.filter_label')"
-                hideLabel
             >
                 <option value="">{{ __('webhooks::self-service.deliveries.all_endpoints') }}</option>
                 @foreach ($endpoints as $endpoint)
@@ -138,8 +136,13 @@
             :description="__('webhooks::self-service.empty.no_deliveries.'.$emptyStateKey)"
         />
     @else
+        {{-- Below sm each delivery stands as a card and each value as a line that names its column, as
+             the endpoint list and the health board do: as a table its seven columns needed a sideways
+             scroll on a phone. --}}
         <x-wirekit::table
+            id="wh-portal-deliveries-table"
             hoverable
+            stack-below="sm"
             :aria-label="__('webhooks::self-service.a11y.deliveries_table')"
             :table-label="__('webhooks::self-service.a11y.deliveries_table')"
         >
@@ -150,11 +153,11 @@
                     <x-wirekit::table.th>{{ __('webhooks::self-service.deliveries.response_code') }}</x-wirekit::table.th>
                     <x-wirekit::table.th align="right">{{ __('webhooks::self-service.deliveries.attempts') }}</x-wirekit::table.th>
                     @if ($showsErrors)
-                        {{-- A floor on this column, for the reason the endpoint list gives its URL
-                             one: the table scrolls sideways on a narrow screen, and a column free to
+                        {{-- A floor on this column from sm up, where the deliveries stand as a table,
+                             for the reason the endpoint list gives its URL one: a column free to
                              collapse takes the squeeze. This one carries the text the reader came
-                             for, and at 375px it got 80px, one word to a line. --}}
-                        <x-wirekit::table.th class="min-w-64">{{ __('webhooks::self-service.deliveries.error') }}</x-wirekit::table.th>
+                             for, and in a narrow table it got 80px, one word to a line. --}}
+                        <x-wirekit::table.th class="sm:min-w-64">{{ __('webhooks::self-service.deliveries.error') }}</x-wirekit::table.th>
                     @endif
                     <x-wirekit::table.th align="right">{{ __('webhooks::self-service.deliveries.when') }}</x-wirekit::table.th>
                     <x-wirekit::table.th align="right"><span class="sr-only">{{ __('webhooks::self-service.deliveries.replay') }}</span></x-wirekit::table.th>
@@ -176,10 +179,10 @@
                         <x-wirekit::table.th headerScope="row">
                             <x-wirekit::text weight="medium">{{ $delivery->event_type }}</x-wirekit::text>
                         </x-wirekit::table.th>
-                        <x-wirekit::table.td>
+                        <x-wirekit::table.td :label="__('webhooks::self-service.deliveries.outcome')">
                             <x-wirekit::badge :intent="$intent">{{ __('webhooks::self-service.deliveries.status.'.$delivery->status->value) }}</x-wirekit::badge>
                         </x-wirekit::table.td>
-                        <x-wirekit::table.td>
+                        <x-wirekit::table.td :label="__('webhooks::self-service.deliveries.response_code')">
                             {{-- Null whenever no HTTP answer arrived at all, which is not
                                  the same as a zero. --}}
                             {{-- The duration hangs off the code rather than standing alone: the
@@ -201,17 +204,19 @@
                         </x-wirekit::table.td>
                         {{-- How often the package has sent this one, so a reader tells a delivery that already went
                              out again from one that went out once before deciding to send it again. --}}
-                        <x-wirekit::table.td align="right">
+                        {{-- Its own label keeps the figure a named line of the card below sm: a cell aligned to
+                             the end without one stands as the card's row of actions. --}}
+                        <x-wirekit::table.td align="right" :label="__('webhooks::self-service.deliveries.attempts')">
                             <x-wirekit::text size="sm" intent="muted">{{ \Pushery\Webhooks\Support\LocalizedNumber::format($delivery->attempt) }}</x-wirekit::text>
                         </x-wirekit::table.td>
                         @if ($showsErrors)
                             {{-- Blade escapes it, so markup a receiver wrote back is text. --}}
-                            <x-wirekit::table.td>
+                            <x-wirekit::table.td :label="__('webhooks::self-service.deliveries.error')">
                                 <x-wirekit::text size="sm" intent="muted">{{ $delivery->error ?? '—' }}</x-wirekit::text>
                             </x-wirekit::table.td>
                         @endif
-                        <x-wirekit::table.td align="right">
-                            <time datetime="{{ $delivery->created_at->toIso8601String() }}" title="{{ $when->isoFormat(__('webhooks::self-service.formats.moment')) }}">
+                        <x-wirekit::table.td align="right" :label="__('webhooks::self-service.deliveries.when')">
+                            <time datetime="{{ $delivery->created_at->toIso8601String() }}" title="{{ $when->isoFormat(__('webhooks::self-service.formats.moment')) }}" class="whitespace-nowrap">
                                 <x-wirekit::text size="sm" intent="muted">{{ $when->diffForHumans() }}</x-wirekit::text>
                             </time>
                         </x-wirekit::table.td>
@@ -231,7 +236,7 @@
                                 <x-slot:trigger>
                                     <x-wirekit::button
                                         size="sm"
-                                        surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
+                                        surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral"
                                         :aria-label="__('webhooks::self-service.deliveries.replay_sr', ['label' => __('webhooks::self-service.deliveries.replay'), 'event' => $delivery->event_type, 'at' => $when->isoFormat(__('webhooks::self-service.formats.precise'))])"
                                     >{{ __('webhooks::self-service.deliveries.replay') }}</x-wirekit::button>
                                 </x-slot:trigger>
@@ -256,7 +261,9 @@
             {{-- Its own landmark name: the endpoint list on this same page carries a
                  paginator too, and two navigation landmarks called "Pagination" leave a
                  screen-reader user picking between them at random. --}}
-            {{ $deliveries->links(data: ['landmarkLabel' => __('webhooks::self-service.deliveries.pagination_label')]) }}
+            {{-- One page on each side of the current one: the default three made a row of twelve numbers that
+                 outgrew the table it pages. --}}
+            {{ $deliveries->onEachSide(1)->links(data: ['landmarkLabel' => __('webhooks::self-service.deliveries.pagination_label')]) }}
         </div>
     @endif
 </div>

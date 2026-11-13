@@ -6,6 +6,35 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.31.0] - 2026-11-13
+
+### ✨ Added
+
+- **`Outbox::resend()` sends an entry again with a corrected body, and after a wait.** Handed a `PendingWebhook`, it seals that webhook's delivery into the entry, under the entry's message id and at the entry's place in its stream, so a body corrected after the receiver refused the first one goes out without writing `delivery` by hand. `after:` makes the entry due that many seconds later. A webhook with another message id, or one that belongs to another stream, is refused with `OutboxUnavailable` before the entry is touched.
+- **The outbox's relay can take its turns on a queue of its own.** `server.outbox.queue` and `server.outbox.connection` (`WEBHOOKS_SERVER_OUTBOX_QUEUE`, `WEBHOOKS_SERVER_OUTBOX_CONNECTION`) put each `RelayOutboxJob` on the queue and connection they name, so a slow endpoint of another webhook does not hold the outbox up. Without a value the relay stays on `server.queue` and `server.connection`, as before.
+
+### 🔧 Changed
+
+- **Secondary actions are filled buttons by default.** `ui.secondary_surface` ships `filled` instead of `outline`, so "Test", "Secret", "Edit", "Transform", "Replay", "Endpoint health" and the other secondary actions of every shipped screen are buttons with a fill rather than a border. Each of them names the neutral intent, or the danger one for a destructive action, so a filled secondary action does not draw as dark as the primary action beside it. To keep the border, set `ui.secondary_surface` to `outline`. The switch that turns an endpoint of the portal on and off draws both of its states with a light tinted fill, green while the endpoint is on, so it reads as a state beside the actions rather than as the loudest of them.
+- **The plain rendering of the operator screens draws its actions as filled buttons.** "Edit", "Enable" or "Disable", "Rotate secret", "Redeliver", "Ping" and "Cancel" were colored text, and "Delete" red text. They are buttons with a light gray fill now, and Delete one in red.
+
+### 🐛 Fixed
+
+- **The endpoint list's placeholder reserves the height of the empty list again.** It reserved the height the empty list had before the button that adds an endpoint took the small size, so the first screen of a new account moved up when the list arrived. The placeholder holds the empty list's height now.
+- **The overview's recent queue ends near the charts beside it.** It stood in the side column with eight deliveries, each three lines high, and left the column under the latency panel empty for about 40 % of the page. The overview shows the five newest now, with status and response code on one line where the panel is narrow; the Queue tab still shows 25.
+- **The dashboard's figures read in sentence case, and "Disabled" warns only when an endpoint is disabled.** "Total Webhooks Sent" and "Retry Rate" stood in title case beside "Successful" and "Top events", and the count of disabled endpoints was amber at 0 as well. The two labels are "Total webhooks sent" and "Retry rate" now, and the count is neutral while it is 0.
+- **A relative time stays on one line.** "7 minutes ago" in the deliveries of the dashboard, the portal and the operator log, and the age of an endpoint's health score, could break between its words in a narrow column. Each stands in an element that does not wrap now.
+- **The portal's endpoint list and its pager keep the size of the screen around them, and the operator list's status keeps the width of its word.** "+ New endpoint" was a size larger than "Endpoint health" and every row action, and has their size now. The pager under the portal's deliveries showed ten page numbers at the start of a long log, twelve with the last two, and outgrew the table it pages; it shows one page on each side of the current one now. In the endpoint list of the WireKit operator screens the status badge stretched across its column with its word at the start, and keeps the width of its word now.
+- **The endpoint health board stacks into cards on a phone.** As a table its eight columns needed a sideways scroll, and an endpoint's address broke letter by letter in its narrow column. Below `sm` each endpoint now stands as a card that names each value, as the endpoint list already does, and the address wraps only at the card's edge. Two fields above the cards choose the column to sort by and the order, because the column headers that sort the board are out of sight there.
+- **The filters above the deliveries stand on one line, in the portal and in the delivery log of the WireKit operator screens.** The lists hid their labels while the two date pickers showed theirs, and the row lined its fields up at the bottom, so the lists sat lower than the pickers. Every filter now shows its label, and the row lines them up at the top.
+- **The deliveries of the dashboard and of the portal, and the delivery log and endpoint list of the operator screens in both renderings, stack into cards on a phone.** As tables they needed a sideways scroll there. Below `sm` each row now stands as a card that names each value, as the portal's endpoint list and the health board do. On the dashboard two fields above the cards choose the column to sort by and the order, because the column headers that sort the table are out of sight there; from `sm` up the headers sort as before.
+- **The actions of a row of the WireKit operator screens stand side by side at its end.** In the delivery log "Redeliver" stood over "Ping", because the confirmation around the first took a line of its own; in the endpoint list a long address claimed its whole length for its column and pressed the four actions into two rows. The address is capped from `lg` up, where it wraps as it wraps anywhere.
+- **A delivery of the Platform layer that goes through the outbox is given up after its tries.** With `platform.outbox`, the outbox applied `server.outbox.max_attempts` to the deliveries of both layers. Left unset, so that the host's own webhooks keep trying until the receiver takes them, a delivery to a dead endpoint was never given up, and the circuit breaker never switched that endpoint off. Set, it ended the host's own webhooks as well. An entry of the Platform layer now keeps the tries its delivery has as a queued job, `server.tries`, and `server.outbox.max_attempts` applies to the entries of the Server layer only.
+
+### 🔒 Security
+
+- **The raw-body capture keeps only the body of a request to a receiving route.** `CaptureRawBody` runs before the router has matched anything, and it kept the body of every request as a string, so a sender without a signature could have any address of the host buffer a body up to the web server's limit. It now asks the host's routes which route the request reaches, by method, host and path, the same match the router makes next, and keeps the body only when that is a route `Route::webhooks()` registered. Every other request is left unread, and with cached routes the match runs on the compiled matcher. A limit in the middleware of a receiving route still comes after that read; the receiving guide says what it stops and what the web server's own limit refuses first.
+
 ## [3.30.0] - 2026-11-12
 
 ### ✨ Added
@@ -3728,7 +3757,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.30.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.31.0...HEAD
+[3.31.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.30.0...v3.31.0
 [3.30.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.29.0...v3.30.0
 [3.29.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.28.0...v3.29.0
 [3.28.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.27.0...v3.28.0

@@ -117,49 +117,56 @@
          overflow container clips an absolutely positioned element only when it is that
          element's containing block, so without it the header stays where its column lands and
          widens the document whenever the table is wider than the screen. --}}
+    {{-- Below sm each row stands as a card: the header row moves out of sight, every value is a line
+         that starts with the name of its column, drawn from the cell's data-label and silent to a
+         screen reader, which hears the column header as in the table, and the actions stand as the
+         card's last row. The roles are written out because some browsers stop exposing a table
+         whose cells are laid out as cards. --}}
+    @php($stackedCell = "px-3 py-2 max-sm:grid max-sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] max-sm:gap-x-3 max-sm:px-3 max-sm:py-1 max-sm:before:content-[attr(data-label)_/_''] max-sm:before:font-medium max-sm:before:text-gray-500")
     <div class="relative w-full min-w-0 overflow-x-auto" tabindex="0" role="region" aria-label="{{ __('webhooks::management.a11y.delivery_log_table') }}">
-    <table class="w-full text-left text-sm" aria-label="{{ __('webhooks::management.a11y.delivery_log_table') }}">
-        <thead>
-            <tr>
-                <th class="px-3 py-2">{{ __('webhooks::management.table.event') }}</th>
+    <table id="wh-plain-delivery-log-table" role="table" class="w-full text-left text-sm max-sm:block" aria-label="{{ __('webhooks::management.a11y.delivery_log_table') }}">
+        <thead role="rowgroup" class="max-sm:sr-only">
+            <tr role="row">
+                <th role="columnheader" class="px-3 py-2">{{ __('webhooks::management.table.event') }}</th>
                 {{-- On this screen and not on the portal's: the query is deliberately unscoped
                      across every tenant, so rows for different endpoints stand under one another
                      and without this cell the row does not say where it went. The endpoint
                      filter is optional, so "set one first" is not an answer. --}}
-                <th class="px-3 py-2">{{ __('webhooks::management.table.endpoint') }}</th>
-                <th class="px-3 py-2">{{ __('webhooks::management.table.status') }}</th>
-                <th class="px-3 py-2">{{ __('webhooks::management.table.attempt') }}</th>
-                <th class="px-3 py-2">{{ __('webhooks::management.table.code') }}</th>
-                <th class="px-3 py-2">{{ __('webhooks::management.table.when') }}</th>
+                <th role="columnheader" class="px-3 py-2">{{ __('webhooks::management.table.endpoint') }}</th>
+                <th role="columnheader" class="px-3 py-2">{{ __('webhooks::management.table.status') }}</th>
+                <th role="columnheader" class="px-3 py-2">{{ __('webhooks::management.table.attempt') }}</th>
+                <th role="columnheader" class="px-3 py-2">{{ __('webhooks::management.table.code') }}</th>
+                <th role="columnheader" class="px-3 py-2">{{ __('webhooks::management.table.when') }}</th>
                 {{-- Not an empty <th>: an empty header announces nothing. --}}
-                <th class="px-3 py-2"><span class="sr-only">{{ __('webhooks::management.table.actions') }}</span></th>
+                <th role="columnheader" class="px-3 py-2"><span class="sr-only">{{ __('webhooks::management.table.actions') }}</span></th>
             </tr>
         </thead>
-        <tbody>
+        <tbody role="rowgroup" class="max-sm:flex max-sm:flex-col max-sm:gap-3">
             @foreach ($deliveries as $delivery)
                 {{-- In the display zone of `webhooks.dashboard.timezone`, as on every dashboard surface. --}}
                 @php($when = \Pushery\Webhooks\Dashboard\DashboardTimezone::apply($delivery->created_at)->settings(['locale' => app()->getLocale()]))
-                <tr wire:key="del-{{ $delivery->id }}" class="border-t">
-                    <th scope="row" class="px-3 py-2">{{ $delivery->event_type }}</th>
+                <tr wire:key="del-{{ $delivery->id }}" role="row" class="border-t max-sm:block max-sm:rounded max-sm:border max-sm:py-2">
+                    <th scope="row" role="rowheader" class="px-3 py-2 max-sm:block max-sm:px-3 max-sm:py-1 max-sm:font-medium">{{ $delivery->event_type }}</th>
                     {{-- Name, then url, then the bare id -- the same ladder both action names
                          already walk, so the cell and the announcement never disagree about what
                          this endpoint is called. The id is the last rung rather than an em dash:
                          a deleted endpoint still has rows, and "which one" is the question. --}}
-                    <td class="px-3 py-2">{{ $delivery->subscription?->name ?: $delivery->subscription?->url ?: $delivery->subscription_id }}</td>
+                    <td role="cell" data-label="{{ __('webhooks::management.table.endpoint') }}" class="{{ $stackedCell }}">{{ $delivery->subscription?->name ?: $delivery->subscription?->url ?: $delivery->subscription_id }}</td>
                     {{-- The stored status value keys the label; only the label is translated. --}}
-                    <td class="px-3 py-2">{{ __('webhooks::management.status.'.$delivery->status->value) }}</td>
-                    <td class="px-3 py-2">{{ $delivery->attempt }}</td>
+                    <td role="cell" data-label="{{ __('webhooks::management.table.status') }}" class="{{ $stackedCell }}">{{ __('webhooks::management.status.'.$delivery->status->value) }}</td>
+                    <td role="cell" data-label="{{ __('webhooks::management.table.attempt') }}" class="{{ $stackedCell }}">{{ $delivery->attempt }}</td>
                     {{-- The duration hangs off the code rather than standing in its own column:
                          a duration without an answer says nothing, and the pair is the question a
                          reader actually has -- it arrived, but how slow was it? A receiver
                          getting slower is the run-up to one that fails. --}}
-                    <td class="px-3 py-2">{{ $delivery->response_code === null ? '—' : $delivery->response_code.($delivery->duration_ms === null ? '' : ' · '.__('webhooks::management.deliveries.duration', ['ms' => \Pushery\Webhooks\Support\LocalizedNumber::format($delivery->duration_ms)])) }}</td>
+                    <td role="cell" data-label="{{ __('webhooks::management.table.code') }}" class="{{ $stackedCell }}">{{ $delivery->response_code === null ? '—' : $delivery->response_code.($delivery->duration_ms === null ? '' : ' · '.__('webhooks::management.deliveries.duration', ['ms' => \Pushery\Webhooks\Support\LocalizedNumber::format($delivery->duration_ms)])) }}</td>
                     {{-- Relative in the cell, absolute on hover — both in the reader's locale,
                          never the raw stored timestamp. --}}
-                    <td class="px-3 py-2">
-                        <time datetime="{{ $delivery->created_at->toIso8601String() }}" title="{{ $when->isoFormat(__('webhooks::management.formats.moment')) }}">{{ $when->diffForHumans() }}</time>
+                    <td role="cell" data-label="{{ __('webhooks::management.table.when') }}" class="{{ $stackedCell }}">
+                        <time datetime="{{ $delivery->created_at->toIso8601String() }}" title="{{ $when->isoFormat(__('webhooks::management.formats.moment')) }}" class="whitespace-nowrap">{{ $when->diffForHumans() }}</time>
                     </td>
-                    <td class="px-3 py-2 text-right">
+                    <td role="cell" class="px-3 py-2 text-right max-sm:mt-2 max-sm:flex max-sm:justify-end max-sm:border-t max-sm:px-3 max-sm:pt-2">
+                        <div class="inline-flex flex-wrap justify-end gap-2">
                         {{-- Both go over the wire and both do something: a second redeliver
                              queues a second delivery, a second ping spends the allowance the
                              component then throttles. So neither takes a second click while
@@ -190,7 +197,7 @@
                                 wire:confirm="{{ __('webhooks::management.redeliver_dialog.title') }}&#10;&#10;{{ __('webhooks::management.redeliver_dialog.description') }}"
                                 wire:loading.attr="disabled"
                                 wire:target="redeliver"
-                                class="text-indigo-600"
+                                class="rounded bg-gray-100 px-3 py-1.5 text-gray-900 hover:bg-gray-200"
                                 aria-label="{{ __('webhooks::management.a11y.redeliver_delivery', ['label' => __('webhooks::management.deliveries.redeliver'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat(__('webhooks::management.formats.moment'))]) }}"
                             >{{ __('webhooks::management.deliveries.redeliver') }}</button>
                         @endif
@@ -200,8 +207,9 @@
                              applies to both, because it answers "may this reader act", not "is
                              this action dangerous". --}}
                         @if ($canPing)
-                            <button type="button" wire:click="ping({{ $delivery->subscription_id }})" wire:loading.attr="disabled" wire:target="ping" class="ml-3 text-indigo-600" aria-label="{{ __('webhooks::management.a11y.ping_subscription', ['label' => __('webhooks::management.deliveries.ping'), 'url' => $delivery->subscription?->url ?? $delivery->subscription_id]) }}">{{ __('webhooks::management.deliveries.ping') }}</button>
+                            <button type="button" wire:click="ping({{ $delivery->subscription_id }})" wire:loading.attr="disabled" wire:target="ping" class="rounded bg-gray-100 px-3 py-1.5 text-gray-900 hover:bg-gray-200" aria-label="{{ __('webhooks::management.a11y.ping_subscription', ['label' => __('webhooks::management.deliveries.ping'), 'url' => $delivery->subscription?->url ?? $delivery->subscription_id]) }}">{{ __('webhooks::management.deliveries.ping') }}</button>
                         @endif
+                        </div>
                     </td>
                 </tr>
             @endforeach

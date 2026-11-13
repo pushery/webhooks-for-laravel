@@ -37,6 +37,12 @@ return [
         'as_of' => 'Atualizado',
         'actions' => 'Ações',
     ],
+    'sort' => [
+        'field' => 'Ordenar por',
+        'direction' => 'Ordem',
+        'ascending' => 'Crescente',
+        'descending' => 'Decrescente',
+    ],
 
     // Badge labels for the stored health band. The key is the persisted health_status
     // value and is never translated; only the label a reader sees is.

@@ -83,7 +83,7 @@
                 {{ $editingId === null ? __('webhooks::management.form.submit') : __('webhooks::management.form.submit_update') }}
             </button>
             @if ($editingId !== null)
-                <button type="button" wire:click="cancel" class="text-gray-600">{{ __('webhooks::management.actions.cancel') }}</button>
+                <button type="button" wire:click="cancel" class="rounded bg-gray-100 px-4 py-2 text-gray-900 hover:bg-gray-200">{{ __('webhooks::management.actions.cancel') }}</button>
             @endif
         </div>
     </form>
@@ -152,30 +152,37 @@
          overflow container clips an absolutely positioned element only when it is that
          element's containing block, so without it the header stays where its column lands and
          widens the document whenever the table is wider than the screen. --}}
+    {{-- Below sm each row stands as a card: the header row moves out of sight, every value is a line
+         that starts with the name of its column, drawn from the cell's data-label and silent to a
+         screen reader, which hears the column header as in the table, and the actions stand as the
+         card's last row. The roles are written out because some browsers stop exposing a table
+         whose cells are laid out as cards. --}}
+    @php($stackedCell = "px-3 py-2 max-sm:grid max-sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] max-sm:gap-x-3 max-sm:px-3 max-sm:py-1 max-sm:before:content-[attr(data-label)_/_''] max-sm:before:font-medium max-sm:before:text-gray-500")
     <div class="relative w-full min-w-0 overflow-x-auto" tabindex="0" role="region" aria-label="{{ __('webhooks::management.a11y.subscriptions_table') }}">
-    <table class="w-full text-left text-sm" aria-label="{{ __('webhooks::management.a11y.subscriptions_table') }}">
-        <thead>
-            <tr>
-                <th class="px-3 py-2">{{ __('webhooks::management.table.endpoint') }}</th>
-                <th class="px-3 py-2">{{ __('webhooks::management.table.events') }}</th>
-                <th class="px-3 py-2">{{ __('webhooks::management.table.status') }}</th>
+    <table id="wh-plain-subscriptions-table" role="table" class="w-full text-left text-sm max-sm:block" aria-label="{{ __('webhooks::management.a11y.subscriptions_table') }}">
+        <thead role="rowgroup" class="max-sm:sr-only">
+            <tr role="row">
+                <th role="columnheader" class="px-3 py-2">{{ __('webhooks::management.table.endpoint') }}</th>
+                <th role="columnheader" class="px-3 py-2">{{ __('webhooks::management.table.events') }}</th>
+                <th role="columnheader" class="px-3 py-2">{{ __('webhooks::management.table.status') }}</th>
                 {{-- Not an empty <th>: an empty header announces nothing, so a screen-reader
                      reader arriving in the last column is told only that it is the last one. --}}
-                <th class="px-3 py-2"><span class="sr-only">{{ __('webhooks::management.table.actions') }}</span></th>
+                <th role="columnheader" class="px-3 py-2"><span class="sr-only">{{ __('webhooks::management.table.actions') }}</span></th>
             </tr>
         </thead>
-        <tbody>
+        <tbody role="rowgroup" class="max-sm:flex max-sm:flex-col max-sm:gap-3">
             @foreach ($subscriptions as $subscription)
-                <tr wire:key="sub-{{ $subscription->id }}" class="border-t">
-                    <th scope="row" class="px-3 py-2">
+                <tr wire:key="sub-{{ $subscription->id }}" role="row" class="border-t max-sm:block max-sm:rounded max-sm:border max-sm:py-2">
+                    <th scope="row" role="rowheader" class="px-3 py-2 max-sm:block max-sm:px-3 max-sm:py-1">
                         <span class="font-medium">{{ $subscription->name ?? '—' }}</span>
-                        <span class="block text-gray-500">{{ $subscription->url }}</span>
+                        <span class="block text-gray-500 max-sm:break-all">{{ $subscription->url }}</span>
                     </th>
-                    <td class="px-3 py-2">{{ implode(', ', $subscription->eventTypeNames()) }}</td>
+                    <td role="cell" data-label="{{ __('webhooks::management.table.events') }}" class="{{ $stackedCell }}">{{ implode(', ', $subscription->eventTypeNames()) }}</td>
                     {{-- The same three bands as the WireKit stub, in this stub's own plain
                          classes. Both are kept in step deliberately: a host that starts on one
                          and moves to the other must not lose a state on the way. --}}
-                    <td class="px-3 py-2">
+                    <td role="cell" data-label="{{ __('webhooks::management.table.status') }}" class="{{ $stackedCell }}">
+                        <span>
                         @if (! $subscription->is_active)
                             <span class="text-gray-500">{{ __('webhooks::management.subscription.disabled') }}</span>
                         @elseif ($subscription->health_status === 'failing')
@@ -191,21 +198,23 @@
                         @if ($subscription->wasAutoDisabled())
                             <span class="block text-gray-500">{{ __('webhooks::management.subscription.auto_disabled', ['count' => $subscription->consecutive_failures]) }}</span>
                         @endif
+                        </span>
                     </td>
-                    <td class="px-3 py-2 text-right">
+                    <td role="cell" class="px-3 py-2 text-right max-sm:mt-2 max-sm:flex max-sm:justify-end max-sm:border-t max-sm:px-3 max-sm:pt-2">
+                        <div class="inline-flex flex-wrap justify-end gap-2">
                         @if ($canEdit)
                         <button
                             type="button"
                             wire:click="edit({{ $subscription->id }})"
                             aria-label="{{ __('webhooks::management.a11y.edit_subscription', ['url' => $subscription->url]) }}"
-                            class="text-indigo-600"
+                            class="rounded bg-gray-100 px-3 py-1.5 text-gray-900 hover:bg-gray-200"
                         >{{ __('webhooks::management.subscription.edit') }}</button>
                         @endif
                         {{-- Named per row like its neighbors; the visible word switches with the
                              row's state, so it is interpolated rather than described. --}}
                         @if ($canToggle)
                         @php($toggleLabel = $subscription->is_active ? __('webhooks::management.subscription.disable') : __('webhooks::management.subscription.enable'))
-                        <button type="button" wire:click="toggle({{ $subscription->id }})" class="ml-3 text-indigo-600" aria-label="{{ __('webhooks::management.a11y.toggle_subscription', ['label' => $toggleLabel, 'url' => $subscription->url]) }}">
+                        <button type="button" wire:click="toggle({{ $subscription->id }})" class="rounded bg-gray-100 px-3 py-1.5 text-gray-900 hover:bg-gray-200" aria-label="{{ __('webhooks::management.a11y.toggle_subscription', ['label' => $toggleLabel, 'url' => $subscription->url]) }}">
                             {{ $toggleLabel }}
                         </button>
                         @endif
@@ -218,7 +227,7 @@
                             wire:click="rotate({{ $subscription->id }})"
                             wire:confirm="{{ __('webhooks::management.rotate_dialog.title') }}&#10;&#10;{{ __('webhooks::management.rotate_dialog.description') }}"
                             aria-label="{{ __('webhooks::management.a11y.rotate_subscription', ['label' => __('webhooks::management.subscription.rotate'), 'url' => $subscription->url]) }}"
-                            class="ml-3 text-indigo-600"
+                            class="rounded bg-gray-100 px-3 py-1.5 text-gray-900 hover:bg-gray-200"
                         >{{ __('webhooks::management.subscription.rotate') }}</button>
                         @endif
                         {{-- Deleting an endpoint is irreversible and stops a live production
@@ -233,9 +242,10 @@
                             wire:click="destroy({{ $subscription->id }})"
                             wire:confirm="{{ __('webhooks::management.delete_dialog.title') }}&#10;&#10;{{ __('webhooks::management.delete_dialog.description') }}"
                             aria-label="{{ __('webhooks::management.a11y.delete_subscription', ['url' => $subscription->url]) }}"
-                            class="ml-3 text-red-600"
+                            class="rounded bg-red-600 px-3 py-1.5 text-white hover:bg-red-500"
                         >{{ __('webhooks::management.subscription.delete') }}</button>
                         @endif
+                        </div>
                     </td>
                 </tr>
             @endforeach

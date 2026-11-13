@@ -20,11 +20,11 @@ return [
 
     'kpis' => [
         'title' => 'At a glance',
-        'total' => 'Total Webhooks Sent',
+        'total' => 'Total webhooks sent',
         'successful' => 'Successful',
         'failed' => 'Failed',
         'pending' => 'Pending',
-        'retry_rate' => 'Retry Rate',
+        'retry_rate' => 'Retry rate',
     ],
 
     // Date patterns are translated, not just their month names: the order differs by locale, since
@@ -110,6 +110,12 @@ return [
         'all_statuses' => 'All statuses',
         'event_type' => 'Event type',
         'event_type_placeholder' => 'Filter by event type',
+    ],
+    'sort' => [
+        'field' => 'Sort by',
+        'direction' => 'Order',
+        'ascending' => 'Ascending',
+        'descending' => 'Descending',
     ],
 
     // Badge labels for the stored DeliveryStatus values. The key is the persisted

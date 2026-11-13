@@ -98,7 +98,9 @@
                     <div class="flex flex-col gap-[var(--padding-wk-y-lg)]">
                         <livewire:webhooks.dashboard.setup-summary wire:key="ov-setup" />
                         <livewire:webhooks.dashboard.top-events :window="$window" wire:key="ov-top-{{ $window }}" />
-                        <livewire:webhooks.dashboard.recent-queue wire:key="ov-recent" />
+                        {{-- The five newest beside the charts, so the side column ends near where they do; the Queue
+                             tab shows 25 across the page. --}}
+                        <livewire:webhooks.dashboard.recent-queue :limit="5" wire:key="ov-recent" />
                     </div>
                 </div>
             </div>

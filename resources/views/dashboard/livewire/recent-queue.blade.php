@@ -51,8 +51,9 @@
                                          and 254 on a phone, so Replay slid past the scroller's edge. Below 24rem of panel
                                          width the Status and Code columns step aside and their values move here, leaving two
                                          columns that fit. The event stays the first thing in the row header, so the row is
-                                         still named by what was delivered. --}}
-                                    <span class="mt-[var(--gap-wk-xs)] flex flex-col items-start gap-[var(--gap-wk-xs)] @[24rem]:hidden">
+                                         still named by what was delivered. Status and code share a line and wrap
+                                         only where the panel is too narrow for both. --}}
+                                    <span class="mt-[var(--gap-wk-xs)] flex flex-wrap items-center gap-x-[var(--gap-wk-sm)] gap-y-[var(--gap-wk-xs)] @[24rem]:hidden">
                                         <x-wirekit::badge :intent="$intent">{{ __('webhooks::dashboard.status.'.$delivery->status->value) }}</x-wirekit::badge>
                                         @if ($delivery->response_code !== null)
                                             <x-wirekit::text as="span" size="xs" intent="muted">{{ __('webhooks::dashboard.table.code') }} {{ $delivery->response_code }}</x-wirekit::text>
@@ -68,7 +69,7 @@
                                              replay buttons out. --}}
                                         <x-wirekit::button
                                             size="sm"
-                                            surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
+                                            surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral"
                                             wire:click="redeliver('{{ $delivery->id }}')"
                                             wire:loading.attr="disabled"
                                             wire:target="redeliver"

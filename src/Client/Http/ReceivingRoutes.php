@@ -31,12 +31,20 @@ final class ReceivingRoutes
         // concrete RouteCollection is. Asking it for its array is one call and keeps the loop
         // honestly typed rather than asserting around the declaration.
         foreach ($router->getRoutes()->getRoutes() as $route) {
-            if ($route->getActionName() === WebhookController::class) {
+            if (self::isReceiving($route)) {
                 $routes[] = $route;
             }
         }
 
         return $routes;
+    }
+
+    /**
+     * Whether the route is a receiving route, by its controller.
+     */
+    public static function isReceiving(Route $route): bool
+    {
+        return $route->getActionName() === WebhookController::class;
     }
 
     /**

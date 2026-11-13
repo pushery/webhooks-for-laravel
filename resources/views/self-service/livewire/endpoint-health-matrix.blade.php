@@ -1,6 +1,7 @@
 {{-- The endpoint health status board: one row per owned endpoint with its cached
      health band + score and — once recomputed — its live success rate, p95 latency and
-     sample size. The Status and Score headers sort the board; per-row and all-at-once
+     sample size. The Status and Score headers sort the board, and below sm two fields above
+     the cards do; per-row and all-at-once
      Recompute drive the shared health engine. Owner-scoped, WireKit-tokenized throughout. --}}
 <div class="wh-portal wh-portal-health mx-auto flex max-w-5xl flex-col gap-[var(--padding-wk-y-lg)] p-[var(--padding-wk-x-lg)]" wire:key="health-matrix">
     <header>
@@ -11,12 +12,12 @@
                 {{-- Absent when this board is embedded without the portal's own routes: there
                      is no endpoint page of ours to go back to. --}}
                 @if ($portalUrl !== null)
-                    <x-wirekit::button :href="$portalUrl" wire:navigate size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" intent="neutral">
+                    <x-wirekit::button :href="$portalUrl" wire:navigate size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral">
                         {{ __('webhooks::self-service.actions.back_to_endpoints') }}
                     </x-wirekit::button>
                 @endif
                 @if (! $endpoints->isEmpty())
-                    <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" wire:click="recomputeAll" wire:loading.attr="disabled" wire:target="recomputeAll">
+                    <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral" wire:click="recomputeAll" wire:loading.attr="disabled" wire:target="recomputeAll">
                         {{ __('webhooks::self-service.health_page.recompute_all') }}
                     </x-wirekit::button>
                 @endif
@@ -47,8 +48,27 @@
             :description="__('webhooks::self-service.empty.no_endpoints_health.description')"
         />
     @else
+        {{-- Below sm the header row is out of sight with the buttons that sort the board, so the sort
+             stands above the cards. From sm up the headers sort. --}}
+        <div class="grid grid-cols-2 items-start gap-[var(--padding-wk-x-md)] sm:hidden" data-wh-sort-fields>
+            <x-wirekit::select name="sortField" wire:model.live="sortField" :label="__('webhooks::self-service.sort.field')">
+                <option value="score">{{ __('webhooks::self-service.table.score') }}</option>
+                <option value="status">{{ __('webhooks::self-service.table.status') }}</option>
+            </x-wirekit::select>
+
+            <x-wirekit::select name="sortDirection" wire:model.live="sortDirection" :label="__('webhooks::self-service.sort.direction')">
+                <option value="desc">{{ __('webhooks::self-service.sort.descending') }}</option>
+                <option value="asc">{{ __('webhooks::self-service.sort.ascending') }}</option>
+            </x-wirekit::select>
+        </div>
+
+        {{-- Below sm each endpoint stands as a card and each value as a line that names its column, as
+             the endpoint list does: as a table the eight columns needed a sideways scroll on a phone,
+             and the endpoint's address broke letter by letter in its narrow column. --}}
         <x-wirekit::table
+            id="wh-portal-health-table"
             hoverable
+            stack-below="sm"
             :aria-label="__('webhooks::self-service.a11y.health_table')"
             :table-label="__('webhooks::self-service.a11y.health_table')"
         >
@@ -93,31 +113,31 @@
                                 @if ($endpoint->name !== null)
                                     <x-wirekit::text weight="medium">{{ $endpoint->name }}</x-wirekit::text>
                                 @endif
-                                <x-wirekit::text size="sm" intent="muted" class="break-all">{{ $endpoint->url }}</x-wirekit::text>
+                                <x-wirekit::text size="sm" intent="muted" class="break-words">{{ $endpoint->url }}</x-wirekit::text>
                             </x-wirekit::stack>
                         </x-wirekit::table.th>
-                        <x-wirekit::table.td>
+                        <x-wirekit::table.td :label="__('webhooks::self-service.table.status')">
                             <x-wirekit::badge :intent="$healthIntent">{{ $healthLabel }}</x-wirekit::badge>
                         </x-wirekit::table.td>
-                        <x-wirekit::table.td>
+                        <x-wirekit::table.td :label="__('webhooks::self-service.table.score')">
                             <x-wirekit::text weight="medium">{{ $endpoint->health_score ?? '—' }}</x-wirekit::text>
                         </x-wirekit::table.td>
-                        <x-wirekit::table.td align="right">
+                        <x-wirekit::table.td align="right" :label="__('webhooks::self-service.table.success_rate')">
                             <x-wirekit::text size="sm">{{ $report !== null ? \Pushery\Webhooks\Support\LocalizedNumber::format($report['successRate'] * 100, 1).'%' : '—' }}</x-wirekit::text>
                         </x-wirekit::table.td>
-                        <x-wirekit::table.td align="right">
+                        <x-wirekit::table.td align="right" :label="__('webhooks::self-service.table.p95')">
                             <x-wirekit::text size="sm">{{ $report !== null ? \Pushery\Webhooks\Support\LocalizedNumber::format($report['p95']).' ms' : '—' }}</x-wirekit::text>
                         </x-wirekit::table.td>
-                        <x-wirekit::table.td align="right">
+                        <x-wirekit::table.td align="right" :label="__('webhooks::self-service.table.sample')">
                             <x-wirekit::text size="sm">{{ $report !== null ? $report['sampleSize'] : '—' }}</x-wirekit::text>
                         </x-wirekit::table.td>
-                        <x-wirekit::table.td>
-                            <x-wirekit::text size="sm" intent="muted">{{ $endpoint->health_calculated_at?->settings(['locale' => app()->getLocale()])->diffForHumans() ?? __('webhooks::self-service.health_page.never') }}</x-wirekit::text>
+                        <x-wirekit::table.td :label="__('webhooks::self-service.table.as_of')">
+                            <x-wirekit::text size="sm" intent="muted" class="whitespace-nowrap">{{ $endpoint->health_calculated_at?->settings(['locale' => app()->getLocale()])->diffForHumans() ?? __('webhooks::self-service.health_page.never') }}</x-wirekit::text>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td align="right">
                             <x-wirekit::button
                                 size="sm"
-                                surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
+                                surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral"
                                 wire:click="recompute({{ $endpoint->id }})"
                                 wire:loading.attr="disabled"
                                 wire:target="recompute"

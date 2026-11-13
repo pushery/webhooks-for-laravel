@@ -14,10 +14,8 @@
      ones whatever this says -- but it takes out the case that is both the worst and the certain
      one.
 
-     224px, because the empty state's height depends on the WireKit release: from 2.64 it pads
-     vertically with its side padding, and the empty list stands 226px tall; earlier releases
-     draw it at 210px. This floor is within a few pixels of the first and within one spacing step
-     of the second. --}}
-<div class="wh-portal-list-placeholder min-h-56" role="status" aria-label="{{ __('webhooks::self-service.a11y.loading_endpoints') }}" wire:key="endpoint-list-placeholder">
+     200px, within a few pixels of the empty list: the row with the button that adds an endpoint
+     and WireKit's empty state under it. --}}
+<div class="wh-portal-list-placeholder min-h-50" role="status" aria-label="{{ __('webhooks::self-service.a11y.loading_endpoints') }}" wire:key="endpoint-list-placeholder">
     <x-wirekit::skeleton.table :rows="4" />
 </div>

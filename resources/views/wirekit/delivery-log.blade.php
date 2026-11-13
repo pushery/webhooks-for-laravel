@@ -45,11 +45,12 @@
          of equal fields. With the widths each control brings it would break into rows of different
          lengths, a right edge somewhere else on every line. From `sm` up the row keeps its own
          widths. --}}
-    <x-wirekit::row gap="md" class="flex-wrap items-end">
-        {{-- Both filters hide their label visually, so the label reaches sighted readers
-             only through assistive technology — it is translated like any other. --}}
+    <x-wirekit::row gap="md" align="start" class="flex-wrap">
+        {{-- Every filter shows its label, the lists as well as the two pickers, and the row lines them up
+             at the top: with a label above each control the controls stand on one line, whatever room a
+             picker keeps below its own. --}}
         <div class="w-full sm:w-auto">
-            <x-wirekit::select name="status" wire:model.live="status" :label="__('webhooks::management.filters.status')" hideLabel>
+            <x-wirekit::select name="status" wire:model.live="status" :label="__('webhooks::management.filters.status')">
                 <option value="">{{ __('webhooks::management.filters.all_statuses') }}</option>
                 <option value="pending">{{ __('webhooks::management.status_options.pending') }}</option>
                 <option value="succeeded">{{ __('webhooks::management.status_options.succeeded') }}</option>
@@ -70,7 +71,7 @@
              form already builds its selection from; no second source. --}}
         <div class="w-full sm:w-auto">
             @if ($eventTypes !== [])
-                <x-wirekit::select name="eventType" wire:model.live="eventType" :label="__('webhooks::management.filters.event_type')" hideLabel>
+                <x-wirekit::select name="eventType" wire:model.live="eventType" :label="__('webhooks::management.filters.event_type')">
                     <option value="">{{ __('webhooks::management.filters.all_event_types') }}</option>
                     @foreach ($eventTypes as $type)
                         <option value="{{ $type }}">{{ $type }}</option>
@@ -81,7 +82,6 @@
                     name="eventType"
                     wire:model.live.debounce.300ms="eventType"
                     :label="__('webhooks::management.filters.event_type')"
-                    hideLabel
                     :placeholder="__('webhooks::management.filters.event_type_placeholder')"
                 />
             @endif
@@ -92,7 +92,7 @@
              incident. A control that takes a number is one nobody can use without running a
              query first. --}}
         <div class="w-full sm:w-auto">
-            <x-wirekit::select name="endpointId" wire:model.live="endpointId" :label="__('webhooks::management.filters.endpoint')" hideLabel>
+            <x-wirekit::select name="endpointId" wire:model.live="endpointId" :label="__('webhooks::management.filters.endpoint')">
                 <option value="">{{ __('webhooks::management.filters.all_endpoints') }}</option>
                 @foreach ($endpoints as $endpoint)
                     <option value="{{ $endpoint->id }}">{{ $endpoint->name ?: $endpoint->url }}</option>
@@ -107,9 +107,7 @@
              rendered through View::make() with the data render() passes has no component, and
              with it no property: there the pickers start empty.
 
-             The two carry visible labels, unlike the lists beside them. A list names itself through
-             its first option; two bare fields side by side say nothing about which one starts the
-             range. Each sits in a box wide enough for a moment, its clear button and its chevron. --}}
+             Each sits in a box wide enough for a moment, its clear button and its chevron. --}}
         <div class="w-full sm:w-72">
             <x-wirekit::datetime-picker
                 name="from"
@@ -152,8 +150,12 @@
             :description="__('webhooks::management.empty.no_deliveries.description')"
         />
     @else
+        {{-- Below sm each delivery stands as a card and each value as a line that names its column: as a
+             table its seven columns needed a sideways scroll on a phone. --}}
         <x-wirekit::table
+            id="wh-delivery-log-table"
             hoverable
+            stack-below="sm"
             :aria-label="__('webhooks::management.a11y.delivery_log_table')"
             :table-label="__('webhooks::management.a11y.delivery_log_table')"
         >
@@ -190,7 +192,7 @@
                     @endphp
                     <x-wirekit::table.row wire:key="del-{{ $delivery->id }}">
                         <x-wirekit::table.th headerScope="row">{{ $delivery->event_type }}</x-wirekit::table.th>
-                        <x-wirekit::table.td>
+                        <x-wirekit::table.td :label="__('webhooks::management.table.endpoint')">
                             {{-- Name, then url, then the bare id -- the same ladder both action
                                  names already walk, so the cell and the announcement never
                                  disagree about what this endpoint is called. The id is the last
@@ -198,21 +200,21 @@
                                  and "which one" is exactly what the reader is asking. --}}
                             {{ $delivery->subscription?->name ?: $delivery->subscription?->url ?: $delivery->subscription_id }}
                         </x-wirekit::table.td>
-                        <x-wirekit::table.td>
+                        <x-wirekit::table.td :label="__('webhooks::management.table.status')">
                             {{-- The stored status value keys the label; only the label is translated. --}}
                             <x-wirekit::badge :intent="$intent">{{ __('webhooks::management.status.'.$delivery->status->value) }}</x-wirekit::badge>
                         </x-wirekit::table.td>
-                        <x-wirekit::table.td>{{ $delivery->attempt }}</x-wirekit::table.td>
+                        <x-wirekit::table.td :label="__('webhooks::management.table.attempt')">{{ $delivery->attempt }}</x-wirekit::table.td>
                         {{-- The duration hangs off the code rather than standing in its own
                              column: a duration without an answer says nothing, and the pair is
                              the question a reader actually has -- it arrived, but how slow was
                              it? A receiver getting slower is the run-up to one that fails. Same
                              shape as the portal panel, so the two screens read alike. --}}
-                        <x-wirekit::table.td>{{ $delivery->response_code === null ? '—' : $delivery->response_code.($delivery->duration_ms === null ? '' : ' · '.__('webhooks::management.deliveries.duration', ['ms' => \Pushery\Webhooks\Support\LocalizedNumber::format($delivery->duration_ms)])) }}</x-wirekit::table.td>
-                        <x-wirekit::table.td>
+                        <x-wirekit::table.td :label="__('webhooks::management.table.code')">{{ $delivery->response_code === null ? '—' : $delivery->response_code.($delivery->duration_ms === null ? '' : ' · '.__('webhooks::management.deliveries.duration', ['ms' => \Pushery\Webhooks\Support\LocalizedNumber::format($delivery->duration_ms)])) }}</x-wirekit::table.td>
+                        <x-wirekit::table.td :label="__('webhooks::management.table.when')">
                             {{-- Relative in the cell, absolute on hover — both in the reader's
                                  locale, never the raw stored timestamp. --}}
-                            <time datetime="{{ $delivery->created_at->toIso8601String() }}" title="{{ $when->isoFormat(__('webhooks::management.formats.moment')) }}">{{ $when->diffForHumans() }}</time>
+                            <time datetime="{{ $delivery->created_at->toIso8601String() }}" title="{{ $when->isoFormat(__('webhooks::management.formats.moment')) }}" class="whitespace-nowrap">{{ $when->diffForHumans() }}</time>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td align="right">
                             {{-- Named per ROW. Twenty buttons all reading "Redeliver" are twenty
@@ -237,6 +239,9 @@
 
                                  With neither config key set this renders exactly as it always
                                  has -- a host that configured nothing sees no change. --}}
+                            {{-- One row, so the two actions stand side by side at the end of the line: as two
+                                 siblings of the cell the dialog took a line of its own and Ping stood under it. --}}
+                            <x-wirekit::row gap="xs" class="justify-end">
                             @if ($canRedeliver)
                                 {{-- The dialog, not a bare click. Pressing this sends a real
                                      HTTP request to a customer's endpoint under the delivery's
@@ -248,7 +253,7 @@
                                 {{-- It closes with the re-render its action causes, and says so, so an application that turns close-on-confirm on for every dialog does not ask this one for a confirm control. --}}
                                 <x-wirekit::alert-dialog :name="'redeliver-'.$delivery->id" :close-on-confirm="false">
                                     <x-slot:trigger>
-                                        <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" :aria-label="__('webhooks::management.a11y.redeliver_delivery', ['label' => __('webhooks::management.deliveries.redeliver'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat(__('webhooks::management.formats.moment'))])">{{ __('webhooks::management.deliveries.redeliver') }}</x-wirekit::button>
+                                        <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral" :aria-label="__('webhooks::management.a11y.redeliver_delivery', ['label' => __('webhooks::management.deliveries.redeliver'), 'event' => $delivery->event_type, 'endpoint' => $delivery->subscription?->name ?? $delivery->subscription?->url ?? $delivery->subscription_id, 'at' => $when->isoFormat(__('webhooks::management.formats.moment'))])">{{ __('webhooks::management.deliveries.redeliver') }}</x-wirekit::button>
                                     </x-slot:trigger>
 
                                     <x-wirekit::alert-dialog.title>{{ __('webhooks::management.redeliver_dialog.title') }}</x-wirekit::alert-dialog.title>
@@ -265,8 +270,9 @@
                                  ability check applies to both, because it answers "may this
                                  reader act", not "is this action dangerous". --}}
                             @if ($canPing)
-                                <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" wire:click="ping({{ $delivery->subscription_id }})" wire:loading.attr="disabled" wire:target="ping" :aria-label="__('webhooks::management.a11y.ping_subscription', ['label' => __('webhooks::management.deliveries.ping'), 'url' => $delivery->subscription?->url ?? $delivery->subscription_id])">{{ __('webhooks::management.deliveries.ping') }}</x-wirekit::button>
+                                <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral" wire:click="ping({{ $delivery->subscription_id }})" wire:loading.attr="disabled" wire:target="ping" :aria-label="__('webhooks::management.a11y.ping_subscription', ['label' => __('webhooks::management.deliveries.ping'), 'url' => $delivery->subscription?->url ?? $delivery->subscription_id])">{{ __('webhooks::management.deliveries.ping') }}</x-wirekit::button>
                             @endif
+                            </x-wirekit::row>
                         </x-wirekit::table.td>
                     </x-wirekit::table.row>
                 @endforeach

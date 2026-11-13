@@ -33,7 +33,8 @@
         @if ($this->capReached)
             <x-wirekit::text size="sm" intent="muted">{{ $this->capNotice }}</x-wirekit::text>
         @else
-            <x-wirekit::button wire:click="newEndpoint" wire:loading.attr="disabled" wire:target="newEndpoint">
+            {{-- The size of the page's other action, "Endpoint health" above, and of the row actions below. --}}
+            <x-wirekit::button size="sm" wire:click="newEndpoint" wire:loading.attr="disabled" wire:target="newEndpoint">
                 <x-slot:iconLeft><x-wirekit::icon name="plus" size="sm" /></x-slot:iconLeft>
                 {{ __('webhooks::self-service.list.new_endpoint') }}
             </x-wirekit::button>
@@ -106,9 +107,12 @@
                             <x-wirekit::text size="sm">{{ implode(', ', $endpoint->eventTypeNames()) ?: '—' }}</x-wirekit::text>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td :label="__('webhooks::self-service.table.status')">
+                            {{-- A state the reader can switch, so a tinted fill in both states, told apart by
+                                 the word and by the intent. A filled success block at button height stood out
+                                 as the loudest action on the row, beside health badges of the same green. --}}
                             <x-wirekit::button
                                 size="sm"
-                                :surface="$endpoint->is_active ? 'filled' : 'ghost'"
+                                surface="soft"
                                 :intent="$endpoint->is_active ? 'success' : 'neutral'"
                                 wire:click="toggle({{ $endpoint->id }})"
                                 :aria-pressed="$endpoint->is_active ? 'true' : 'false'"
@@ -131,7 +135,7 @@
                                      that waits on a network round trip. --}}
                                 <x-wirekit::button
                                     size="sm"
-                                    surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
+                                    surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral"
                                     wire:click="ping({{ $endpoint->id }})"
                                     wire:loading.attr="disabled"
                                     wire:target="ping"
@@ -144,7 +148,7 @@
                                 </x-wirekit::button>
                                 <x-wirekit::button
                                     size="sm"
-                                    surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
+                                    surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral"
                                     wire:click="reveal({{ $endpoint->id }})"
                                     :aria-label="__('webhooks::self-service.a11y.reveal_secret', ['url' => $endpoint->url])"
                                 >
@@ -155,7 +159,7 @@
                                 </x-wirekit::button>
                                 <x-wirekit::button
                                     size="sm"
-                                    surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
+                                    surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral"
                                     wire:click="edit({{ $endpoint->id }})"
                                     :aria-label="__('webhooks::self-service.a11y.edit_endpoint', ['url' => $endpoint->url])"
                                 >
@@ -172,7 +176,7 @@
                                 @if ($showTransformLink)
                                     <x-wirekit::button
                                         size="sm"
-                                        surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
+                                        surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral"
                                         :href="route('webhooks.self-service.transform', $endpoint->id)"
                                         wire:navigate
                                         :aria-label="__('webhooks::self-service.a11y.edit_transform', ['label' => __('webhooks::self-service.list.transform'), 'url' => $endpoint->url])"
@@ -209,7 +213,7 @@
                                         <x-slot:trigger>
                                             <x-wirekit::button
                                                 size="sm"
-                                                surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
+                                                surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}"
                                                 intent="danger"
                                                 :aria-label="__('webhooks::self-service.a11y.delete_endpoint', ['url' => $endpoint->url])"
                                             >
@@ -251,7 +255,7 @@
         </x-wirekit::table>
 
         <div class="mt-[var(--space-wk-sm)]">
-            {{ $endpoints->links() }}
+            {{ $endpoints->onEachSide(1)->links() }}
         </div>
     @endif
 </div>
