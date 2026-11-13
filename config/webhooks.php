@@ -284,12 +284,19 @@ return [
         // such a job missed and every retry that has come due.
         //
         // max_attempts ends an entry after that many failed attempts; null, the default, keeps
-        // trying until the receiver takes it or refuses it for good. alarm_after_hours raises
+        // trying until the receiver takes it or refuses it for good. An entry the Platform layer
+        // writes (platform.outbox) takes the tries of its delivery instead. alarm_after_hours raises
         // WebhookOutboxEntryOverdue once for an entry still not delivered after that long, and 0
         // switches the alarm off. Delivered and skipped entries are pruned after prune_after_days;
         // a refused one stays, because it holds its stream until it is sent again or skipped.
+        //
+        // queue and connection put the relay's turns on a queue of their own, so a slow endpoint of
+        // another webhook does not hold the outbox up. Without a value they take webhooks.server.queue
+        // and webhooks.server.connection, with every other delivery of the Server layer.
         'outbox' => [
             'enabled' => EnvFlag::protection(env('WEBHOOKS_SERVER_OUTBOX_ENABLED', false), false),
+            'queue' => env('WEBHOOKS_SERVER_OUTBOX_QUEUE'),
+            'connection' => env('WEBHOOKS_SERVER_OUTBOX_CONNECTION'),
             'max_attempts' => EnvLimit::optionalCeiling(env('WEBHOOKS_SERVER_OUTBOX_MAX_ATTEMPTS'), null),
             'alarm_after_hours' => EnvLimit::ceiling(env('WEBHOOKS_SERVER_OUTBOX_ALARM_AFTER_HOURS'), 72, zeroSwitchesOff: true),
             'prune_after_days' => EnvLimit::ceiling(env('WEBHOOKS_SERVER_OUTBOX_PRUNE_AFTER_DAYS'), 14),
@@ -414,10 +421,11 @@ return [
         // redelivery, goes out through the transactional outbox of the Server layer, recorded in
         // one transaction with its row in the delivery log. A call whose push fails after the
         // commit is then sent by the outbox's sweep; without it, such a row stays pending with no
-        // call behind it. Off by default, and it needs server.outbox.enabled: the outbox's own
-        // retry policy then decides the attempts, server.outbox.max_attempts among them, in place
-        // of the queued job's tries. A delivery the rate limit holds back becomes an entry due
-        // that much later.
+        // call behind it. Off by default, and it needs server.outbox.enabled. Each delivery keeps
+        // the tries it has as a queued job, server.tries, so one that runs out of them is given up
+        // and counts for the circuit breaker as it would without the outbox;
+        // server.outbox.max_attempts applies to the entries of the Server layer only. A delivery
+        // the rate limit holds back becomes an entry due that much later.
         'outbox' => EnvFlag::protection(env('WEBHOOKS_PLATFORM_OUTBOX', false), false),
 
         // A brake on the manual test ping (Webhooks::ping), which the shaping above
@@ -700,11 +708,12 @@ return [
         'enabled' => EnvFlag::protection(env('WEBHOOKS_CLIENT_ENABLED', false), false),
 
         // Keep true. A middleware is prepended to the global stack so the exact received
-        // bytes are captured before any other middleware can parse or re-encode the body;
-        // signature verification then runs over those bytes. Set to false only if you supply
-        // your own raw-body capture, or to avoid globally buffering every request body — with
-        // it off the receiver verifies over the request content read at processing time, which
-        // can be a re-serialized body and then silently fails to verify on some producers.
+        // bytes of a request to a receiving route are captured before any other middleware can
+        // parse or re-encode the body; signature verification then runs over those bytes. A
+        // request to any other address is left unread. Set to false only if you supply your own
+        // raw-body capture — with it off the receiver verifies over the request content read at
+        // processing time, which can be a re-serialized body and then silently fails to verify
+        // on some producers.
         //
         // Those captured bytes are then decoded into the envelope a handler reads: JSON, or a
         // form body the producer declared as application/x-www-form-urlencoded (Mollie's shape).
@@ -725,7 +734,10 @@ return [
         // Two levers, and they answer different halves. 'large_payload' below moves a big body
         // onto a disk and keeps a pointer, which fixes the storage cost without refusing
         // anything. A limit that refuses belongs in front of the route, in your own middleware,
-        // because answering 413 to a producer is a policy about who may send you what.
+        // because answering 413 to a producer is a policy about who may send you what. With
+        // raw_body_capture on, the body of a request to a receiving route is read before that
+        // middleware runs: the limit stops the signature, the row and the job, not the read. The
+        // web server's own limit, such as nginx's client_max_body_size, refuses before it.
         //
         // A default here would be either too low for somebody or too high to be worth having.
 
@@ -1237,16 +1249,18 @@ return [
         'csp_nonce' => null,
 
         // The WireKit surface the shipped screens draw their secondary actions with: the two
-        // operator screens, the self-service panels and the dashboard alike. 'outline' gives each
-        // such action a border, so it reads as a button beside the primary one. 'ghost' draws them
-        // without border or fill, the default before 3.20.0; beside a label with no icon, such a
-        // button reads as plain text. Any other surface WireKit knows works here as well.
+        // operator screens, the self-service panels and the dashboard alike. 'filled' gives each
+        // such action a fill in the neutral intent, and a destructive one in the danger intent, so
+        // it reads as a button beside the primary one without competing with it. 'outline' draws a
+        // border only, the default from 3.20.0 to 3.30.0; 'ghost' draws neither border nor fill,
+        // the default before that, and beside a label with no icon it reads as plain text. Any
+        // other surface WireKit knows works here as well.
         //
         // One button is not read from here, because it is not a secondary action: the
         // active/inactive toggle in the endpoint list draws 'ghost' as the off half of a two-state
         // control. That ghost is a state rather than a rank, and following this key would make
         // "disabled" look like every other button on the row.
-        'secondary_surface' => 'outline',
+        'secondary_surface' => 'filled',
 
         // A `data-*` attribute put on every element that shows a plaintext signing secret: the
         // current and the previous one in the secret panel, and the new one the operator console

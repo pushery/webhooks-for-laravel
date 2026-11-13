@@ -92,6 +92,12 @@ return [
         'event_type' => 'Event-Typ',
         'event_type_placeholder' => 'Nach Event-Typ filtern',
     ],
+    'sort' => [
+        'field' => 'Sortieren nach',
+        'direction' => 'Reihenfolge',
+        'ascending' => 'Aufsteigend',
+        'descending' => 'Absteigend',
+    ],
 
     // Der Schlüssel ist der gespeicherte Statuswert und bleibt unverändert;
     // übersetzt wird nur die Beschriftung. Kleinschreibung wie im Original-Design.

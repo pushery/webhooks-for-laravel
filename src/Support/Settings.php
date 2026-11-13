@@ -316,6 +316,28 @@ final class Settings
         return null;
     }
 
+    /**
+     * The queue the relay of the transactional outbox takes its turns on: webhooks.server.outbox.queue,
+     * or the queue of every other delivery of the Server layer when it names none.
+     */
+    public function outboxQueue(): string
+    {
+        $queue = Config::get('webhooks.server.outbox.queue');
+
+        return is_string($queue) && trim($queue) !== '' ? trim($queue) : $this->queue();
+    }
+
+    /**
+     * The queue connection of those turns: webhooks.server.outbox.connection, or the connection of every
+     * other delivery of the Server layer when it names none.
+     */
+    public function outboxConnection(): ?string
+    {
+        $connection = Config::get('webhooks.server.outbox.connection');
+
+        return is_string($connection) && trim($connection) !== '' ? trim($connection) : $this->connection();
+    }
+
     public function rateLimitEnabled(): bool
     {
         return Config::boolean('webhooks.platform.rate_limit.enabled', true);

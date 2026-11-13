@@ -16,7 +16,8 @@
             <x-wirekit::stats cols="3">
                 <x-wirekit::stat :label="__('webhooks::dashboard.setup.total')" :value="\Pushery\Webhooks\Support\LocalizedNumber::format($summary['total'])" intent="neutral" />
                 <x-wirekit::stat :label="__('webhooks::dashboard.setup.active')" :value="\Pushery\Webhooks\Support\LocalizedNumber::format($summary['active'])" intent="success" />
-                <x-wirekit::stat :label="__('webhooks::dashboard.setup.disabled')" :value="\Pushery\Webhooks\Support\LocalizedNumber::format($summary['disabled'])" intent="warning" />
+                {{-- A warning only while an endpoint is disabled: "0" in amber reads as something to look at. --}}
+                <x-wirekit::stat :label="__('webhooks::dashboard.setup.disabled')" :value="\Pushery\Webhooks\Support\LocalizedNumber::format($summary['disabled'])" :intent="$summary['disabled'] > 0 ? 'warning' : 'neutral'" />
             </x-wirekit::stats>
         @endif
     </x-wirekit::card.body>

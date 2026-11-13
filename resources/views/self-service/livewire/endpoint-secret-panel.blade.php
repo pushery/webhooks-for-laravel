@@ -76,7 +76,7 @@
                                 <x-wirekit::text size="sm" intent="muted" class="break-all">{{ $this->endpointUrl }}</x-wirekit::text>
                             @endif
                         </x-wirekit::stack>
-                        <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" intent="neutral" wire:click="hide">{{ __('webhooks::self-service.secret.hide') }}</x-wirekit::button>
+                        <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral" wire:click="hide">{{ __('webhooks::self-service.secret.hide') }}</x-wirekit::button>
                     </div>
 
                     <x-wirekit::text size="sm" intent="muted">
@@ -155,7 +155,7 @@
                     @endif
 
                     <div>
-                        <x-wirekit::button surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" wire:click="rotate">{{ __('webhooks::self-service.secret.rotate') }}</x-wirekit::button>
+                        <x-wirekit::button surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral" wire:click="rotate">{{ __('webhooks::self-service.secret.rotate') }}</x-wirekit::button>
                     </div>
                 </div>
             </x-wirekit::card.body>

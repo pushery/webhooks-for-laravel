@@ -90,6 +90,12 @@ return [
         'event_type' => 'Event-type',
         'event_type_placeholder' => 'Filteren op event-type',
     ],
+    'sort' => [
+        'field' => 'Sorteren op',
+        'direction' => 'Volgorde',
+        'ascending' => 'Oplopend',
+        'descending' => 'Aflopend',
+    ],
 
     // Badge labels for the stored DeliveryStatus values. The key is the persisted
     // value and is never translated; only the label a reader sees is. Lowercase, as

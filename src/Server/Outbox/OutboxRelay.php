@@ -237,7 +237,7 @@ final readonly class OutboxRelay
 
         event(new WebhookAttemptFailed($data, $attempt, $response, $outcome->exception));
 
-        $maximum = $this->maximumAttempts();
+        $maximum = $this->maximumAttempts($data);
 
         if ($maximum !== null && $attempt >= $maximum) {
             $ended = $this->end($entry, $token, OutboxEntryState::GivenUp, $attempt, $response, $outcome->exception);
@@ -359,11 +359,20 @@ final readonly class OutboxRelay
     }
 
     /**
-     * The configured most attempts, or null to keep trying until the receiver takes the entry or
+     * The most attempts an entry gets, or null to keep trying until the receiver takes it or
      * refuses it for good.
+     *
+     * An entry of the Platform layer carries one of its deliveries and gets the tries that
+     * delivery carries, as its queued job would: the endpoint's circuit breaker counts only a
+     * delivery that was given up, so an entry that never ends would keep a dead endpoint switched
+     * on. Every other entry follows `webhooks.server.outbox.max_attempts`.
      */
-    private function maximumAttempts(): ?int
+    private function maximumAttempts(WebhookDeliveryData $data): ?int
     {
+        if (is_string($data->meta['delivery_id'] ?? null)) {
+            return $data->maxTries;
+        }
+
         $maximum = Config::get('webhooks.server.outbox.max_attempts');
 
         if (! is_int($maximum) || $maximum < 1) {

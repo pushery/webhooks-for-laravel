@@ -86,6 +86,21 @@ final class DeliveriesTable extends Component
     }
 
     /**
+     * The two sort fields shown on a narrow screen, where the rows stand as cards and the column
+     * headers that sort them are out of sight, set these two properties directly. The query clamps
+     * both, as it does for every value the browser can write.
+     */
+    public function updatingSortField(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingSortDirection(): void
+    {
+        $this->resetPage();
+    }
+
+    /**
      * Sort by a column, flipping direction when the same column is chosen again.
      */
     public function sortBy(string $field): void

@@ -101,7 +101,7 @@
                             {{ $editingId === null ? __('webhooks::management.form.submit') : __('webhooks::management.form.submit_update') }}
                         </x-wirekit::button>
                         @if ($editingId !== null)
-                            <x-wirekit::button type="button" surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" wire:click="cancel">
+                            <x-wirekit::button type="button" surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral" wire:click="cancel">
                                 {{ __('webhooks::management.actions.cancel') }}
                             </x-wirekit::button>
                         @endif
@@ -156,11 +156,15 @@
         {{-- id + tabindex="-1" so the delete dialog below has somewhere to put the focus back.
              tabindex="-1" is the half that gets left off: without it a target cannot take focus
              programmatically, and focus-return-to then points at an element that refuses it —
-             which behaves exactly like declaring nothing at all. --}}
+             which behaves exactly like declaring nothing at all.
+
+             Below sm each endpoint stands as a card and each value as a line that names its column, as
+             the portal's endpoint list does. --}}
         <x-wirekit::table
             id="wh-subscriptions-table"
             tabindex="-1"
             hoverable
+            stack-below="sm"
             :aria-label="__('webhooks::management.a11y.subscriptions_table')"
             :table-label="__('webhooks::management.a11y.subscriptions_table')"
         >
@@ -172,8 +176,9 @@
                          wrap at all and the header cell grows to the width of the longest URL,
                          pushing the columns right of it out of the table. With `break-all` and no
                          floor the opposite happens -- the column is free to collapse, and a real
-                         URL becomes a dozen short lines. The two go together or neither works. --}}
-                    <x-wirekit::table.th class="min-w-64">{{ __('webhooks::management.table.endpoint') }}</x-wirekit::table.th>
+                         URL becomes a dozen short lines. The two go together or neither works.
+                         From sm up only: below it the cell spans its card. --}}
+                    <x-wirekit::table.th class="sm:min-w-64">{{ __('webhooks::management.table.endpoint') }}</x-wirekit::table.th>
                     <x-wirekit::table.th>{{ __('webhooks::management.table.events') }}</x-wirekit::table.th>
                     <x-wirekit::table.th>{{ __('webhooks::management.table.status') }}</x-wirekit::table.th>
                     {{-- The actions column carries no visible header, but it still needs an
@@ -186,13 +191,16 @@
             <x-wirekit::table.body>
                 @foreach ($subscriptions as $subscription)
                     <x-wirekit::table.row wire:key="sub-{{ $subscription->id }}">
-                        <x-wirekit::table.th headerScope="row" class="min-w-64">
-                            <x-wirekit::stack gap="none">
+                        <x-wirekit::table.th headerScope="row" class="sm:min-w-64">
+                            {{-- Capped from lg up, where the row's actions want their line: a long address
+                                 otherwise claimed its whole length for the column, and the four actions
+                                 beside it broke into two rows. It wraps at the cap as it wraps anywhere. --}}
+                            <x-wirekit::stack gap="none" class="lg:max-w-xs">
                                 <x-wirekit::text weight="medium">{{ $subscription->name ?? '—' }}</x-wirekit::text>
                                 <x-wirekit::text size="sm" intent="muted" class="break-all">{{ $subscription->url }}</x-wirekit::text>
                             </x-wirekit::stack>
                         </x-wirekit::table.th>
-                        <x-wirekit::table.td>{{ implode(', ', $subscription->eventTypeNames()) }}</x-wirekit::table.td>
+                        <x-wirekit::table.td :label="__('webhooks::management.table.events')">{{ implode(', ', $subscription->eventTypeNames()) }}</x-wirekit::table.td>
                         {{-- Switched off outranks every health band: an endpoint nobody is
                              delivering to has no current health, and reporting a stale one as
                              if it were live is the same confusion in the other direction.
@@ -214,8 +222,9 @@
                                 default => ['success', __('webhooks::management.subscription.active')],
                             };
                         @endphp
-                        <x-wirekit::table.td>
-                            <x-wirekit::stack gap="none">
+                        <x-wirekit::table.td :label="__('webhooks::management.table.status')">
+                            {{-- `start`, so the badge keeps the width of its word rather than the column's. --}}
+                            <x-wirekit::stack gap="none" align="start">
                                 <x-wirekit::badge :intent="$healthIntent">
                                     {{ $healthLabel }}
                                 </x-wirekit::badge>
@@ -241,7 +250,7 @@
                                 @if ($canEdit)
                                 <x-wirekit::button
                                     size="sm"
-                                    surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
+                                    surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral"
                                     wire:click="edit({{ $subscription->id }})"
                                     :aria-label="__('webhooks::management.a11y.edit_subscription', ['url' => $subscription->url])"
                                 >
@@ -270,7 +279,7 @@
                                         ? ($rowActionIcons['disable'] ?? null)
                                         : ($rowActionIcons['enable'] ?? null);
                                 @endphp
-                                <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}" wire:click="toggle({{ $subscription->id }})" wire:loading.attr="disabled" wire:target="toggle" :aria-label="__('webhooks::management.a11y.toggle_subscription', ['label' => $toggleLabel, 'url' => $subscription->url])">
+                                <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral" wire:click="toggle({{ $subscription->id }})" wire:loading.attr="disabled" wire:target="toggle" :aria-label="__('webhooks::management.a11y.toggle_subscription', ['label' => $toggleLabel, 'url' => $subscription->url])">
                                     @if ($toggleIcon !== null)
                                         <x-slot:iconLeft><x-wirekit::icon :name="$toggleIcon" size="sm" /></x-slot:iconLeft>
                                     @endif
@@ -288,7 +297,7 @@
                                     <x-slot:trigger>
                                         <x-wirekit::button
                                             size="sm"
-                                            surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
+                                            surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral"
                                             :aria-label="__('webhooks::management.a11y.rotate_subscription', ['label' => __('webhooks::management.subscription.rotate'), 'url' => $subscription->url])"
                                         >
                                             @if (($rowActionIcons['rotate_secret'] ?? null) !== null)
@@ -345,7 +354,7 @@
                                     <x-slot:trigger>
                                         <x-wirekit::button
                                             size="sm"
-                                            surface="{{ config('webhooks.ui.secondary_surface', 'outline') }}"
+                                            surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}"
                                             intent="danger"
                                             :aria-label="__('webhooks::management.a11y.delete_subscription', ['url' => $subscription->url])"
                                         >

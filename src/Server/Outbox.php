@@ -7,6 +7,7 @@ namespace Pushery\Webhooks\Server;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Date;
+use InvalidArgumentException;
 use JsonException;
 use Pushery\Webhooks\Core\Http\ErrorMessageRedactor;
 use Pushery\Webhooks\Enums\OutboxEntryState;
@@ -102,16 +103,69 @@ final readonly class Outbox
     }
 
     /**
-     * Send an entry again from the start: pending, due at once, no attempt counted and no alarm
-     * raised yet. An entry of a stream takes its own place again, so the entries behind it wait for
-     * it as before.
+     * Send an entry again from the start: pending, no attempt counted and no alarm raised yet. An
+     * entry of a stream takes its own place again, so the entries behind it wait for it as before.
+     *
+     * Given a webhook, the entry goes out with that webhook's delivery instead of the one it was
+     * written with: a corrected body under the entry's message id, at the entry's place in its
+     * stream. Give the webhook the entry's id with `useMessageId($entry->message_id)`. A webhook
+     * with another message id, or one whose URL and ordering key belong to another stream, is
+     * refused, because the entry would no longer be the message its receiver and its stream know.
+     *
+     *     $outbox->resend($entry, WebhookSender::to($endpoint->url)
+     *         ->payload($corrected)
+     *         ->useSecret($endpoint->secret)
+     *         ->orderedBy("order:{$order->id}")
+     *         ->useMessageId($entry->message_id));
+     *
+     * The entry is due $after seconds from now, at once by default, and the relay's turn for it
+     * waits as long. A test that switched the fake on records the given delivery and writes
+     * nothing, the way `record()` does.
+     *
+     * @throws OutboxUnavailable when the webhook carries another message id or belongs to another stream
+     * @throws InvalidArgumentException when $after is negative
+     * @throws JsonException
      */
-    public function resend(WebhookOutboxEntry $entry): void
+    public function resend(WebhookOutboxEntry $entry, ?PendingWebhook $webhook = null, int $after = 0): void
     {
+        if ($after < 0) {
+            throw new InvalidArgumentException("An outbox entry is sent again after 0 seconds or more, not after {$after}.");
+        }
+
+        $delivery = [];
+
+        if ($webhook instanceof PendingWebhook) {
+            $data = $webhook->toDeliveryData();
+
+            if ($data->messageId !== $entry->message_id) {
+                throw OutboxUnavailable::resentUnderAnotherMessageId($entry->message_id, $data->messageId);
+            }
+
+            if ($data->stream() !== $entry->stream) {
+                throw OutboxUnavailable::resentIntoAnotherStream($entry->message_id);
+            }
+
+            $fake = WebhookFake::active();
+
+            if ($fake instanceof WebhookFake) {
+                $fake->record(FakedWebhook::sentThroughTheServer($data));
+
+                return;
+            }
+
+            $delivery = [
+                'url' => ErrorMessageRedactor::url($data->url),
+                'event_type' => $data->eventType,
+                'meta' => $data->meta,
+                'delivery' => Crypt::encrypt($data),
+            ];
+        }
+
         $entry->forceFill([
+            ...$delivery,
             'state' => OutboxEntryState::Pending,
             'attempts' => 0,
-            'next_attempt_at' => Date::now(),
+            'next_attempt_at' => Date::now()->addSeconds($after),
             'claimed_by' => null,
             'last_status' => null,
             'last_error' => null,
@@ -119,7 +173,7 @@ final readonly class Outbox
             'ended_at' => null,
         ])->save();
 
-        $this->relay($entry);
+        $this->relay($entry, $after);
     }
 
     /**
@@ -153,8 +207,8 @@ final readonly class Outbox
     {
         $settings = new Settings;
         $job = new RelayOutboxJob($entry->stream, $entry->stream === null ? $entry->message_id : null);
-        $job->onQueue($settings->queue());
-        $job->onConnection($settings->connection());
+        $job->onQueue($settings->outboxQueue());
+        $job->onConnection($settings->outboxConnection());
 
         // A turn before the entry is due would find nothing to send, so it waits as long as the entry does.
         if ($delay > 0) {
