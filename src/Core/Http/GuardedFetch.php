@@ -192,6 +192,8 @@ final readonly class GuardedFetch
         $start = hrtime(true);
 
         try {
+            // The client follows no redirect: transportOptions() sets allow_redirects to false, so a
+            // redirect comes back as the response, and follow() vets and pins each hop it requests.
             $response = Http::withOptions($options)
                 ->withMiddleware(TransportExceptionNormalizer::wrap(...))
                 ->withHeaders($headers)
@@ -275,6 +277,8 @@ final readonly class GuardedFetch
         $start = hrtime(true);
 
         try {
+            // The client follows no redirect: transportOptions() sets allow_redirects to false, and a
+            // redirect comes back to the caller as the head it answered with.
             $psr = Http::withOptions($options)
                 ->withMiddleware(TransportExceptionNormalizer::wrap(...))
                 ->withHeaders($headers)

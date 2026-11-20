@@ -24,16 +24,14 @@ use Pushery\Webhooks\Client\WebhookCallStatus;
  */
 final class RecordCallOutcome
 {
-    public function handle(ProcessWebhookJob $job, Closure $next): mixed
+    public function handle(ProcessWebhookJob $job, Closure $next): void
     {
-        return TenantScopes::run($job->webhookCall, static function () use ($job, $next): mixed {
-            $result = $next($job);
+        TenantScopes::run($job->webhookCall, static function () use ($job, $next): void {
+            $next($job);
 
             if ($job->job?->isReleased() !== true && $job->job?->hasFailed() !== true) {
                 self::record($job->webhookCall, WebhookCallStatus::Processed);
             }
-
-            return $result;
         });
     }
 

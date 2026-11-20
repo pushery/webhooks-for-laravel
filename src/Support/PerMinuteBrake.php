@@ -19,6 +19,9 @@ use Illuminate\Support\Facades\RateLimiter;
  */
 final class PerMinuteBrake
 {
+    /**
+     * @param  mixed  $value  a value from the environment or the config, which a host may have set to any type
+     */
     public static function read(mixed $value, int $default): ?int
     {
         if (is_string($value) && preg_match('/\A\s*-?\d+\s*\z/', $value) === 1) {

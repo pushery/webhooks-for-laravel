@@ -83,8 +83,9 @@ final class PayloadReclaimer
             $orphaned++;
             $bytes += $size ?? $filesystem->size($path);
 
-            if (! $dryRun) {
-                $filesystem->delete($path);
+            // A disk that does not throw answers a refused delete with false, and the object stays: it counts as
+            // deleted only once it is gone.
+            if (! $dryRun && ($filesystem->delete($path) || ! $filesystem->exists($path))) {
                 $deleted++;
             }
         }

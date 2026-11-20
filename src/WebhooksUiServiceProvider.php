@@ -8,6 +8,7 @@ use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 use Pushery\Webhooks\Livewire\DeliveryLog;
 use Pushery\Webhooks\Livewire\SubscriptionManager;
+use Pushery\Webhooks\Support\UiAssets;
 use Pushery\Webhooks\Support\UiVariant;
 
 /**
@@ -59,6 +60,11 @@ final class WebhooksUiServiceProvider extends ServiceProvider
     {
         Livewire::component('webhooks.admin.subscriptions', SubscriptionManager::class);
         Livewire::component('webhooks.admin.deliveries', DeliveryLog::class);
+
+        // The plain endpoint list loads the package's script to keep focus in the list after a
+        // delete, and this provider may be registered without the dashboard and the portal, which
+        // register the same route.
+        UiAssets::registerRoute();
 
         if ($this->app->runningInConsole()) {
             $this->publishes([

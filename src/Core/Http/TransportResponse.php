@@ -13,7 +13,8 @@ namespace Pushery\Webhooks\Core\Http;
 final readonly class TransportResponse
 {
     /**
-     * @param  array<string, list<string>>  $headers
+     * @param  array<array-key, list<string>>  $headers  each header with its values; a name made of digits is an int
+     *                                                   key, the way PHP stores it
      */
     public function __construct(
         public int $status,

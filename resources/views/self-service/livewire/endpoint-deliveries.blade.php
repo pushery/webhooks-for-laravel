@@ -32,7 +32,7 @@
                      those versions out. --}}
                 <x-wirekit::select
                     name="windowDays"
-                    wire:model.live="windowDays"
+                    wire:model.live.number="windowDays"
                     :label="__('webhooks::self-service.deliveries.window_label')"
                 >
                     @foreach ($windowChoices as $choice)
@@ -97,7 +97,7 @@
         @if ($endpoints->isNotEmpty())
             <x-wirekit::select
                 name="endpointId"
-                wire:model.live="endpointId"
+                wire:model.live.number="endpointId"
                 :label="__('webhooks::self-service.deliveries.filter_label')"
             >
                 <option value="">{{ __('webhooks::self-service.deliveries.all_endpoints') }}</option>

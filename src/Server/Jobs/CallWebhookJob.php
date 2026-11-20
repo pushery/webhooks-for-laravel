@@ -16,6 +16,7 @@ use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 use Pushery\Webhooks\Server\Delivery\DeliveryGate;
 use Pushery\Webhooks\Server\Delivery\DeliveryPipeline;
 use Pushery\Webhooks\Server\Delivery\Disposition;
+use Pushery\Webhooks\Server\Delivery\HoldsDeliveries;
 use Pushery\Webhooks\Server\Delivery\RetryAfter;
 use Pushery\Webhooks\Server\Events\WebhookAttemptDeferred;
 use Pushery\Webhooks\Server\Events\WebhookAttemptFailed;
@@ -162,6 +163,17 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
 
         if ($refusal !== null) {
             $this->finalFailure($attempt, null, DeliveryRefused::because($refusal));
+
+            return;
+        }
+
+        // An endpoint whose attempts keep failing can be held for a while. The delivery then waits in the queue, and
+        // neither the attempt it did not make nor the wait is charged to it. On a connection that cannot hold a job
+        // back it goes now, as the wait would be no wait there.
+        $hold = $gate instanceof HoldsDeliveries ? $gate->holdFor($this->data) : null;
+
+        if ($hold !== null && $this->queueCanDelay()) {
+            $this->holdBack($attempt, $hold);
 
             return;
         }
@@ -337,6 +349,25 @@ final class CallWebhookJob implements ShouldQueueAfterCommit
         $delay = min(self::LONGEST_TURN_WAIT, 2 ** min($this->data->streamWaits(), 6));
 
         $job = new self($this->data->waited($delay));
+        $job->onQueue($this->queue);
+        $job->onConnection($this->connection);
+        $job->delay($delay);
+
+        dispatch($job);
+    }
+
+    /**
+     * Come back once the hold on the endpoint ends: a fresh job carrying the requests made so far, this pickup's not
+     * among them, and its time to keep trying moved by the wait, so the hold costs neither. On SQS no longer than its
+     * message timer accepts; the job then comes back sooner and waits again while the hold lasts.
+     */
+    private function holdBack(int $attempt, int $seconds): void
+    {
+        $delay = app(QueueManager::class)->connection($this->connection) instanceof SqsQueue
+            ? min($seconds, self::SQS_MAX_DELAY_SECONDS)
+            : $seconds;
+
+        $job = new self($this->data->heldBack($attempt - 1, $delay));
         $job->onQueue($this->queue);
         $job->onConnection($this->connection);
         $job->delay($delay);

@@ -349,6 +349,18 @@ outbox while `server.outbox.enabled`. An
 application with a database per tenant sets `schedule.enabled` to `false` and runs
 these commands from its own tenant loop.
 
+On a database or a file cache store, schedule the pruning of the package's expired
+cache keys as well. Those stores delete an expired key only when it is read again,
+and the receiver keeps a key for every delivery id and the outbound rate limit one
+for every minute a subscription sends in, which nothing reads again:
+
+```php
+use Illuminate\Support\Facades\Schedule;
+use Pushery\Webhooks\Support\PruneExpiredCacheKeys;
+
+Schedule::call(PruneExpiredCacheKeys::class)->daily();
+```
+
 Seven more are for the application to run when it needs them:
 
 - `webhooks:preflight` checks that the database the persistent layers use is
@@ -390,6 +402,7 @@ needs no inbound receiving, no portal and no dashboard:
 ```
 
 ```php
+use App\Events\InvoicePaid;
 use Pushery\Webhooks\Server\PendingWebhook;
 
 class NotifyInvoicePaid
@@ -475,6 +488,15 @@ this; it passes carrier-grade NAT, site-local IPv6 and `::7f00:1` as public.
   read with no lower bound on `created_at` visits every partition there is. Raise the
   config key if the application needs a longer window, or set it to `0` to remove the
   bound entirely.
+- Do not keep the limiter store on a store that loses keys. The endpoint hold and the
+  outbound rate limit keep their state in the store `cache.limiter` names, or else the
+  default store. A Redis under any `maxmemory-policy` but `noeviction`, Memcached
+  without `-M`, a Redis without `appendonly yes`, and a store a deploy flushes with
+  `cache:clear` or `optimize:clear` all lose it: a hold then ends early, and a minute
+  can carry twice `max_per_minute`. Name a store of its own, a Redis connection and
+  database no other store uses with `noeviction` and `appendonly yes`, or a database
+  store with a table of its own. A full Redis under `noeviction` refuses writes
+  instead of dropping keys.
 - Do not publish the AsyncAPI document by calling `Artisan::call('webhooks:asyncapi')`
   from a route. The package registers its commands only in the console, so that route
   passes every test and fails in production. Return `Webhooks::asyncApi()` from the

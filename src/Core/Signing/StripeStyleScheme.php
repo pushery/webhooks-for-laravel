@@ -104,7 +104,7 @@ readonly class StripeStyleScheme implements AcceptsSignatureHeaders, SignatureSc
             // without '=' an empty value.
             [$key, $value] = array_pad(explode('=', trim($part), 2), 2, '');
 
-            if ($key === 't' && preg_match('/^\d+$/', $value) === 1) {
+            if ($key === 't' && preg_match('/^\d+$/D', $value) === 1) {
                 $timestamp = (int) $value;
             }
 

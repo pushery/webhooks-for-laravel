@@ -41,6 +41,8 @@ trait AuthorizesDashboardReads
      * The same gate before every render, because boot() does not run on the request that follows
      * a lazy placeholder (see above). Variadic because Livewire hands trait hooks their context as
      * named arguments, and this check needs none of it.
+     *
+     * @param  mixed  ...$context  the arguments Livewire passes to a rendering hook, none of which this reads
      */
     public function renderingAuthorizesDashboardReads(mixed ...$context): void
     {

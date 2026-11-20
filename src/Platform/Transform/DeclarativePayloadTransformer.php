@@ -44,6 +44,7 @@ final class DeclarativePayloadTransformer implements PayloadTransformer
      * Keep only the allow-listed fields, preserving their original order.
      *
      * @param  array<array-key, mixed>  $payload
+     * @param  mixed  $include  the rule as the endpoint's transform stores it, which a tenant may have written as any JSON value
      * @return array<array-key, mixed>
      */
     private function applyInclude(array $payload, mixed $include): array
@@ -65,6 +66,7 @@ final class DeclarativePayloadTransformer implements PayloadTransformer
      * Drop every deny-listed field.
      *
      * @param  array<array-key, mixed>  $payload
+     * @param  mixed  $exclude  the rule as the endpoint's transform stores it, which a tenant may have written as any JSON value
      * @return array<array-key, mixed>
      */
     private function applyExclude(array $payload, mixed $exclude): array
@@ -107,6 +109,7 @@ final class DeclarativePayloadTransformer implements PayloadTransformer
      * refuses `a` in turn.
      *
      * @param  array<array-key, mixed>  $payload
+     * @param  mixed  $map  the rule as the endpoint's transform stores it, which a tenant may have written as any JSON value
      * @return array<array-key, mixed>
      */
     private function applyRename(array $payload, mixed $map): array
@@ -178,6 +181,7 @@ final class DeclarativePayloadTransformer implements PayloadTransformer
      * Nest the whole result under a single key.
      *
      * @param  array<array-key, mixed>  $payload
+     * @param  mixed  $key  the rule as the endpoint's transform stores it, which a tenant may have written as any JSON value
      * @return array<array-key, mixed>
      */
     private function applyRewrap(array $payload, mixed $key): array

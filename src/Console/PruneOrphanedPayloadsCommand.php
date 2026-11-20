@@ -94,6 +94,13 @@ final class PruneOrphanedPayloadsCommand extends Command
             ? sprintf('Dry run: %d orphaned object(s) holding %s would be deleted.', $totalOrphaned, $size)
             : sprintf('Reclaimed %d orphaned object(s), freeing %s.', $totalDeleted, $size));
 
+        // An orphan the disk refused stays, and a scheduler hears of it only through the exit code.
+        if (! $dryRun && $totalDeleted < $totalOrphaned) {
+            $this->error(sprintf('%d orphaned object(s) stayed: the disk refused to delete them.', $totalOrphaned - $totalDeleted));
+
+            return self::FAILURE;
+        }
+
         return self::SUCCESS;
     }
 

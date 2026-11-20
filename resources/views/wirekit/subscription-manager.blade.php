@@ -145,12 +145,13 @@
              the empty state rather than a bare header row over nothing. --}}
         {{-- Level 2, not WireKit's default 3: this screen brings no heading of its own, so the title
              is the first heading under the host page's, and an h3 there skipped a level. --}}
+        {{-- The form above is there only for an operator who may register an endpoint. --}}
         <x-wirekit::empty-state
             icon="globe"
             variant="outline"
             :level="2"
             :title="__('webhooks::management.empty.no_subscriptions.title')"
-            :description="__('webhooks::management.empty.no_subscriptions.description')"
+            :description="$canCreate ? __('webhooks::management.empty.no_subscriptions.description') : __('webhooks::management.empty.no_subscriptions.description_read_only')"
         />
     @else
         {{-- id + tabindex="-1" so the delete dialog below has somewhere to put the focus back.

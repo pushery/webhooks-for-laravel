@@ -200,6 +200,11 @@ return [
         'connect_timeout' => EnvLimit::ceiling(env('WEBHOOKS_SERVER_CONNECT_TIMEOUT'), 3),
         'timeout' => EnvLimit::ceiling(env('WEBHOOKS_SERVER_TIMEOUT'), 5),
         'tries' => EnvLimit::ceiling(env('WEBHOOKS_SERVER_TRIES'), 3),
+        // A time to keep trying instead of a number of tries, in seconds: every delivery, the
+        // platform's fan-out included, retries on the backoff below until the time is up, with
+        // the backoff's cap as the longest pause. Unset, 'tries' decides, as it always has. A
+        // single call sets its own with PendingWebhook::retryForSeconds().
+        'retry_for_seconds' => EnvLimit::optionalCeiling(env('WEBHOOKS_SERVER_RETRY_FOR_SECONDS'), null),
 
         // The retry schedule. 'base' and 'cap' bound the jittered exponential delay. A retry
         // is a released job, which even SQS holds back for up to 12 hours, so the cap is the
@@ -390,6 +395,21 @@ return [
         'circuit_breaker' => [
             'enabled' => true,
             'threshold' => 10,
+
+            // A hold on an endpoint whose ATTEMPTS keep failing, beside the threshold above,
+            // which counts exhausted deliveries and switches the endpoint off. Off while
+            // 'attempts' is null. Once on, 'attempts' failed attempts within 'window' seconds
+            // hold the endpoint for 'seconds': its deliveries wait in the queue without an
+            // attempt, charged to neither their tries nor their time to keep trying, and the
+            // workers they would have bound serve every other endpoint. Once the hold has run
+            // out one delivery goes as the probe: if it gets through the hold is lifted, if it
+            // fails the endpoint is held again. The counts live in the cache store Laravel's
+            // rate limiter uses, so every worker reads the same hold.
+            'hold' => [
+                'attempts' => EnvLimit::optionalCeiling(env('WEBHOOKS_PLATFORM_HOLD_ATTEMPTS'), null),
+                'window' => EnvLimit::ceiling(env('WEBHOOKS_PLATFORM_HOLD_WINDOW'), 60),
+                'seconds' => EnvLimit::ceiling(env('WEBHOOKS_PLATFORM_HOLD_SECONDS'), 60),
+            ],
         ],
 
         // Prefix wildcards in a subscription's event types. Off by default (exact matching).
@@ -710,7 +730,9 @@ return [
         // Keep true. A middleware is prepended to the global stack so the exact received
         // bytes of a request to a receiving route are captured before any other middleware can
         // parse or re-encode the body; signature verification then runs over those bytes. A
-        // request to any other address is left unread. Set to false only if you supply your own
+        // request to any other address is left unread. The capture tells a receiving route by
+        // the request's method and path and never reads its host, which a middleware of yours
+        // may make trusted only later in the stack. Set to false only if you supply your own
         // raw-body capture — with it off the receiver verifies over the request content read at
         // processing time, which can be a re-serialized body and then silently fails to verify
         // on some producers.

@@ -381,8 +381,8 @@ final class ImportCallsCommand extends Command
     {
         if (! array_key_exists($source, $this->sourceConfigs)) {
             $declared = array_any(
-                Config::array('webhooks.client.configs', []),
-                static fn (mixed $entry): bool => is_array($entry) && ($entry['name'] ?? null) === $source,
+                array_filter(Config::array('webhooks.client.configs', []), is_array(...)),
+                static fn (array $entry): bool => ($entry['name'] ?? null) === $source,
             );
 
             $this->sourceConfigs[$source] = $declared ? WebhookConfig::forName($source) : null;
@@ -396,6 +396,8 @@ final class ImportCallsCommand extends Command
      * with an offset keeps it; one without is read in the zone it was written in, which is
      * app.timezone for a table Eloquent's timestamps() wrote, or whatever --from-timezone names. A
      * missing one falls back to now().
+     *
+     * @param  mixed  $value  the timestamp column of the legacy row, which a driver hands over as a string, a number or a date object
      */
     private function timestamp(mixed $value, Dialect $dialect, string $zone): string
     {

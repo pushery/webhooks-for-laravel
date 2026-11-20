@@ -14,6 +14,7 @@ use Pushery\Webhooks\Events\WebhookDeliverySucceeded;
 use Pushery\Webhooks\Events\WebhookEndpointAutoDisabled;
 use Pushery\Webhooks\Models\WebhookDelivery;
 use Pushery\Webhooks\Models\WebhookSubscription;
+use Pushery\Webhooks\Platform\Delivery\EndpointHold;
 use Pushery\Webhooks\Search\SearchIndexer;
 use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 use Pushery\Webhooks\Server\Events\WebhookAttemptFailed;
@@ -39,6 +40,7 @@ final readonly class WebhookServerEventSubscriber
 
     public function __construct(
         private Settings $config,
+        private EndpointHold $hold,
     ) {}
 
     public function subscribe(Dispatcher $events): void
@@ -50,6 +52,9 @@ final readonly class WebhookServerEventSubscriber
 
     public function onSucceeded(WebhookAttemptSucceeded $event): void
     {
+        // Before the row is looked up: the hold is the endpoint's, whatever became of this delivery's row.
+        $this->hold->succeeded($event->data);
+
         $delivery = $this->resolveDelivery($event->data);
 
         if (! $delivery instanceof WebhookDelivery || $this->isTerminal($delivery)) {
@@ -83,6 +88,8 @@ final readonly class WebhookServerEventSubscriber
 
     public function onFailed(WebhookAttemptFailed $event): void
     {
+        $this->hold->failed($event->data);
+
         $delivery = $this->resolveDelivery($event->data);
 
         // A failed attempt that will be retried. Leave terminal rows untouched so a

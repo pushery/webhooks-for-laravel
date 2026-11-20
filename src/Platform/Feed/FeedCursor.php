@@ -24,8 +24,11 @@ use Pushery\Webhooks\Support\WebhookConnection;
  */
 final readonly class FeedCursor
 {
-    /** A timestamp as an engine returns one: date, time, optional fraction, optional offset. */
-    private const string STORED_TIME = '/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}(:?\d{2})?)?$/';
+    /**
+     * A timestamp as an engine returns one: date, time, optional fraction, optional offset, and
+     * nothing after it. `\z`, not `$`, which also matches before a final line feed.
+     */
+    private const string STORED_TIME = '/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}(:?\d{2})?)?\z/';
 
     private function __construct(
         public string $createdAt,

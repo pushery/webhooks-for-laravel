@@ -19,6 +19,9 @@ namespace Pushery\Webhooks\Support;
  */
 final class EnvLimit
 {
+    /**
+     * @param  mixed  $value  a value from the environment or the config, which a host may have set to any type
+     */
     public static function ceiling(mixed $value, int $default, int $floor = 1, bool $zeroSwitchesOff = false): int
     {
         $number = self::wholeNumber($value);
@@ -32,6 +35,8 @@ final class EnvLimit
 
     /**
      * The same reading for a limit that ships without a value, where null means no limit.
+     *
+     * @param  mixed  $value  a value from the environment or the config, which a host may have set to any type
      */
     public static function optionalCeiling(mixed $value, ?int $default, int $floor = 1): ?int
     {
@@ -40,6 +45,9 @@ final class EnvLimit
         return $number !== null && $number >= $floor ? $number : $default;
     }
 
+    /**
+     * @param  mixed  $value  a value from the environment or the config, which a host may have set to any type
+     */
     private static function wholeNumber(mixed $value): ?int
     {
         if (is_int($value)) {

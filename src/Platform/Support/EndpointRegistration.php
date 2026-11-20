@@ -101,7 +101,9 @@ final class EndpointRegistration
      * @template TValue
      *
      * @param  Closure(): TValue  $register
-     * @return TValue
+     * @return mixed what `$register` returns, whatever its type
+     *
+     * @phpstan-return TValue
      *
      * @throws LockTimeoutException when a concurrent registration held the lock too long
      */

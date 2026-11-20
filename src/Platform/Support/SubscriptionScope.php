@@ -112,6 +112,8 @@ final class SubscriptionScope
 
     /**
      * Normalize whatever a resolver yields into a tenant identity (or null).
+     *
+     * @param  mixed  $resolved  what the host's resolver answered, which may be any value
      */
     private static function normalize(mixed $resolved): ?TenantIdentity
     {

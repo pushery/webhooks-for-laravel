@@ -78,6 +78,8 @@ final readonly class SignsRequests
     /**
      * Whether Guzzle would follow a redirect under this `allow_redirects` setting: `true`, or an array whose `max` is
      * above zero. An array without `max` takes Guzzle's default of five.
+     *
+     * @param  mixed  $setting  the `allow_redirects` option as the request's options carry it: false, true or an array
      */
     private function followsRedirects(mixed $setting): bool
     {

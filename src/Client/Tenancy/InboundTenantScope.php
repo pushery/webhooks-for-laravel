@@ -38,7 +38,9 @@ interface InboundTenantScope
      * @template TResult
      *
      * @param  Closure(): TResult  $work
-     * @return TResult
+     * @return mixed what `$work` returns, whatever its type
+     *
+     * @phpstan-return TResult
      */
     public function run(string $tenant, Closure $work): mixed;
 

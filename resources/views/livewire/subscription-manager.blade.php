@@ -14,8 +14,20 @@
     // The attribute `ui.sensitive_attribute` names, on the one-time secret only, so a screenshot
     // redactor blanks the value and leaves the heading and the controls around it readable.
     $sensitive = \Pushery\Webhooks\Support\SensitiveAttribute::bag();
+
+    // The script that keeps focus in the list after a delete comes through the route the console's
+    // provider registers. A host that mounts the component without that provider has no such route,
+    // and the list then renders without the script rather than pointing at one that is not there.
+    $removalFocus = \Illuminate\Support\Facades\Route::has(\Pushery\Webhooks\Support\UiAssets::ROUTE);
 @endphp
 <div class="wh-subscriptions space-y-8">
+    {{-- A file from the application's own origin, so a strict policy runs it without a nonce. --}}
+    @if ($removalFocus)
+        @assets
+            <script src="{{ \Pushery\Webhooks\Support\UiAssets::url() }}" defer></script>
+        @endassets
+    @endif
+
     {{-- The form is the create action until a row is opened, and the edit action after. --}}
     @if ($editingId !== null ? $canEdit : $canCreate)
     {{-- One form for both jobs. The component decides which it is from whether an endpoint
@@ -132,10 +144,13 @@
     @if ($subscriptions->isEmpty())
         {{-- The zero-row case is the first thing every new install sees, so this stub ships the
              empty state rather than a header row over nothing. --}}
-        <p class="wh-empty py-8 text-center text-sm">
-            <span class="block font-medium">{{ __('webhooks::management.empty.no_subscriptions.title') }}</span>
-            {{ __('webhooks::management.empty.no_subscriptions.description') }}
-        </p>
+        {{-- Level 2, as the WireKit view titles it: this screen brings no heading of its own, so the
+             title is the first heading under the host page's. --}}
+        <div class="wh-empty py-8 text-center text-sm">
+            <h2 class="m-0 text-sm font-medium">{{ __('webhooks::management.empty.no_subscriptions.title') }}</h2>
+            {{-- The form above is there only for an operator who may register an endpoint. --}}
+            <p>{{ $canCreate ? __('webhooks::management.empty.no_subscriptions.description') : __('webhooks::management.empty.no_subscriptions.description_read_only') }}</p>
+        </div>
     @else
     {{-- A scroll container of its own, so the overbreadth stops here instead of reaching the
          document. Without it the whole page grows a horizontal scrollbar on a narrow viewport
@@ -151,14 +166,19 @@
          `relative` makes the region the containing block of the `sr-only` column header. An
          overflow container clips an absolutely positioned element only when it is that
          element's containing block, so without it the header stays where its column lands and
-         widens the document whenever the table is wider than the screen. --}}
+         widens the document whenever the table is wider than the screen.
+
+         The region also takes focus when a delete removes the row whose button held it, the
+         place the WireKit rendering's dialog returns focus to. Without it focus falls to the
+         document body, and a keyboard or screen-reader reader starts again at the top of the
+         page. --}}
     {{-- Below sm each row stands as a card: the header row moves out of sight, every value is a line
          that starts with the name of its column, drawn from the cell's data-label and silent to a
          screen reader, which hears the column header as in the table, and the actions stand as the
          card's last row. The roles are written out because some browsers stop exposing a table
          whose cells are laid out as cards. --}}
     @php($stackedCell = "px-3 py-2 max-sm:grid max-sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] max-sm:gap-x-3 max-sm:px-3 max-sm:py-1 max-sm:before:content-[attr(data-label)_/_''] max-sm:before:font-medium max-sm:before:text-gray-500")
-    <div class="relative w-full min-w-0 overflow-x-auto" tabindex="0" role="region" aria-label="{{ __('webhooks::management.a11y.subscriptions_table') }}">
+    <div class="relative w-full min-w-0 overflow-x-auto" tabindex="0" role="region" aria-label="{{ __('webhooks::management.a11y.subscriptions_table') }}" @if ($removalFocus) x-data="webhooksRemovalFocus" @endif>
     <table id="wh-plain-subscriptions-table" role="table" class="w-full text-left text-sm max-sm:block" aria-label="{{ __('webhooks::management.a11y.subscriptions_table') }}">
         <thead role="rowgroup" class="max-sm:sr-only">
             <tr role="row">

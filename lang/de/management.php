@@ -102,6 +102,7 @@ return [
         'no_subscriptions' => [
             'title' => 'Noch keine Endpunkte',
             'description' => 'Registriere oben deinen ersten Endpunkt, um Webhooks zuzustellen.',
+            'description_read_only' => 'Endpunkte erscheinen hier, sobald jemand, der Webhooks verwalten darf, einen registriert.',
         ],
         'no_deliveries' => [
             'title' => 'Keine Zustellungen gefunden',

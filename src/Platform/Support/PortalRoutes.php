@@ -42,6 +42,8 @@ final class PortalRoutes
      *
      * Null rather than an empty string: a view has to be able to tell "no link" from "a link
      * to nowhere", and an empty href is a link to the current page.
+     *
+     * @param  mixed  ...$parameters  the parameters of the route, as `route()` takes them
      */
     public static function url(string $name, mixed ...$parameters): ?string
     {

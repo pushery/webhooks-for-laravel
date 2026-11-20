@@ -8,8 +8,6 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
  * Captures the exact request bytes before anything downstream can parse, mutate or
@@ -18,13 +16,14 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  * interoperability bug. Registered early (prepended to the global stack) when
  * webhooks.client.raw_body_capture is on.
  *
- * Only a request addressed to one of the package's receiving routes is captured. The
- * middleware runs before the router has matched anything, so it asks the host's route
- * collection for the route the request reaches, the same match the router makes next,
- * and captures only when that route is a receiving route. With cached routes that match
- * runs on the compiled matcher, so no other route is built for it. A request to any other
- * address keeps its body unread here, and `RawBody::of()` reads the request's own content
- * for it, as it does with the capture switched off.
+ * Only a request addressed to one of the package's receiving routes is captured, told by its
+ * method and its path. Not by its host: the middleware runs before every middleware of the
+ * host, and a host that sets its trusted hosts for each request in one of them has not set
+ * them yet, so the host read here would be checked against the list of the request before.
+ * A receiving route bound to a domain is captured on any host as a result, which costs
+ * nothing, as the capture takes and refuses nothing. A request to any other address keeps
+ * its body unread here, and `RawBody::of()` reads the request's own content for it, as it
+ * does with the capture switched off.
  *
  * @internal
  */
@@ -46,16 +45,11 @@ final readonly class CaptureRawBody
         return $next($request);
     }
 
-    /** Whether the route the request reaches, by its method, host and path, is a receiving route. */
+    /** Whether the request addresses a receiving route, by its method and its path, the way the router's own validators read the two. */
     private function addressesAReceivingRoute(Request $request): bool
     {
-        try {
-            $route = $this->router->getRoutes()->match($request);
-        } catch (MethodNotAllowedHttpException|NotFoundHttpException) {
-            // No route takes the request, and the router answers it with 405 or 404.
-            return false;
-        }
+        $path = rawurldecode(rtrim($request->getPathInfo(), '/') ?: '/');
 
-        return ReceivingRoutes::isReceiving($route);
+        return array_any(ReceivingRoutes::addresses($this->router), fn (array $address): bool => in_array($request->getMethod(), $address['methods'], true) && preg_match($address['path'], $path) === 1);
     }
 }

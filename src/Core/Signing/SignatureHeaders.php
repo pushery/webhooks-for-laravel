@@ -27,7 +27,9 @@ final readonly class SignatureHeaders
         $lookup = [];
 
         foreach ($headers as $name => $value) {
-            $lookup[strtolower($name)] = $value;
+            // A name made of digits arrives as an int key, the way PHP stores it, so it is cast before
+            // it is lowered.
+            $lookup[strtolower((string) $name)] = $value;
         }
 
         $this->headers = $headers;
