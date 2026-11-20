@@ -70,13 +70,23 @@ final class TransportExceptionNormalizer
             /**
              * @param  array<array-key, mixed>  $options
              */
-            // A rejection reason need not be a Throwable — guzzle only ever rejects with
-            // one, but the promise contract allows anything, and `throw` needs one. Letting
-            // a non-throwable fall through would raise a TypeError whose message says
-            // nothing about the delivery that failed.
-            static fn (RequestInterface $request, array $options): PromiseInterface => $handler($request, $options)->otherwise(static fn (mixed $reason): never => throw $reason instanceof Throwable
-                ? self::normalize($reason)
-                : new RuntimeException('The webhook transport was rejected with a non-throwable reason.'));
+            static fn (RequestInterface $request, array $options): PromiseInterface => $handler($request, $options)->otherwise(self::rethrow(...));
+    }
+
+    /**
+     * Throws the reason a transfer was rejected with, normalized.
+     *
+     * A rejection reason need not be a Throwable: guzzle only ever rejects with one, but the
+     * promise contract allows anything, and `throw` needs one. Letting a non-throwable fall
+     * through would raise a TypeError whose message says nothing about the delivery that failed.
+     *
+     * @param  mixed  $reason  the reason the promise was rejected with, which its contract lets be any value
+     */
+    private static function rethrow(mixed $reason): never
+    {
+        throw $reason instanceof Throwable
+            ? self::normalize($reason)
+            : new RuntimeException('The webhook transport was rejected with a non-throwable reason.');
     }
 
     public static function normalize(Throwable $exception): Throwable

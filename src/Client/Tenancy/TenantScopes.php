@@ -23,7 +23,9 @@ final class TenantScopes
      * @template TResult
      *
      * @param  Closure(): TResult  $work
-     * @return TResult
+     * @return mixed what `$work` returns, whatever its type
+     *
+     * @phpstan-return TResult
      */
     public static function run(WebhookCall $call, Closure $work): mixed
     {
@@ -37,7 +39,9 @@ final class TenantScopes
      * @template TResult
      *
      * @param  Closure(): TResult  $work
-     * @return TResult
+     * @return mixed what `$work` returns, whatever its type
+     *
+     * @phpstan-return TResult
      */
     public static function runFor(string $source, ?string $tenant, Closure $work): mixed
     {

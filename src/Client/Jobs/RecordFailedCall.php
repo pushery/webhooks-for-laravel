@@ -48,6 +48,10 @@ final readonly class RecordFailedCall
         }
     }
 
+    /**
+     * @param  mixed  $stored  the command of the failed job's payload, as the queue stored it: an encrypted or a serialized string, or whatever a broken payload holds
+     * @return mixed the job the command restores, which the caller checks, or null
+     */
     private function restore(mixed $stored): mixed
     {
         if (! is_string($stored)) {

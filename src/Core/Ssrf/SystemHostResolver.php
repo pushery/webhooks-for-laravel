@@ -35,7 +35,7 @@ final class SystemHostResolver implements HostResolver
      */
     public function __construct(?callable $aaaaLookup = null)
     {
-        $this->aaaaLookup = $aaaaLookup ?? static fn (string $host): mixed => @dns_get_record($host, DNS_AAAA);
+        $this->aaaaLookup = $aaaaLookup ?? static fn (string $host): array|false => @dns_get_record($host, DNS_AAAA);
     }
 
     /**
@@ -65,6 +65,7 @@ final class SystemHostResolver implements HostResolver
      * Pure and static so both directions are directly testable — the live lookup beside it
      * cannot be.
      *
+     * @param  mixed  $answer  what `dns_get_record()` or an injected lookup answered: a list of records, false, or anything else a lookup returns
      * @return list<array<array-key, mixed>>
      */
     public static function normalizeRecords(mixed $answer): array

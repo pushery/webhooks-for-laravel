@@ -108,6 +108,9 @@ final class PayloadVisibility
      * Null is kept as null rather than labeled: a null carries no value to leak, and collapsing
      * it into a marker would hide the one distinction an operator most often needs, "the field
      * was there but empty" versus "the field was never sent".
+     *
+     * @param  mixed  $payload  a decoded payload, which may be any JSON value
+     * @return mixed the payload with every sensitive field masked, in the shape it came in
      */
     public static function redact(mixed $payload): mixed
     {

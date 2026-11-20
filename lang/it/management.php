@@ -102,6 +102,7 @@ return [
         'no_subscriptions' => [
             'title' => 'Ancora nessun endpoint',
             'description' => 'Registra qui sopra il tuo primo endpoint per iniziare a inviare webhook.',
+            'description_read_only' => 'Gli endpoint compaiono qui quando qualcuno autorizzato a gestire i webhook ne registra uno.',
         ],
         'no_deliveries' => [
             'title' => 'Nessuna consegna trovata',

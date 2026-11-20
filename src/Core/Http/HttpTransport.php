@@ -36,6 +36,8 @@ final class HttpTransport
     {
         $start = hrtime(true);
 
+        // The client follows no redirect: optionsFor() sets allow_redirects to false, so a 307 or a
+        // 308 never carries the signed body to a host the pin did not check.
         $response = Http::withOptions($this->optionsFor($endpoint, $options))
             // Normalized here, before Laravel marshals, because afterwards the information is
             // destroyed: Response::toException() builds a fresh exception with no `previous`, so

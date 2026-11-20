@@ -13,6 +13,7 @@ use Pushery\Webhooks\Search\SearchIndexer;
 use Pushery\Webhooks\Support\TableLookup;
 use Pushery\Webhooks\Support\Timestamp;
 use Pushery\Webhooks\Support\WebhookConnection;
+use RuntimeException;
 
 /**
  * Deletes every stored copy of the events a caller names: their rows in the delivery log, the
@@ -70,9 +71,22 @@ final class EventEraser
 
         $orphans = array_values(array_filter($objects, fn (array $object): bool => ! $this->stillReferenced(...$object)));
 
+        // A disk that does not throw answers a refused delete with false, Laravel's own disks among them, and the
+        // payload would stay while the erasure counts it as gone. Every object is tried, and the ones that stayed are
+        // named: their rows are gone, so webhooks:prune-orphaned-payloads finds them as orphans once the disk lets it.
         $deleteObjects = static function () use ($orphans): void {
+            $kept = [];
+
             foreach ($orphans as [$disk, $path]) {
-                Storage::disk($disk)->delete($path);
+                $filesystem = Storage::disk($disk);
+
+                if (! $filesystem->delete($path) && $filesystem->exists($path)) {
+                    $kept[] = $disk.':'.$path;
+                }
+            }
+
+            if ($kept !== []) {
+                throw new RuntimeException('The payload of an erased event could not be deleted: '.implode(', ', $kept).'.');
             }
         };
 

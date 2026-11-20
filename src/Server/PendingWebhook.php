@@ -124,7 +124,7 @@ final class PendingWebhook
 
     /**
      * A call seeded with the engine's configured defaults — the signing dialect, the
-     * HTTP verb, the timeouts, the try count, TLS verification, canonicalization, the
+     * HTTP verb, the timeouts, the try count or the time to keep trying, TLS verification, canonicalization, the
      * Retry-After policy, the retry schedule, the egress proxy, and the queue and
      * connection its job is pushed onto. Config is the
      * default for every delivery; the builder below overrides it per call. Seeding
@@ -141,6 +141,7 @@ final class PendingWebhook
         $call->connectTimeout = $config->connectTimeout();
         $call->timeout = $config->timeout();
         $call->tries = $config->tries();
+        $call->retryForSeconds = $config->retryForSeconds();
         $call->verifySsl = $config->verifySsl();
         $call->canonicalize = $config->canonicalizeJson();
         $call->respectRetryAfter = $config->respectRetryAfter();
@@ -353,7 +354,7 @@ final class PendingWebhook
 
     public function maximumTries(int $tries): self
     {
-        return tap(clone $this, fn (self $call): mixed => $call->tries = max(1, $tries));
+        return tap(clone $this, fn (self $call): int => $call->tries = max(1, $tries));
     }
 
     /**

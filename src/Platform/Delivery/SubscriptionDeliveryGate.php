@@ -9,6 +9,7 @@ use Pushery\Webhooks\Models\WebhookDelivery;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 use Pushery\Webhooks\Server\Delivery\DeliveryGate;
+use Pushery\Webhooks\Server\Delivery\HoldsDeliveries;
 
 /**
  * Re-reads the endpoint a queued delivery was addressed to, immediately before it is
@@ -29,10 +30,18 @@ use Pushery\Webhooks\Server\Delivery\DeliveryGate;
  * Deliveries the Platform layer did not create (a consumer driving the engine
  * directly) carry no subscription id and are never refused.
  *
+ * It also holds the deliveries of an endpoint whose attempts keep failing, for as long as
+ * {@see EndpointHold} says, without refusing them.
+ *
  * @internal
  */
-final class SubscriptionDeliveryGate implements DeliveryGate
+final class SubscriptionDeliveryGate implements DeliveryGate, HoldsDeliveries
 {
+    public function holdFor(WebhookDeliveryData $data): ?int
+    {
+        return app(EndpointHold::class)->waitFor($data);
+    }
+
     public function refusalFor(WebhookDeliveryData $data): ?string
     {
         $subscriptionId = $data->meta['subscription_id'] ?? null;

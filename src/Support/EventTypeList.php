@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pushery\Webhooks\Support;
 
 use Closure;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Pushery\Webhooks\Database\Dialect\Dialect;
 use Pushery\Webhooks\Models\WebhookSubscription;
 
@@ -66,6 +67,7 @@ final class EventTypeList
      * row a host wrote outside the forms, and a type error on either would take down the whole
      * list of endpoints, not only the row.
      *
+     * @param  mixed  $stored  the stored list as the model hands it: a JSON string, an array or null
      * @return list<string>
      */
     public static function fromStorage(mixed $stored): array
@@ -131,17 +133,24 @@ final class EventTypeList
 
     /**
      * The rule both forms put on `eventTypes`: on MySQL, the list takes at most `$maxBytes`.
-     *
-     * @return Closure(string, mixed, Closure): void
      */
-    public static function fitsTheMySqlIndex(int $maxBytes, string $message): Closure
+    public static function fitsTheMySqlIndex(int $maxBytes, string $message): ValidationRule
     {
-        return static function (string $attribute, mixed $value, Closure $fail) use ($maxBytes, $message): void {
-            if (is_array($value)
-                && WebhookConnection::dialect() === Dialect::MySql
-                && self::totalBytes($value) > $maxBytes
-            ) {
-                $fail($message);
+        return new readonly class($maxBytes, $message) implements ValidationRule
+        {
+            public function __construct(private int $maxBytes, private string $message) {}
+
+            /**
+             * @param  mixed  $value  the submitted list, as the request carries it, which may be any value a client sends
+             */
+            public function validate(string $attribute, mixed $value, Closure $fail): void
+            {
+                if (is_array($value)
+                    && WebhookConnection::dialect() === Dialect::MySql
+                    && EventTypeList::totalBytes($value) > $this->maxBytes
+                ) {
+                    $fail($this->message);
+                }
             }
         };
     }

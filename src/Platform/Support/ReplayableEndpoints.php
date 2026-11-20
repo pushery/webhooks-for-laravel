@@ -100,6 +100,7 @@ final class ReplayableEndpoints
      * wrong in the direction that grants: dropping unreadable entries would silently narrow, and
      * casting them would silently widen onto whatever id the cast produced.
      *
+     * @param  mixed  $resolved  what the host's resolver answered, which may be any value
      * @return list<int>
      */
     private static function normalize(mixed $resolved): array

@@ -62,7 +62,7 @@ final class ShippedIcons
         }
 
         // A null entry is a host dropping that icon on purpose, so it is not something to draw.
-        $rowActions = array_filter($configured, static fn (mixed $alias): bool => is_string($alias) && $alias !== '');
+        $rowActions = array_filter(array_filter($configured, is_string(...)), static fn (string $alias): bool => $alias !== '');
 
         return array_values(array_unique([...self::LITERAL_ALIASES, ...$rowActions]));
     }

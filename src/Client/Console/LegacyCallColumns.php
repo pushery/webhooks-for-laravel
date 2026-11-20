@@ -35,6 +35,8 @@ final readonly class LegacyCallColumns
 
     /**
      * One column off one source row, or null when the row does not carry it.
+     *
+     * @return mixed the value of the column as the driver returned it, of whatever type the legacy table holds
      */
     public function of(stdClass $row, string $column): mixed
     {

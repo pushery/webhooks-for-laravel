@@ -104,12 +104,7 @@ final class EgressIpsCommand extends Command
      */
     private function publishedIps(): array
     {
-        $configured = Config::array('webhooks.core.egress.published_ips', []);
-
-        $ips = array_map(
-            static fn (mixed $ip): string => is_string($ip) ? $ip : '',
-            $configured,
-        );
+        $ips = array_filter(Config::array('webhooks.core.egress.published_ips', []), is_string(...));
 
         // Re-indexed once, at the end: a hand-keyed or gap-keyed config must still print
         // as a JSON array, not as an object a firewall cannot read.

@@ -83,8 +83,10 @@ final readonly class Ed25519Scheme implements SignatureScheme
         $timestamp = $headers->get($this->timestampHeader);
         $signatureHeader = $headers->get($this->signatureHeader);
 
+        // `\z`, not `$`, which also matches before a final line feed: the header is signed as it
+        // arrives, so its shape is held to digits and nothing after them.
         if ($id === null || $id === '' || $timestamp === null || $signatureHeader === null
-            || preg_match('/^\d+$/', $timestamp) !== 1) {
+            || preg_match('/^\d+\z/', $timestamp) !== 1) {
             return VerificationResult::malformed();
         }
 

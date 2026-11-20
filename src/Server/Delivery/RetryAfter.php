@@ -34,7 +34,7 @@ final class RetryAfter
         }
 
         foreach ($response->headers as $name => $values) {
-            if (strtolower($name) === 'retry-after') {
+            if (strtolower((string) $name) === 'retry-after') {
                 return self::parse($values[0] ?? null);
             }
         }
@@ -60,7 +60,7 @@ final class RetryAfter
             return null;
         }
 
-        if (preg_match('/^\d+$/', $value) === 1) {
+        if (preg_match('/^\d+$/D', $value) === 1) {
             return (int) $value;
         }
 

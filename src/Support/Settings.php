@@ -46,6 +46,21 @@ final class Settings
     }
 
     /**
+     * How long a delivery keeps being retried instead of a number of tries, in seconds, or null where the tries
+     * decide. A digit string counts as the number it writes; anything below a second is no time at all.
+     */
+    public function retryForSeconds(): ?int
+    {
+        $seconds = Config::get('webhooks.server.retry_for_seconds');
+
+        if (is_numeric($seconds) && (int) $seconds >= 1) {
+            return (int) $seconds;
+        }
+
+        return null;
+    }
+
+    /**
      * The request options a host adds to every delivery, `webhooks.server.request_options`, once
      * every key is one a host may add.
      *
@@ -385,6 +400,33 @@ final class Settings
     public function circuitBreakerThreshold(): int
     {
         return Config::integer('webhooks.platform.circuit_breaker.threshold', 10);
+    }
+
+    /**
+     * How many failed attempts within the window hold an endpoint, or null while the hold is off. A digit string counts
+     * as the number it writes, and a number below one switches the hold off as null does.
+     */
+    public function holdAttempts(): ?int
+    {
+        $attempts = Config::get('webhooks.platform.circuit_breaker.hold.attempts');
+
+        if (is_numeric($attempts) && (int) $attempts >= 1) {
+            return (int) $attempts;
+        }
+
+        return null;
+    }
+
+    /** The seconds within which the failed attempts of an endpoint are counted toward its hold. */
+    public function holdWindow(): int
+    {
+        return max(1, Config::integer('webhooks.platform.circuit_breaker.hold.window', 60));
+    }
+
+    /** How long an endpoint is held before one probe may go, in seconds. */
+    public function holdSeconds(): int
+    {
+        return max(1, Config::integer('webhooks.platform.circuit_breaker.hold.seconds', 60));
     }
 
     public function horizonTags(): bool

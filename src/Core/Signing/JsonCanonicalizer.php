@@ -35,15 +35,23 @@ final readonly class JsonCanonicalizer
     }
 
     /**
+     * One value of the payload: a nested array sorted the same way, any other value as it is.
+     *
+     * @param  mixed  $item  a value of the payload, which may be any JSON value
+     * @return mixed the nested array sorted, or the value unchanged
+     */
+    private function sortItem(mixed $item): mixed
+    {
+        return is_array($item) ? $this->sortRecursive($item) : $item;
+    }
+
+    /**
      * @param  array<array-key, mixed>  $value
      * @return array<array-key, mixed>
      */
     private function sortRecursive(array $value): array
     {
-        $sorted = array_map(
-            fn (mixed $item): mixed => is_array($item) ? $this->sortRecursive($item) : $item,
-            $value,
-        );
+        $sorted = array_map($this->sortItem(...), $value);
 
         if (! array_is_list($sorted)) {
             ksort($sorted, SORT_STRING);

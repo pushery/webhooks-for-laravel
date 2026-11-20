@@ -1037,6 +1037,7 @@ final class WebhookConfig
      * Normalize the optional 'large_payload' block into enabled + threshold + disk,
      * falling back to the documented defaults (off, 256 KiB, the 's3' disk).
      *
+     * @param  mixed  $largePayload  a value of the source's config entry, which a host may have written as any type
      * @return array{enabled: bool, threshold: int, disk: string}
      */
     private static function resolveLargePayload(mixed $largePayload): array
@@ -1054,6 +1055,7 @@ final class WebhookConfig
      * Normalize the optional 'rate_limit' block into a fixed window (how many requests, over
      * how many seconds), or null when the source declares none (unthrottled).
      *
+     * @param  mixed  $rateLimit  a value of the source's config entry, which a host may have written as any type
      * @return array{max_attempts: int, decay_seconds: int}|null
      */
     private static function resolveRateLimit(mixed $rateLimit): ?array
@@ -1072,6 +1074,7 @@ final class WebhookConfig
      * Normalize the optional 'jwks' block into a url + cache TTL + optional kid, or
      * null when no JWKS is configured (the static-secret path).
      *
+     * @param  mixed  $jwks  a value of the source's config entry, which a host may have written as any type
      * @return array{url: string, cacheTtl: int, kid: ?string}|null
      */
     private static function resolveJwks(string $name, mixed $jwks): ?array
@@ -1103,6 +1106,7 @@ final class WebhookConfig
      * 'auto' resolves to the scheme the entry's key material can verify with: Ed25519 for
      * public keys, Standard Webhooks for a shared secret.
      *
+     * @param  mixed  $scheme  a value of the source's config entry, which a host may have written as any type
      * @return class-string<SignatureScheme>
      */
     private static function resolveScheme(string $name, mixed $scheme, bool $publicKeys): string
@@ -1121,6 +1125,8 @@ final class WebhookConfig
     /**
      * Whether a configured secret is an Ed25519 public key in the `whpk_` form that
      * `webhooks:ed25519-keygen` prints.
+     *
+     * @param  mixed  $secret  a value of the source's config entry, which a host may have written as any type
      */
     private static function isPublicKeyToken(mixed $secret): bool
     {
@@ -1128,6 +1134,7 @@ final class WebhookConfig
     }
 
     /**
+     * @param  mixed  $verifier  a value of the source's config entry, which a host may have written as any type
      * @return class-string<InboundVerifier>|null
      */
     private static function resolveVerifier(string $name, mixed $verifier): ?string
@@ -1149,6 +1156,7 @@ final class WebhookConfig
      * Refused beside a 'jwks' url and beside a 'verifier': both decide the key material themselves, and a resolver
      * that also named one would leave which of the two signs for a delivery to the order of a match arm.
      *
+     * @param  mixed  $resolver  a value of the source's config entry, which a host may have written as any type
      * @return class-string<InboundTenantResolver>|null
      */
     private static function resolveTenantResolver(string $name, mixed $resolver, bool $hasJwks, bool $hasVerifier): ?string
@@ -1174,6 +1182,7 @@ final class WebhookConfig
      * Refused without a 'tenant_resolver': only a resolver stores a call with a tenant, so a scope beside a config
      * without one would never be asked for anything.
      *
+     * @param  mixed  $scope  a value of the source's config entry, which a host may have written as any type
      * @return class-string<InboundTenantScope>|null
      */
     private static function resolveTenantScope(string $name, mixed $scope, bool $hasTenantResolver): ?string
@@ -1198,6 +1207,8 @@ final class WebhookConfig
      * a typo would otherwise pass silently, and because usesFastPathDedupe() keys on a 'redis'
      * substring it would quietly disable the cache fast path — a silent performance regression
      * under a retry storm, with no error. Fails loudly here like the other config keys do.
+     *
+     * @param  mixed  $dedupe  a value of the source's config entry, which a host may have written as any type
      */
     private static function resolveDedupe(string $name, mixed $dedupe): string
     {
@@ -1217,6 +1228,8 @@ final class WebhookConfig
      * than as a refusal of every delivery, which reads exactly like a wrong secret. Only
      * PlainHmacScheme writes its digest in more than one way; every other scheme's format is fixed
      * by its dialect, so naming an encoding for one is refused as well.
+     *
+     * @param  mixed  $spec  a value of the source's config entry, which a host may have written as any type
      */
     private static function resolveSignatureEncoding(string $name, mixed $spec, string $scheme): ?SignatureEncoding
     {
@@ -1241,6 +1254,8 @@ final class WebhookConfig
      * Validate the optional 'dedupe_id' strategy up front, so a typo fails at config load
      * rather than by silently keying dedupe on nothing. Returns the spec verbatim, or null
      * for the default (the id header).
+     *
+     * @param  mixed  $spec  a value of the source's config entry, which a host may have written as any type
      */
     private static function resolveDedupeId(string $name, mixed $spec): ?string
     {
@@ -1268,6 +1283,8 @@ final class WebhookConfig
      * rather than by silently logging every delivery with an empty type — a failure with no
      * red anywhere, discovered when somebody tries to split the stream. Returns the spec
      * verbatim, or null for the default (the body's own `type`).
+     *
+     * @param  mixed  $spec  a value of the source's config entry, which a host may have written as any type
      */
     private static function resolveEventType(string $name, mixed $spec): ?string
     {
@@ -1316,6 +1333,7 @@ final class WebhookConfig
      *
      * @param  class-string<TObject>  $interface
      * @param  class-string<TObject>  $default
+     * @param  mixed  $value  a value of the source's config entry, which a host may have written as any type
      * @return class-string<TObject>
      */
     private static function classOr(string $name, string $key, mixed $value, string $interface, string $default): string
@@ -1332,6 +1350,7 @@ final class WebhookConfig
     }
 
     /**
+     * @param  mixed  $process  a value of the source's config entry, which a host may have written as any type
      * @return class-string<ProcessWebhookJob>|array<string, class-string<ProcessWebhookJob>>|null
      */
     private static function resolveProcess(string $name, mixed $process): string|array|null
@@ -1395,11 +1414,17 @@ final class WebhookConfig
         return $explicit;
     }
 
+    /**
+     * @param  mixed  $value  a value of the source's config entry, which a host may have written as any type
+     */
     private static function stringOr(mixed $value, string $default): string
     {
         return is_string($value) && $value !== '' ? $value : $default;
     }
 
+    /**
+     * @param  mixed  $value  a value of the source's config entry, which a host may have written as any type
+     */
     private static function intOr(mixed $value, int $default): int
     {
         return is_int($value) ? $value : $default;
@@ -1407,6 +1432,7 @@ final class WebhookConfig
 
     /**
      * @param  list<string>  $default
+     * @param  mixed  $value  a value of the source's config entry, which a host may have written as any type
      * @return list<string>
      */
     private static function stringList(mixed $value, array $default): array
@@ -1419,6 +1445,7 @@ final class WebhookConfig
     }
 
     /**
+     * @param  mixed  $value  a value of the source's config entry, which a host may have written as any type
      * @return '*'|list<string>
      */
     private static function resolveStoreHeaders(mixed $value): string|array

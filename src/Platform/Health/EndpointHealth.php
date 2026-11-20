@@ -252,6 +252,8 @@ final readonly class EndpointHealth
     /**
      * Coerce a raw database value (PostgreSQL returns aggregates as strings) to int,
      * defaulting to zero for a null or non-numeric value.
+     *
+     * @param  mixed  $value  a column of the query row, as the driver returns it
      */
     private function toInt(mixed $value): int
     {
@@ -265,6 +267,8 @@ final readonly class EndpointHealth
     /**
      * Coerce a raw database value to float, defaulting to zero for a null or
      * non-numeric value (an empty window yields a NULL percentile).
+     *
+     * @param  mixed  $value  a column of the query row, as the driver returns it
      */
     private function toFloat(mixed $value): float
     {

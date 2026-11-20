@@ -185,6 +185,9 @@ final class DashboardScope
         return $identity;
     }
 
+    /**
+     * @return mixed what the host's resolver answered, which may be any value
+     */
     private static function resolve(): mixed
     {
         return (self::$resolver ?? self::defaultResolver())();
@@ -193,6 +196,8 @@ final class DashboardScope
     /**
      * Normalize a resolved value into a tenant identity, or null when it carries no
      * owner type (a bare id cannot identify a morph pair on its own).
+     *
+     * @param  mixed  $resolved  what the host's resolver answered, which may be any value
      */
     private static function normalize(mixed $resolved): ?TenantIdentity
     {

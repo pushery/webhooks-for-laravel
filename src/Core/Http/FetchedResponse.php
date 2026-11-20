@@ -14,7 +14,8 @@ namespace Pushery\Webhooks\Core\Http;
 final readonly class FetchedResponse
 {
     /**
-     * @param  array<string, list<string>>  $headers  each header with its values, under the name the server sent
+     * @param  array<array-key, list<string>>  $headers  each header with its values, under the name the server sent;
+     *                                                   a name made of digits is an int key, the way PHP stores it
      */
     public function __construct(
         public int $status,
@@ -28,7 +29,7 @@ final readonly class FetchedResponse
     public function header(string $name): ?string
     {
         foreach ($this->headers as $header => $values) {
-            if (strcasecmp($header, $name) === 0) {
+            if (strcasecmp((string) $header, $name) === 0) {
                 return $values[0] ?? null;
             }
         }

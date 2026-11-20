@@ -322,8 +322,10 @@ final readonly class PartitionManager
             $name = data_get($row, 'name');
             $qualified = data_get($row, 'qualified');
 
+            // `\z`, not `$`, which also matches before a final line feed: a partition attached by
+            // hand under such a name is not one of the monthly ones, and the prune would drop it.
             if (is_string($name) && is_string($qualified)
-                && preg_match('/^'.self::TABLE.'_\d{4}_\d{2}$/', $name) === 1) {
+                && preg_match('/^'.self::TABLE.'_\d{4}_\d{2}\z/', $name) === 1) {
                 $found[$name] = $qualified;
             }
         }

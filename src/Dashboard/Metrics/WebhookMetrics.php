@@ -392,6 +392,8 @@ final readonly class WebhookMetrics
     /**
      * Coerce a raw database value (PostgreSQL returns numerics as strings) to int,
      * defaulting to zero for a null or non-numeric value.
+     *
+     * @param  mixed  $value  a column of the query row, as the driver returns it
      */
     private function toInt(mixed $value): int
     {
@@ -405,6 +407,8 @@ final readonly class WebhookMetrics
     /**
      * Coerce a raw database value to float, defaulting to zero for a null or
      * non-numeric value (an empty window yields a NULL percentile).
+     *
+     * @param  mixed  $value  a column of the query row, as the driver returns it
      */
     private function toFloat(mixed $value): float
     {
@@ -462,7 +466,7 @@ final readonly class WebhookMetrics
     {
         $table = $this->sourceModel()->getTable();
 
-        if (preg_match('/^[A-Za-z_]\w*$/', $table) !== 1) {
+        if (preg_match('/^[A-Za-z_]\w*$/D', $table) !== 1) {
             throw new RuntimeException(
                 "Refusing to build metrics SQL for an unexpected source table name [{$table}]."
             );

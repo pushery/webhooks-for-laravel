@@ -91,11 +91,11 @@ final class UiAssets
     /**
      * Register the asset route, once.
      *
-     * Called from every provider whose screens mount these components — the dashboard and the
-     * self-service portal — because either may be enabled without the other, and a headless
-     * or send-only host should carry no route it will never serve. The guard makes the second
-     * call a no-op rather than a duplicate route, which would otherwise be resolved by
-     * whichever definition Laravel saw last.
+     * Called from every provider whose screens mount these components — the dashboard, the
+     * self-service portal and the operator console — because any of them may be enabled without
+     * the others, and a headless or send-only host should carry no route it will never serve.
+     * The guard makes the second call a no-op rather than a duplicate route, which would
+     * otherwise be resolved by whichever definition Laravel saw last.
      */
     public static function registerRoute(): void
     {

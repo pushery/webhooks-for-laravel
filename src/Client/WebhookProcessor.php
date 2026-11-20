@@ -561,7 +561,9 @@ final readonly class WebhookProcessor
      * @template TResult
      *
      * @param  Closure(): TResult  $work
-     * @return TResult
+     * @return mixed what `$work` returns, whatever its type
+     *
+     * @phpstan-return TResult
      */
     private function inTenantScope(?string $tenant, Closure $work): mixed
     {
@@ -736,8 +738,9 @@ final readonly class WebhookProcessor
             // in that position: a host writes the names in any case.
             //
             // It is kept because it says the comparison is case-insensitive at the point where a
-            // reader asks, instead of making them go and check what HeaderBag guarantees.
-            if ($only !== null && ! in_array(strtolower($name), $only, true)) {
+            // reader asks, instead of making them go and check what HeaderBag guarantees. The cast
+            // is needed: a header whose name is made of digits arrives as an int key.
+            if ($only !== null && ! in_array(strtolower((string) $name), $only, true)) {
                 continue;
             }
 

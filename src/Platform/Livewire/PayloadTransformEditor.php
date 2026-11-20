@@ -445,6 +445,7 @@ final class PayloadTransformEditor extends Component
     /**
      * Extract only the string entries from a raw rule value as a clean list.
      *
+     * @param  mixed  $value  a field of the editor's form, as Livewire hydrated it from the browser
      * @return list<string>
      */
     private function stringList(mixed $value): array

@@ -17,6 +17,10 @@ namespace Pushery\Webhooks\Support;
  * package ships: a missing line, an empty line as copying a template of a .env leaves one, and a
  * spelling that names neither.
  *
+ * Internal: the configuration file this package publishes reads its switches through
+ * EnvFlag::protection(), which takes the same spellings as off and on, so a published copy never
+ * calls this class.
+ *
  * @internal
  */
 final class EnvSwitch

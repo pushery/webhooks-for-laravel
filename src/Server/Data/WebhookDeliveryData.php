@@ -198,6 +198,25 @@ final readonly class WebhookDeliveryData
     }
 
     /**
+     * The same delivery, back in the queue after its endpoint was held for $delay seconds: the requests made so far are
+     * remembered, and its time to keep trying is moved by the wait, so the hold is charged to neither its tries nor its
+     * time.
+     */
+    public function heldBack(int $attemptsMade, int $delay): self
+    {
+        $until = $this->retryUntil();
+
+        return $this->continued(
+            $attemptsMade,
+            $this->retryAfterDeferrals,
+            $this->streamWaits(),
+            $until === null ? null : $until + $delay,
+            $this->encryptedSecret,
+            $this->options,
+        );
+    }
+
+    /**
      * The same delivery, sent again from the start: no request made, no deferral and no wait
      * counted, and the whole time to keep trying ahead of it again.
      */

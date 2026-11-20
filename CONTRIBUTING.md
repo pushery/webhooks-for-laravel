@@ -58,7 +58,7 @@ what a patch will be measured against:
 |---|---|
 | Code style | Laravel Pint, zero diffs. |
 | Refactoring | Rector, dry-run clean. |
-| Static analysis | Larastan at `max`, no errors, no baseline. |
+| Static analysis | Larastan at level 10, no errors, no baseline. |
 | Types | 100% type coverage. |
 | Tests | [Pest](https://pestphp.com) against a real PostgreSQL, 100% line coverage, plus mutation testing and a real-browser end-to-end suite. |
 | Public surface | Every user-visible string translated (English and German), the public tree free of internal references, the `CHANGELOG.md` updated. |

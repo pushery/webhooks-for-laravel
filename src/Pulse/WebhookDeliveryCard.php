@@ -68,24 +68,26 @@ final class WebhookDeliveryCard extends Card
         $latency = $this->keyByEvent($this->aggregate(WebhookDeliveryRecorder::LATENCY, ['avg', 'max']));
         $failures = $this->keyByEvent($this->aggregate(WebhookDeliveryRecorder::FAILURE, ['count']));
 
-        return $this->aggregate(WebhookDeliveryRecorder::THROUGHPUT, ['count'], 'count')
-            ->map(function (mixed $row) use ($latency, $failures): WebhookEventStat {
-                $data = (array) $row;
-                $key = $this->asString($data['key'] ?? '');
-                $sample = $latency[$key] ?? [];
-                $total = $this->asInt($data['count'] ?? 0);
-                $failed = $this->asInt($failures[$key]['count'] ?? 0);
+        $stats = [];
 
-                return new WebhookEventStat(
-                    event: $key,
-                    total: $total,
-                    failed: $failed,
-                    failureRate: $total > 0 ? round($failed / $total * 100, 1) : 0.0,
-                    avg: isset($sample['avg']) ? $this->asFloat($sample['avg']) : null,
-                    max: isset($sample['max']) ? $this->asFloat($sample['max']) : null,
-                );
-            })
-            ->values();
+        foreach ($this->aggregate(WebhookDeliveryRecorder::THROUGHPUT, ['count'], 'count') as $row) {
+            $data = (array) $row;
+            $key = $this->asString($data['key'] ?? '');
+            $sample = $latency[$key] ?? [];
+            $total = $this->asInt($data['count'] ?? 0);
+            $failed = $this->asInt($failures[$key]['count'] ?? 0);
+
+            $stats[] = new WebhookEventStat(
+                event: $key,
+                total: $total,
+                failed: $failed,
+                failureRate: $total > 0 ? round($failed / $total * 100, 1) : 0.0,
+                avg: isset($sample['avg']) ? $this->asFloat($sample['avg']) : null,
+                max: isset($sample['max']) ? $this->asFloat($sample['max']) : null,
+            );
+        }
+
+        return new Collection($stats);
     }
 
     /**
@@ -121,6 +123,9 @@ final class WebhookDeliveryCard extends Card
         return $value instanceof Collection ? 0.0 : $value;
     }
 
+    /**
+     * @param  mixed  $value  a value of a Pulse aggregate row, which Pulse hands back untyped
+     */
     private function asInt(mixed $value): int
     {
         if (is_numeric($value)) {
@@ -130,6 +135,9 @@ final class WebhookDeliveryCard extends Card
         return 0;
     }
 
+    /**
+     * @param  mixed  $value  a value of a Pulse aggregate row, which Pulse hands back untyped
+     */
     private function asFloat(mixed $value): float
     {
         if (is_numeric($value)) {
@@ -139,6 +147,9 @@ final class WebhookDeliveryCard extends Card
         return 0.0;
     }
 
+    /**
+     * @param  mixed  $value  a value of a Pulse aggregate row, which Pulse hands back untyped
+     */
     private function asString(mixed $value): string
     {
         if (is_string($value)) {

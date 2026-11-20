@@ -417,6 +417,8 @@ final readonly class WebhookManager
      * say) is rejected here rather than surfacing as an opaque insert error on the first
      * fan-out. A bigint key may arrive as a numeric string — the driver returns bigints as
      * strings — and matches all the same.
+     *
+     * @param  mixed  $key  the key of the owner model, as Eloquent reports it, which may be of any type
      */
     private function ensureOwnerKeyStorable(mixed $key): void
     {
@@ -1014,7 +1016,18 @@ final readonly class WebhookManager
 
         ksort($rules, SORT_STRING);
 
-        return array_map(static fn (mixed $rule): mixed => is_array($rule) ? self::ruleSet($rule) : $rule, $rules);
+        return array_map(self::ruleOf(...), $rules);
+    }
+
+    /**
+     * One entry of a rule set: a nested set sorted the same way, any other value as it is.
+     *
+     * @param  mixed  $rule  a value of the rule set, which may be any JSON value
+     * @return mixed the nested set sorted, or the value unchanged
+     */
+    private static function ruleOf(mixed $rule): mixed
+    {
+        return is_array($rule) ? self::ruleSet($rule) : $rule;
     }
 
     /**
@@ -1079,8 +1092,8 @@ final readonly class WebhookManager
         // matches the delivery-log event_id and a receiver can dedupe a redelivery.
         // The scheme sets the webhook-id/timestamp/signature headers at send time.
         //
-        // The engine's configured defaults — signing dialect, verb, timeouts, tries,
-        // TLS verification, canonicalization, retry schedule, Retry-After policy, the
+        // The engine's configured defaults — signing dialect, verb, timeouts, tries or the
+        // time to keep trying, TLS verification, canonicalization, retry schedule, Retry-After policy, the
         // egress proxy, and the queue and connection — are already seeded by
         // PendingWebhook::create(), so fan-out adds only what is specific to this event
         // and endpoint.
@@ -1243,6 +1256,8 @@ final readonly class WebhookManager
     /**
      * A number read back from the cache. Some stores, Redis among them, hand a stored integer back
      * as a string, so a type check alone would read a real value as missing.
+     *
+     * @param  mixed  $value  a value read back from the store, of whatever type it came back as
      */
     private function storedInt(mixed $value, int $default): int
     {

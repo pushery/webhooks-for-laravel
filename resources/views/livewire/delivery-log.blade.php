@@ -97,10 +97,10 @@
         {{-- An empty table and a filter that matched nothing are the same picture, so the empty
              state says which one it is. Without it a reader cannot tell a quiet system from a
              filter they set by accident. --}}
-        <p class="wh-empty py-8 text-center text-sm">
-            <span class="block font-medium">{{ __('webhooks::management.empty.no_deliveries.title') }}</span>
-            {{ __('webhooks::management.empty.no_deliveries.description') }}
-        </p>
+        <div class="wh-empty py-8 text-center text-sm">
+            <h2 class="m-0 text-sm font-medium">{{ __('webhooks::management.empty.no_deliveries.title') }}</h2>
+            <p>{{ __('webhooks::management.empty.no_deliveries.description') }}</p>
+        </div>
     @else
     {{-- A scroll container of its own, so the overbreadth stops here instead of reaching the
          document. Without it the whole page grows a horizontal scrollbar on a narrow viewport

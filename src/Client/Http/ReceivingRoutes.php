@@ -4,23 +4,35 @@ declare(strict_types=1);
 
 namespace Pushery\Webhooks\Client\Http;
 
+use Illuminate\Routing\CompiledRouteCollection;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
+use WeakMap;
 
 /**
- * The routes this package's own macro registered, and the config name each one carries.
+ * Whether a route of the application is one of this package's receiving routes, and the config name it receives for.
  *
- * Two preflight checks ask the same question first — which of the host's routes are receiving
- * routes — and a second copy of that predicate is a second copy that drifts. It lives here once.
+ * An application asks it in a middleware of its own that sets a limit or a connection per receiving route:
+ * {@see self::isReceiving()} and {@see self::configNameOf()} are public API. The other methods serve the package's own
+ * checks, which ask the same question, and are internal.
  *
- * Asked of the controller rather than of the route name, because a host may rename the route and
- * the controller is what makes it a receiving route.
- *
- * @internal
+ * Asked of the controller rather than of the route name, because an application may rename the route and the
+ * controller is what makes it a receiving route.
  */
 final class ReceivingRoutes
 {
     /**
+     * The addresses of the receiving routes of each cached route collection, kept for as long as the collection lives.
+     *
+     * @var WeakMap<CompiledRouteCollection, list<array{methods: list<string>, path: string}>>|null
+     */
+    private static ?WeakMap $cached = null;
+
+    /**
+     * The receiving routes among every route the router holds.
+     *
+     * @internal
+     *
      * @return list<Route>
      */
     public static function all(Router $router): array
@@ -37,6 +49,42 @@ final class ReceivingRoutes
         }
 
         return $routes;
+    }
+
+    /**
+     * The method and the path pattern of each receiving route, for a request the router has not matched yet.
+     *
+     * A cached collection builds every route when it is asked for them, so its answer is kept for as long as the
+     * collection lives, which under Octane is every request the worker serves. A collection that is not cached is
+     * read each time, so that a route added to it later counts.
+     *
+     * @internal
+     *
+     * @return list<array{methods: list<string>, path: string}>
+     */
+    public static function addresses(Router $router): array
+    {
+        $collection = $router->getRoutes();
+
+        if ($collection instanceof CompiledRouteCollection && isset(self::$cached[$collection])) {
+            return self::$cached[$collection];
+        }
+
+        $addresses = [];
+
+        foreach (self::all($router) as $route) {
+            $addresses[] = [
+                'methods' => array_values(array_filter($route->methods(), is_string(...))),
+                'path' => $route->toSymfonyRoute()->compile()->getRegex(),
+            ];
+        }
+
+        if ($collection instanceof CompiledRouteCollection) {
+            self::$cached ??= new WeakMap;
+            self::$cached[$collection] = $addresses;
+        }
+
+        return $addresses;
     }
 
     /**
@@ -67,6 +115,8 @@ final class ReceivingRoutes
 
     /**
      * A printable identity for a route, for a message a host has to act on.
+     *
+     * @internal
      */
     public static function label(Route $route): string
     {

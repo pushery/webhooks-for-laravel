@@ -102,6 +102,7 @@ return [
         'no_subscriptions' => [
             'title' => 'Nog geen endpoints',
             'description' => 'Registreer hierboven je eerste endpoint om webhooks af te leveren.',
+            'description_read_only' => 'Endpoints verschijnen hier zodra iemand die webhooks mag beheren er een registreert.',
         ],
         'no_deliveries' => [
             'title' => 'Geen leveringen gevonden',

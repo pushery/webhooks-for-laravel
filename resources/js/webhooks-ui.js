@@ -193,6 +193,59 @@
                 },
             };
         });
+
+        /*
+         * Focus for the endpoint list of the plain operator console, when an action removes the
+         * row that held it.
+         *
+         * Deleting an endpoint removes its row, and with it the button that had focus. The browser
+         * then gives focus to the document body, so a keyboard or screen-reader reader is put back
+         * at the top of the page, with nothing to say where the row went. The WireKit rendering
+         * hands focus to the table from its alert dialog; this hands it to the list's scroll
+         * region, which surrounds the table and is focusable already.
+         *
+         * Only a control inside this element that held focus and then left the document moves
+         * focus here, and only while nothing else holds it. A press in macOS WebKit focuses no
+         * button at all, and focus that moved on to another element is not this one's to take.
+         */
+        window.Alpine.data('webhooksRemovalFocus', function () {
+            return {
+                held: null,
+                observer: null,
+                init() {
+                    this.$el.addEventListener('focusin', (event) => {
+                        this.held = event.target;
+                    });
+
+                    this.$el.addEventListener('focusout', (event) => {
+                        // A removal moves focus to nothing, so only a move to an element outside
+                        // this one lets go of the control.
+                        if (event.relatedTarget instanceof Element && ! this.$el.contains(event.relatedTarget)) {
+                            this.held = null;
+                        }
+                    });
+
+                    this.observer = new MutationObserver(() => {
+                        if (this.held === null || this.held.isConnected) {
+                            return;
+                        }
+
+                        this.held = null;
+
+                        if (document.activeElement === null || document.activeElement === document.body) {
+                            this.$el.focus();
+                        }
+                    });
+
+                    this.observer.observe(this.$el, { childList: true, subtree: true });
+                },
+                destroy() {
+                    if (this.observer !== null) {
+                        this.observer.disconnect();
+                    }
+                },
+            };
+        });
     };
 
     // Both orders happen, and which one occurs depends on how the host loads Alpine. A

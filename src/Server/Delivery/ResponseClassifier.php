@@ -82,7 +82,7 @@ final readonly class ResponseClassifier
         $mediaTypes = [];
 
         foreach ($response->headers as $name => $values) {
-            if (strcasecmp($name, 'Content-Type') === 0) {
+            if (strcasecmp((string) $name, 'Content-Type') === 0) {
                 foreach ($values as $value) {
                     $mediaTypes[] = strtolower(trim(explode(';', $value, 2)[0]));
                 }

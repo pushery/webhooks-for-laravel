@@ -127,7 +127,7 @@
                             >{{ $endpoint->is_active ? __('webhooks::self-service.list.active') : __('webhooks::self-service.list.disabled') }}</x-wirekit::button>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td align="right">
-                            <div class="inline-flex items-center gap-[var(--gap-wk-sm)] max-sm:flex max-sm:flex-wrap">
+                            <div class="flex flex-wrap items-center gap-[var(--gap-wk-sm)] sm:justify-end" data-endpoint-actions>
                                 {{-- First, and the order is the point: this is the action a
                                      tenant reaches for most and the only one that costs
                                      nothing. Destructive stays last. It carries a loading

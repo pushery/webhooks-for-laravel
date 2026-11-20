@@ -53,7 +53,7 @@ final readonly class AsyncApiGenerator
                 'address' => $type,
                 'description' => $description,
                 'messages' => [$type => ['$ref' => '#/components/messages/'.$type]],
-            ], static fn (mixed $value): bool => $value !== null);
+            ], static fn (string|array|null $value): bool => $value !== null);
 
             $operations[$type] = [
                 'action' => 'send',
@@ -68,7 +68,7 @@ final readonly class AsyncApiGenerator
                 'contentType' => 'application/json',
                 'payload' => $schema,
                 'examples' => $example !== null ? [['name' => 'example', 'payload' => $example]] : null,
-            ], static fn (mixed $value): bool => $value !== null);
+            ], static fn (string|array|null $value): bool => $value !== null);
         }
 
         return [

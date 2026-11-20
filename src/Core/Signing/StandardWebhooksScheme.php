@@ -11,7 +11,7 @@ use Pushery\Webhooks\Core\Signing\Exceptions\UnusableSigningSecret;
  * The default signature dialect: byte-compatible with the industry Standard
  * Webhooks specification and the official `standardwebhooks/standardwebhooks`
  * SDKs (JS/Python/Go/Ruby/Rust/Java/C#/Elixir). Any Standard Webhooks consumer
- * can verify our deliveries out of the box, and we can verify theirs.
+ * verifies these deliveries with the shared secret, and this scheme verifies theirs.
  *
  * Signed content: `{id}.{timestamp}.{rawBody}`, HMAC-SHA256, base64-encoded.
  * Headers: `webhook-id`, `webhook-timestamp`, and a space-separated
@@ -72,8 +72,10 @@ final readonly class StandardWebhooksScheme implements SignatureScheme
         $timestamp = $headers->get($this->timestampHeader);
         $signatureHeader = $headers->get($this->signatureHeader);
 
+        // `\z`, not `$`, which also matches before a final line feed: the header is signed as it
+        // arrives, so its shape is held to digits and nothing after them.
         if ($id === null || $id === '' || $timestamp === null || $signatureHeader === null
-            || preg_match('/^\d+$/', $timestamp) !== 1) {
+            || preg_match('/^\d+\z/', $timestamp) !== 1) {
             return VerificationResult::malformed();
         }
 

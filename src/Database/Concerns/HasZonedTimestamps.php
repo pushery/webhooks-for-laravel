@@ -84,6 +84,8 @@ trait HasZonedTimestamps
      * class to CarbonImmutable (Date::use(CarbonImmutable::class)), and Eloquent then hands
      * back a CarbonImmutable — narrowing the return to the mutable class made every timestamp
      * read throw a TypeError there. CarbonInterface is the honest contract.
+     *
+     * @param  mixed  $value  what Eloquent hands a date cast: a string, a number, a DateTimeInterface or a Carbon
      */
     protected function asDateTime(mixed $value): CarbonInterface
     {

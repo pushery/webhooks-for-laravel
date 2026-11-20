@@ -30,10 +30,11 @@ final class RefreshEndpointHealthCommand extends Command
         $failed = [];
 
         // Per row, for the reason spelled out in RevokeRotatedSecretsCommand: an unguarded sweep
-        // over a cursor ends at its first bad row, and the endpoints ordered after it keep the
+        // over the rows ends at its first bad row, and the endpoints ordered after it keep the
         // score the last delivery left them with -- which is precisely what this command exists
-        // to stop.
-        foreach (WebhookSubscription::model()::query()->active()->cursor() as $subscription) {
+        // to stop. A thousand rows at a time by key: the database driver buffers the whole result
+        // of a cursor, PostgreSQL's outside memory_limit, and the endpoints grow with every host.
+        foreach (WebhookSubscription::model()::query()->active()->lazyById(1000) as $subscription) {
             try {
                 $health->refresh($subscription);
                 $count++;

@@ -21,10 +21,16 @@ use Illuminate\View\ComponentAttributeBag;
  */
 final class SensitiveAttribute
 {
-    /** The configured name, or null where none or no `data-*` name is set. */
+    /**
+     * The configured name, or null where none or no `data-*` name is set.
+     *
+     * @param  mixed  $configured  a value from the environment or the config, which a host may have set to any type
+     */
     public static function name(mixed $configured): ?string
     {
-        if (! is_string($configured) || preg_match('/^data-[a-z0-9]+(?:-[a-z0-9]+)*$/', $configured) !== 1) {
+        // `\z`, not `$`, which also matches before a final line feed, the one a double-quoted value
+        // of a .env can carry.
+        if (! is_string($configured) || preg_match('/^data-[a-z0-9]+(?:-[a-z0-9]+)*\z/', $configured) !== 1) {
             return null;
         }
 

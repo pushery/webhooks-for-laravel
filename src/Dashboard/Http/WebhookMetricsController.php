@@ -219,6 +219,8 @@ final class WebhookMetricsController
      * plausible chart drawn one or two hours beside the truth, and nothing anywhere goes red.
      * PostgreSQL returns the offset in the string, so there the parse was already exact.
      * {@see Timestamp::read()} holds that decision for every reader.
+     *
+     * @param  mixed  $value  a column of the query row, as the driver returns it
      */
     private function toIso(mixed $value): string
     {
@@ -231,6 +233,8 @@ final class WebhookMetricsController
 
     /**
      * Coerce a raw database value (PostgreSQL returns numerics as strings) to int.
+     *
+     * @param  mixed  $value  a column of the query row, as the driver returns it
      */
     private function toInt(mixed $value): int
     {
@@ -243,6 +247,8 @@ final class WebhookMetricsController
 
     /**
      * Coerce a raw database value to float — an empty window yields a NULL percentile.
+     *
+     * @param  mixed  $value  a column of the query row, as the driver returns it
      */
     private function toFloat(mixed $value): float
     {
@@ -255,6 +261,8 @@ final class WebhookMetricsController
 
     /**
      * Coerce a raw database value to a string column.
+     *
+     * @param  mixed  $value  a column of the query row, as the driver returns it
      */
     private function toText(mixed $value): string
     {
