@@ -108,16 +108,24 @@ class WebhookOutboxEntry extends Model
     }
 
     /**
-     * The entries eligible for pruning: delivered and skipped ones whose end lies further back than
-     * the configured window. A refused entry and one the outbox gave up on are never pruned here,
-     * because removing them would let their stream move on without anybody deciding it should.
+     * The entries eligible for pruning, once their end lies further back than the configured window:
+     * delivered and skipped ones, and refused ones and ones the outbox gave up on outside a stream. In
+     * a stream, a refused entry and one given up stay, because removing them would let their stream
+     * move on without anybody deciding it should. Outside a stream they hold nothing back, and the
+     * delivery each one keeps sealed would otherwise outlive the delivery log.
      *
      * @return Builder<static>
      */
     public function prunable(): Builder
     {
         return static::model()::query()
-            ->whereIn('state', [OutboxEntryState::Delivered->value, OutboxEntryState::Skipped->value])
+            ->where(static function (Builder $query): void {
+                $query->whereIn('state', [OutboxEntryState::Delivered->value, OutboxEntryState::Skipped->value])
+                    ->orWhere(static function (Builder $outside): void {
+                        $outside->whereNull('stream')
+                            ->whereIn('state', [OutboxEntryState::Refused->value, OutboxEntryState::GivenUp->value]);
+                    });
+            })
             ->where(
                 'ended_at',
                 '<=',

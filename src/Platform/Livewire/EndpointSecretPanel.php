@@ -145,7 +145,7 @@ final class EndpointSecretPanel extends Component
 
     /**
      * Whether the reveal window has elapsed. A panel with no reveal in flight is not
-     * considered expired (there is simply nothing to show).
+     * considered expired (there is nothing to show).
      */
     private function isExpired(): bool
     {

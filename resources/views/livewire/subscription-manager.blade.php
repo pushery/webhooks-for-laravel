@@ -121,7 +121,7 @@
                  And it carries no `onfocus="this.select()"`, which is the obvious addition and the
                  one this package must not make. An inline handler is script under `script-src
                  'self'` without a nonce — a policy an application is entitled to choose — so the
-                 browser refuses to run it, nothing throws, and the affordance is simply dead. That
+                 browser refuses to run it, nothing throws, and the affordance is dead. That
                  failure has already happened three times on this surface; UiAssets states the third
                  and why the answer had to be one with no policy dependency left. Auto-select would
                  need a named factory in the served asset, which is a different change with a
@@ -183,6 +183,7 @@
         <thead role="rowgroup" class="max-sm:sr-only">
             <tr role="row">
                 <th role="columnheader" class="px-3 py-2">{{ __('webhooks::management.table.endpoint') }}</th>
+                <th role="columnheader" class="px-3 py-2">{{ __('webhooks::management.table.owner') }}</th>
                 <th role="columnheader" class="px-3 py-2">{{ __('webhooks::management.table.events') }}</th>
                 <th role="columnheader" class="px-3 py-2">{{ __('webhooks::management.table.status') }}</th>
                 {{-- Not an empty <th>: an empty header announces nothing, so a screen-reader
@@ -197,6 +198,16 @@
                         <span class="font-medium">{{ $subscription->name ?? '—' }}</span>
                         <span class="block text-gray-500 max-sm:break-all">{{ $subscription->url }}</span>
                     </th>
+                    {{-- An endpoint without an owner receives the events of every owner, so it is marked
+                         rather than left blank. --}}
+                    @php($ownerName = \Pushery\Webhooks\Support\OwnerNames::ofEndpoint($subscription))
+                    <td role="cell" data-label="{{ __('webhooks::management.table.owner') }}" class="{{ $stackedCell }}">
+                        @if ($ownerName === null)
+                            <span class="text-gray-500">{{ __('webhooks::management.subscription.global') }}</span>
+                        @else
+                            <span class="break-words">{{ $ownerName }}</span>
+                        @endif
+                    </td>
                     <td role="cell" data-label="{{ __('webhooks::management.table.events') }}" class="{{ $stackedCell }}">{{ implode(', ', $subscription->eventTypeNames()) }}</td>
                     {{-- The same three bands as the WireKit stub, in this stub's own plain
                          classes. Both are kept in step deliberately: a host that starts on one

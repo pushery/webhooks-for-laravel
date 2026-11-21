@@ -129,7 +129,7 @@ final class PreflightCommand extends Command
             // The other way the same binding breaks, and it is checked from the route side
             // because the config side cannot see it. A typo in the second argument of
             // Route::webhooks() leaves a route that exists, resolves and refuses every delivery
-            // for ever -- and the config is not wrong, it simply has no entry of that name.
+            // for ever -- and the config is not wrong, it has no entry of that name.
             //
             // A failure for the same reason the check above is one: the route cannot carry
             // traffic. Together with webhooks.client.expected this covers both directions of a

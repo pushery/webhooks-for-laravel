@@ -18,6 +18,7 @@ use Illuminate\Validation\ValidationException;
 use Pushery\Webhooks\Core\Http\Exceptions\BlockedDestination;
 use Pushery\Webhooks\Core\Http\Exceptions\HostUnresolvable;
 use Pushery\Webhooks\Core\Ssrf\SsrfGuard;
+use Pushery\Webhooks\Database\OwnerKeyType;
 use Pushery\Webhooks\Enums\DeliveryStatus;
 use Pushery\Webhooks\Facades\Webhooks;
 use Pushery\Webhooks\Models\WebhookDelivery;
@@ -183,7 +184,7 @@ final class SelfServiceEndpoints
         $query = WebhookDelivery::model()::query()
             ->select($columns)
             ->where('owner_type', $owner->type)
-            ->where('owner_id', $owner->id);
+            ->where('owner_id', OwnerKeyType::fromConfig()->bound($owner->id));
 
         if ($endpoint !== null) {
             $query->where('subscription_id', SubscriptionScope::forOwner($owner->type, $owner->id)->findOrFail($endpoint)->id);
@@ -226,7 +227,7 @@ final class SelfServiceEndpoints
         // Loaded again through the owner pair even when a model is handed in: the pair is what decides whose it is.
         $stored = WebhookDelivery::model()::query()
             ->where('owner_type', $owner->type)
-            ->where('owner_id', $owner->id)
+            ->where('owner_id', OwnerKeyType::fromConfig()->bound($owner->id))
             ->whereSubmittedKey($delivery instanceof WebhookDelivery ? $delivery->id : $delivery)
             ->firstOrFail();
 

@@ -249,6 +249,19 @@ return [
         'ping_throttled' => 'Dit endpoint heeft zijn testgebeurtenissen voorlopig opgebruikt. Probeer het over :seconds seconde(n) opnieuw.',
     ],
 
+    'conflict' => [
+        'endpoint' => 'Iemand anders heeft dit endpoint gewijzigd terwijl je het open had: :fields. Er is niets opgeslagen. Sluit het formulier en open het endpoint opnieuw om de huidige waarden te zien.',
+        'transform' => 'Iemand anders heeft de payload-instellingen van dit endpoint gewijzigd nadat je deze pagina opende: :fields. Er is niets opgeslagen. Laad de pagina opnieuw om de huidige instellingen te zien.',
+        'fields' => [
+            'name' => 'naam',
+            'url' => 'URL',
+            'event_types' => 'event-types',
+            'active' => 'aan of uit',
+            'version' => 'payloadversie',
+            'transform' => 'transformatieregels',
+        ],
+    ],
+
     // The form's own validation copy, passed to the validator as custom messages and
     // attribute names, so a refused save speaks the reader's language rather than the
     // framework's default English lines.

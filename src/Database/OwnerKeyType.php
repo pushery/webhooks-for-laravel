@@ -15,13 +15,15 @@ use Pushery\Webhooks\Database\Dialect\Dialect;
  * The storage type of the denormalized owner key (`owner_id`) — the one decision that has to
  * hold identically across every table the owner morph pair spans: the subscriptions table,
  * the delivery log and the dashboard rollup. A polymorphic owner may be keyed by a bigint
- * (the default), a UUID or a ULID; the package renders each table's `owner_id` column, the
- * MySQL rollup's null-owner sentinel and the subscribe-time key guard from this one enum, so
- * the three tables can never disagree and a UUID/ULID host is a config flag, not a migration
- * fork it has to re-apply after every `vendor:publish --force`.
+ * (the default), a UUID or a ULID, and owners of different key types, such as an account keyed
+ * by a bigint beside a workspace keyed by a UUID, share the tables as text. The package renders
+ * each table's `owner_id` column, the MySQL rollup's null-owner sentinel and the subscribe-time
+ * key guard from this one enum, so the three tables can never disagree and a UUID/ULID host is a
+ * config flag, not a migration fork it has to re-apply after every `vendor:publish --force`.
  *
  * Set once, before migrating, via `webhooks.platform.owner_key_type`; changing it on a
- * populated database is a schema migration, not a runtime toggle.
+ * populated database is a schema migration, not a runtime toggle. `webhooks:owner-key-type`
+ * makes that migration while the tables are empty, and to `text` also with rows.
  *
  * Part of the public API, because the migrations this package publishes call it. Once published, a
  * migration runs in the host's own namespace, and a host that analyzes its migrations reads every call
@@ -33,6 +35,10 @@ enum OwnerKeyType: string
     case Bigint = 'bigint';
     case Uuid = 'uuid';
     case Ulid = 'ulid';
+    case Text = 'text';
+
+    /** The longest key `text` holds: a bigint has at most 20 digits, a UUID 36 characters, a ULID 26. */
+    public const int TEXT_LENGTH = 64;
 
     /**
      * The configured owner-key type, defaulting to bigint. A typo throws here — at the point
@@ -48,10 +54,11 @@ enum OwnerKeyType: string
         }
 
         throw new InvalidArgumentException(
-            'webhooks.platform.owner_key_type must be one of "bigint" (default), "uuid" or "ulid". '
+            'webhooks.platform.owner_key_type must be one of "bigint" (default), "uuid", "ulid" or "text". '
             .'It fixes the storage type of the owner_id column across the subscriptions table, the '
             .'delivery log and the dashboard rollup, so it must be set before the tables are migrated '
-            .'and match the primary-key type of the models that own webhook subscriptions.'
+            .'and match the primary-key type of the models that own webhook subscriptions, or be "text" '
+            .'where those models key by different types.'
         );
     }
 
@@ -65,6 +72,7 @@ enum OwnerKeyType: string
             self::Bigint => $table->unsignedBigInteger($name),
             self::Uuid => $table->uuid($name),
             self::Ulid => $table->ulid($name),
+            self::Text => $table->string($name, self::TEXT_LENGTH),
         };
     }
 
@@ -89,6 +97,7 @@ enum OwnerKeyType: string
             self::Bigint => $dialect === Dialect::MySql ? 'bigint unsigned' : 'bigint',
             self::Uuid => $dialect === Dialect::MySql ? 'char(36)' : 'uuid',
             self::Ulid => 'char(26)',
+            self::Text => 'varchar('.self::TEXT_LENGTH.')',
         };
     }
 
@@ -97,7 +106,8 @@ enum OwnerKeyType: string
      * unique key cannot span NULLs (PostgreSQL's rollup is a view and keeps the source NULL).
      * It must be a valid value of the column type and can never collide with a real owner key:
      * 0 is never a real bigint owner id, and neither the nil UUID nor the all-zero ULID is ever
-     * issued by a key generator (a ULID encodes a timestamp, so its minimum is unreachable).
+     * issued by a key generator (a ULID encodes a timestamp, so its minimum is unreachable). Under
+     * `text` it is the empty string, which accepts() refuses as an owner key.
      */
     public function sentinelId(): int|string
     {
@@ -105,6 +115,7 @@ enum OwnerKeyType: string
             self::Bigint => 0,
             self::Uuid => '00000000-0000-0000-0000-000000000000',
             self::Ulid => '00000000000000000000000000',
+            self::Text => '',
         };
     }
 
@@ -128,6 +139,28 @@ enum OwnerKeyType: string
             self::Bigint => is_int($key) || ($key !== '' && ctype_digit($key)),
             self::Uuid => is_string($key) && Str::isUuid($key),
             self::Ulid => is_string($key) && Str::isUlid($key),
+            self::Text => is_int($key) || ($key !== '' && strlen($key) <= self::TEXT_LENGTH),
         };
+    }
+
+    /**
+     * An owner key as a query binds it: as a string under `text`, so the engine compares text with text,
+     * and as given under the other types. MySQL compares a character column with a number as numbers: it
+     * converts every key of the owner type before it compares, so no index on the column serves the
+     * query, and a key such as `5e2fa3c0-…` reads as 500.
+     */
+    public function bound(int|string $key): int|string
+    {
+        return $this === self::Text && is_int($key) ? (string) $key : $key;
+    }
+
+    /**
+     * Whether a conversion to this type keeps the keys the tables hold. Every bigint, UUID and ULID can be
+     * written as text, so a table with rows converts to `text`; no key of one of the other types can be
+     * written as another, so a conversion to one of them needs empty tables.
+     */
+    public function keepsEveryKey(): bool
+    {
+        return $this === self::Text;
     }
 }

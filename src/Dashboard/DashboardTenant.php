@@ -129,7 +129,7 @@ final readonly class DashboardTenant
     public function condition(): array
     {
         if ($this->identity instanceof TenantIdentity) {
-            return ['owner_type = ? AND owner_id = ?', [$this->identity->type, $this->identity->id]];
+            return ['owner_type = ? AND owner_id = ?', [$this->identity->type, OwnerKeyType::fromConfig()->bound($this->identity->id)]];
         }
 
         // All-tenants imposes no owner restriction at all. Returned as an always-true
@@ -162,7 +162,7 @@ final readonly class DashboardTenant
     public function rollupCondition(Dialect $dialect): array
     {
         if ($this->identity instanceof TenantIdentity) {
-            return ['owner_type = ? AND owner_id = ?', [$this->identity->type, $this->identity->id]];
+            return ['owner_type = ? AND owner_id = ?', [$this->identity->type, OwnerKeyType::fromConfig()->bound($this->identity->id)]];
         }
 
         // All-tenants reads every rollup row, so the dialect's null-owner representation is

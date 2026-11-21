@@ -220,6 +220,11 @@ final class WebhookMetricsController
      * PostgreSQL returns the offset in the string, so there the parse was already exact.
      * {@see Timestamp::read()} holds that decision for every reader.
      *
+     * The instant is written in UTC on both engines. PostgreSQL hands the bucket back in the zone
+     * of its session, so a session in a zone whose offset is not whole hours wrote an hour of UTC
+     * as, say, `22:45:00+05:45`: the right instant, but not the form a reader of an hourly series
+     * expects, and another form than MySQL's.
+     *
      * @param  mixed  $value  a column of the query row, as the driver returns it
      */
     private function toIso(mixed $value): string
@@ -228,7 +233,7 @@ final class WebhookMetricsController
             return '';
         }
 
-        return Timestamp::read(WebhookConnection::dialect(), $value)->toIso8601String();
+        return Timestamp::read(WebhookConnection::dialect(), $value)->utc()->toIso8601String();
     }
 
     /**

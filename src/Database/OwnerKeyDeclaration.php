@@ -32,7 +32,7 @@ use Throwable;
  * or needs its own indexes forks the two create-table migrations — a normal thing to do, and this
  * package's own docs describe the shape. The moment it happens, the column comes from the fork and
  * the setting comes from the config, and nothing holds the two together. The exception in the first
- * bullet is well written and names the cure exactly; it simply arrives at the first customer click,
+ * bullet is well written and names the cure exactly; it arrives at the first customer click,
  * months after the mistake was made.
  *
  * So the check reads the column rather than believing the setting, and it is deliberately
@@ -79,7 +79,7 @@ final class OwnerKeyDeclaration
         $declared = self::declared();
 
         if (! $declared instanceof OwnerKeyType) {
-            // A setting that is not one of the three throws at its point of use with a
+            // A setting that is not one of the four throws at its point of use with a
             // message of its own. Repeating that here would only give the same mistake two
             // voices, and this one is not the better of the two.
             return [];
@@ -181,7 +181,7 @@ final class OwnerKeyDeclaration
     }
 
     /**
-     * Which of the three declarable types a column spelling is, or null for none of them: the same
+     * Which of the four declarable types a column spelling is, or null for none of them: the same
      * reading this check applies, for the conversion that brings the columns to the declared type.
      */
     public static function typeOf(string $columnType): ?OwnerKeyType
@@ -190,7 +190,7 @@ final class OwnerKeyDeclaration
     }
 
     /**
-     * Which of the three declarable types a column spelling actually is.
+     * Which of the four declarable types a column spelling actually is.
      *
      * Read from the engine's own rendering rather than a table of expected spellings, because
      * the spellings differ per engine and per how the column was written: PostgreSQL answers
@@ -200,7 +200,10 @@ final class OwnerKeyDeclaration
      * The order is load-bearing, and the widths are the only thing separating two of them. MySQL
      * stores a UUID as `char(36)` and a ULID as `char(26)`: the type name is identical and only the
      * width tells them apart, so the character branches must test the width and must come after the
-     * two named types. Anything else answers null, and null is silence rather than a finding.
+     * two named types. `text` is a column of varying length, `character varying(64)` on PostgreSQL and
+     * `varchar(64)` on MySQL, which the fixed-width UUID and ULID columns never are, so it is told
+     * apart by its type name before the widths are read. Anything else answers null, and null is
+     * silence rather than a finding.
      */
     private static function classify(string $type): ?OwnerKeyType
     {
@@ -209,6 +212,7 @@ final class OwnerKeyDeclaration
         return match (true) {
             str_contains($normalized, 'uuid') => OwnerKeyType::Uuid,
             str_contains($normalized, 'int') => OwnerKeyType::Bigint,
+            str_contains($normalized, 'varchar'), str_contains($normalized, 'varying') => OwnerKeyType::Text,
             str_contains($normalized, '(36)') => OwnerKeyType::Uuid,
             str_contains($normalized, '(26)') => OwnerKeyType::Ulid,
             default => null,

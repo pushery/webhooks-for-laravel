@@ -154,7 +154,7 @@ final class ShippedIcons
             $advisories[] = sprintf(
                 'Your WireKit icon preset resolves the shipped screens\' icons into the \'%s\' set, and '
                 .'no set with that prefix is registered with Blade Icons, so the screens draw WireKit\'s '
-                .'inert placeholder where an icon belongs. They render — they are simply without '
+                .'inert placeholder where an icon belongs. They render — they are without '
                 .'iconography. %s',
                 $prefix,
                 $package !== null

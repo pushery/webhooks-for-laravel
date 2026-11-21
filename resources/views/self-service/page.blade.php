@@ -34,7 +34,10 @@
 
     <livewire:webhooks.self-service.endpoint-form wire:key="portal-form" />
     <livewire:webhooks.self-service.secret-panel wire:key="portal-secret" />
-    <livewire:webhooks.self-service.endpoint-list wire:key="portal-list" />
+    {{-- Rendered with the page rather than lazily. On a phone each endpoint stands as a card, and the list
+         grows taller than any floor its placeholder can hold, so swapping it in moved the deliveries below it
+         down the screen. A host that embeds the list on a screen of its own keeps the placeholder. --}}
+    <livewire:webhooks.self-service.endpoint-list wire:key="portal-list" :lazy="false" />
     <livewire:webhooks.self-service.endpoint-deliveries wire:key="portal-deliveries" />
 
     <x-wirekit::toast-region />

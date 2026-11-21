@@ -206,7 +206,10 @@ final readonly class Outbox
     private function relay(WebhookOutboxEntry $entry, int $delay = 0): void
     {
         $settings = new Settings;
-        $job = new RelayOutboxJob($entry->stream, $entry->stream === null ? $entry->message_id : null);
+        // The message id goes along for a worker still running an earlier release, whose turn finds the entry by it.
+        $job = $entry->stream === null
+            ? new RelayOutboxJob(null, $entry->message_id, $entry->id)
+            : new RelayOutboxJob($entry->stream, null);
         $job->onQueue($settings->outboxQueue());
         $job->onConnection($settings->outboxConnection());
 

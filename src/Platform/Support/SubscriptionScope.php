@@ -8,6 +8,7 @@ use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Pushery\Webhooks\Database\OwnerKeyType;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Support\TenantIdentity;
 use RuntimeException;
@@ -107,7 +108,7 @@ final class SubscriptionScope
      */
     private static function constrain(Builder $query, TenantIdentity $owner): Builder
     {
-        return $query->where('owner_type', $owner->type)->where('owner_id', $owner->id);
+        return $query->where('owner_type', $owner->type)->where('owner_id', OwnerKeyType::fromConfig()->bound($owner->id));
     }
 
     /**
@@ -173,7 +174,7 @@ final class SubscriptionScope
 
     /**
      * A Jetstream-style team when the user model exposes a currentTeam relation, read
-     * defensively so a plain user model (no team concept) simply falls through to the
+     * defensively so a plain user model (no team concept) falls through to the
      * user itself as its own tenant.
      */
     private static function currentTeam(Model $user): ?Model

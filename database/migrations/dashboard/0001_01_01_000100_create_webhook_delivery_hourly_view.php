@@ -71,7 +71,7 @@ return new class extends Migration
         // t-digest so the Tier-2 percentile driver can merge them across a window with
         // the extension's tdigest(tdigest) aggregate in O(buckets). The whole column is
         // guarded behind the extension check, so this migration still runs on a stock
-        // box without tdigest — the view simply omits the digest and the default 'live'
+        // box without tdigest — the view omits the digest and the default 'live'
         // driver keeps working.
         $bucket = $this->bucketExpression();
         $digest = TdigestExtension::isInstalled($this->getConnection())

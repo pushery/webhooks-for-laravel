@@ -23,7 +23,7 @@ final class TdigestExtension
 
     /**
      * Whether the tdigest extension is installed on the given connection (the default
-     * connection when null). A non-PostgreSQL connection simply reports false.
+     * connection when null). A non-PostgreSQL connection reports false.
      */
     public static function isInstalled(?string $connection = null): bool
     {

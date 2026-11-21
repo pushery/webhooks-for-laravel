@@ -279,6 +279,18 @@ final class Settings
     }
 
     /**
+     * What a delivery that names no secret, no secrets resolver and no doNotSign() does: `report` sends it unsigned
+     * and reports it to the exception handler, `refuse` refuses to build it. Any other value reads as `report`, the
+     * default, so a typo never refuses deliveries a host meant to send.
+     *
+     * @return 'report'|'refuse'
+     */
+    public function unsignedDeliveries(): string
+    {
+        return Config::get('webhooks.server.signing.unsigned') === 'refuse' ? 'refuse' : 'report';
+    }
+
+    /**
      * Whether the Server signs its deliveries asymmetrically with its own Ed25519
      * keypair. Off by default; while off, deliveries are signed with the symmetric
      * per-endpoint secret under the configured scheme.
