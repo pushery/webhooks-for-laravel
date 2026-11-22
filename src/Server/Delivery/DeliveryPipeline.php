@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pushery\Webhooks\Server\Delivery;
 
 use Illuminate\Contracts\Container\Container;
+use Illuminate\Support\Facades\Crypt;
 use Pushery\Webhooks\Core\Http\Exceptions\HostUnresolvable;
 use Pushery\Webhooks\Core\Http\Exceptions\NonRetryable;
 use Pushery\Webhooks\Core\Http\HttpTransport;
@@ -13,6 +14,7 @@ use Pushery\Webhooks\Core\Signing\SignatureScheme;
 use Pushery\Webhooks\Core\Signing\WebhookMessage;
 use Pushery\Webhooks\Core\Ssrf\SsrfGuard;
 use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
+use Pushery\Webhooks\Server\Exceptions\UnknownBearerTokenResolver;
 use Pushery\Webhooks\Server\Exceptions\UnknownSecretsResolver;
 use Pushery\Webhooks\Server\Exceptions\UnknownSignatureScheme;
 use Pushery\Webhooks\Server\Signing\ResolvesDeliverySecrets;
@@ -106,9 +108,23 @@ final readonly class DeliveryPipeline
     }
 
     /**
+     * The headers of this attempt: the delivery's own, its signature, and `Authorization` where it sends a bearer
+     * token.
+     *
      * @return array<string, string>
      */
     private function headersFor(WebhookDeliveryData $data): array
+    {
+        $token = $this->bearerTokenFor($data);
+        $headers = $this->signedHeadersFor($data);
+
+        return $token === null ? $headers : [...$headers, 'Authorization' => BearerToken::header($token)];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function signedHeadersFor(WebhookDeliveryData $data): array
     {
         if ($data->doNotSign) {
             return $data->headers;
@@ -129,6 +145,29 @@ final readonly class DeliveryPipeline
         $signature = $scheme->sign(WebhookMessage::for($data->rawBody, $data->messageId), $secrets);
 
         return array_merge($data->headers, $signature->toArray());
+    }
+
+    /**
+     * The bearer token this attempt sends: the one the delivery's resolver names now, where it was dispatched with
+     * one, otherwise the one it was queued with, unsealed, or null where it sends none.
+     */
+    private function bearerTokenFor(WebhookDeliveryData $data): ?string
+    {
+        $class = $data->bearerTokenResolver();
+
+        if ($class !== null) {
+            $resolver = $this->container->make($class);
+
+            if (! $resolver instanceof ResolvesBearerTokens) {
+                throw UnknownBearerTokenResolver::for($class);
+            }
+
+            return $resolver->tokenFor($data);
+        }
+
+        $sealed = $data->encryptedBearerToken();
+
+        return $sealed === null ? null : Crypt::decryptString($sealed);
     }
 
     /**

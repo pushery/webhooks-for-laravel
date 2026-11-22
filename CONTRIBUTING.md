@@ -45,7 +45,7 @@ If you already have the fix, include it in the issue — a diff, a patch, or a l
 a branch on your fork. It is applied upstream with the same review as any internal
 change, and you are credited in the [changelog](CHANGELOG.md) entry that ships it. If
 you open a pull request instead, it is read as a patch and then closed with a link to
-the release that carries the change; nothing is lost, it simply cannot land through
+the release that carries the change; nothing is lost, it cannot land through
 this repository's git history.
 
 ## The bar a change has to clear

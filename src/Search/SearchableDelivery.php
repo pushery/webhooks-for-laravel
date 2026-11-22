@@ -8,6 +8,7 @@ use Illuminate\Support\Str;
 use Laravel\Scout\Builder;
 use Laravel\Scout\Searchable;
 use Pushery\Webhooks\Core\Http\ErrorMessageRedactor;
+use Pushery\Webhooks\Database\OwnerKeyType;
 use Pushery\Webhooks\Support\Settings;
 
 /**
@@ -79,7 +80,7 @@ trait SearchableDelivery
     {
         return static::search($query)
             ->where('owner_type', $ownerType)
-            ->where('owner_id', $ownerId);
+            ->where('owner_id', OwnerKeyType::fromConfig()->bound($ownerId));
     }
 
     /**

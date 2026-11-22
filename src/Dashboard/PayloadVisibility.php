@@ -30,7 +30,7 @@ use Illuminate\Support\Facades\Gate;
  * Denial does not mean a blank space. The default fallback redacts: the structure of the body
  * survives, its values do not. That is a deliberate design choice rather than a softer one —
  * for debugging, the shape of a body is almost always the useful part, and a drawer that
- * simply stops after its heading reads as a defect, which is how a guard gets "repaired" out
+ * stops after its heading reads as a defect, which is how a guard gets "repaired" out
  * of existence by the next person to look at it.
  *
  * @internal Engine internals, deliberately. A host's extension points here are the ability and

@@ -156,7 +156,7 @@ final class TransportExceptionNormalizer
         // The response-less sibling guzzle 8 raises for the same errno when no headers had
         // arrived — so both wire events, and both majors, reach Laravel in one shape and
         // persist the same errno 28 text. The original is kept as `previous`, which is more
-        // than guzzle 7 offers: there the partial response is simply dropped.
+        // than guzzle 7 offers: there the partial response is dropped.
         return new NetworkTimeoutException(
             $exception->getMessage(),
             $exception->getRequest(),

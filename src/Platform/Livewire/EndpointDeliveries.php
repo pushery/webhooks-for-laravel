@@ -16,6 +16,7 @@ use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Pushery\Webhooks\Database\OwnerKeyType;
 use Pushery\Webhooks\Enums\DeliveryStatus;
 use Pushery\Webhooks\Facades\Webhooks;
 use Pushery\Webhooks\Models\WebhookDelivery;
@@ -93,7 +94,7 @@ final class EndpointDeliveries extends Component
      * tenant-facing copy of the same control, and it had neither the cap nor the select().
      *
      * When it truncates the view says so. A short list that looks complete is how a reader
-     * concludes an endpoint has no deliveries when it was simply never offered.
+     * concludes an endpoint has no deliveries when it was never offered.
      */
     private const int ENDPOINT_OPTIONS = 200;
 
@@ -217,7 +218,7 @@ final class EndpointDeliveries extends Component
      *
      * These cannot widen the window, because they are added to it rather than used instead of it.
      * The window's own lower bound stays on the query unconditionally, so a `from` older than the
-     * host's ceiling is ANDed with it and the older of the two simply loses. That is what keeps
+     * host's ceiling is ANDed with it and the older of the two loses. That is what keeps
      * this pair safe on a panel where `windowDays` had to be clamped by hand: a reader may ask a
      * narrower question, never a wider one.
      *
@@ -541,7 +542,7 @@ final class EndpointDeliveries extends Component
             if ($owner instanceof TenantIdentity) {
                 $scope->where(fn (Builder $pair): Builder => $pair
                     ->where('owner_type', $owner->type)
-                    ->where('owner_id', $owner->id));
+                    ->where('owner_id', OwnerKeyType::fromConfig()->bound($owner->id)));
             }
 
             if ($readable !== []) {

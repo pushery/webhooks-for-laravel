@@ -135,8 +135,9 @@ final readonly class WebhookManager
 
     /**
      * Delete every stored copy of these events: their rows in the delivery log, redeliveries
-     * included, their entries in the search index, and their offloaded payload objects where no
-     * other row still points at one. A delivery of them still waiting in the queue is not sent.
+     * included, their entries in the search index and in the transactional outbox, and their
+     * offloaded payload objects where no other row still points at one. A delivery of them still
+     * waiting in the queue or in the outbox is not sent.
      *
      * An event id is the `event_id` a delivery carries, the one {@see self::dispatch()} hands back
      * on every delivery of the fan-out and {@see self::dispatchTo()} on its one delivery. Keep it
@@ -440,7 +441,7 @@ final readonly class WebhookManager
         throw new InvalidArgumentException(sprintf(
             'A webhook subscription owner key (%s) cannot be stored as the configured '
             .'webhooks.platform.owner_key_type "%s". Set it to match the primary-key type of your '
-            .'owner models (bigint, uuid or ulid) and migrate, or leave the subscription global by '
+            .'owner models (bigint, uuid or ulid, or text where they key by different types) and migrate, or leave the subscription global by '
             .'passing a null owner.',
             $shown,
             $type->value,

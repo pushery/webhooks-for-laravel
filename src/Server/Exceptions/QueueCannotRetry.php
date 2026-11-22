@@ -22,7 +22,7 @@ use Throwable;
  * never called, and the row sat at its non-final state for ever. That is the exact state
  * {@see CallWebhookJob} promises cannot happen — *"no path may
  * end without a terminal event"* — and it is the one failure observability itself cannot
- * see, because nothing is wrong with any of the numbers, there is simply a row nobody
+ * see, because nothing is wrong with any of the numbers, there is a row nobody
  * finishes.
  *
  * It carries the original failure as its previous exception: the delivery failed for a

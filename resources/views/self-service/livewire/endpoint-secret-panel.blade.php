@@ -17,7 +17,7 @@
 
      A file rather than an inline script: the registration used to ride in this block as an
      inline `<script>` with an optional nonce, and under a strict nonce-less policy
-     (`script-src 'self'`, which an application is entitled to choose) the browser simply
+     (`script-src 'self'`, which an application is entitled to choose) the browser
      refused to run it. Nothing threw, nothing reached a log, and a CSP audit read the
      expression as valid — the panel was dead and looked fine. Served from the app's own
      origin it runs under every policy, with nothing for the host to configure. --}}

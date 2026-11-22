@@ -251,6 +251,21 @@ return [
         'ping_throttled' => 'This endpoint has had its test events for now. Try again in :seconds second(s).',
     ],
 
+    // A save that found the endpoint changed by somebody else since the reader opened it. Nothing is
+    // written, and :fields lists what changed, joined from the names under `fields`.
+    'conflict' => [
+        'endpoint' => 'Someone else changed this endpoint while you had it open: :fields. Nothing was saved. Close the form and open the endpoint again to see the current values.',
+        'transform' => 'Someone else changed the payload settings of this endpoint after you opened this page: :fields. Nothing was saved. Reload the page to see the current settings.',
+        'fields' => [
+            'name' => 'name',
+            'url' => 'URL',
+            'event_types' => 'event types',
+            'active' => 'on or off',
+            'version' => 'payload version',
+            'transform' => 'transform rules',
+        ],
+    ],
+
     // The form's own validation copy, passed to the validator as custom messages and
     // attribute names, so a refused save speaks the reader's language rather than the
     // framework's default English lines.

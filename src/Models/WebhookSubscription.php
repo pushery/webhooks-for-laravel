@@ -18,6 +18,7 @@ use Pushery\Webhooks\Database\Concerns\Replaceable;
 use Pushery\Webhooks\Database\Concerns\ScopesByTimestamp;
 use Pushery\Webhooks\Database\Concerns\UsesWebhookConnection;
 use Pushery\Webhooks\Database\Factories\WebhookSubscriptionFactory;
+use Pushery\Webhooks\Database\OwnerKeyType;
 use Pushery\Webhooks\Livewire\SubscriptionManager;
 use Pushery\Webhooks\Platform\Livewire\EndpointForm;
 use Pushery\Webhooks\Support\EventTypeList;
@@ -252,9 +253,11 @@ class WebhookSubscription extends Model
             $inner->whereNull('owner_id');
 
             if ($tenant instanceof Model) {
-                $inner->orWhere(function (Builder $owned) use ($tenant): void {
+                $key = $tenant->getKey();
+
+                $inner->orWhere(function (Builder $owned) use ($tenant, $key): void {
                     $owned->where('owner_type', $tenant->getMorphClass())
-                        ->where('owner_id', $tenant->getKey());
+                        ->where('owner_id', is_int($key) || is_string($key) ? OwnerKeyType::fromConfig()->bound($key) : $key);
                 });
             }
         });

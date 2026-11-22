@@ -17,7 +17,7 @@ use Pushery\Webhooks\Models\WebhookDelivery;
 /**
  * The slide-in detail drawer for one delivery: payload, the attempt count and a
  * replay action. Opened by a 'show-delivery' event from the deliveries table and
- * always tenant-scoped, so a foreign delivery id simply resolves to nothing.
+ * always tenant-scoped, so a foreign delivery id resolves to nothing.
  *
  * The body is gated separately from the rest of the drawer — reading that a delivery
  * failed and reading whose order it was are different permission levels. See

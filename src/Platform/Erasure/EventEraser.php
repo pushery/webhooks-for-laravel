@@ -10,6 +10,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use Pushery\Webhooks\Search\SearchIndexer;
+use Pushery\Webhooks\Server\Models\WebhookOutboxEntry;
 use Pushery\Webhooks\Support\TableLookup;
 use Pushery\Webhooks\Support\Timestamp;
 use Pushery\Webhooks\Support\WebhookConnection;
@@ -17,7 +18,8 @@ use RuntimeException;
 
 /**
  * Deletes every stored copy of the events a caller names: their rows in the delivery log, the
- * search index entries of those rows, and the offloaded payload objects nothing else points at.
+ * search index entries of those rows, their entries in the transactional outbox, and the offloaded
+ * payload objects nothing else points at.
  *
  * The rows are read and deleted through the TABLE, not through `webhooks.models`: a host's model
  * may carry a global scope, and a deletion that went through it would leave the rows the scope
@@ -49,7 +51,7 @@ final class EventEraser
         $ids = $this->validated($eventIds);
 
         if ($ids === []) {
-            return new ForgottenEvents(0, 0, 0);
+            return new ForgottenEvents(0, 0, 0, 0);
         }
 
         $rowIds = [];
@@ -68,6 +70,7 @@ final class EventEraser
         SearchIndexer::unindexDeliveries($rowIds);
 
         $deleted = $this->rows($ids)->delete();
+        $outboxEntries = $this->deleteOutboxEntries($ids);
 
         $orphans = array_values(array_filter($objects, fn (array $object): bool => ! $this->stillReferenced(...$object)));
 
@@ -95,7 +98,34 @@ final class EventEraser
         // Outside a transaction this runs at once; inside one, when it commits.
         $connection instanceof Connection ? $connection->afterCommit($deleteObjects) : $deleteObjects();
 
-        return new ForgottenEvents($deleted, count($orphans), count($objects) - count($orphans));
+        return new ForgottenEvents($deleted, count($orphans), count($objects) - count($orphans), $outboxEntries);
+    }
+
+    /**
+     * Deletes the entries of the transactional outbox these events were recorded as, in every state,
+     * and returns how many there were.
+     *
+     * An entry holds the delivery sealed whole, under the event id as its message id. One still
+     * waiting would not be sent, because the delivery gate refuses a delivery whose log row is gone,
+     * but it would end refused and keep its sealed copy until pruning. Deleted, it holds no stream
+     * back either: the relay waits only for earlier entries that are still there.
+     *
+     * Deleted through the table of the configured model, the one the relay sends from, and not
+     * through the model, so that a global scope there cannot hide an entry from the erasure. Where
+     * the outbox was never migrated there is no table and nothing to delete.
+     *
+     * @param  non-empty-list<string>  $ids
+     */
+    private function deleteOutboxEntries(array $ids): int
+    {
+        $model = WebhookOutboxEntry::model();
+        $table = new $model()->getTable();
+
+        if (! TableLookup::exists($table, WebhookConnection::name())) {
+            return 0;
+        }
+
+        return WebhookConnection::db()->table($table)->whereIn('message_id', $ids)->delete();
     }
 
     /**

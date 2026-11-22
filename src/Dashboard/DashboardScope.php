@@ -272,7 +272,7 @@ final class DashboardScope
 
     /**
      * A Jetstream-style team when the user model exposes a currentTeam relation, read
-     * defensively so a plain user model (no team concept) simply falls through to the
+     * defensively so a plain user model (no team concept) falls through to the
      * user itself as its own tenant — mirrors SubscriptionScope so both agree.
      */
     private static function currentTeam(Model $user): ?Model

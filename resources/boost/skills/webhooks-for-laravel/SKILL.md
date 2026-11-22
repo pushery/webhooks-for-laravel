@@ -160,6 +160,19 @@ in `failed_jobs` (`webhooks.server.encrypt_jobs`, on by default). A listener of 
 attempt event that implements `ShouldQueue` writes a job of its own with the
 delivery in it, so give it `ShouldBeEncrypted` as well.
 
+A receiver behind an API gateway that asks every request for a key it issued gets it
+with `->useBearerToken($token)`, sent as `Authorization: Bearer` beside the signature
+and sealed in the queue like the secret. To send the key that holds at each attempt,
+name a class implementing `Pushery\Webhooks\Server\Delivery\ResolvesBearerTokens` with
+`->resolveBearerTokenUsing()`. Never put such a key into `withHeaders()`: those headers
+stand in the queue in cleartext.
+
+An event about one resource carries it in the shape of the API with
+`->payload(Pushery\Webhooks\Server\JsonApiPayload::for($type, $resource))`, where
+`$resource` is the application's `JsonApiResource`: Standard Webhooks' envelope of
+`type`, `timestamp` and `data`, with the resource object the API answers under `data`.
+Do not wrap a whole JSON:API document into `data`; the envelope is no document.
+
 **Fan an event out, or aim it at one endpoint.** With the Platform layer on,
 `Webhooks::dispatch($type, $payload, $tenant)` delivers to every active endpoint
 subscribed to that type. Its third argument narrows to a **tenant**, not to an
@@ -208,6 +221,8 @@ Webhooks::dispatch('invoice.paid', $payload, $team, eventId: $event->id);
 ```
 
 ```php
+namespace App\Jobs;
+
 use Pushery\Webhooks\Client\Jobs\ProcessWebhookJob;
 
 class HandlePartnerWebhook extends ProcessWebhookJob
@@ -385,7 +400,9 @@ Seven more are for the application to run when it needs them:
 - `webhooks:owner-key-type` changes the `owner_id` columns of the subscriptions
   table, the delivery log and the dashboard rollup to `platform.owner_key_type`, for
   an installation migrated before it chose the type. It runs only while those
-  tables are empty and exits non-zero otherwise; `--dry-run` reports what would change.
+  tables are empty and exits non-zero otherwise, except toward `text`, where every row
+  keeps its key; `--dry-run` reports what would change. `text` is the type for owners
+  of different key types in the same tables, such as a numbered account and a UUID workspace.
 - `webhooks:import-calls`, with the Client layer on, backfills the `webhook_calls`
   log from the inbound-webhook table the application used before this package. It
   can run again without duplicating rows.
@@ -402,6 +419,8 @@ needs no inbound receiving, no portal and no dashboard:
 ```
 
 ```php
+namespace App\Listeners;
+
 use App\Events\InvoicePaid;
 use Pushery\Webhooks\Server\PendingWebhook;
 
@@ -465,6 +484,11 @@ this; it passes carrier-grade NAT, site-local IPv6 and `::7f00:1` as public.
   the layers the application actually switched on.
 - Do not set `server.enabled=false` alone to stop outbound delivery. Platform
   boots Server regardless; set both.
+- Do not dispatch without `useSecret()`, `useSecrets()` or `resolveSecretsUsing()`
+  unless the delivery is meant to go unsigned, and then say so with `doNotSign()`.
+  Without either it is reported as `UnsignedDeliveryNotChosen`, or refused under
+  `server.signing.unsigned` = `refuse`. Keep the copy every setter returns:
+  `$call->doNotSign();` on a line of its own changes nothing.
 - Do not verify inbound signatures by hand. The Client layer's pipeline handles
   verification, replay windows and de-duplication; a hand-rolled comparison is
   where timing leaks and replay holes come from.
@@ -501,6 +525,14 @@ this; it passes carrier-grade NAT, site-local IPv6 and `::7f00:1` as public.
   from a route. The package registers its commands only in the console, so that route
   passes every test and fails in production. Return `Webhooks::asyncApi()` from the
   route instead; it builds the same document from the catalog.
+- Do not put a customer's host on `core.ssrf.allowed_hosts`, and do not switch
+  `core.ssrf.block_private_networks` off for one. Every address a customer chooses goes
+  through the guard before it is called: a delivery's endpoint by itself, any other call
+  through `GuardedFetch`. A host on `allowed_hosts` skips the guard altogether.
+- Do not sign the calls between services of your own with `SignsRequests` where they
+  pass an API gateway. Such a call shows who sends it with a key the receiving service
+  issued, as `Authorization: Bearer`. `SignsRequests` and `VerifySignedRequest` are for a
+  third party that asks for signed calls or sends them.
 
 ## Further reading
 

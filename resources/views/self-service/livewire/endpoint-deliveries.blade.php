@@ -64,7 +64,7 @@
                  minute. Each is handed what the property holds through FilterBound::shown(), since
                  a link or a host may still pass a day, which the picker cannot show. The pair
                  narrows within the window above and can never reach past it — the window's own
-                 bound stays on the query, so the older of the two bounds simply loses.
+                 bound stays on the query, so the older of the two bounds loses.
 
                  Every filter of the row shows its label, the lists as well as the two pickers,
                  and the row lines them up at the top: with a label above each control the controls
@@ -108,7 +108,7 @@
 
             @if ($endpointsTruncated)
                 {{-- Said out loud rather than truncated in silence: a list that looks complete
-                     is how a reader concludes an endpoint has no deliveries when it was simply
+                     is how a reader concludes an endpoint has no deliveries when it was
                      never offered. --}}
                 <x-wirekit::text size="sm" intent="muted">{{ __('webhooks::self-service.deliveries.endpoints_truncated') }}</x-wirekit::text>
             @endif

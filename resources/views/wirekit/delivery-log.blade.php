@@ -133,7 +133,7 @@
 
     @if ($endpointsTruncated)
         {{-- Said out loud rather than truncated in silence: a list that looks complete is how a
-             reader concludes an endpoint has no deliveries when it was simply never offered. --}}
+             reader concludes an endpoint has no deliveries when it was never offered. --}}
         <x-wirekit::text size="sm" intent="muted">{{ __('webhooks::management.filters.endpoints_truncated') }}</x-wirekit::text>
     @endif
 

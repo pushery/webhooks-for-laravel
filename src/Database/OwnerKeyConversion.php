@@ -12,14 +12,17 @@ use Pushery\Webhooks\Support\TableLookup;
 use RuntimeException;
 
 /**
- * Brings the `owner_id` columns of an installation whose tables hold no rows to another owner_key_type.
+ * Brings the `owner_id` columns of an installation whose tables hold no rows to another owner_key_type,
+ * and those of one whose tables hold rows to `text`.
  *
  * The type is rendered at migration time from `webhooks.platform.owner_key_type`, into the subscriptions
  * table, the delivery log and the dashboard rollup: a materialized view over the delivery log on
  * PostgreSQL, a table of its own on MySQL. An installation migrated before the setting was chosen keeps
  * the columns it got. This class changes each of them to what a fresh migration with the configured type
- * creates, and only while the tables are empty: a row's key is of the old type, and no conversion
- * carries it to the new one.
+ * creates. Toward bigint, uuid or ulid it does so only while the tables are empty: a row's key is of the
+ * old type, and no conversion carries it to another of them. Toward `text` the rows keep their keys,
+ * because every key of the other types can be written as text, and the rollup's global rows take the
+ * text sentinel in place of the old one.
  *
  * PostgreSQL does not change the type of a column a view selects, so the rollup view is dropped and
  * created again from its stored definition and indexes, in one transaction with the column changes and
@@ -94,18 +97,18 @@ final readonly class OwnerKeyConversion
     /**
      * Change every owner_id that is not of the given type to it.
      *
-     * A table with rows ends the run before any statement: on PostgreSQL the change would set every
-     * key to null, and on MySQL it would have to convert keys no conversion can turn into keys of the
-     * other type.
+     * Toward a type that does not keep every key, a table with rows ends the run before any statement:
+     * on PostgreSQL the change would set every key to null, and on MySQL it would have to convert keys no
+     * conversion can turn into keys of the other type. Toward `text` each key is written as text.
      *
-     * @throws RuntimeException when a table the type spans holds a row
+     * @throws RuntimeException when a table the type spans holds a row and the type does not keep every key
      */
     public function convert(OwnerKeyType $target): void
     {
         $db = DB::connection($this->connection);
 
         if (Dialect::for($this->connection) === Dialect::MySql) {
-            $this->refuseOccupied();
+            $this->refuseOccupied($target);
             $this->convertMySql($db, $target, array_keys($this->pending($target)));
 
             return;
@@ -113,13 +116,17 @@ final readonly class OwnerKeyConversion
 
         $db->transaction(function () use ($db, $target): void {
             $this->lockPostgresTables($db);
-            $this->refuseOccupied();
+            $this->refuseOccupied($target);
             $this->convertPostgres($db, $target, array_keys($this->pending($target)));
         });
     }
 
-    private function refuseOccupied(): void
+    private function refuseOccupied(OwnerKeyType $target): void
     {
+        if ($target->keepsEveryKey()) {
+            return;
+        }
+
         $occupied = $this->occupied();
 
         if ($occupied !== []) {
@@ -161,13 +168,16 @@ final readonly class OwnerKeyConversion
 
         $type = $target->rawType(Dialect::Pgsql);
 
+        // Toward text each key is written as text. Toward another type the tables are empty, so the new
+        // column starts empty as well: no key is carried over.
+        $using = $target->keepsEveryKey() ? 'owner_id::text' : 'NULL::'.$type;
+
         foreach ($tables as $table) {
-            // The tables are empty, so the new column starts empty as well: no key is carried over.
             $db->statement(sprintf(
-                'ALTER TABLE %s ALTER COLUMN owner_id TYPE %s USING NULL::%s',
+                'ALTER TABLE %s ALTER COLUMN owner_id TYPE %s USING %s',
                 $db->getQueryGrammar()->wrapTable(TableLookup::qualified($table, $this->connection)),
                 $type,
-                $type,
+                $using,
             ));
         }
 
@@ -249,6 +259,12 @@ final readonly class OwnerKeyConversion
                     $target === OwnerKeyType::Bigint ? '' : ' COLLATE utf8mb4_0900_as_cs',
                     $target->sentinelId(),
                 ));
+
+                // A global row kept the old sentinel, written as text: `0` or the nil UUID. Its owner_type
+                // is the empty string, which no owner has, so those rows take the text sentinel.
+                if ($target->keepsEveryKey()) {
+                    $db->table($table)->where('owner_type', '')->update(['owner_id' => $target->sentinelId()]);
+                }
 
                 continue;
             }

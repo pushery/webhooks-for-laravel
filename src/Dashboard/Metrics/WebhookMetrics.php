@@ -165,7 +165,7 @@ final readonly class WebhookMetrics
      *
      * It is measured against the raw rows rather than against the clock, and that is what keeps it
      * quiet on a quiet installation. Comparing the newest rollup bucket to `now()` reports every
-     * endpoint that simply had no traffic as stale; comparing it to the newest delivery reports
+     * endpoint that had no traffic as stale; comparing it to the newest delivery reports
      * only the case where rows exist that the rollup has not seen. No traffic, no lag, no warning.
      *
      * Null has two causes and they are the same answer: nothing to summarize yet, or the rollup

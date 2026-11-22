@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Date;
 use Pushery\Webhooks\Core\Signing\SecretSet;
 use Pushery\Webhooks\Core\Signing\SignatureScheme;
 use Pushery\Webhooks\Server\Backoff\BackoffStrategy;
+use Pushery\Webhooks\Server\Delivery\ResolvesBearerTokens;
 use Pushery\Webhooks\Server\Jobs\CallWebhookJob;
 use Pushery\Webhooks\Server\Signing\EncryptedSecretResolver;
 use Pushery\Webhooks\Server\Signing\ResolvesDeliverySecrets;
@@ -36,7 +37,9 @@ use RuntimeException;
  * tries with a time to keep trying, and {@see self::$retryUntil} is the moment that time
  * ends. {@see self::$retryableProblemTypes} names the problem types a 4xx answer is retried
  * for, and {@see self::$secretsResolver} the class each attempt asks for its secrets in place
- * of the sealed ones. A job queued by an earlier version carries none of these five, nor
+ * of the sealed ones. {@see self::$encryptedBearerToken} is the bearer token every attempt sends,
+ * sealed like the secret, and {@see self::$bearerTokenResolver} the class each attempt asks for one
+ * instead. A job queued by an earlier version carries none of these seven, nor
  * {@see self::$streamWaits}: a readonly property the serialized job never had stays
  * uninitialized when it is unserialized, so they are read through the methods below, which
  * answer the defaults for such a job instead of throwing in the worker.
@@ -55,6 +58,9 @@ final readonly class WebhookDeliveryData
      * @param  ?list<string>  $retryableProblemTypes  the problem types a 4xx answer is retried for, null for none
      * @param  ?class-string<ResolvesDeliverySecrets>  $secretsResolver  the class each attempt asks for its secrets, or
      *                                                                   null to sign with the sealed ones
+     * @param  ?string  $encryptedBearerToken  the bearer token every attempt sends, sealed, or null for none
+     * @param  ?class-string<ResolvesBearerTokens>  $bearerTokenResolver  the class each attempt asks for its bearer
+     *                                                                    token, or null to send the sealed one
      */
     public function __construct(
         public string $messageId,
@@ -78,6 +84,8 @@ final readonly class WebhookDeliveryData
         public ?int $streamWaits = null,
         public ?array $retryableProblemTypes = null,
         public ?string $secretsResolver = null,
+        public ?string $encryptedBearerToken = null,
+        public ?string $bearerTokenResolver = null,
     ) {}
 
     /**
@@ -148,6 +156,26 @@ final readonly class WebhookDeliveryData
     }
 
     /**
+     * The bearer token this delivery was queued with, sealed with the application key, or null where it sends none
+     * or asks {@see self::bearerTokenResolver()} for one at each attempt.
+     */
+    public function encryptedBearerToken(): ?string
+    {
+        return $this->encryptedBearerToken ?? null;
+    }
+
+    /**
+     * The class each attempt of this delivery asks for the bearer token it sends, or null where it sends the one it
+     * was queued with, or none.
+     *
+     * @return ?class-string<ResolvesBearerTokens>
+     */
+    public function bearerTokenResolver(): ?string
+    {
+        return $this->bearerTokenResolver ?? null;
+    }
+
+    /**
      * The secrets this delivery carries, unsealed: the current one and, during a rotation window, the previous one
      * beside it. Null for an unsigned delivery and for one whose {@see self::secretsResolver()} names a class, which
      * carries no secret and signs each attempt with what that class returns.
@@ -174,6 +202,7 @@ final readonly class WebhookDeliveryData
             $this->streamWaits(),
             $this->retryUntil(),
             $this->encryptedSecret,
+            $this->encryptedBearerToken(),
             $this->options,
         );
     }
@@ -193,6 +222,7 @@ final readonly class WebhookDeliveryData
             $this->streamWaits() + 1,
             $seconds === null ? null : Date::now()->getTimestamp() + $delay + $seconds,
             $this->encryptedSecret,
+            $this->encryptedBearerToken(),
             $this->options,
         );
     }
@@ -212,6 +242,7 @@ final readonly class WebhookDeliveryData
             $this->streamWaits(),
             $until === null ? null : $until + $delay,
             $this->encryptedSecret,
+            $this->encryptedBearerToken(),
             $this->options,
         );
     }
@@ -230,14 +261,15 @@ final readonly class WebhookDeliveryData
             0,
             $seconds === null ? null : Date::now()->getTimestamp() + $seconds,
             $this->encryptedSecret,
+            $this->encryptedBearerToken(),
             $this->options,
         );
     }
 
     /**
      * The same delivery with each value it carries sealed with the application key replaced by
-     * what $reseal returns for it: the signing secrets, and the proxy and the client certificate's
-     * passphrase of its options. Everything else stays as it is, the progress of its attempts
+     * what $reseal returns for it: the signing secrets, the bearer token, and the proxy and the client
+     * certificate's passphrase of its options. Everything else stays as it is, the progress of its attempts
      * included.
      *
      * A value sealed under a key that has left `app.previous_keys` can no longer be opened, so a
@@ -248,12 +280,15 @@ final readonly class WebhookDeliveryData
      */
     public function resealed(Closure $reseal): self
     {
+        $token = $this->encryptedBearerToken();
+
         return $this->continued(
             $this->attemptOffset,
             $this->retryAfterDeferrals,
             $this->streamWaits(),
             $this->retryUntil(),
             $this->encryptedSecret === null ? null : $reseal($this->encryptedSecret),
+            $token === null ? null : $reseal($token),
             $this->options->resealed($reseal),
         );
     }
@@ -264,6 +299,7 @@ final readonly class WebhookDeliveryData
         int $streamWaits,
         ?int $retryUntil,
         ?string $encryptedSecret,
+        ?string $encryptedBearerToken,
         DeliveryOptions $options,
     ): self {
         return new self(
@@ -288,6 +324,8 @@ final readonly class WebhookDeliveryData
             streamWaits: $streamWaits,
             retryableProblemTypes: $this->retryableProblemTypes(),
             secretsResolver: $this->secretsResolver(),
+            encryptedBearerToken: $encryptedBearerToken,
+            bearerTokenResolver: $this->bearerTokenResolver(),
         );
     }
 }

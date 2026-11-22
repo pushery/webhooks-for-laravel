@@ -157,15 +157,17 @@ final readonly class GuardedFetch
      * @param  int  $connectTimeout  seconds to wait for the connection
      * @param  int  $timeout  seconds the whole transfer may take
      * @param  bool  $truncate  hand back the head of a longer body instead of refusing it
+     * @param  ?EgressAddresses  $from  the local addresses the request leaves from, one per family, or null for the default route
      *
      * @throws BlockedDestination when the guard refuses the URL
      * @throws HostUnresolvable when the host resolves to no address
      * @throws ResponseTooLarge when the body is longer than `$maxBytes` and `$truncate` is false
      * @throws MalformedResponseFraming when the response declares its length and is chunked as well
      * @throws ResponseTimedOut when the server accepted the connection and its answer took longer than `$timeout`
-     * @throws ConnectionException when the connection fails, or a timeout strikes while it is made
+     * @throws ConnectionException when the connection fails, or a timeout strikes while it is made, or `$from` names
+     *                             no address in a family the destination has
      */
-    public function get(string $url, int $maxBytes, array $headers = [], int $connectTimeout = 3, int $timeout = 10, bool $truncate = false): FetchedResponse
+    public function get(string $url, int $maxBytes, array $headers = [], int $connectTimeout = 3, int $timeout = 10, bool $truncate = false, ?EgressAddresses $from = null): FetchedResponse
     {
         if ($maxBytes < 0) {
             throw new InvalidArgumentException('The byte limit of a fetch is never negative.');
@@ -174,7 +176,7 @@ final readonly class GuardedFetch
         $endpoint = $this->guard->resolveAndPin($url);
         $sink = new LimitedSink($maxBytes, keepHead: $truncate);
 
-        $options = $this->transportOptions($endpoint, $connectTimeout, $timeout) + [
+        $options = $this->transportOptions($endpoint, $connectTimeout, $timeout, $from) + [
             'sink' => $sink,
             'on_headers' => static function (ResponseInterface $response) use ($sink, $truncate): void {
                 // A cut transfer ends in an exception, so the sink keeps the status and the headers
@@ -257,20 +259,22 @@ final readonly class GuardedFetch
      * @param  array<string, string>  $headers  request headers, such as `Accept`
      * @param  int  $connectTimeout  seconds to wait for the connection
      * @param  int  $timeout  seconds the transfer may take until the headers are in
+     * @param  ?EgressAddresses  $from  the local addresses the request leaves from, one per family, or null for the default route
      * @return FetchedResponse its body always empty
      *
      * @throws BlockedDestination when the guard refuses the URL
      * @throws HostUnresolvable when the host resolves to no address
      * @throws MalformedResponseFraming when the response declares its length and is chunked as well
      * @throws ResponseTimedOut when the server accepted the connection and its headers took longer than `$timeout`
-     * @throws ConnectionException when the connection fails, or a timeout strikes while it is made
+     * @throws ConnectionException when the connection fails, or a timeout strikes while it is made, or `$from` names
+     *                             no address in a family the destination has
      */
-    public function lead(string $url, array $headers = [], int $connectTimeout = 3, int $timeout = 10): FetchedResponse
+    public function lead(string $url, array $headers = [], int $connectTimeout = 3, int $timeout = 10, ?EgressAddresses $from = null): FetchedResponse
     {
         $endpoint = $this->vetWhereItLeads($url);
         $head = new ResponseHead;
 
-        $options = $this->transportOptions($endpoint, $connectTimeout, $timeout) + [
+        $options = $this->transportOptions($endpoint, $connectTimeout, $timeout, $from) + [
             'on_headers' => $head->keep(...),
         ];
 
@@ -364,11 +368,17 @@ final readonly class GuardedFetch
 
     /**
      * The transport options of both requests: the timeouts, no redirect followed, TLS verified,
-     * nothing inflated, no proxy, and the connection pinned to the vetted addresses.
+     * nothing inflated, no proxy, and the connection pinned to the vetted addresses, bound to a
+     * local address of its family where the caller names any.
+     *
+     * Asked before the transfer starts, so a destination without an address in a family the caller
+     * may leave from is refused before anything is sent.
      *
      * @return array<string, mixed>
+     *
+     * @throws ConnectionException when `$from` names no address in a family the destination has
      */
-    private function transportOptions(PinnedEndpoint $endpoint, int $connectTimeout, int $timeout): array
+    private function transportOptions(PinnedEndpoint $endpoint, int $connectTimeout, int $timeout, ?EgressAddresses $from = null): array
     {
         $options = [
             'connect_timeout' => $connectTimeout,
@@ -378,6 +388,10 @@ final readonly class GuardedFetch
             'decode_content' => false,
             'proxy' => ['no' => ['*']],
         ];
+
+        if ($from instanceof EgressAddresses) {
+            return [...$options, ...$from->requestOptionsFor($endpoint)];
+        }
 
         $resolve = $endpoint->curlResolveEntries();
 

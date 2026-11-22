@@ -14,7 +14,7 @@
 <div @class(['wh-portal-form', 'contents' => ! $open]) wire:key="endpoint-form">
     {{-- Permanent, so the announcement is not inserted together with its own region -- a live
          region has to be in the DOM before its text appears. It says the form opened, which
-         nothing did before: the card simply materialized above the list. --}}
+         nothing did before: the card materialized above the list. --}}
     <x-wirekit::visually-hidden role="status" aria-live="polite">
         @if ($open){{ $endpointId === null ? __('webhooks::self-service.form.new_heading') : __('webhooks::self-service.form.edit_heading') }}@endif
     </x-wirekit::visually-hidden>

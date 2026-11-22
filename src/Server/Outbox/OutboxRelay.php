@@ -89,13 +89,24 @@ final readonly class OutboxRelay
     }
 
     /**
-     * Send one entry outside a stream, if it is due.
+     * Send one entry outside a stream, found by its key, if it is due.
      *
      * @return int how many entries were attempted
      */
-    public function relayEntry(string $messageId): int
+    public function relayEntry(int $entry): int
     {
-        return $this->relay(static fn (Builder $query): Builder => $query->where('message_id', $messageId));
+        return $this->relay(static fn (Builder $query): Builder => $query->whereKey($entry));
+    }
+
+    /**
+     * Send the entries outside a stream that carry the message id, each of them once, if it is due.
+     * A turn queued by an earlier release of the package names its entry this way.
+     *
+     * @return int how many entries were attempted
+     */
+    public function relayMessage(string $messageId): int
+    {
+        return $this->relay(static fn (Builder $query): Builder => $query->where('message_id', $messageId)->whereNull('stream'));
     }
 
     /**

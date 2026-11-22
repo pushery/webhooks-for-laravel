@@ -78,7 +78,7 @@
          and nothing said which was which.
          The lag is measured against the newest delivery, not against the clock, so an endpoint
          with no traffic never reports one -- and it only shows past twice the configured
-         cadence, because one cadence behind is simply between two runs. --}}
+         cadence, because one cadence behind is between two runs. --}}
     @if ($this->rollupLagMinutes() !== null)
         <x-wirekit::alert intent="warning" role="status">
             {{ __('webhooks::dashboard.rollup_stale', ['minutes' => $this->rollupLagMinutes()]) }}

@@ -155,7 +155,7 @@ final readonly class Ed25519Scheme implements SignatureScheme
 
     /**
      * The 32-byte Ed25519 public key for verifying, or null when the configured key
-     * is not a valid 32-byte key — a misconfigured public key simply cannot match an
+     * is not a valid 32-byte key — a misconfigured public key cannot match an
      * untrusted request, so it is skipped rather than raised (a bad signature must
      * never surface as a 500).
      *

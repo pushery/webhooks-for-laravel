@@ -108,7 +108,7 @@ final readonly class WebhookProcessor
 
         // Resolving the key material is its own step, because for a `jwks` source it is an
         // outbound HTTP call and it can fail. It used to sit inline as an argument to verify(),
-        // so a provider that was down, serving a maintenance page or simply unreachable threw
+        // so a provider that was down, serving a maintenance page or unreachable threw
         // straight past the controller -- which catches only WebhookConfigCannotVerify -- and
         // every anonymous POST was answered 500.
         //
@@ -271,7 +271,7 @@ final readonly class WebhookProcessor
         // and not every producer puts it in the body: GitHub sends `X-GitHub-Event` and
         // leaves the body carrying only `action`. Read from the body alone, such an
         // installation logs every delivery with an empty type -- nothing goes red, the
-        // stream simply cannot be split. So the config gets to say where it comes from,
+        // stream cannot be split. So the config gets to say where it comes from,
         // with the body's own value as the default it hands back unchanged.
         $eventType = $this->config->eventTypeFor($headers, $rawBody, $message->type);
 
@@ -492,18 +492,21 @@ final readonly class WebhookProcessor
         $bindings = [$id, $this->config->name, $tenant, $webhookId, $message->type, $payloadJson, $storedBody, $disk, $path, hash('sha256', $rawBody), $headersJson];
 
         // PostgreSQL returns the inserted id (null on a duplicate); MySQL reports the outcome
-        // through the affected-row count (1 inserted, 0 duplicate) and binds its timestamps from
-        // PHP as UTC, since its ON DUPLICATE KEY form carries no now() and the session zone is
-        // untrustworthy. Either way a duplicate yields null, and the row is then read by id.
+        // through the affected-row count (1 inserted, 0 duplicate). Either way a duplicate yields
+        // null, and the row is then read by id. Both bind the arrival from PHP's clock, the clock
+        // created_at is read against, each as its engine takes an instant without the session zone.
         $connection = $this->db();
+        $arrived = Date::now();
 
         if ($dialect === Dialect::MySql) {
-            $now = Timestamp::mysql(Date::now());
+            $now = Timestamp::mysql($arrived);
 
             if ($connection->affectingStatement($sql, [...$bindings, $now, $now]) === 0) {
                 return null;
             }
         } else {
+            $now = Timestamp::sql($arrived);
+
             // The Postgres arm is a write that Laravel's select path cannot recognize as one, and
             // it needs both lines below rather than either.
             //
@@ -523,7 +526,7 @@ final readonly class WebhookProcessor
             // `getPdo()` and records the modification itself.
             //
             // Invisible inside a transaction, where `getReadPdo()` returns the write PDO.
-            $inserted = $connection->selectOne($sql, $bindings, false);
+            $inserted = $connection->selectOne($sql, [...$bindings, $now, $now], false);
 
             if ($connection instanceof Connection) {
                 $connection->recordsHaveBeenModified();
