@@ -10,7 +10,7 @@
      load-bearing. Under a Content-Security-Policy without `unsafe-eval` a host runs Alpine's CSP
      evaluator, which parses attribute expressions against a small grammar instead of handing them
      to `new Function`. An object literal with methods does not parse there, so an inline trap would
-     simply not run — in the browser, with nothing in any server log. It would take out the focus
+     not run — in the browser, with nothing in any server log. It would take out the focus
      trap specifically, on a panel that shows delivery payloads, which is the one part of this
      screen a keyboard or screen-reader user cannot do without. A registered factory parses, and its
      body is ordinary JavaScript that never goes through that evaluator at all.

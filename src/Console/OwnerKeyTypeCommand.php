@@ -10,14 +10,16 @@ use Pushery\Webhooks\Database\OwnerKeyType;
 use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
- * Changes the owner_id columns to `webhooks.platform.owner_key_type` while the tables are empty.
+ * Changes the owner_id columns to `webhooks.platform.owner_key_type` while the tables are empty, and to
+ * `text` also with rows.
  *
  * The type is fixed when the tables are migrated. An installation that chose it later, such as an
  * application that starts keying webhook endpoints by a UUID workspace after its first deploy, runs
  * this once: the subscriptions table, the delivery log and the dashboard rollup then have the columns a
  * fresh migration with the setting creates. With a row in any of them it changes nothing and exits
- * with 1, because a row's key is of the old type. Setting the old type back and running it again is
- * the way back.
+ * with 1, because a row's key is of the old type, unless the setting is `text`: every key of the other
+ * types can be written as text, so the rows keep their keys. Setting the old type back and running it
+ * again is the way back from a conversion of empty tables.
  *
  * @internal
  */
@@ -50,7 +52,13 @@ final class OwnerKeyTypeCommand extends Command
 
         $occupied = $conversion->occupied();
 
-        if ($occupied !== []) {
+        if ($occupied !== [] && $target->keepsEveryKey()) {
+            $this->line(sprintf(
+                '%s %s rows, and each keeps its key, written as text.',
+                implode(' and ', $occupied),
+                count($occupied) === 1 ? 'holds' : 'hold',
+            ));
+        } elseif ($occupied !== []) {
             $this->error(sprintf(
                 '%s %s rows. owner_id changes its type only while these tables are empty, because the keys they hold are of the old type. Nothing was changed.',
                 implode(' and ', $occupied),

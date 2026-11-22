@@ -194,6 +194,11 @@ return [
                 'enabled' => false,
                 'secret_key' => env('WEBHOOKS_ED25519_SECRET_KEY'),
             ],
+            // A delivery that names no secret, no secrets resolver and no doNotSign() goes out unsigned
+            // although nobody chose that. 'report' sends it and reports UnsignedDeliveryNotChosen to the
+            // exception handler; 'refuse' throws it instead of building the delivery. doNotSign() sends
+            // unsigned on purpose, and neither value reports it.
+            'unsigned' => 'report',
         ],
 
         'http_verb' => 'post',
@@ -292,8 +297,9 @@ return [
         // trying until the receiver takes it or refuses it for good. An entry the Platform layer
         // writes (platform.outbox) takes the tries of its delivery instead. alarm_after_hours raises
         // WebhookOutboxEntryOverdue once for an entry still not delivered after that long, and 0
-        // switches the alarm off. Delivered and skipped entries are pruned after prune_after_days;
-        // a refused one stays, because it holds its stream until it is sent again or skipped.
+        // switches the alarm off. Delivered and skipped entries are pruned after prune_after_days,
+        // and so are refused and given-up entries outside a stream. In a stream, a refused or
+        // given-up entry stays, because it holds its stream until it is sent again or skipped.
         //
         // queue and connection put the relay's turns on a queue of their own, so a slow endpoint of
         // another webhook does not hold the outbox up. Without a value they take webhooks.server.queue
@@ -355,9 +361,11 @@ return [
         'enabled' => EnvFlag::protection(env('WEBHOOKS_PLATFORM_ENABLED', true), true),
 
         // The primary-key type of the models that own webhook subscriptions: 'bigint'
-        // (default), 'uuid' or 'ulid'. It fixes the storage type of the denormalized
-        // owner_id column across the subscriptions table, the delivery log and the
-        // dashboard rollup — the three must match or the tenant join breaks — so set it
+        // (default), 'uuid' or 'ulid', or 'text' where owners of different key types own
+        // endpoints, such as an account keyed by a number beside a workspace keyed by a
+        // UUID. It fixes the storage type of the denormalized owner_id column across the
+        // subscriptions table, the delivery log and the dashboard rollup — the three must
+        // match or the tenant join breaks — so set it
         // to match your owner models and migrate; changing it on a populated database is a
         // schema migration, not a runtime toggle. A subscription with a null (global)
         // owner works under every setting.
@@ -421,7 +429,7 @@ return [
 
         // Shapes a single endpoint's traffic — it does not throw messages away. A
         // subscription over its per-minute allowance still gets its delivery-log row and
-        // its delivery; the delivery is simply enqueued with a delay, so a burst is spread
+        // its delivery; the delivery is enqueued with a delay, so a burst is spread
         // across the following minutes at max_per_minute instead of arriving at once. Each
         // minute of that schedule counts what is scheduled into it, so traffic that keeps
         // arriving faster than the allowance waits longer rather than raising the rate. A
@@ -1062,7 +1070,7 @@ return [
         // stays while it reads as a field name and becomes [key 1], [key 2], … when it reads as
         // data, such as an email address or an account number. 'hidden' shows nothing but the
         // notice. Either way the drawer says why, because a panel that
-        // simply stops after its heading reads as a bug and invites the guard's removal.
+        // stops after its heading reads as a bug and invites the guard's removal.
         // Anything other than those two tokens is read as 'hidden' — a typo in a security
         // setting must not be the permissive reading.
         'payload' => [

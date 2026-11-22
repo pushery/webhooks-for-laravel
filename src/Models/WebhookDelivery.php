@@ -235,7 +235,7 @@ class WebhookDelivery extends Model
      *
      * The id column is a uuid on PostgreSQL, which answers any other text with an error (22P02)
      * rather than with no row. Looked up unchecked, such a key is a server error on PostgreSQL
-     * and not found on MySQL, whose char(36) column simply holds no such id. Checked here first,
+     * and not found on MySQL, whose char(36) column holds no such id. Checked here first,
      * it is not found on both, like an id that is absent.
      *
      * @param  Builder<static>  $query

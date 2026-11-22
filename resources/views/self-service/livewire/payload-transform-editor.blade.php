@@ -192,7 +192,7 @@
                 <x-wirekit::stack gap="md">
                     <x-wirekit::heading :level="2" size="sm">{{ __('webhooks::self-service.transform.preview_heading') }}</x-wirekit::heading>
 
-                    {{-- Malformed JSON is named, never swallowed: without this the sample simply
+                    {{-- Malformed JSON is named, never swallowed: without this the sample
                          previews as {} and the tenant reads it as "my rules broke the payload". --}}
                     <x-wirekit::textarea
                         name="sampleJson"

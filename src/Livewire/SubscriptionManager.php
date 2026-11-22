@@ -113,7 +113,7 @@ class SubscriptionManager extends Component
      * serialized and sent once.
      *
      * The alternative was a reveal window like the self-service panel's. That one can afford a
-     * TTL because it also has `reveal()`: when the window closes, the tenant simply asks again.
+     * TTL because it also has `reveal()`: when the window closes, the tenant asks again.
      * This console has no way back, so a timer would only decide how long the operator has before
      * the secret is unrecoverable — and rotating again is a change every consumer of that
      * endpoint must follow.
@@ -517,7 +517,7 @@ class SubscriptionManager extends Component
             // never moves. The paginator reads its page from the request via
             // Paginator::resolveCurrentPage(), and a Livewire update request carries no `page`
             // parameter, so every answer is page one. The failure has no error and no log line: the
-            // list simply looks like an installation with 25 endpoints in it, which on the one
+            // list looks like an installation with 25 endpoints in it, which on the one
             // screen whose whole point is that the list outgrows a screen is the worst possible way
             // to be wrong.
             //
@@ -525,7 +525,10 @@ class SubscriptionManager extends Component
             // paginated read is several queries: where two rows tie, the database may order them
             // differently per query, so a reader sees one endpoint twice and another never, on the
             // same screen whose whole point is that the list outgrows a page.
-            'subscriptions' => WebhookSubscription::model()::query()->latest()->orderByDesc('id')->simplePaginate(25, pageName: $this->getPageName()),
+            //
+            // The owner of each row loads with the page, in one query per owner type: the list names it, and
+            // an operator who edits, switches off, rotates or deletes a row has to know whose it is.
+            'subscriptions' => WebhookSubscription::model()::query()->with('owner')->latest()->orderByDesc('id')->simplePaginate(25, pageName: $this->getPageName()),
             // The catalog, plus anything the opened row already holds that the catalog no
             // longer declares. Without the second half the stale value has no checkbox, so
             // it can be neither kept nor dropped — Livewire's checkbox binding only ever

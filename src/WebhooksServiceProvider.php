@@ -170,7 +170,7 @@ final class WebhooksServiceProvider extends ServiceProvider
             // partitionExists() before any DDL, so a steady-state daily run creates nothing; the
             // window is the once-a-month CREATE, where PostgreSQL's IF NOT EXISTS is not
             // race-free and two schedulers can collide on pg_class. On MySQL the prune is an
-            // unbounded chunked-delete loop instead, so two overlapping runs simply double the
+            // unbounded chunked-delete loop instead, so two overlapping runs double the
             // delete load on the table everything else is writing to.
             //
             // onOneServer() is the half that matters for a cluster — the Laravel scheduler fires

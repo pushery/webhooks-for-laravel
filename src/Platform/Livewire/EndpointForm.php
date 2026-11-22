@@ -8,6 +8,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\View as ViewFactory;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Pushery\Webhooks\Models\WebhookSubscription;
@@ -16,6 +17,7 @@ use Pushery\Webhooks\Platform\Support\EventTypeAbilities;
 use Pushery\Webhooks\Platform\Support\SelfServiceEndpoints;
 use Pushery\Webhooks\Platform\Support\SubscriptionScope;
 use Pushery\Webhooks\Support\Settings;
+use Pushery\Webhooks\Support\WebhookConnection;
 
 /**
  * Create or edit a single endpoint. Opened by the list via the new-endpoint /
@@ -44,6 +46,18 @@ final class EndpointForm extends Component
     public array $eventTypes = [];
 
     public bool $isActive = true;
+
+    /**
+     * The fields this form edits, as the endpoint held them when the form was opened.
+     *
+     * A save compares them with the row it locks, and writes nothing when somebody else changed one
+     * in the meantime: two people editing one endpoint must not overwrite each other without a
+     * word. Locked, because the browser must not be the one to say what the row held.
+     *
+     * @var array<string, mixed>
+     */
+    #[Locked]
+    public array $opened = [];
 
     /**
      * Open the form to register a new endpoint. Refused when the tenant is at its cap.
@@ -85,6 +99,7 @@ final class EndpointForm extends Component
         // exposure as the operator console, and a tenant has even less recourse.
         $this->eventTypes = $subscription->eventTypeNames();
         $this->isActive = $subscription->is_active;
+        $this->opened = $this->editedFields($subscription);
         $this->open = true;
     }
 
@@ -128,16 +143,37 @@ final class EndpointForm extends Component
             return;
         }
 
-        $subscription = $this->findOwnedEndpoint($this->endpointId);
-        // Redundant with the boot gate, and deliberately kept: {@see InteractsWithEndpoints}
-        // states the rule and its measurement -- the gate reads the same ability this policy
-        // consults, and the ownership it adds is already enforced by the scoped lookup. This is
-        // what still refuses if a future caller reaches the action without that lookup.
-        $this->authorize('update', $subscription);
+        $endpointId = $this->endpointId;
 
-        $endpoints->change($subscription, $this->url, $this->eventTypes, $this->name, $this->isActive, Auth::user());
+        // Compared under a lock on the row and written in the same transaction, so a change somebody
+        // else saves in between can neither pass the comparison nor be overwritten after it.
+        $saved = WebhookConnection::db()->transaction(function () use ($endpoints, $endpointId): bool {
+            $subscription = $this->scopedQuery()->lockForUpdate()->findOrFail($endpointId);
+            // Redundant with the boot gate, and deliberately kept: {@see InteractsWithEndpoints}
+            // states the rule and its measurement -- the gate reads the same ability this policy
+            // consults, and the ownership it adds is already enforced by the scoped lookup. This is
+            // what still refuses if a future caller reaches the action without that lookup.
+            $this->authorize('update', $subscription);
 
-        $this->finish(__('webhooks::self-service.toast.endpoint_updated'));
+            $changed = $this->changedFields($this->opened, $this->editedFields($subscription));
+
+            if ($changed !== []) {
+                // The form stays open with what the reader typed, and nothing is written.
+                $this->dispatch('wirekit-toast', variant: 'warning', message: __('webhooks::self-service.conflict.endpoint', [
+                    'fields' => $this->fieldNames($changed),
+                ]));
+
+                return false;
+            }
+
+            $endpoints->change($subscription, $this->url, $this->eventTypes, $this->name, $this->isActive, Auth::user());
+
+            return true;
+        });
+
+        if ($saved) {
+            $this->finish(__('webhooks::self-service.toast.endpoint_updated'));
+        }
     }
 
     private function finish(string $message): void
@@ -150,7 +186,7 @@ final class EndpointForm extends Component
 
     private function resetForm(): void
     {
-        $this->reset(['endpointId', 'name', 'url', 'eventTypes', 'isActive']);
+        $this->reset(['endpointId', 'name', 'url', 'eventTypes', 'isActive', 'opened']);
         $this->resetValidation();
     }
 
@@ -181,6 +217,51 @@ final class EndpointForm extends Component
         // eventTypeNames() hands back a list, which is how this method's type is declared and how
         // the render below treats it.
         return $this->findOwnedEndpoint($this->endpointId)->eventTypeNames();
+    }
+
+    /**
+     * The fields this form edits, as the given row holds them, keyed by the name the conflict
+     * message gives each one.
+     *
+     * @return array<string, mixed>
+     */
+    private function editedFields(WebhookSubscription $subscription): array
+    {
+        return [
+            'name' => $subscription->name,
+            'url' => $subscription->url,
+            'event_types' => $subscription->eventTypeNames(),
+            'active' => $subscription->is_active,
+        ];
+    }
+
+    /**
+     * The fields whose value the row no longer holds as it did when the form was opened, in the
+     * order the form shows them.
+     *
+     * @param  array<string, mixed>  $opened
+     * @param  array<string, mixed>  $stored
+     * @return list<string>
+     */
+    private function changedFields(array $opened, array $stored): array
+    {
+        return array_values(array_filter(
+            array_keys($stored),
+            static fn (string $field): bool => ! array_key_exists($field, $opened) || $opened[$field] !== $stored[$field],
+        ));
+    }
+
+    /**
+     * The changed fields in the reader's language, for the conflict message.
+     *
+     * @param  list<string>  $fields
+     */
+    private function fieldNames(array $fields): string
+    {
+        return implode(', ', array_map(
+            static fn (string $field): string => (string) __('webhooks::self-service.conflict.fields.'.$field),
+            $fields,
+        ));
     }
 
     public function render(): View

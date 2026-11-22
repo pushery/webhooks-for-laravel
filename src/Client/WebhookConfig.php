@@ -269,7 +269,7 @@ final class WebhookConfig
      * timestamp can.
      * `tolerance_seconds` sits right there in the entry and reads like protection even for a
      * dialect that has no timestamp to check it against, and the dedupe default is a header the
-     * producer may simply not send — a key that stays null, and a null collides with nothing.
+     * producer may not send — a key that stays null, and a null collides with nothing.
      *
      * A source that picks its handler from such a header draws an advisory of its own, because it
      * needs another cure: the same captured body, resent under another event type, verifies and
@@ -774,7 +774,7 @@ final class WebhookConfig
      * sends `X-GitHub-Event`, and its body carries only `action` — the sub-kind. Read from
      * the body alone, such an installation logs every delivery with an empty type, so the
      * generated column is empty too and per-type job routing falls to the catch-all every
-     * time. Nothing goes red; the stream simply cannot be split.
+     * time. Nothing goes red; the stream cannot be split.
      *
      * The resolver form is the one GitHub actually wants, because the useful type is the
      * header and `action` together (`release.published`) rather than either half.

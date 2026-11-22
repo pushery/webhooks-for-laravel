@@ -55,7 +55,7 @@ class DeliveryLog extends Component
      * asked for, and the reader only ever picks one.
      *
      * When it truncates the view says so. A short list that looks complete is how a reader
-     * concludes an endpoint has no deliveries when it simply was not offered — the same
+     * concludes an endpoint has no deliveries when it was not offered — the same
      * wrong answer this whole surface exists to prevent.
      */
     private const int ENDPOINT_OPTIONS = 200;
@@ -321,7 +321,7 @@ class DeliveryLog extends Component
         $query = WebhookDelivery::model()::query()
             // Eagerly, and with three columns rather than the row: every rendered delivery names
             // its endpoint now -- in the column and in both action names -- so the lazy read this
-            // view has always done in its aria-labels was already 25 queries a page. It simply
+            // view has always done in its aria-labels was already 25 queries a page. It
             // cost nothing visible, which is why nobody counted it.
             ->with(['subscription:id,name,url'])
             ->when($this->status !== '', fn (Builder $query): Builder => $query->where('status', $this->status))

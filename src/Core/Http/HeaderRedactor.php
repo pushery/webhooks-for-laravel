@@ -26,7 +26,7 @@ final class HeaderRedactor
      * A stored blob therefore masked `authorization` and carried the same password in clear text
      * one key further down. That is worse than masking nothing: the redacted line beside it makes
      * the blob read as safe. `proxy-authorization` is an ordinary credential header that was
-     * simply never on the list.
+     * never on the list.
      *
      * @var list<string>
      */

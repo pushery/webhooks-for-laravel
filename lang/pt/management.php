@@ -40,6 +40,7 @@ return [
 
     'table' => [
         'endpoint' => 'Endpoint',
+        'owner' => 'Proprietário',
         'events' => 'Eventos',
         'status' => 'Estado',
         'event' => 'Evento',
@@ -54,6 +55,8 @@ return [
     'subscription' => [
         'active' => 'Ativo',
         'disabled' => 'Desativado',
+        // An endpoint without an owner, which receives the events of every owner.
+        'global' => 'Global',
         // Health bands, worded exactly as the self-service matrix words them: one
         // package, one vocabulary for the same state.
         'degraded' => 'Degradado',

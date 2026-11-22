@@ -41,7 +41,7 @@ use Illuminate\Support\Facades\Gate;
  * declines to decide, and the check falls through to an ability that does not exist —
  * a deny. Every action then refuses every operator, including the one the permission was
  * granted to, and it refuses silently: nothing throws and nothing is logged, so the form
- * simply does nothing when submitted.
+ * does nothing when submitted.
  *
  * That failure is invisible to the obvious tests: a surface that denies everything looks
  * exactly like a surface that is well guarded. Only a positive test, one asserting that a

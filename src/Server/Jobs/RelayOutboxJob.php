@@ -31,10 +31,19 @@ final class RelayOutboxJob implements ShouldQueueAfterCommit
 
     public int $timeout;
 
+    /**
+     * The key of the entry outside a stream this turn is for. Several entries can share a message
+     * id, since an event sent to several endpoints writes one each, so the key names the one entry.
+     * A turn queued by an earlier release of the package has none, and goes by the message id.
+     */
+    public ?int $entry = null;
+
     public function __construct(
         public readonly ?string $stream,
         public readonly ?string $messageId,
+        ?int $entry = null,
     ) {
+        $this->entry = $entry;
         $settings = new Settings;
 
         // The turn stops starting attempts once its time is up, and the attempt it started last
@@ -53,8 +62,14 @@ final class RelayOutboxJob implements ShouldQueueAfterCommit
             return;
         }
 
+        if ($this->entry !== null) {
+            $relay->relayEntry($this->entry);
+
+            return;
+        }
+
         if ($this->messageId !== null) {
-            $relay->relayEntry($this->messageId);
+            $relay->relayMessage($this->messageId);
         }
     }
 }

@@ -13,7 +13,7 @@ use Pushery\Webhooks\Client\Http\ReceivingRoutes as Routes;
  *
  * A typo in the second argument of `Route::webhooks()` produces a route that exists, resolves and
  * answers every anonymous delivery with a refusal, for ever. The deployment is green, the config
- * is valid — the entry the route names simply is not in it — and the first thing that reports the
+ * is valid — the entry the route names is not in it — and the first thing that reports the
  * mistake is the producer's own dashboard.
  *
  * This is the mirror of `webhooks.client.expected`, and the pair covers the two directions the

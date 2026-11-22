@@ -11,12 +11,14 @@ use Illuminate\Support\Facades\View as ViewFactory;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
 use Pushery\Webhooks\Platform\Support\PortalRoutes;
 use Pushery\Webhooks\Platform\Transform\DeclarativePayloadTransformer;
 use Pushery\Webhooks\Platform\Transform\PayloadVersionRegistry;
+use Pushery\Webhooks\Support\WebhookConnection;
 use Pushery\Webhooks\WebhookManager;
 
 /**
@@ -30,7 +32,7 @@ use Pushery\Webhooks\WebhookManager;
  * The endpoint is loaded and authorized against the row-level policy on mount and again
  * on save, so a tenant can only ever edit a transform for an endpoint it owns. Saving
  * persists the rules and version onto the subscription; while payload versioning is
- * disabled the edit is still stored, it simply does not reshape deliveries until the
+ * disabled the edit is still stored, it does not reshape deliveries until the
  * feature is switched on.
  */
 #[Layout('webhooks::self-service.layout')]
@@ -78,6 +80,18 @@ final class PayloadTransformEditor extends Component
      */
     public int $previewRevision = 0;
 
+    /**
+     * The payload version and the transform as the endpoint held them when this page read it, on
+     * load and after each save.
+     *
+     * A save compares them with the row it locks, and writes nothing when somebody else changed one
+     * in the meantime. Locked, because the browser must not be the one to say what the row held.
+     *
+     * @var array<string, mixed>
+     */
+    #[Locked]
+    public array $opened = [];
+
     public function mount(WebhookSubscription $subscription): void
     {
         // Route-model binding resolves the {subscription} segment unscoped, so re-resolve it
@@ -104,6 +118,7 @@ final class PayloadTransformEditor extends Component
         $this->payloadVersion = $subscription->payload_version ?? '';
 
         $this->hydrateRules($subscription->transform ?? []);
+        $this->opened = $this->payloadFields($subscription);
 
         $this->sampleJson = $this->defaultSampleJson();
     }
@@ -200,16 +215,40 @@ final class PayloadTransformEditor extends Component
         $this->rejectNestedPaths();
 
         $rules = $this->buildRules();
+        $endpointId = (int) $this->endpointId;
 
-        // Through the manager, so the change fires WebhookEndpointPayloadUpdated with the person who
-        // made it, as it does for a host's own screen that calls updatePayload().
-        Container::getInstance()->make(WebhookManager::class)->updatePayload(
-            $subscription,
-            $this->payloadVersion !== '' ? $this->payloadVersion : null,
-            $rules === [] ? null : $rules,
-        );
+        // Compared under a lock on the row and written in the same transaction, so a change somebody
+        // else saves in between can neither pass the comparison nor be overwritten after it.
+        $saved = WebhookConnection::db()->transaction(function () use ($endpointId, $rules): bool {
+            $locked = $this->scopedQuery()->lockForUpdate()->findOrFail($endpointId);
+            $changed = $this->changedFields($this->opened, $this->payloadFields($locked));
 
-        $this->dispatch('wirekit-toast', variant: 'success', message: __('webhooks::self-service.toast.transform_saved'));
+            if ($changed !== []) {
+                $this->dispatch('wirekit-toast', variant: 'warning', message: __('webhooks::self-service.conflict.transform', [
+                    'fields' => $this->fieldNames($changed),
+                ]));
+
+                return false;
+            }
+
+            // Through the manager, so the change fires WebhookEndpointPayloadUpdated with the person who
+            // made it, as it does for a host's own screen that calls updatePayload().
+            Container::getInstance()->make(WebhookManager::class)->updatePayload(
+                $locked,
+                $this->payloadVersion !== '' ? $this->payloadVersion : null,
+                $rules === [] ? null : $rules,
+            );
+
+            // Read back as the database holds it, which the next save compares against: a store that
+            // keeps the transform as jsonb hands its keys back in an order of its own.
+            $this->opened = $this->payloadFields($locked->refresh());
+
+            return true;
+        });
+
+        if ($saved) {
+            $this->dispatch('wirekit-toast', variant: 'success', message: __('webhooks::self-service.toast.transform_saved'));
+        }
     }
 
     /**
@@ -260,7 +299,7 @@ final class PayloadTransformEditor extends Component
      * can. Without it the only signal a malformed sample gives is both preview panes
      * quietly collapsing to an empty object — which reads as "my transform rules broke
      * the payload" rather than "my sample has a stray comma". An empty field is not an
-     * error: it is simply nothing to preview yet.
+     * error: it is nothing to preview yet.
      */
     public function sampleError(): ?string
     {
@@ -484,13 +523,55 @@ final class PayloadTransformEditor extends Component
         $encoded = json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
         // This comparison cannot fail. `json_encode` returns string|false, so comparing against
-        // true never matches and the ternary simply yields the encoded value, which is identical
+        // true never matches and the ternary yields the encoded value, which is identical
         // behavior for every input that encodes. The two differ only when encoding fails, and what
         // reaches here is an array this component itself validated as JSON.
         //
         // It stays as a type net rather than as behavior: the method returns string, and without
         // it a failed encode would return false from a string-typed method.
         return $encoded === false ? '{}' : $encoded;
+    }
+
+    /**
+     * The payload version and the transform as the given row holds them, keyed by the name the
+     * conflict message gives each one.
+     *
+     * @return array<string, mixed>
+     */
+    private function payloadFields(WebhookSubscription $subscription): array
+    {
+        return [
+            'version' => $subscription->payload_version,
+            'transform' => $subscription->transform,
+        ];
+    }
+
+    /**
+     * The fields whose value the row no longer holds as it did when this page read it.
+     *
+     * @param  array<string, mixed>  $opened
+     * @param  array<string, mixed>  $stored
+     * @return list<string>
+     */
+    private function changedFields(array $opened, array $stored): array
+    {
+        return array_values(array_filter(
+            array_keys($stored),
+            static fn (string $field): bool => ! array_key_exists($field, $opened) || $opened[$field] !== $stored[$field],
+        ));
+    }
+
+    /**
+     * The changed fields in the reader's language, for the conflict message.
+     *
+     * @param  list<string>  $fields
+     */
+    private function fieldNames(array $fields): string
+    {
+        return implode(', ', array_map(
+            static fn (string $field): string => (string) __('webhooks::self-service.conflict.fields.'.$field),
+            $fields,
+        ));
     }
 
     public function render(): View

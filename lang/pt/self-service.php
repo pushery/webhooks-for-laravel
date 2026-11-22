@@ -249,6 +249,19 @@ return [
         'ping_throttled' => 'Este endpoint esgotou os seus eventos de teste por agora. Tenta novamente em :seconds segundo(s).',
     ],
 
+    'conflict' => [
+        'endpoint' => 'Outra pessoa alterou este endpoint enquanto o tinhas aberto: :fields. Nada foi guardado. Fecha o formulário e abre novamente o endpoint para veres os valores atuais.',
+        'transform' => 'Outra pessoa alterou as definições do payload deste endpoint depois de abrires esta página: :fields. Nada foi guardado. Recarrega a página para veres as definições atuais.',
+        'fields' => [
+            'name' => 'nome',
+            'url' => 'URL',
+            'event_types' => 'tipos de evento',
+            'active' => 'ligado ou desligado',
+            'version' => 'versão do payload',
+            'transform' => 'regras de transformação',
+        ],
+    ],
+
     // The form's own validation copy, passed to the validator as custom messages and
     // attribute names, so a refused save speaks the reader's language rather than the
     // framework's default English lines.

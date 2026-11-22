@@ -6,9 +6,9 @@
      85px of downward jump, on the first screen every new tenant sees.
 
      Such a jump counts against a host's Core Web Vitals: on an embedding screen it measured a CLS
-     of 0.148, against 0.1 for "good". In the portal the list sits far enough down that
-     nobody sees it; a host embedding the panel puts it where its own screen needs it, and there
-     it lands above the fold.
+     of 0.148, against 0.1 for "good". The portal renders the list with the page, so the
+     placeholder serves a host that embeds the panel where its own screen needs it, and there it
+     lands above the fold.
 
      A floor cannot take out the jump for every account -- ten rows are taller than four skeleton
      ones whatever this says -- but it takes out the case that is both the worst and the certain

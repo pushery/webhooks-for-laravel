@@ -23,5 +23,10 @@ final readonly class ForgottenEvents
          * bytes, or an inbound call, shares one. They hold no more than that row does.
          */
         public int $objectsKept,
+        /**
+         * Entries of the transactional outbox deleted, each the delivery sealed whole, in whatever
+         * state it stood. One that was still waiting is not sent.
+         */
+        public int $outboxEntries = 0,
     ) {}
 }

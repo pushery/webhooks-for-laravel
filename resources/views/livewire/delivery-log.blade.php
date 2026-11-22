@@ -89,7 +89,7 @@
 
     @if ($endpointsTruncated)
         {{-- Said out loud rather than truncated in silence: a list that looks complete is how a
-             reader concludes an endpoint has no deliveries when it was simply never offered. --}}
+             reader concludes an endpoint has no deliveries when it was never offered. --}}
         <p class="text-sm">{{ __('webhooks::management.filters.endpoints_truncated') }}</p>
     @endif
 

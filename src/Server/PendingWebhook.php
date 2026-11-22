@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use JsonException;
+use NoDiscard;
 use Pushery\Webhooks\Core\Signing\JsonCanonicalizer;
 use Pushery\Webhooks\Core\Signing\SecretSet;
 use Pushery\Webhooks\Core\Signing\SignatureScheme;
@@ -18,9 +19,13 @@ use Pushery\Webhooks\Server\Backoff\BackoffStrategy;
 use Pushery\Webhooks\Server\Backoff\ExponentialWithJitter;
 use Pushery\Webhooks\Server\Data\DeliveryOptions;
 use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
+use Pushery\Webhooks\Server\Delivery\BearerToken;
+use Pushery\Webhooks\Server\Delivery\ResolvesBearerTokens;
 use Pushery\Webhooks\Server\Events\WebhookDeliveryDispatching;
 use Pushery\Webhooks\Server\Exceptions\OrderedDeliveryUnavailable;
+use Pushery\Webhooks\Server\Exceptions\UnknownBearerTokenResolver;
 use Pushery\Webhooks\Server\Exceptions\UnknownSecretsResolver;
+use Pushery\Webhooks\Server\Exceptions\UnsignedDeliveryNotChosen;
 use Pushery\Webhooks\Server\Jobs\CallWebhookJob;
 use Pushery\Webhooks\Server\Signing\EncryptedSecretResolver;
 use Pushery\Webhooks\Server\Signing\ResolvesDeliverySecrets;
@@ -62,6 +67,11 @@ final class PendingWebhook
 
     /** @var ?class-string<ResolvesDeliverySecrets> */
     private ?string $secretsResolver = null;
+
+    private ?string $bearerToken = null;
+
+    /** @var ?class-string<ResolvesBearerTokens> */
+    private ?string $bearerTokenResolver = null;
 
     private bool $doNotSign = false;
 
@@ -169,6 +179,7 @@ final class PendingWebhook
         return $call;
     }
 
+    #[NoDiscard]
     public function url(string $url): self
     {
         return tap(clone $this, fn (self $call): string => $call->url = $url);
@@ -177,6 +188,7 @@ final class PendingWebhook
     /**
      * @param  array<array-key, mixed>  $payload
      */
+    #[NoDiscard]
     public function payload(array $payload): self
     {
         return tap(clone $this, function (self $call) use ($payload): void {
@@ -185,6 +197,7 @@ final class PendingWebhook
         });
     }
 
+    #[NoDiscard]
     public function sendRawBody(string $body, string $contentType = 'application/json'): self
     {
         return tap(clone $this, function (self $call) use ($body, $contentType): void {
@@ -198,16 +211,19 @@ final class PendingWebhook
      * Canonicalize the JSON payload (sorted keys) before signing, so signed and
      * sent bytes stay identical for a receiver that re-canonicalizes. Opt-in.
      */
+    #[NoDiscard]
     public function canonicalizeJson(bool $canonicalize = true): self
     {
         return tap(clone $this, fn (self $call): bool => $call->canonicalize = $canonicalize);
     }
 
+    #[NoDiscard]
     public function useSecret(string $secret): self
     {
         return tap(clone $this, fn (self $call): SecretSet => $call->secrets = SecretSet::fromCurrent($secret));
     }
 
+    #[NoDiscard]
     public function useSecrets(string $current, string $previous): self
     {
         return tap(clone $this, fn (self $call): SecretSet => $call->secrets = SecretSet::rotating($current, $previous));
@@ -223,6 +239,7 @@ final class PendingWebhook
      * @param  class-string  $resolver  a class implementing ResolvesDeliverySecrets; any other class is refused with
      *                                  UnknownSecretsResolver
      */
+    #[NoDiscard]
     public function resolveSecretsUsing(string $resolver): self
     {
         if (! is_a($resolver, ResolvesDeliverySecrets::class, true)) {
@@ -232,6 +249,46 @@ final class PendingWebhook
         return tap(clone $this, fn (self $call): string => $call->secretsResolver = $resolver);
     }
 
+    /**
+     * Send `Authorization: Bearer` with this token on every attempt, beside the signature, for a receiver behind an
+     * API gateway that asks each request for a key it issued.
+     *
+     * The token travels sealed with the application key and is unsealed only when an attempt is sent, so it never
+     * stands in cleartext in the queue, in the outbox or in an event. Every attempt sends this token, one after the
+     * receiver replaced it included; to send the key that holds at each attempt, name a class with
+     * `resolveBearerTokenUsing()` instead. A token with a space, a tab, a line break or a control character is
+     * refused with an InvalidArgumentException.
+     */
+    #[NoDiscard]
+    public function useBearerToken(string $token): self
+    {
+        BearerToken::header($token);
+
+        return tap(clone $this, fn (self $call): string => $call->bearerToken = $token);
+    }
+
+    /**
+     * Send `Authorization: Bearer` with the token this class names at each attempt, instead of the token of this
+     * call.
+     *
+     * The delivery then carries no token in the queue: each attempt, and each resend, makes the class from the
+     * container and asks it, so an attempt after the receiver replaced its key sends the new one. It takes the place
+     * of `useBearerToken()`.
+     *
+     * @param  class-string  $resolver  a class implementing ResolvesBearerTokens; any other class is refused with
+     *                                  UnknownBearerTokenResolver
+     */
+    #[NoDiscard]
+    public function resolveBearerTokenUsing(string $resolver): self
+    {
+        if (! is_a($resolver, ResolvesBearerTokens::class, true)) {
+            throw UnknownBearerTokenResolver::for($resolver);
+        }
+
+        return tap(clone $this, fn (self $call): string => $call->bearerTokenResolver = $resolver);
+    }
+
+    #[NoDiscard]
     public function doNotSign(bool $doNotSign = true): self
     {
         return tap(clone $this, fn (self $call): bool => $call->doNotSign = $doNotSign);
@@ -240,6 +297,7 @@ final class PendingWebhook
     /**
      * @param  class-string<SignatureScheme>  $scheme
      */
+    #[NoDiscard]
     public function signUsing(string $scheme): self
     {
         return tap(clone $this, fn (self $call): string => $call->schemeClass = $scheme);
@@ -250,16 +308,19 @@ final class PendingWebhook
      * layer passes its event id here so a redelivery re-signs with the same id and
      * the DB event_id equals the wire id.
      */
+    #[NoDiscard]
     public function useMessageId(string $messageId): self
     {
         return tap(clone $this, fn (self $call): string => $call->messageId = $messageId);
     }
 
+    #[NoDiscard]
     public function forEventType(?string $eventType): self
     {
         return tap(clone $this, fn (self $call): ?string => $call->eventType = $eventType);
     }
 
+    #[NoDiscard]
     public function useHttpVerb(string $verb): self
     {
         return tap(clone $this, fn (self $call): string => $call->verb = strtolower($verb));
@@ -268,6 +329,7 @@ final class PendingWebhook
     /**
      * @param  array<string, string>  $headers
      */
+    #[NoDiscard]
     public function withHeaders(array $headers): self
     {
         return tap(clone $this, fn (self $call): array => $call->headers = [...$call->headers, ...$headers]);
@@ -277,6 +339,7 @@ final class PendingWebhook
      * At least one second. To the HTTP client a timeout of 0 means no timeout at all, the
      * opposite of what a caller asking for none expects, and a negative one means nothing.
      */
+    #[NoDiscard]
     public function timeoutInSeconds(int $timeout): self
     {
         return tap(clone $this, fn (self $call): int => $call->timeout = max(1, $timeout));
@@ -285,21 +348,25 @@ final class PendingWebhook
     /**
      * At least one second, for the reason {@see self::timeoutInSeconds()} gives.
      */
+    #[NoDiscard]
     public function connectTimeoutInSeconds(int $connectTimeout): self
     {
         return tap(clone $this, fn (self $call): int => $call->connectTimeout = max(1, $connectTimeout));
     }
 
+    #[NoDiscard]
     public function verifySsl(bool|string $verify = true): self
     {
         return tap(clone $this, fn (self $call): bool|string => $call->verifySsl = $verify);
     }
 
+    #[NoDiscard]
     public function useProxy(string $proxy): self
     {
         return tap(clone $this, fn (self $call): string => $call->proxy = $proxy);
     }
 
+    #[NoDiscard]
     public function useMutualTls(string $cert, ?string $key = null, ?string $passphrase = null): self
     {
         return tap(clone $this, function (self $call) use ($cert, $key, $passphrase): void {
@@ -313,6 +380,7 @@ final class PendingWebhook
      * Obey a retryable 429/503 Retry-After header when scheduling the next attempt
      * (clamped to the Retry-After cap) instead of the jittered delay. On by default.
      */
+    #[NoDiscard]
     public function respectRetryAfter(bool $respect = true): self
     {
         return tap(clone $this, fn (self $call): bool => $call->respectRetryAfter = $respect);
@@ -324,6 +392,7 @@ final class PendingWebhook
      * $maxDeferrals times, so a long rate-limit window cannot exhaust the delivery
      * before the endpoint is ready for it.
      */
+    #[NoDiscard]
     public function retryAfterCapInSeconds(int $seconds, ?int $maxDeferrals = null): self
     {
         return tap(clone $this, function (self $call) use ($seconds, $maxDeferrals): void {
@@ -347,11 +416,13 @@ final class PendingWebhook
      * How many bytes of the endpoint's response are captured for the delivery log. The
      * rest is read off the wire and discarded, never buffered.
      */
+    #[NoDiscard]
     public function captureResponseBytes(int $bytes): self
     {
         return tap(clone $this, fn (self $call): int => $call->responseCaptureBytes = max(0, $bytes));
     }
 
+    #[NoDiscard]
     public function maximumTries(int $tries): self
     {
         return tap(clone $this, fn (self $call): int => $call->tries = max(1, $tries));
@@ -364,6 +435,7 @@ final class PendingWebhook
      * starts when the delivery is due: after its delay, and for an ordered delivery once its
      * turn has come. At least one second; null counts tries again.
      */
+    #[NoDiscard]
     public function retryForSeconds(?int $seconds): self
     {
         return tap(clone $this, fn (self $call): ?int => $call->retryForSeconds = $seconds === null ? null : max(1, $seconds));
@@ -379,6 +451,7 @@ final class PendingWebhook
      *
      * @param  list<string>  $types
      */
+    #[NoDiscard]
     public function retryableProblemTypes(array $types): self
     {
         foreach ($types as $type) {
@@ -400,6 +473,7 @@ final class PendingWebhook
      * dispatching without either throws {@see OrderedDeliveryUnavailable}. Null sends the
      * delivery on its own again.
      */
+    #[NoDiscard]
     public function orderedBy(?string $key): self
     {
         if ($key !== null && trim($key) === '') {
@@ -409,6 +483,7 @@ final class PendingWebhook
         return tap(clone $this, fn (self $call): ?string => $call->orderingKey = $key);
     }
 
+    #[NoDiscard]
     public function useBackoffStrategy(BackoffStrategy $backoff): self
     {
         return tap(clone $this, fn (self $call): BackoffStrategy => $call->backoff = $backoff);
@@ -417,6 +492,7 @@ final class PendingWebhook
     /**
      * @param  array<string, scalar|null>  $meta
      */
+    #[NoDiscard]
     public function meta(array $meta): self
     {
         return tap(clone $this, fn (self $call): array => $call->meta = [...$call->meta, ...$meta]);
@@ -425,6 +501,7 @@ final class PendingWebhook
     /**
      * @param  list<string>  $tags
      */
+    #[NoDiscard]
     public function withTags(array $tags): self
     {
         return tap(clone $this, fn (self $call): array => $call->tags = [...$call->tags, ...$tags]);
@@ -435,6 +512,7 @@ final class PendingWebhook
      * how the Platform layer shapes an over-limit endpoint's traffic instead of
      * dropping the event.
      */
+    #[NoDiscard]
     public function delayInSeconds(int $seconds): self
     {
         // The dispatch reads `if ($this->delaySeconds > 0)`, so 0 and -1 both mean "queue it
@@ -452,11 +530,13 @@ final class PendingWebhook
         return $this->delaySeconds;
     }
 
+    #[NoDiscard]
     public function onQueue(?string $queue): self
     {
         return tap(clone $this, fn (self $call): ?string => $call->queue = $queue);
     }
 
+    #[NoDiscard]
     public function onConnection(?string $connection): self
     {
         return tap(clone $this, fn (self $call): ?string => $call->connection = $connection);
@@ -517,10 +597,33 @@ final class PendingWebhook
     }
 
     /**
+     * The delivery this call describes, as the queue and the outbox carry it.
+     *
+     * A call that names no secret, no secrets resolver and no doNotSign() would go out unsigned although nobody chose
+     * that, so it is reported to the exception handler, or refused under `webhooks.server.signing.unsigned` =
+     * `refuse`. Under asymmetric signing the call already carries the Server's own key.
+     *
      * @throws JsonException
+     * @throws UnsignedDeliveryNotChosen where the configuration refuses a delivery nobody chose to send unsigned
      */
     public function toDeliveryData(): WebhookDeliveryData
     {
+        if (! $this->doNotSign && $this->secretsResolver === null && ! $this->secrets instanceof SecretSet) {
+            $unsigned = UnsignedDeliveryNotChosen::to((string) parse_url($this->url, PHP_URL_HOST));
+
+            if (new Settings()->unsignedDeliveries() === 'refuse') {
+                throw $unsigned;
+            }
+
+            report($unsigned);
+        }
+
+        // Two `Authorization` headers would leave the receiver to pick one, and the one from withHeaders() would
+        // stand in cleartext in the queue beside the sealed token.
+        if (($this->bearerToken !== null || $this->bearerTokenResolver !== null) && $this->namesAuthorization()) {
+            throw new InvalidArgumentException('A delivery that sends a bearer token takes no Authorization header of its own: withHeaders() named one beside useBearerToken() or resolveBearerTokenUsing().');
+        }
+
         return new WebhookDeliveryData(
             messageId: $this->messageId ?? (string) Str::uuid7(),
             url: $this->url,
@@ -565,7 +668,17 @@ final class PendingWebhook
                 : Date::now()->getTimestamp() + $this->delaySeconds + $this->retryForSeconds,
             retryableProblemTypes: $this->retryableProblemTypes,
             secretsResolver: $this->doNotSign ? null : $this->secretsResolver,
+            encryptedBearerToken: $this->bearerTokenResolver !== null || $this->bearerToken === null
+                ? null
+                : Crypt::encryptString($this->bearerToken),
+            bearerTokenResolver: $this->bearerTokenResolver,
         );
+    }
+
+    /** Whether the headers of this call name `Authorization`, in any case. */
+    private function namesAuthorization(): bool
+    {
+        return array_any(array_keys($this->headers), static fn (int|string $name): bool => strcasecmp((string) $name, 'Authorization') === 0);
     }
 
     /**

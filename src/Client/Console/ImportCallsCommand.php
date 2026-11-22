@@ -47,7 +47,7 @@ use stdClass;
  *
  * Importing two different tables without distinguishing them is the one way to lose rows. The key
  * is (source, row id), so two tables whose sources agree and whose ids overlap collapse onto each
- * other and the second import reports the collisions as "already present" — rows that are simply
+ * other and the second import reports the collisions as "already present" — rows that are
  * not there afterwards. Give each import its own `--source`, which is what that option is for.
  *
  * Two honesty caveats, both forced by what such a table stores:

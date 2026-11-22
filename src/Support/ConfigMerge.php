@@ -11,7 +11,7 @@ namespace Pushery\Webhooks\Support;
  * ships thirteen top-level keys and twelve of them are deep trees, so a host that
  * publishes the file and keeps only the block it cares about replaces that entire layer:
  * every sibling key it trimmed away becomes undefined, and every key a later release adds
- * to that layer never reaches it. Nothing reports either — a new safety default simply
+ * to that layer never reaches it. Nothing reports either — a new safety default
  * does not take effect.
  *
  * Recursing is not enough on its own. `array_replace_recursive` merges numerically indexed

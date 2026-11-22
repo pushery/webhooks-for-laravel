@@ -180,6 +180,7 @@
                          URL becomes a dozen short lines. The two go together or neither works.
                          From sm up only: below it the cell spans its card. --}}
                     <x-wirekit::table.th class="sm:min-w-64">{{ __('webhooks::management.table.endpoint') }}</x-wirekit::table.th>
+                    <x-wirekit::table.th>{{ __('webhooks::management.table.owner') }}</x-wirekit::table.th>
                     <x-wirekit::table.th>{{ __('webhooks::management.table.events') }}</x-wirekit::table.th>
                     <x-wirekit::table.th>{{ __('webhooks::management.table.status') }}</x-wirekit::table.th>
                     {{-- The actions column carries no visible header, but it still needs an
@@ -201,6 +202,18 @@
                                 <x-wirekit::text size="sm" intent="muted" class="break-all">{{ $subscription->url }}</x-wirekit::text>
                             </x-wirekit::stack>
                         </x-wirekit::table.th>
+                        {{-- An endpoint without an owner receives the events of every owner, so it is marked
+                             rather than left blank. --}}
+                        @php
+                            $ownerName = \Pushery\Webhooks\Support\OwnerNames::ofEndpoint($subscription);
+                        @endphp
+                        <x-wirekit::table.td :label="__('webhooks::management.table.owner')">
+                            @if ($ownerName === null)
+                                <x-wirekit::text intent="muted">{{ __('webhooks::management.subscription.global') }}</x-wirekit::text>
+                            @else
+                                <x-wirekit::text class="break-words">{{ $ownerName }}</x-wirekit::text>
+                            @endif
+                        </x-wirekit::table.td>
                         <x-wirekit::table.td :label="__('webhooks::management.table.events')">{{ implode(', ', $subscription->eventTypeNames()) }}</x-wirekit::table.td>
                         {{-- Switched off outranks every health band: an endpoint nobody is
                              delivering to has no current health, and reporting a stale one as

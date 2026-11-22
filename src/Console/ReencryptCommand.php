@@ -105,8 +105,8 @@ final class ReencryptCommand extends Command
     }
 
     /**
-     * An entry is sealed twice: the whole delivery, and inside it the signing secrets, the proxy
-     * and the client certificate's passphrase. Each layer is asked on its own, because the relay
+     * An entry is sealed twice: the whole delivery, and inside it the signing secrets, the bearer
+     * token, the proxy and the client certificate's passphrase. Each layer is asked on its own, because the relay
      * may have written the outer one again under the current key while the inner ones kept the
      * key the entry was recorded with.
      *

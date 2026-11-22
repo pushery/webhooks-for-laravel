@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pushery\Webhooks\Core\Signing;
 
 use JsonException;
+use stdClass;
 
 /**
  * Opt-in canonical JSON serializer, applied to a payload array before it is
@@ -35,13 +36,18 @@ final readonly class JsonCanonicalizer
     }
 
     /**
-     * One value of the payload: a nested array sorted the same way, any other value as it is.
+     * One value of the payload: a nested array sorted the same way, a plain object sorted like an array and kept an
+     * object, so an empty one still encodes as `{}`, and any other value as it is.
      *
      * @param  mixed  $item  a value of the payload, which may be any JSON value
-     * @return mixed the nested array sorted, or the value unchanged
+     * @return mixed the nested array or object sorted, or the value unchanged
      */
     private function sortItem(mixed $item): mixed
     {
+        if ($item instanceof stdClass) {
+            return (object) $this->sortRecursive(get_object_vars($item));
+        }
+
         return is_array($item) ? $this->sortRecursive($item) : $item;
     }
 
