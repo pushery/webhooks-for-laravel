@@ -6,6 +6,8 @@ namespace Pushery\Webhooks\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Config;
+use Symfony\Component\Console\Formatter\OutputFormatter;
+use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * Prints the published egress-IP allowlist — the fixed set of source IPs your
@@ -30,14 +32,14 @@ final class EgressIpsCommand extends Command
         $format = strtolower(is_string($formatOption) ? $formatOption : 'json');
 
         if (! in_array($format, ['json', 'txt', 'md'], true)) {
-            $this->components->error(sprintf('Unknown format "%s". Use json, txt or md.', $format));
+            $this->components->error(OutputFormatter::escape(sprintf('Unknown format "%s". Use json, txt or md.', $format)));
 
             return self::FAILURE;
         }
 
         $this->warnAboutAnIgnoredProxy();
 
-        $this->line(self::render($this->publishedIps(), $format));
+        $this->output->writeln(self::render($this->publishedIps(), $format), OutputInterface::OUTPUT_RAW);
 
         return self::SUCCESS;
     }

@@ -11,6 +11,7 @@ use Pushery\Webhooks\Database\PartitionManager;
 use Pushery\Webhooks\Support\Settings;
 use Pushery\Webhooks\Support\Timestamp;
 use Pushery\Webhooks\Support\WebhookConnection;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 
 /**
  * Keeps the webhook_deliveries partition set rolling: drains anything the catch-all
@@ -61,11 +62,11 @@ final class PartitionMaintenanceCommand extends Command
         $drained = $partitions->drainDefaultPartition();
 
         if ($stranded > 0) {
-            $this->warn(sprintf(
+            $this->warn(OutputFormatter::escape(sprintf(
                 'Drained %d delivery row(s) out of the default partition into %s — deliveries had been landing outside the provisioned window, which blocks partition creation and retention pruning until it is healed. Check that the scheduler runs this command daily.',
                 $stranded,
                 implode(', ', $drained),
-            ));
+            )));
         }
 
         // Provision the current UTC month through $monthsAhead months from now. The
@@ -75,13 +76,13 @@ final class PartitionMaintenanceCommand extends Command
         $cutoff = CarbonImmutable::now('UTC')->startOfMonth()->subMonths($config->retentionMonths());
         $dropped = $partitions->dropPartitionsOlderThan($cutoff);
 
-        $this->info(sprintf(
+        $this->info(OutputFormatter::escape(sprintf(
             'Provisioned partitions %d month(s) ahead; drained %d month(s) out of the default partition; dropped %d partition(s) before %s.',
             $monthsAhead,
             count($drained),
             count($dropped),
             $cutoff->format('Y-m'),
-        ));
+        )));
 
         // Healed, and still reported through the exit code: the scheduler discards a command's
         // output by default, so a non-zero exit is the one channel a host's onFailure() hook
@@ -111,12 +112,12 @@ final class PartitionMaintenanceCommand extends Command
             $deleted += $affected;
         } while ($affected === self::PRUNE_CHUNK);
 
-        $this->info(sprintf(
+        $this->info(OutputFormatter::escape(sprintf(
             'Pruned %d delivery row(s) older than %s in chunks of %d (MySQL has no partition to drop).',
             $deleted,
             $cutoff->format('Y-m'),
             self::PRUNE_CHUNK,
-        ));
+        )));
 
         return self::SUCCESS;
     }

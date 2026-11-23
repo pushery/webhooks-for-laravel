@@ -7,6 +7,7 @@ namespace Pushery\Webhooks\Core\Signing\Console;
 use Illuminate\Console\Command;
 use Pushery\Webhooks\Core\Signing\Ed25519Keys;
 use Pushery\Webhooks\Core\Signing\Ed25519Scheme;
+use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * Prints a fresh Ed25519 keypair for the asymmetric {@see Ed25519Scheme}.
@@ -27,10 +28,10 @@ final class Ed25519KeygenCommand extends Command
         $keys = Ed25519Keys::generate();
 
         $this->line('Public key (share with receivers):');
-        $this->line($keys['public']);
+        $this->output->writeln($keys['public'], OutputInterface::OUTPUT_RAW);
         $this->newLine();
         $this->line('Secret key (keep private on the sender):');
-        $this->line($keys['secret']);
+        $this->output->writeln($keys['secret'], OutputInterface::OUTPUT_RAW);
 
         return self::SUCCESS;
     }

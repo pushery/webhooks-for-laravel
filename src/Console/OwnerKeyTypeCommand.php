@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 use Pushery\Webhooks\Database\OwnerKeyConversion;
 use Pushery\Webhooks\Database\OwnerKeyType;
 use Pushery\Webhooks\Support\WebhookConnection;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 
 /**
  * Changes the owner_id columns to `webhooks.platform.owner_key_type` while the tables are empty, and to
@@ -37,13 +38,13 @@ final class OwnerKeyTypeCommand extends Command
         $pending = $conversion->pending($target);
 
         if ($pending === []) {
-            $this->info(sprintf('owner_id is already "%s" on every table that carries it. Nothing to change.', $target->value));
+            $this->info(OutputFormatter::escape(sprintf('owner_id is already "%s" on every table that carries it. Nothing to change.', $target->value)));
 
             return self::SUCCESS;
         }
 
         foreach ($pending as $table => $type) {
-            $this->line(sprintf('%s.owner_id is %s and changes to "%s".', $table, $type, $target->value));
+            $this->line(OutputFormatter::escape(sprintf('%s.owner_id is %s and changes to "%s".', $table, $type, $target->value)));
         }
 
         if ($conversion->rebuildsRollupView($target)) {
@@ -53,17 +54,17 @@ final class OwnerKeyTypeCommand extends Command
         $occupied = $conversion->occupied();
 
         if ($occupied !== [] && $target->keepsEveryKey()) {
-            $this->line(sprintf(
+            $this->line(OutputFormatter::escape(sprintf(
                 '%s %s rows, and each keeps its key, written as text.',
                 implode(' and ', $occupied),
                 count($occupied) === 1 ? 'holds' : 'hold',
-            ));
+            )));
         } elseif ($occupied !== []) {
-            $this->error(sprintf(
+            $this->error(OutputFormatter::escape(sprintf(
                 '%s %s rows. owner_id changes its type only while these tables are empty, because the keys they hold are of the old type. Nothing was changed.',
                 implode(' and ', $occupied),
                 count($occupied) === 1 ? 'holds' : 'hold',
-            ));
+            )));
 
             return self::FAILURE;
         }
@@ -76,7 +77,7 @@ final class OwnerKeyTypeCommand extends Command
 
         $conversion->convert($target);
 
-        $this->info(sprintf('owner_id is now "%s" on every table that carries it.', $target->value));
+        $this->info(OutputFormatter::escape(sprintf('owner_id is now "%s" on every table that carries it.', $target->value)));
 
         return self::SUCCESS;
     }

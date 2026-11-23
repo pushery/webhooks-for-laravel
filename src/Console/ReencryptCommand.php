@@ -15,6 +15,7 @@ use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 use Pushery\Webhooks\Server\Models\WebhookOutboxEntry;
 use Pushery\Webhooks\Support\WebhookConnection;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 
 /**
  * Encrypts every value this package keeps at rest under the application key again, under the
@@ -247,19 +248,19 @@ final class ReencryptCommand extends Command
      */
     private function summarize(string $kind, string $rows, array $tally, string $consequence, bool $written): bool
     {
-        $this->info(sprintf(
+        $this->info(OutputFormatter::escape(sprintf(
             '%s: %d %s again under the current key, %d already under it.',
             $kind,
             $tally['again'],
             $written ? 'encrypted' : 'would be encrypted',
             $tally['already'],
-        ));
+        )));
 
         if ($tally['unreadable'] === []) {
             return false;
         }
 
-        $this->error(sprintf(
+        $this->error(OutputFormatter::escape(sprintf(
             '%s: %d cannot be decrypted with APP_KEY or any key in APP_PREVIOUS_KEYS (%s %s). '
             .'Add the key they were encrypted under to APP_PREVIOUS_KEYS and run this again; %s.',
             $kind,
@@ -267,7 +268,7 @@ final class ReencryptCommand extends Command
             $rows,
             implode(', ', $tally['unreadable']),
             $consequence,
-        ));
+        )));
 
         return true;
     }

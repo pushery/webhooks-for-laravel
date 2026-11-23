@@ -7,6 +7,7 @@ namespace Pushery\Webhooks\Console;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Config;
 use Pushery\Webhooks\Server\Outbox\OutboxRelay;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 
 /**
  * Sends every entry of the transactional outbox that is due, the longest-waiting first.
@@ -35,7 +36,7 @@ final class RelayOutboxCommand extends Command
 
         $attempted = $relay->relayDue();
 
-        $this->info(sprintf('Attempted %d outbox %s.', $attempted, $attempted === 1 ? 'entry' : 'entries'));
+        $this->info(OutputFormatter::escape(sprintf('Attempted %d outbox %s.', $attempted, $attempted === 1 ? 'entry' : 'entries')));
 
         return self::SUCCESS;
     }

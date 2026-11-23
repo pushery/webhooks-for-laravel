@@ -12,6 +12,7 @@ use Pushery\Webhooks\Database\Dialect\Dialect;
 use Pushery\Webhooks\Database\Dialect\Sql\RollupRefresh;
 use Pushery\Webhooks\Support\Timestamp;
 use Pushery\Webhooks\Support\WebhookConnection;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 
 /**
  * Refreshes the hourly delivery-metrics materialized view. Runs CONCURRENTLY so the
@@ -42,7 +43,7 @@ final class RefreshMetricsCommand extends Command
             $this->db()->statement(self::refreshStatement($view, $this->holdsSnapshot($view)));
         }
 
-        $this->info("Refreshed the {$view} delivery-metrics rollup.");
+        $this->info(OutputFormatter::escape("Refreshed the {$view} delivery-metrics rollup."));
 
         return self::SUCCESS;
     }

@@ -19,6 +19,7 @@ use Pushery\Webhooks\Support\Settings;
 use Pushery\Webhooks\Support\ShippedIcons;
 use Pushery\Webhooks\Support\WebhookConnection;
 use RuntimeException;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 
 /**
  * Checks that the database webhooks-for-laravel stores its tables in is one the package
@@ -72,7 +73,7 @@ final class PreflightCommand extends Command
         try {
             DatabaseRequirement::ensure($name);
         } catch (RuntimeException $exception) {
-            $this->components->error($exception->getMessage());
+            $this->components->error(OutputFormatter::escape($exception->getMessage()));
 
             return self::FAILURE;
         }
@@ -83,7 +84,7 @@ final class PreflightCommand extends Command
 
         if ($contradictions !== []) {
             foreach ($contradictions as $message) {
-                $this->components->error($message);
+                $this->components->error(OutputFormatter::escape($message));
             }
 
             // A failure, not a warning. This command is what a host runs to be told the
@@ -102,7 +103,7 @@ final class PreflightCommand extends Command
 
             if ($faults !== []) {
                 foreach ($faults as $message) {
-                    $this->components->error($message);
+                    $this->components->error(OutputFormatter::escape($message));
                 }
 
                 return self::FAILURE;
@@ -120,7 +121,7 @@ final class PreflightCommand extends Command
 
             if ($forgeryFaults !== []) {
                 foreach ($forgeryFaults as $message) {
-                    $this->components->error($message);
+                    $this->components->error(OutputFormatter::escape($message));
                 }
 
                 return self::FAILURE;
@@ -139,7 +140,7 @@ final class PreflightCommand extends Command
 
             if ($bindingFaults !== []) {
                 foreach ($bindingFaults as $message) {
-                    $this->components->error($message);
+                    $this->components->error(OutputFormatter::escape($message));
                 }
 
                 return self::FAILURE;
@@ -152,7 +153,7 @@ final class PreflightCommand extends Command
             // because tolerance_seconds sits in the entry either way and the dedupe default is a
             // header the producer may never send.
             foreach ([...WebhookConfig::replayBoundaryAdvisories(), ...WebhookConfig::signingKeyAdvisories()] as $message) {
-                $this->components->warn($message);
+                $this->components->warn(OutputFormatter::escape($message));
             }
         }
 
@@ -174,7 +175,7 @@ final class PreflightCommand extends Command
         ];
 
         foreach ($warnings as $message) {
-            $this->components->warn($message);
+            $this->components->warn(OutputFormatter::escape($message));
         }
 
         // A failure, and the same class as the forgery-protected route above: not a legal
@@ -185,7 +186,7 @@ final class PreflightCommand extends Command
         $timeoutFault = JobTimeoutBudget::fault();
 
         if ($timeoutFault !== null) {
-            $this->components->error($timeoutFault);
+            $this->components->error(OutputFormatter::escape($timeoutFault));
 
             return self::FAILURE;
         }
@@ -209,12 +210,12 @@ final class PreflightCommand extends Command
         $driver = Config::get("queue.connections.{$serverConnection}.driver");
 
         if ($serverConnection === 'sync' || $driver === 'sync') {
-            $this->components->warn(sprintf(
+            $this->components->warn(OutputFormatter::escape(sprintf(
                 'The server layer resolves to the [sync] queue connection, which has no worker: a delivery that '
                 .'fails in a retryable way ends after one attempt instead of using its %d tries. Use a real queue '
                 .'connection (database, redis, sqs) wherever deliveries matter.',
                 is_int($tries = Config::get('webhooks.server.tries')) ? $tries : 3,
-            ));
+            )));
         }
 
         // The documentation names this command as one of the two things guarding the shipped
@@ -227,17 +228,17 @@ final class PreflightCommand extends Command
 
         if ($collation !== []) {
             foreach ($collation as $message) {
-                $this->components->error($message);
+                $this->components->error(OutputFormatter::escape($message));
             }
 
             return self::FAILURE;
         }
 
-        $this->components->info(sprintf(
+        $this->components->info(OutputFormatter::escape(sprintf(
             'Database preflight passed: the [%s] connection uses the [%s] driver, which is supported.',
             $connection->getName() ?? 'default',
             $connection->getDriverName(),
-        ));
+        )));
 
         return self::SUCCESS;
     }
