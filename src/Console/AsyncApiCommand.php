@@ -7,6 +7,8 @@ namespace Pushery\Webhooks\Console;
 use Illuminate\Console\Command;
 use Pushery\Webhooks\Platform\AsyncApi\AsyncApiGenerator;
 use Pushery\Webhooks\WebhookManager;
+use Symfony\Component\Console\Formatter\OutputFormatter;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -36,7 +38,7 @@ final class AsyncApiCommand extends Command
         $error = self::formatError($format, class_exists(Yaml::class));
 
         if ($error !== null) {
-            $this->components->error($error);
+            $this->components->error(OutputFormatter::escape($error));
 
             return self::FAILURE;
         }
@@ -54,12 +56,12 @@ final class AsyncApiCommand extends Command
 
         if (is_string($path) && $path !== '') {
             file_put_contents($path, $rendered.PHP_EOL);
-            $this->components->info(sprintf('AsyncAPI document written to %s.', $path));
+            $this->components->info(OutputFormatter::escape(sprintf('AsyncAPI document written to %s.', $path)));
 
             return self::SUCCESS;
         }
 
-        $this->line($rendered);
+        $this->output->writeln($rendered, OutputInterface::OUTPUT_RAW);
 
         return self::SUCCESS;
     }

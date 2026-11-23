@@ -181,6 +181,9 @@ routes *rule to endpoint* rather than *event to every endpoint of that type*, us
 
 ```php
 use Pushery\Webhooks\Facades\Webhooks;
+use Pushery\Webhooks\Models\WebhookSubscription;
+
+$subscription = WebhookSubscription::query()->firstOrFail(); // the subscription your rule picked
 
 $delivery = Webhooks::dispatchTo($subscription, 'invoice.paid', ['invoice_id' => 'in_123']);
 ```
@@ -199,6 +202,10 @@ must be a UUID; a UUIDv7 more than a minute ahead of the clock, or an id an
 endpoint has already received, raises `InvalidArgumentException`.
 
 ```php
+$team = \App\Models\Team::query()->firstOrFail(); // the tenant
+$event = \App\Models\BillingEvent::query()->latest('id')->firstOrFail(); // your own record of what happened
+$payload = ['invoice_id' => 'in_123'];
+
 Webhooks::dispatch('invoice.paid', $payload, $team, eventId: $event->id);
 ```
 
@@ -286,6 +293,10 @@ a controller does not rebuild them. Decide who may act for the tenant before eac
 ```php
 use Pushery\Webhooks\Platform\Support\SelfServiceEndpoints;
 use Pushery\Webhooks\Support\TenantIdentity;
+
+$user = request()->user(); // who acts for the tenant
+$url = 'https://example.com/webhooks';
+$deliveryId = request()->integer('delivery'); // the delivery the customer asked to replay
 
 $tenant = TenantIdentity::fromModel($team);
 $endpoints = app(SelfServiceEndpoints::class);
@@ -450,6 +461,8 @@ customer's token:
 
 ```php
 use Pushery\Webhooks\Core\Http\GuardedFetch;
+
+$customer = \App\Models\Customer::query()->firstOrFail(); // a customer who entered a status URL and a token
 
 $response = app(GuardedFetch::class)->get(
     $customer->status_url,

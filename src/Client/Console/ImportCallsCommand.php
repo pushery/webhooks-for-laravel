@@ -27,6 +27,7 @@ use Pushery\Webhooks\Support\TableLookup;
 use Pushery\Webhooks\Support\Timestamp;
 use Pushery\Webhooks\Support\WebhookConnection;
 use stdClass;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 
 /**
  * Copies an inbound-webhook backlog from a table you used before this package into its own
@@ -142,13 +143,13 @@ final class ImportCallsCommand extends Command
         try {
             new DateTimeZone($zone);
         } catch (Exception) {
-            $this->error(sprintf('"%s" is not a time zone; pass an identifier such as UTC or Europe/Berlin.', $zone));
+            $this->error(OutputFormatter::escape(sprintf('"%s" is not a time zone; pass an identifier such as UTC or Europe/Berlin.', $zone)));
 
             return self::FAILURE;
         }
 
         if (! TableLookup::exists($fromTable, $fromConnection)) {
-            $this->error(sprintf('Source table "%s" was not found on connection "%s".', $fromTable, $fromConnection ?? 'default'));
+            $this->error(OutputFormatter::escape(sprintf('Source table "%s" was not found on connection "%s".', $fromTable, $fromConnection ?? 'default')));
 
             return self::FAILURE;
         }
@@ -157,13 +158,13 @@ final class ImportCallsCommand extends Command
         // installation with one connection the import would read its own calls and copy each one
         // into itself under a new id, and a dry run would announce them as calls to import.
         if ($this->readsTheTableItWrites($fromConnection, $fromTable)) {
-            $this->error(sprintf(
+            $this->error(OutputFormatter::escape(sprintf(
                 'The source table "%s" on connection "%s" is the table this command writes the imported calls to, '
                 .'so the import would copy every call into itself. Name the table you are importing from with '
                 .'--from-table, and its connection with --from-connection if it lives on another one.',
                 $fromTable,
                 $fromConnection ?? 'default',
-            ));
+            )));
 
             return self::FAILURE;
         }
@@ -229,10 +230,10 @@ final class ImportCallsCommand extends Command
         );
 
         if ($untimed !== null && $untimed !== []) {
-            $this->warn(sprintf(
+            $this->warn(OutputFormatter::escape(sprintf(
                 'The source rows carry no %s column, so the imported rows take the time of the import instead. Name the column with --from-created-at or --from-updated-at.',
                 implode(' or ', array_map(static fn (string $column): string => '['.$column.']', $untimed)),
-            ));
+            )));
         }
 
         $this->report($dryRun, $imported, $skipped, $errored, $errors);
@@ -454,12 +455,12 @@ final class ImportCallsCommand extends Command
      */
     private function report(bool $dryRun, int $imported, int $skipped, int $errored, array $errors): void
     {
-        $this->info($dryRun
+        $this->info(OutputFormatter::escape($dryRun
             ? sprintf('Dry run: would import %d, would skip %d already present, %d could not be read.', $imported, $skipped, $errored)
-            : sprintf('Imported %d call(s), skipped %d already present, %d could not be read.', $imported, $skipped, $errored));
+            : sprintf('Imported %d call(s), skipped %d already present, %d could not be read.', $imported, $skipped, $errored)));
 
         foreach ($errors as $error) {
-            $this->warn('Skipped '.$error);
+            $this->warn(OutputFormatter::escape('Skipped '.$error));
         }
     }
 

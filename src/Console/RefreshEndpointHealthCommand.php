@@ -7,6 +7,7 @@ namespace Pushery\Webhooks\Console;
 use Illuminate\Console\Command;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Platform\Health\EndpointHealth;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 use Throwable;
 
 /**
@@ -53,11 +54,11 @@ final class RefreshEndpointHealthCommand extends Command
         $this->info(sprintf('Refreshed the health score of %d active endpoint(s).', $count));
 
         if ($failed !== []) {
-            $this->error(sprintf(
+            $this->error(OutputFormatter::escape(sprintf(
                 '%d endpoint(s) could not be scored and keep whatever their last delivery left: %s.',
                 count($failed),
                 implode(', ', $failed),
-            ));
+            )));
 
             return self::FAILURE;
         }

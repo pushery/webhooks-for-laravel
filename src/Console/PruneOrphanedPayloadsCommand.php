@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Config;
 use Pushery\Webhooks\Support\LocalizedNumber;
 use Pushery\Webhooks\Support\PayloadReclaimer;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 
 /**
  * Deletes offloaded payload objects on the configured Storage disk(s) that no log row still
@@ -74,14 +75,14 @@ final class PruneOrphanedPayloadsCommand extends Command
             $totalDeleted += $result['deleted'];
             $totalBytes += $result['bytes'];
 
-            $this->line(sprintf(
+            $this->line(OutputFormatter::escape(sprintf(
                 '  %s: %d scanned, %d orphaned%s%s.',
                 $disk,
                 $result['scanned'],
                 $result['orphaned'],
                 $dryRun ? '' : sprintf(', %d deleted', $result['deleted']),
                 $result['foreign'] > 0 ? sprintf(', %d other file(s) under webhooks/ left alone', $result['foreign']) : '',
-            ));
+            )));
         }
 
         // Not Number::fileSize(): it reaches Illuminate\Support\Number::format(), which throws
@@ -90,9 +91,9 @@ final class PruneOrphanedPayloadsCommand extends Command
         // delete and then die without reporting what it had deleted.
         $size = LocalizedNumber::fileSize($totalBytes);
 
-        $this->info($dryRun
+        $this->info(OutputFormatter::escape($dryRun
             ? sprintf('Dry run: %d orphaned object(s) holding %s would be deleted.', $totalOrphaned, $size)
-            : sprintf('Reclaimed %d orphaned object(s), freeing %s.', $totalDeleted, $size));
+            : sprintf('Reclaimed %d orphaned object(s), freeing %s.', $totalDeleted, $size)));
 
         // An orphan the disk refused stays, and a scheduler hears of it only through the exit code.
         if (! $dryRun && $totalDeleted < $totalOrphaned) {

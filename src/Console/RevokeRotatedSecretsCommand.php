@@ -7,6 +7,7 @@ namespace Pushery\Webhooks\Console;
 use Illuminate\Console\Command;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\WebhookManager;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 use Throwable;
 
 /**
@@ -67,13 +68,13 @@ final class RevokeRotatedSecretsCommand extends Command
         $this->info(sprintf('Revoked %d rotated-away endpoint secret(s) whose window had closed.', $revoked));
 
         if ($failed !== []) {
-            $this->error(sprintf(
+            $this->error(OutputFormatter::escape(sprintf(
                 '%d endpoint(s) could not be processed and still hold a rotated-away secret: %s. '
                 .'Their previous_secret cannot be read -- check APP_KEY and APP_PREVIOUS_KEYS, or '
                 .'clear the column for those rows.',
                 count($failed),
                 implode(', ', $failed),
-            ));
+            )));
 
             // A non-zero exit is what makes this reachable at all: withoutOverlapping is a skip
             // and scheduler output is discarded by default, so a host's onFailure() hook is the

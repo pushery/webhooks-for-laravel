@@ -6,6 +6,29 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.34.0] - 2026-11-23
+
+### ✨ Added
+
+- **`Support\PruneExpiredCacheKeys` also prunes behind a `failover` store and a `storage` store.** Both of these Laravel cache drivers leave expired entries behind as a database or a file store does. A failover store writes each entry into the first of its stores that answers, so the pruner goes through each of its stores once. A storage store lays its files out on a filesystem disk the way a file store does in its directory, and the pruner deletes the expired files the store laid out there and leaves every other file on the disk alone.
+
+### 🔧 Changed
+
+- **`symfony/console` is a declared dependency.** The Artisan commands escape what they print with its output formatter. Every Laravel version the package supports installs the component already, so no installation resolves differently.
+
+### 🐛 Fixed
+
+- **On MySQL, the migration that adds `tenant` to `webhook_calls` gives the session its lock wait back.** It bounded `lock_wait_timeout` to 3 seconds for its `ALTER` and left the bound on the session, so every later migration of the same run and every seeder of `migrate --seed` gave up on a lock after 3 seconds as well. It reads the value the session had first and sets it again once the `ALTER` is done, also when the `ALTER` fails. PostgreSQL was not affected: its bound ends with the migration's transaction.
+
+  **Upgrade:** nothing to do where the package runs its own migrations. A published copy of the client migrations keeps the old behavior until it is replaced by the file the package ships.
+
+- **A command prints a stored value as it is written.** Symfony's console formatter reads a tag it can parse as a style, such as `<info>` or `</>`, as styling and drops it, so a table name, a connection, a path, a time zone, an endpoint id or the message of an exception that held one came out colored and cut short. Every message of the package's commands now goes out through `OutputFormatter::escape()`, and `webhooks:asyncapi`, `webhooks:egress-ips` and `webhooks:ed25519-keygen` write their document and their keys as raw bytes.
+
+### 📚 Documentation
+
+- **The examples of the Boost skill set every variable they read.** The examples for `dispatchTo()`, for `dispatch()` with an `eventId`, for `SelfServiceEndpoints` and for `GuardedFetch` read a subscription, a team, an event, a user, a URL, a delivery or a customer without setting it, so code copied from them stopped at its first call. Each now sets what it reads, as the documentation pages do.
+- **The documentation says that the `octane` store of Laravel Octane is out of the pruner's reach.** The store keeps an expired entry in a table of a fixed number of rows, `octane.cache.rows`, until its key is written again or the server restarts, and the scheduler, where the pruner runs, sees an empty store. Once the table is full, writing a new key fails, so the documentation advises against making `octane` the default cache store of an application that runs this package.
+
 ## [3.33.0] - 2026-11-21
 
 ### ✨ Added
@@ -3827,7 +3850,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.33.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.34.0...HEAD
+[3.34.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.33.0...v3.34.0
 [3.33.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.32.0...v3.33.0
 [3.32.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.31.0...v3.32.0
 [3.31.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.30.0...v3.31.0

@@ -35,11 +35,15 @@ return new class extends Migration
             return;
         }
 
-        $this->boundLocks();
+        $previous = $this->boundLocks();
 
-        $schema->table('webhook_calls', function (Blueprint $table): void {
-            $table->string('tenant', 191)->nullable()->after('source');
-        });
+        try {
+            $schema->table('webhook_calls', function (Blueprint $table): void {
+                $table->string('tenant', 191)->nullable()->after('source');
+            });
+        } finally {
+            $this->releaseLocks($previous);
+        }
     }
 
     public function down(): void
@@ -62,29 +66,49 @@ return new class extends Migration
             ));
         }
 
-        $this->boundLocks();
+        $previous = $this->boundLocks();
 
-        $schema->table('webhook_calls', function (Blueprint $table): void {
-            $table->dropColumn('tenant');
-        });
+        try {
+            $schema->table('webhook_calls', function (Blueprint $table): void {
+                $table->dropColumn('tenant');
+            });
+        } finally {
+            $this->releaseLocks($previous);
+        }
     }
 
     /**
      * The table takes deliveries all the time, so the short exclusive lock the ALTER needs is waited for three seconds
      * at most: the migration fails rather than holding every insert behind it, and running it again is the remedy. On
-     * PostgreSQL the bound ends with the migration's transaction; MySQL has no such scope and keeps it for the session.
+     * PostgreSQL the bound ends with the migration's transaction. MySQL has no such scope and keeps it for the session,
+     * which every later migration of the same run and every seeder of `migrate --seed` share, so the value the session
+     * had is read first and put back by releaseLocks() once the ALTER is done. Under `migrate --pretend` nothing runs,
+     * so nothing is read.
+     *
+     * @return int|null the lock wait the MySQL session had before, or null where there is nothing to put back
      */
-    private function boundLocks(): void
+    private function boundLocks(): ?int
     {
         $connection = Schema::connection($this->getConnection())->getConnection();
 
         if (Dialect::for($this->getConnection()) === Dialect::MySql) {
+            $previous = $connection->pretending() ? null : $connection->scalar('select @@session.lock_wait_timeout');
             $connection->statement('SET SESSION lock_wait_timeout = 3');
 
-            return;
+            return is_numeric($previous) ? (int) $previous : null;
         }
 
         $connection->statement("SET LOCAL lock_timeout = '3s'");
         $connection->statement("SET LOCAL statement_timeout = '30s'");
+
+        return null;
+    }
+
+    /** Put back the lock wait the MySQL session had before boundLocks(), whether the ALTER succeeded or not. */
+    private function releaseLocks(?int $previous): void
+    {
+        if ($previous !== null) {
+            Schema::connection($this->getConnection())->getConnection()->statement('SET SESSION lock_wait_timeout = ?', [$previous]);
+        }
     }
 };
