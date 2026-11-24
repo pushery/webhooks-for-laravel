@@ -19,7 +19,9 @@ use Pushery\Webhooks\Support\Settings;
  * connect timeout while the endpoints of every other subscription wait. The hold counts attempts instead:
  * `hold.attempts` failed attempts within `hold.window` seconds hold the endpoint for `hold.seconds`, and its deliveries
  * wait in the queue without an attempt. Once the hold has run out, one delivery goes as the probe while the others wait
- * as long as an attempt can take: the probe's success lifts the hold, its failure holds the endpoint again.
+ * as long as an attempt can take: the probe's success lifts the hold, its failure holds the endpoint again. The probes
+ * that fail in a row are counted, and the breaker switches the endpoint off once they come to its threshold: a held
+ * delivery with a deadline is charged no time, so a dead endpoint under a deadline exhausts no delivery.
  *
  * Off while `hold.attempts` is null, and a delivery the Platform did not create, which names no subscription, is never
  * held. The counts live in the limiter store, as the dispatch schedule does, so every worker reads the same hold, and
@@ -37,21 +39,30 @@ final readonly class EndpointHold
 
     public function __construct(private Settings $settings) {}
 
-    /** Count a failed attempt against its endpoint, and hold the endpoint once the attempts come to the threshold. */
-    public function failed(WebhookDeliveryData $data): void
+    /**
+     * Count a failed attempt against its endpoint, and hold the endpoint once the attempts come to the threshold.
+     *
+     * @return int the probes of the endpoint that failed in a row, this one included, or 0 for an attempt that was no
+     *             probe
+     */
+    public function failed(WebhookDeliveryData $data): int
     {
         $endpoint = $this->endpointOf($data);
         $threshold = $this->settings->holdAttempts();
 
         if ($endpoint === null || $threshold === null) {
-            return;
+            return 0;
         }
 
         // A failed probe holds the endpoint again at once: the attempts that held it were counted already.
         if ($this->store()->has($this->key($endpoint, 'probe'))) {
             $this->hold($endpoint);
 
-            return;
+            $probes = $this->key($endpoint, 'failed-probes');
+            $this->store()->add($probes, 0, $this->settings->holdSeconds() + self::REMEMBERED);
+
+            // A store that cannot count answers false, which reads as no failed probe.
+            return (int) $this->store()->increment($probes);
         }
 
         $failures = $this->key($endpoint, 'failures');
@@ -61,6 +72,8 @@ final readonly class EndpointHold
         if (is_numeric($count) && (int) $count >= $threshold) {
             $this->hold($endpoint);
         }
+
+        return 0;
     }
 
     /**
@@ -75,7 +88,7 @@ final readonly class EndpointHold
             return;
         }
 
-        foreach (['failures', 'until', 'probe'] as $part) {
+        foreach (['failures', 'until', 'probe', 'failed-probes'] as $part) {
             $this->store()->forget($this->key($endpoint, $part));
         }
     }

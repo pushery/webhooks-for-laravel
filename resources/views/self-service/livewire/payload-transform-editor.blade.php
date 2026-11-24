@@ -81,7 +81,7 @@
                                             name="includeFields.{{ $i }}"
                                             wire:model.live.debounce.400ms="includeFields.{{ $i }}"
                                             :placeholder="__('webhooks::self-service.transform.field_name_placeholder')"
-                                            :aria-label="__('webhooks::self-service.a11y.include_field', ['number' => $i + 1])"
+                                            :aria-label="__('webhooks::self-service.a11y.include_field', ['number' => $loop->iteration])"
                                         />
                                     </div>
                                     <x-wirekit::button
@@ -90,7 +90,7 @@
                                         surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}"
                                         intent="danger"
                                         wire:click="removeIncludeField({{ $i }})"
-                                        :aria-label="__('webhooks::self-service.a11y.remove_include_field', ['number' => $i + 1])"
+                                        :aria-label="__('webhooks::self-service.a11y.remove_include_field', ['number' => $loop->iteration])"
                                     >{{ __('webhooks::self-service.actions.remove') }}</x-wirekit::button>
                                 </div>
                             @endforeach
@@ -112,7 +112,7 @@
                                             name="excludeFields.{{ $i }}"
                                             wire:model.live.debounce.400ms="excludeFields.{{ $i }}"
                                             :placeholder="__('webhooks::self-service.transform.field_name_placeholder')"
-                                            :aria-label="__('webhooks::self-service.a11y.exclude_field', ['number' => $i + 1])"
+                                            :aria-label="__('webhooks::self-service.a11y.exclude_field', ['number' => $loop->iteration])"
                                         />
                                     </div>
                                     <x-wirekit::button
@@ -121,7 +121,7 @@
                                         surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}"
                                         intent="danger"
                                         wire:click="removeExcludeField({{ $i }})"
-                                        :aria-label="__('webhooks::self-service.a11y.remove_exclude_field', ['number' => $i + 1])"
+                                        :aria-label="__('webhooks::self-service.a11y.remove_exclude_field', ['number' => $loop->iteration])"
                                     >{{ __('webhooks::self-service.actions.remove') }}</x-wirekit::button>
                                 </div>
                             @endforeach
@@ -143,7 +143,7 @@
                                             name="renamePairs.{{ $i }}.from"
                                             wire:model.live.debounce.400ms="renamePairs.{{ $i }}.from"
                                             :placeholder="__('webhooks::self-service.transform.rename_from_placeholder')"
-                                            :aria-label="__('webhooks::self-service.a11y.rename_source_field', ['number' => $i + 1])"
+                                            :aria-label="__('webhooks::self-service.a11y.rename_source_field', ['number' => $loop->iteration])"
                                         />
                                     </div>
                                     <span class="text-[color:var(--color-wk-text-muted)]" aria-hidden="true">&rarr;</span>
@@ -152,7 +152,7 @@
                                             name="renamePairs.{{ $i }}.to"
                                             wire:model.live.debounce.400ms="renamePairs.{{ $i }}.to"
                                             :placeholder="__('webhooks::self-service.transform.rename_to_placeholder')"
-                                            :aria-label="__('webhooks::self-service.a11y.rename_target_field', ['number' => $i + 1])"
+                                            :aria-label="__('webhooks::self-service.a11y.rename_target_field', ['number' => $loop->iteration])"
                                         />
                                     </div>
                                     <x-wirekit::button
@@ -161,7 +161,7 @@
                                         surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}"
                                         intent="danger"
                                         wire:click="removeRenamePair({{ $i }})"
-                                        :aria-label="__('webhooks::self-service.a11y.remove_rename_pair', ['number' => $i + 1])"
+                                        :aria-label="__('webhooks::self-service.a11y.remove_rename_pair', ['number' => $loop->iteration])"
                                     >{{ __('webhooks::self-service.actions.remove') }}</x-wirekit::button>
                                 </div>
                             @endforeach

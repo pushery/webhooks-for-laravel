@@ -190,6 +190,11 @@ class SubscriptionManager extends Component
     {
         $this->authorizeAction($this->editingId === null ? 'create' : 'edit');
 
+        // The rules on `eventTypes.*` reach each element through its key, and Laravel below 13.43.0 passes over an
+        // element whose key is empty (GHSA-cq3g-fj94-c8p3). The list carries nothing in its keys, so it is numbered
+        // anew before the rules read it, and every element meets them on every supported Laravel.
+        $this->eventTypes = array_values($this->eventTypes);
+
         $accepted = new Settings()->acceptedEventTypes();
 
         // Read once: each read loads the endpoint row again.
@@ -377,7 +382,7 @@ class SubscriptionManager extends Component
     private function register(): void
     {
         try {
-            $subscription = Webhooks::subscribe(null, $this->url, array_values($this->eventTypes), $this->name ?: null);
+            $subscription = Webhooks::subscribe(null, $this->url, $this->eventTypes, $this->name ?: null);
         } catch (BlockedDestination|HostUnresolvable) {
             // The guard's own message stays out of the form: it is an operator
             // diagnostic for the log, and it would tell a stranger which hosts resolve

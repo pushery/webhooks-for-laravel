@@ -152,12 +152,19 @@ final readonly class GuardedFetch
      * limit rather than refused before its first byte. Google reads a `robots.txt` that way, up to
      * 500 KiB, and ignores what follows.
      *
+     * With `$decode` a body the server compressed although the request offered no encoding comes back inflated,
+     * gzip, deflate or br, and the request still offers none. The limit then holds the inflated body, so a body
+     * that inflates past it ends at the limit as a longer body does. The headers stay as the server sent them,
+     * `Content-Encoding` and `Content-Length` included. Whether br is inflated depends on the curl PHP was
+     * built with.
+     *
      * @param  int  $maxBytes  the longest body accepted, in bytes
      * @param  array<string, string>  $headers  request headers, such as `Accept`
      * @param  int  $connectTimeout  seconds to wait for the connection
      * @param  int  $timeout  seconds the whole transfer may take
      * @param  bool  $truncate  hand back the head of a longer body instead of refusing it
      * @param  ?EgressAddresses  $from  the local addresses the request leaves from, one per family, or null for the default route
+     * @param  bool  $decode  inflate a body the server compressed without being asked
      *
      * @throws BlockedDestination when the guard refuses the URL
      * @throws HostUnresolvable when the host resolves to no address
@@ -167,7 +174,7 @@ final readonly class GuardedFetch
      * @throws ConnectionException when the connection fails, or a timeout strikes while it is made, or `$from` names
      *                             no address in a family the destination has
      */
-    public function get(string $url, int $maxBytes, array $headers = [], int $connectTimeout = 3, int $timeout = 10, bool $truncate = false, ?EgressAddresses $from = null): FetchedResponse
+    public function get(string $url, int $maxBytes, array $headers = [], int $connectTimeout = 3, int $timeout = 10, bool $truncate = false, ?EgressAddresses $from = null, bool $decode = false): FetchedResponse
     {
         if ($maxBytes < 0) {
             throw new InvalidArgumentException('The byte limit of a fetch is never negative.');
@@ -176,9 +183,9 @@ final readonly class GuardedFetch
         $endpoint = $this->guard->resolveAndPin($url);
         $sink = new LimitedSink($maxBytes, keepHead: $truncate);
 
-        $options = $this->transportOptions($endpoint, $connectTimeout, $timeout, $from) + [
+        $options = $this->transportOptions($endpoint, $connectTimeout, $timeout, $from, $decode) + [
             'sink' => $sink,
-            'on_headers' => static function (ResponseInterface $response) use ($sink, $truncate): void {
+            'on_headers' => static function (ResponseInterface $response) use ($sink, $truncate, $decode): void {
                 // A cut transfer ends in an exception, so the sink keeps the status and the headers
                 // of the response its head belongs to.
                 if ($truncate) {
@@ -187,7 +194,11 @@ final readonly class GuardedFetch
                     return;
                 }
 
-                $sink->refuseDeclaredLength($response->getHeaderLine('Content-Length'));
+                // A declared length counts the bytes on the wire. An inflated body is held to the limit by the sink,
+                // which receives it inflated, so the length of the compressed bytes refuses nothing there.
+                if (! $decode) {
+                    $sink->refuseDeclaredLength($response->getHeaderLine('Content-Length'));
+                }
             },
         ];
 
@@ -208,7 +219,7 @@ final readonly class GuardedFetch
 
                 return new FetchedResponse(
                     status: $head->getStatusCode(),
-                    headers: $this->headersOf($head),
+                    headers: $this->headersOf($head, $decode),
                     body: $sink->kept(),
                     durationMs: intdiv(hrtime(true) - $start, 1_000_000),
                     truncated: true,
@@ -231,7 +242,7 @@ final readonly class GuardedFetch
 
         return new FetchedResponse(
             status: $response->status(),
-            headers: $this->headersOf($psr),
+            headers: $this->headersOf($psr, $decode),
             body: $body,
             durationMs: $durationMs,
             truncated: $truncated,
@@ -368,8 +379,12 @@ final readonly class GuardedFetch
 
     /**
      * The transport options of both requests: the timeouts, no redirect followed, TLS verified,
-     * nothing inflated, no proxy, and the connection pinned to the vetted addresses, bound to a
-     * local address of its family where the caller names any.
+     * nothing inflated unless `$decode` asks for it, no proxy, and the connection pinned to the vetted
+     * addresses, bound to a local address of its family where the caller names any.
+     *
+     * With `$decode` curl inflates whatever encoding the server answers with. Guzzle then sends an empty
+     * `Accept-Encoding` in place of the one curl would add, so the request still offers no encoding, and
+     * the sink receives the inflated bytes.
      *
      * Asked before the transfer starts, so a destination without an address in a family the caller
      * may leave from is refused before anything is sent.
@@ -378,14 +393,14 @@ final readonly class GuardedFetch
      *
      * @throws ConnectionException when `$from` names no address in a family the destination has
      */
-    private function transportOptions(PinnedEndpoint $endpoint, int $connectTimeout, int $timeout, ?EgressAddresses $from = null): array
+    private function transportOptions(PinnedEndpoint $endpoint, int $connectTimeout, int $timeout, ?EgressAddresses $from = null, bool $decode = false): array
     {
         $options = [
             'connect_timeout' => $connectTimeout,
             'timeout' => $timeout,
             'allow_redirects' => false,
             'verify' => true,
-            'decode_content' => false,
+            'decode_content' => $decode,
             'proxy' => ['no' => ['*']],
         ];
 
@@ -418,14 +433,35 @@ final readonly class GuardedFetch
     /**
      * Each response header with its values, under the name the server sent.
      *
+     * Guzzle moves `Content-Encoding` and `Content-Length` of a body it inflated to `X-Encoded-Content-Encoding` and
+     * `X-Encoded-Content-Length`, and writes the inflated length in their place. For an inflated body both are read
+     * back from there, so the headers stay as the server sent them.
+     *
      * @return array<string, list<string>>
      */
-    private function headersOf(ResponseInterface $response): array
+    private function headersOf(ResponseInterface $response, bool $inflated = false): array
     {
         $received = [];
+        $sent = [];
 
         foreach ($response->getHeaders() as $name => $values) {
+            if ($inflated && preg_match('/\Ax-encoded-(content-(?:encoding|length))\z/i', (string) $name, $match) === 1) {
+                $sent[ucwords(strtolower($match[1]), '-')] = array_values($values);
+
+                continue;
+            }
+
             $received[(string) $name] = array_values($values);
+        }
+
+        foreach ($sent as $original => $values) {
+            foreach (array_keys($received) as $name) {
+                if (strcasecmp($name, $original) === 0) {
+                    unset($received[$name]);
+                }
+            }
+
+            $received[$original] = $values;
         }
 
         return $received;

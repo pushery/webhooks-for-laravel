@@ -66,6 +66,10 @@ final class SelfServiceEndpoints
         bool $active = true,
         ?Authenticatable $actor = null,
     ): WebhookSubscription {
+        // The list carries nothing in its keys. Numbered anew, every element meets the rules on `eventTypes.*`, which
+        // Laravel below 13.43.0 passes over for an element whose key is empty (GHSA-cq3g-fj94-c8p3).
+        $eventTypes = array_values($eventTypes);
+
         $this->validate($url, $eventTypes, $name, []);
         $this->refuseTypesTheActorLacks($eventTypes, [], $actor);
 
@@ -89,7 +93,7 @@ final class SelfServiceEndpoints
                     // Through the manager, so the URL is checked against internal addresses and the signing secret is
                     // generated and encrypted by the existing scheme. The owner is stored as the tenant identity the
                     // portal's scope filters by, so create and read can never diverge onto different owner columns.
-                    return Webhooks::subscribe($owner, $url, array_values($eventTypes), $this->nameOrNull($name));
+                    return Webhooks::subscribe($owner, $url, $eventTypes, $this->nameOrNull($name));
                 } catch (BlockedDestination|HostUnresolvable) {
                     throw $this->refusal('url', $this->blockedUrlMessage());
                 }
@@ -124,6 +128,9 @@ final class SelfServiceEndpoints
         bool $active = true,
         ?Authenticatable $actor = null,
     ): WebhookSubscription {
+        // Numbered anew for the reason register() gives.
+        $eventTypes = array_values($eventTypes);
+
         // Read once: what the endpoint already holds widens the catalog and the caps, and is the part of the selection no
         // ability is asked for.
         $stored = $endpoint->eventTypeNames();

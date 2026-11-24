@@ -88,7 +88,11 @@ final readonly class WebhookServerEventSubscriber
 
     public function onFailed(WebhookAttemptFailed $event): void
     {
-        $this->hold->failed($event->data);
+        $failedProbes = $this->hold->failed($event->data);
+
+        if ($failedProbes > 0) {
+            $this->tripOnFailedProbes($event->data, $failedProbes);
+        }
 
         $delivery = $this->resolveDelivery($event->data);
 
@@ -175,6 +179,25 @@ final readonly class WebhookServerEventSubscriber
         return true;
     }
 
+    /**
+     * Switch an endpoint off once as many of its probes failed in a row as the breaker counts. A held endpoint sends one
+     * probe at a time, and a held delivery with a deadline is charged no time, so a dead endpoint under a deadline
+     * exhausted no delivery, and the count of exhausted deliveries never came to the threshold.
+     */
+    private function tripOnFailedProbes(WebhookDeliveryData $data, int $failedProbes): void
+    {
+        if (! $this->config->circuitBreakerEnabled() || $failedProbes < $this->config->circuitBreakerThreshold()) {
+            return;
+        }
+
+        $id = $data->meta['subscription_id'] ?? null;
+        $subscription = is_int($id) || is_string($id) ? WebhookSubscription::model()::query()->find($id) : null;
+
+        if ($subscription instanceof WebhookSubscription && $subscription->is_active) {
+            $this->disable($subscription);
+        }
+    }
+
     private function maybeAutoDisable(WebhookSubscription $subscription): void
     {
         if (! $this->config->circuitBreakerEnabled()
@@ -182,6 +205,11 @@ final readonly class WebhookServerEventSubscriber
             return;
         }
 
+        $this->disable($subscription);
+    }
+
+    private function disable(WebhookSubscription $subscription): void
+    {
         // Atomic transition — a conditional UPDATE gated on is_active=true means only
         // the worker that actually flips the flag fires the event, even when several
         // deliveries of the same subscription exhaust concurrently.

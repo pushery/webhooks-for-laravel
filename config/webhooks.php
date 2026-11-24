@@ -223,7 +223,8 @@ return [
         // cap and that wait is not charged against 'tries' — up to retry_after_max_deferrals
         // times — so an endpoint answering "Retry-After: 3600" is still there to receive
         // the webhook when its window elapses, instead of the delivery being exhausted
-        // half an hour earlier. Raise retry_after_cap on a queue that can hold longer
+        // half an hour earlier. An entry of the transactional outbox defers the same way,
+        // waiting the cap in its table. Raise retry_after_cap on a queue that can hold longer
         // delays (Redis, database) to obey such a hint exactly. On SQS a deferral waits
         // 900 seconds at most whatever the cap says, because AWS refuses a longer delay.
         //

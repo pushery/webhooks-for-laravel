@@ -6,6 +6,21 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.35.0] - 2026-11-24
+
+### ✨ Added
+
+- **`GuardedFetch::get()` inflates a body the server compressed unasked, on request.** With `decode: true` a gzip, deflate or br body comes back inflated, and the request still offers no encoding, so a check that reads the body reads text rather than compressed bytes. `maxBytes` then holds the inflated body, so a body that inflates past it ends at the limit. The headers stay as the server sent them, `Content-Encoding` and `Content-Length` included. Without the option nothing is inflated, as before.
+
+### 🐛 Fixed
+
+- **The breaker switches off a dead endpoint under a deadline as well.** The hold charges a held delivery neither its tries nor its time, and the breaker counted exhausted deliveries. With `server.retry_for_seconds` a delivery of a dead endpoint therefore never exhausted: the breaker never came to its threshold, the endpoint was never switched off, and every held delivery was queued again at the end of each hold, without end. The probes that fail in a row now count on their own, and once `platform.circuit_breaker.threshold` of them failed the endpoint is switched off like one whose deliveries exhausted. A probe that gets through starts the count again, so an endpoint that was down for a while keeps its deliveries.
+- **An outbox entry waits out a long `Retry-After` the way a queued delivery does.** A receiver that answered `429` or `503` with a `Retry-After` past `server.backoff.retry_after_cap` had every attempt of an outbox entry charged, so the entry was given up long before the receiver's window ended, and `retry_after_max_deferrals` did nothing for it. The relay now waits the cap without charging that attempt, up to `retry_after_max_deferrals` times, and dispatches `WebhookAttemptDeferred` as the queued job does.
+
+### 🔒 Security
+
+- **A list with an empty key meets its rules like any other.** The operator console and the self-service endpoints validate each selected event type through the rules on `eventTypes.*`, and the payload editor each entry of its include, exclude and rename lists the same way. Laravel below 13.43.0 passes over an element whose key is an empty string ([GHSA-cq3g-fj94-c8p3](https://github.com/advisories/GHSA-cq3g-fj94-c8p3)), so on such a version a request could store an event type outside the catalog, or an entry the column cannot hold. Each of them now numbers its list anew before validating it, and the refusal names position 0 like any other. On Laravel 13.43.0 and later the rules already reached such an element.
+
 ## [3.34.0] - 2026-11-23
 
 ### ✨ Added
@@ -3850,7 +3865,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.34.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.35.0...HEAD
+[3.35.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.34.0...v3.35.0
 [3.34.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.33.0...v3.34.0
 [3.33.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.32.0...v3.33.0
 [3.32.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.31.0...v3.32.0
