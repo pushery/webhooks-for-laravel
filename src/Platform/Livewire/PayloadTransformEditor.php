@@ -176,6 +176,13 @@ final class PayloadTransformEditor extends Component
         $subscription = $this->findOwnedEndpoint((int) $this->endpointId);
         $this->authorize('update', $subscription);
 
+        // The rules on `includeFields.*`, `excludeFields.*` and `renamePairs.*` reach each element through its key, and
+        // Laravel below 13.43.0 passes over an element whose key is empty (GHSA-cq3g-fj94-c8p3). The three lists carry
+        // nothing in their keys, so they are numbered anew before the rules read them.
+        $this->includeFields = array_values($this->includeFields);
+        $this->excludeFields = array_values($this->excludeFields);
+        $this->renamePairs = array_values($this->renamePairs);
+
         // The only write in this component, and the only one in the package that had no
         // validate() at all. Two things got through without it. `payloadVersion` is a public
         // property, so the browser writes it straight onto a `varchar(20)` column — the same

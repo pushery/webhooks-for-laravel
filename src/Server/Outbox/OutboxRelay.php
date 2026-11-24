@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Pushery\Webhooks\Core\Http\ErrorMessageRedactor;
@@ -19,6 +20,7 @@ use Pushery\Webhooks\Server\Delivery\DeliveryGate;
 use Pushery\Webhooks\Server\Delivery\DeliveryPipeline;
 use Pushery\Webhooks\Server\Delivery\Disposition;
 use Pushery\Webhooks\Server\Delivery\RetryAfter;
+use Pushery\Webhooks\Server\Events\WebhookAttemptDeferred;
 use Pushery\Webhooks\Server\Events\WebhookAttemptFailed;
 use Pushery\Webhooks\Server\Events\WebhookAttemptRetrying;
 use Pushery\Webhooks\Server\Events\WebhookAttemptsExhausted;
@@ -249,8 +251,22 @@ final readonly class OutboxRelay
         event(new WebhookAttemptFailed($data, $attempt, $response, $outcome->exception));
 
         $maximum = $this->maximumAttempts($data);
+        $hint = $data->options->respectRetryAfter && $response instanceof TransportResponse ? RetryAfter::from($response) : null;
 
-        if ($maximum !== null && $attempt >= $maximum) {
+        // The receiver asked to come back later than the cap. As a queued delivery does, the entry waits the cap and
+        // the attempt is not charged against its tries, at most retryAfterMaxDeferrals times: waiting the cap and
+        // charging the attempt would spend the tries long before the receiver's window ends. An entry without a
+        // number of tries has none to protect and waits the cap like any other retry, and a cap of zero switches
+        // the hint off, so there is no wait to defer into.
+        if ($maximum !== null && $hint !== null && $data->options->retryAfterCap > 0 && $hint > $data->options->retryAfterCap
+            && $data->retryAfterDeferrals < $data->options->retryAfterMaxDeferrals) {
+            $this->defer($entry, $token, $data, $attempt, $response, $outcome->exception, $hint);
+
+            return;
+        }
+
+        // Every attempt is counted, and the ones that ended in a deferral are not charged, as for a queued delivery.
+        if ($maximum !== null && $attempt - $data->retryAfterDeferrals >= $maximum) {
             $ended = $this->end($entry, $token, OutboxEntryState::GivenUp, $attempt, $response, $outcome->exception);
 
             event(new WebhookAttemptsExhausted($data, $attempt, $response, $outcome->exception));
@@ -262,7 +278,6 @@ final readonly class OutboxRelay
             return;
         }
 
-        $hint = $data->options->respectRetryAfter && $response instanceof TransportResponse ? RetryAfter::from($response) : null;
         $delay = $data->backoff->delayAfterAttempt($attempt, $hint);
 
         $retried = $this->settle($entry, $token, [
@@ -275,6 +290,36 @@ final readonly class OutboxRelay
         event(new WebhookAttemptRetrying($data, $attempt, $delay));
 
         if ($retried) {
+            $this->alarmIfOverdue($entry);
+        }
+    }
+
+    /**
+     * Hold the entry back for the Retry-After cap and carry one more deferral in its sealed delivery, so the next
+     * turn neither charges this attempt nor defers past retryAfterMaxDeferrals.
+     */
+    private function defer(
+        WebhookOutboxEntry $entry,
+        string $token,
+        WebhookDeliveryData $data,
+        int $attempt,
+        ?TransportResponse $response,
+        ?Throwable $exception,
+        int $requested,
+    ): void {
+        $delay = $data->options->retryAfterCap;
+
+        $deferred = $this->settle($entry, $token, [
+            'attempts' => $attempt,
+            'next_attempt_at' => $entry->fromDateTime(Date::now()->addSeconds($delay)),
+            'last_status' => $response?->status,
+            'last_error' => $this->errorFrom($exception),
+            'delivery' => Crypt::encrypt($data->deferred($attempt)),
+        ]);
+
+        event(new WebhookAttemptDeferred($data, $attempt, $delay, $requested));
+
+        if ($deferred) {
             $this->alarmIfOverdue($entry);
         }
     }
@@ -327,7 +372,7 @@ final readonly class OutboxRelay
      * Write the outcome onto the entry, if this turn still holds its claim, and read the entry back
      * so whoever hears about it next sees what was stored.
      *
-     * @param  array{state?: string, attempts: int, next_attempt_at: string|null, last_status: int|null, last_error: string|null, ended_at?: string|null}  $values
+     * @param  array{state?: string, attempts: int, next_attempt_at: string|null, last_status: int|null, last_error: string|null, ended_at?: string|null, delivery?: string}  $values
      */
     private function settle(WebhookOutboxEntry $entry, string $token, array $values): bool
     {
