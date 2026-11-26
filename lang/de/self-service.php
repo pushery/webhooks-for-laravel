@@ -23,6 +23,8 @@ return [
         'delete' => 'Löschen',
         'active' => 'Aktiv',
         'disabled' => 'Deaktiviert',
+        'enable' => 'Aktivieren',
+        'disable' => 'Deaktivieren',
     ],
 
     'table' => [
@@ -132,6 +134,11 @@ return [
         'invalid_json' => 'Das ist kein lesbares JSON-Objekt, deshalb gibt es nichts zur Vorschau. Prüfe auf ein überzähliges Komma oder ein fehlendes Anführungszeichen.',
         'input' => 'Eingabe',
         'output' => 'Ausgabe',
+        'remove_dialog' => [
+            'title' => 'Diese Regel entfernen?',
+            'description' => 'Die Regel wird aus dem Formular entfernt. Die gespeicherte Transformation ändert sich erst beim nächsten Speichern.',
+            'confirm' => 'Entfernen',
+        ],
     ],
 
     // The tenant's own delivery log. The status labels are keyed by the stored

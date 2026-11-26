@@ -22,12 +22,13 @@ return [
     |
     | 'ddl_connection' is the connection webhooks:partition-maintenance creates,
     | attaches and drops partitions of the delivery log through, and drains its
-    | default partition with. Null uses the connection above. Set it where the
-    | application's runtime role does not own the tables, as under Row Level
-    | Security: PostgreSQL lets only the owner of a partitioned table add a
-    | partition, and every query the application makes at runtime stays on the
-    | connection above. It also lets the maintenance use a direct endpoint while
-    | the application uses a pooled one.
+    | default partition with. Null uses the connection above, or its direct
+    | endpoint where the application gives it one (a `direct` key on a PostgreSQL
+    | connection, which Laravel's migrator runs the migrations through). Set it
+    | where the application's runtime role does not own the tables and the owner
+    | signs in elsewhere, as under Row Level Security: PostgreSQL lets only the
+    | owner of a partitioned table add a partition, and every query the
+    | application makes at runtime stays on the connection above.
     |
     */
 
@@ -304,7 +305,9 @@ return [
         //
         // queue and connection put the relay's turns on a queue of their own, so a slow endpoint of
         // another webhook does not hold the outbox up. Without a value they take webhooks.server.queue
-        // and webhooks.server.connection, with every other delivery of the Server layer.
+        // and webhooks.server.connection, with every other delivery of the Server layer. The turn of
+        // an entry the Platform layer writes always takes webhooks.server.queue and
+        // webhooks.server.connection, where its delivery would go as a job.
         'outbox' => [
             'enabled' => EnvFlag::protection(env('WEBHOOKS_SERVER_OUTBOX_ENABLED', false), false),
             'queue' => env('WEBHOOKS_SERVER_OUTBOX_QUEUE'),
@@ -1334,11 +1337,11 @@ return [
             'transform' => 'sliders',
             'delete' => 'trash',
 
-            // The last four are the operator console's row, which drew no icons at all while the
+            // The last three are the operator console's row, which drew no icons at all while the
             // self-service list beside it drew one per action. It reads the same block on purpose:
             // two screens of one package disagreeing about whether a row action carries a symbol is
             // a difference a reader notices and cannot explain, and a second key set would be a
-            // second place to keep in step.
+            // second place to keep in step. 'enable' and 'disable' are read by both rows.
             //
             // 'enable' and 'disable' are two keys rather than one 'toggle', because that button is
             // two actions wearing one position -- its visible word already switches -- and a host

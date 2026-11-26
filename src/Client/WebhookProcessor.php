@@ -16,6 +16,7 @@ use Pushery\Webhooks\Client\Events\InboundWebhookVerified;
 use Pushery\Webhooks\Client\Events\InvalidWebhookSignature;
 use Pushery\Webhooks\Client\Events\UnreadableWebhookPayload;
 use Pushery\Webhooks\Client\Exceptions\InboundListenerFailed;
+use Pushery\Webhooks\Client\Exceptions\SignedRequestRefused;
 use Pushery\Webhooks\Client\Http\RawBody;
 use Pushery\Webhooks\Client\Models\WebhookCall;
 use Pushery\Webhooks\Client\Tenancy\InboundTenant;
@@ -166,10 +167,10 @@ final readonly class WebhookProcessor
         if (! $result->isValid()) {
             // Guarded like the two announcements below, and this is the one with a recorded
             // incident behind it: the event's own docblock describes a throw landing inside
-            // dispatch(), before the abort() on the next line, turning every forged, unsigned
+            // dispatch(), before the refusal below, turning every forged, unsigned
             // or expired POST into a 500 from an anonymous caller — on the one path three
             // docblocks promise is never a 500. That cause was fixed by taking the Request out
-            // of the payload; the shape that let a listener reach the abort() was not, and this
+            // of the payload; the shape that let a listener reach the refusal was not, and this
             // event's docblock invites exactly the listener most likely to throw ("so a
             // listener can alert or rate-limit an abusive source" — an abuse listener is the
             // kind that reaches for Gate::authorize() or abort()).
@@ -201,10 +202,16 @@ final readonly class WebhookProcessor
             // could resolve, and answering it 401 tells a producer to give up on a delivery
             // that was probably genuine. It still needs the host's consent, because a
             // distinguishable answer is information a prober can also read, so an unset
-            // undetermined_status falls back to invalid_status and nothing changes.
-            abort($result->status === VerificationStatus::Undetermined
-                ? $this->config->undeterminedStatus()
-                : $this->config->invalidStatus());
+            // undetermined_status falls back to invalid_status and nothing changes. The refusal
+            // is the one VerifySignedRequest throws for a call, so an application renders both
+            // alike, and a 401 names the signature it asks for.
+            throw SignedRequestRefused::because(
+                $this->config->name,
+                $result,
+                $result->status === VerificationStatus::Undetermined
+                    ? $this->config->undeterminedStatus()
+                    : $this->config->invalidStatus(),
+            );
         }
 
         // The delivery is authentic from here on, and which secret proved it is the one thing

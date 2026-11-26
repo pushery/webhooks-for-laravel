@@ -63,7 +63,22 @@ final readonly class PartitionManager
 
     public function __construct(
         private bool $schemaOwner = false,
+        private ?ConnectionInterface $connection = null,
     ) {}
+
+    /**
+     * A manager that runs every statement on the connection it is given.
+     *
+     * The migration that creates the delivery log builds its first partitions through one, on the
+     * connection the migration runs on. Laravel's migrator may resolve that to the direct endpoint
+     * of the package connection, and the partitioned table the migration has just created is
+     * visible only inside the migration's own transaction. A partition built through any other
+     * connection finds no table to belong to, and under a runtime role it may not create one.
+     */
+    public static function onConnection(ConnectionInterface $connection): self
+    {
+        return new self(connection: $connection);
+    }
 
     /**
      * A manager that runs every statement on the connection for schema changes,
@@ -81,7 +96,7 @@ final readonly class PartitionManager
 
     private function db(): ConnectionInterface
     {
-        return $this->schemaOwner ? WebhookConnection::ddl() : WebhookConnection::db();
+        return $this->connection ?? ($this->schemaOwner ? WebhookConnection::ddl() : WebhookConnection::db());
     }
 
     /**

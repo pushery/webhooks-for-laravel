@@ -23,6 +23,8 @@ return [
         'delete' => 'Elimina',
         'active' => 'Attivo',
         'disabled' => 'Disattivato',
+        'enable' => 'Attiva',
+        'disable' => 'Disattiva',
     ],
 
     'table' => [
@@ -132,6 +134,11 @@ return [
         'invalid_json' => 'Questo non è un oggetto JSON leggibile, quindi non c\'è nulla da mostrare in anteprima. Controlla se c\'è una virgola di troppo o mancano delle virgolette.',
         'input' => 'Ingresso',
         'output' => 'Uscita',
+        'remove_dialog' => [
+            'title' => 'Rimuovere questa regola?',
+            'description' => 'La regola viene rimossa dal modulo. La trasformazione salvata cambia solo al prossimo salvataggio.',
+            'confirm' => 'Rimuovi',
+        ],
     ],
 
     // The tenant's own delivery log. The status labels are keyed by the stored

@@ -84,14 +84,29 @@
                                             :aria-label="__('webhooks::self-service.a11y.include_field', ['number' => $loop->iteration])"
                                         />
                                     </div>
-                                    <x-wirekit::button
-                                        type="button"
-                                        size="sm"
-                                        surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}"
-                                        intent="danger"
-                                        wire:click="removeIncludeField({{ $i }})"
-                                        :aria-label="__('webhooks::self-service.a11y.remove_include_field', ['number' => $loop->iteration])"
-                                    >{{ __('webhooks::self-service.actions.remove') }}</x-wirekit::button>
+                                    {{-- A removal asks first, in the kit's question, and its confirmation
+                                         runs it. It changes the form alone, and the question says so: the
+                                         stored transform changes with the next save. The dialog closes on
+                                         the confirmation, because the rules below move up into the place of
+                                         the removed one, and a dialog left open would stand over the next. --}}
+                                    <x-wirekit::alert-dialog :name="'transform-remove-include-'.$i" close-on-confirm>
+                                        <x-slot:trigger>
+                                            <x-wirekit::button
+                                                type="button"
+                                                size="sm"
+                                                surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}"
+                                                intent="danger"
+                                                :aria-label="__('webhooks::self-service.a11y.remove_include_field', ['number' => $loop->iteration])"
+                                            >{{ __('webhooks::self-service.actions.remove') }}</x-wirekit::button>
+                                        </x-slot:trigger>
+
+                                        <x-wirekit::alert-dialog.title>{{ __('webhooks::self-service.transform.remove_dialog.title') }}</x-wirekit::alert-dialog.title>
+                                        <x-wirekit::alert-dialog.description>{{ __('webhooks::self-service.transform.remove_dialog.description') }}</x-wirekit::alert-dialog.description>
+                                        <x-wirekit::alert-dialog.actions>
+                                            <x-wirekit::alert-dialog.cancel />
+                                            <x-wirekit::button type="button" intent="danger" data-wk-dialog-primary wire:click="removeIncludeField({{ $i }})">{{ __('webhooks::self-service.transform.remove_dialog.confirm') }}</x-wirekit::button>
+                                        </x-wirekit::alert-dialog.actions>
+                                    </x-wirekit::alert-dialog>
                                 </div>
                             @endforeach
                             <div>
@@ -115,14 +130,24 @@
                                             :aria-label="__('webhooks::self-service.a11y.exclude_field', ['number' => $loop->iteration])"
                                         />
                                     </div>
-                                    <x-wirekit::button
-                                        type="button"
-                                        size="sm"
-                                        surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}"
-                                        intent="danger"
-                                        wire:click="removeExcludeField({{ $i }})"
-                                        :aria-label="__('webhooks::self-service.a11y.remove_exclude_field', ['number' => $loop->iteration])"
-                                    >{{ __('webhooks::self-service.actions.remove') }}</x-wirekit::button>
+                                    <x-wirekit::alert-dialog :name="'transform-remove-exclude-'.$i" close-on-confirm>
+                                        <x-slot:trigger>
+                                            <x-wirekit::button
+                                                type="button"
+                                                size="sm"
+                                                surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}"
+                                                intent="danger"
+                                                :aria-label="__('webhooks::self-service.a11y.remove_exclude_field', ['number' => $loop->iteration])"
+                                            >{{ __('webhooks::self-service.actions.remove') }}</x-wirekit::button>
+                                        </x-slot:trigger>
+
+                                        <x-wirekit::alert-dialog.title>{{ __('webhooks::self-service.transform.remove_dialog.title') }}</x-wirekit::alert-dialog.title>
+                                        <x-wirekit::alert-dialog.description>{{ __('webhooks::self-service.transform.remove_dialog.description') }}</x-wirekit::alert-dialog.description>
+                                        <x-wirekit::alert-dialog.actions>
+                                            <x-wirekit::alert-dialog.cancel />
+                                            <x-wirekit::button type="button" intent="danger" data-wk-dialog-primary wire:click="removeExcludeField({{ $i }})">{{ __('webhooks::self-service.transform.remove_dialog.confirm') }}</x-wirekit::button>
+                                        </x-wirekit::alert-dialog.actions>
+                                    </x-wirekit::alert-dialog>
                                 </div>
                             @endforeach
                             <div>
@@ -155,14 +180,24 @@
                                             :aria-label="__('webhooks::self-service.a11y.rename_target_field', ['number' => $loop->iteration])"
                                         />
                                     </div>
-                                    <x-wirekit::button
-                                        type="button"
-                                        size="sm"
-                                        surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}"
-                                        intent="danger"
-                                        wire:click="removeRenamePair({{ $i }})"
-                                        :aria-label="__('webhooks::self-service.a11y.remove_rename_pair', ['number' => $loop->iteration])"
-                                    >{{ __('webhooks::self-service.actions.remove') }}</x-wirekit::button>
+                                    <x-wirekit::alert-dialog :name="'transform-remove-rename-'.$i" close-on-confirm>
+                                        <x-slot:trigger>
+                                            <x-wirekit::button
+                                                type="button"
+                                                size="sm"
+                                                surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}"
+                                                intent="danger"
+                                                :aria-label="__('webhooks::self-service.a11y.remove_rename_pair', ['number' => $loop->iteration])"
+                                            >{{ __('webhooks::self-service.actions.remove') }}</x-wirekit::button>
+                                        </x-slot:trigger>
+
+                                        <x-wirekit::alert-dialog.title>{{ __('webhooks::self-service.transform.remove_dialog.title') }}</x-wirekit::alert-dialog.title>
+                                        <x-wirekit::alert-dialog.description>{{ __('webhooks::self-service.transform.remove_dialog.description') }}</x-wirekit::alert-dialog.description>
+                                        <x-wirekit::alert-dialog.actions>
+                                            <x-wirekit::alert-dialog.cancel />
+                                            <x-wirekit::button type="button" intent="danger" data-wk-dialog-primary wire:click="removeRenamePair({{ $i }})">{{ __('webhooks::self-service.transform.remove_dialog.confirm') }}</x-wirekit::button>
+                                        </x-wirekit::alert-dialog.actions>
+                                    </x-wirekit::alert-dialog>
                                 </div>
                             @endforeach
                             <div>

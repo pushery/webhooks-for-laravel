@@ -23,6 +23,8 @@ return [
         'delete' => 'Delete',
         'active' => 'Active',
         'disabled' => 'Disabled',
+        'enable' => 'Enable',
+        'disable' => 'Disable',
     ],
 
     'table' => [
@@ -133,6 +135,11 @@ return [
         'invalid_json' => 'This is not a readable JSON object, so there is nothing to preview. Check for a stray comma or a missing quote.',
         'input' => 'Input',
         'output' => 'Output',
+        'remove_dialog' => [
+            'title' => 'Remove this rule?',
+            'description' => 'The rule leaves the form. The saved transform changes only when it is saved again.',
+            'confirm' => 'Remove',
+        ],
     ],
 
     // The tenant's own delivery log. The status labels are keyed by the stored

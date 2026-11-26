@@ -96,7 +96,7 @@
                         <x-wirekit::checkbox wire:model="isActive" :label="__('webhooks::management.form.active_label')" />
                     @endif
 
-                    <x-wirekit::row gap="sm">
+                    <x-wirekit::row gap="sm" wrap>
                         <x-wirekit::button type="submit">
                             {{ $editingId === null ? __('webhooks::management.form.submit') : __('webhooks::management.form.submit_update') }}
                         </x-wirekit::button>

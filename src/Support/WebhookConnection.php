@@ -53,14 +53,19 @@ final class WebhookConnection
     }
 
     /**
-     * The configured connection for the package's schema changes, or the package connection's
-     * name when none is configured.
+     * The configured connection for the package's schema changes. When none is configured, the
+     * direct endpoint of the package connection where the application gives it one, and the
+     * package connection itself otherwise.
      *
      * webhooks:partition-maintenance creates, attaches and drops the partitions of the delivery
      * log and drains its default partition through it. PostgreSQL lets only the owner of a
      * partitioned table add a partition, so a host whose runtime role does not own the tables,
      * as under Row Level Security, points this at the owner, and every query the application
-     * makes at runtime stays on {@see self::name()}.
+     * makes at runtime stays on {@see self::name()}. A PostgreSQL connection with a `direct`
+     * endpoint is the layout Laravel's migrator reads the same way: the application runs on the
+     * pooled endpoint and its migrations on the direct one, as the owner. The maintenance takes
+     * that endpoint too, so it creates the next month's partition as the role that created the
+     * table.
      */
     public static function ddlName(): ?string
     {
@@ -71,7 +76,7 @@ final class WebhookConnection
             return $connection;
         }
 
-        return self::name();
+        return self::withItsDirectEndpoint(self::name());
     }
 
     /**
@@ -94,5 +99,34 @@ final class WebhookConnection
     public static function dialect(): Dialect
     {
         return Dialect::for(self::name());
+    }
+
+    /**
+     * The `::direct` variant of a connection whose configuration gives it a direct endpoint, the
+     * name unchanged otherwise. Null stands for the application default, as everywhere here.
+     *
+     * Laravel opens a direct endpoint for a PostgreSQL connection with a non-empty `direct` key,
+     * and its migrator resolves the connection of every migration to that variant. The question is
+     * asked of the configuration, which every release of the framework this package supports
+     * reads, so no method of a newer release is called. A name that already carries a variant
+     * (`::read`, `::write`, `::direct`) is left as it is: it names the endpoint itself.
+     */
+    private static function withItsDirectEndpoint(?string $name): ?string
+    {
+        $resolved = $name ?? Config::get('database.default');
+
+        if (! is_string($resolved) || $resolved === '' || str_contains($resolved, '::')) {
+            return $name;
+        }
+
+        $configuration = Config::get('database.connections.'.$resolved);
+
+        if (! is_array($configuration) || ($configuration['driver'] ?? null) !== 'pgsql') {
+            return $name;
+        }
+
+        $direct = $configuration['direct'] ?? null;
+
+        return is_array($direct) && $direct !== [] ? $resolved.'::direct' : $name;
     }
 }

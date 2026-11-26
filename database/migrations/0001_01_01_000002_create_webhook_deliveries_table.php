@@ -110,7 +110,11 @@ return new class extends Migration
         // already carries, which is why the operator log is fast there and was not here.
         DB::statement('CREATE INDEX webhook_deliveries_created_idx ON webhook_deliveries (created_at)');
 
-        $partitions = new PartitionManager;
+        // The partitions go through the connection this migration runs on, the one the table above
+        // was created on. Laravel's migrator makes it the default for the run, and it may be the
+        // direct endpoint of the package connection: the table exists only inside this migration's
+        // transaction, so a partition built through webhooks.database.connection would find none.
+        $partitions = PartitionManager::onConnection(DB::connection());
         $partitions->ensureDefaultPartition();
         // Cover the previous month through partition_months_ahead months ahead, so inserts
         // always land in a real partition; the maintenance command keeps the window rolling.

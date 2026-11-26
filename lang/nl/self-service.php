@@ -23,6 +23,8 @@ return [
         'delete' => 'Verwijderen',
         'active' => 'Actief',
         'disabled' => 'Uitgeschakeld',
+        'enable' => 'Inschakelen',
+        'disable' => 'Uitschakelen',
     ],
 
     'table' => [
@@ -132,6 +134,11 @@ return [
         'invalid_json' => 'Dit is geen leesbaar JSON-object, dus er valt niets te tonen. Controleer op een overbodige komma of een ontbrekend aanhalingsteken.',
         'input' => 'Invoer',
         'output' => 'Uitvoer',
+        'remove_dialog' => [
+            'title' => 'Deze regel verwijderen?',
+            'description' => 'De regel wordt uit het formulier verwijderd. De opgeslagen transformatie verandert pas bij de volgende keer opslaan.',
+            'confirm' => 'Verwijderen',
+        ],
     ],
 
     // The tenant's own delivery log. The status labels are keyed by the stored

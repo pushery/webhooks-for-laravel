@@ -10,11 +10,14 @@ use Pushery\Webhooks\Core\Signing\VerificationResult;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
- * A call to a route of the application's own API that {@see VerifySignedRequest} refused.
+ * A call to a route of the application's own API that {@see VerifySignedRequest} refused, or a delivery to a receiving
+ * route whose signature did not hold.
  *
  * It is an HttpException carrying the status the config answers a refusal with, and no message, so an application that
- * renders nothing of its own answers exactly as `abort()` with that status would: the framework renders an
- * HttpException by its status and does not report it. An application with an error format of its own renders it:
+ * renders nothing of its own answers as `abort()` with that status would: the framework renders an HttpException by its
+ * status and does not report it. A refusal with `401` adds one header, `WWW-Authenticate: Signature`, because a `401`
+ * names the scheme the route asks for, and here that is a signature over the request, not a credential of another
+ * scheme. A refusal with any other status names none. An application with an error format of its own renders it:
  *
  *     ->withExceptions(function (Exceptions $exceptions): void {
  *         $exceptions->render(fn (SignedRequestRefused $refused) => response()->json([
@@ -35,13 +38,18 @@ final class SignedRequestRefused extends HttpException
      */
     public const string UNVERIFIABLE = 'unverifiable';
 
+    /**
+     * The challenge a refusal with `401` names in `WWW-Authenticate`.
+     */
+    public const string CHALLENGE = 'Signature';
+
     private function __construct(
         public readonly string $configName,
         public readonly string $reason,
         int $status,
         ?WebhookConfigCannotVerify $fault = null,
     ) {
-        parent::__construct($status, '', $fault);
+        parent::__construct($status, '', $fault, $status === 401 ? ['WWW-Authenticate' => self::CHALLENGE] : []);
     }
 
     /**

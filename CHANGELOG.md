@@ -6,6 +6,30 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.36.0] - 2026-11-26
+
+### 🔧 Changed
+
+- **The shipped screens need `pushery/wirekit` 2.74.1 or newer.** `conflict` refuses an older WireKit.
+
+  **Upgrade:** a host that renders the shipped screens updates `pushery/wirekit` to 2.74.1 or newer. A host without WireKit is not affected.
+- **Removing a rule in the payload transform editor asks first.** The Remove button of an include field, an exclude field or a rename pair opens a WireKit alert dialog, and its confirmation takes the rule out of the form. The saved transform changes with the next save, as before.
+- **The self-service endpoint list switches an endpoint off and on among its row actions.** The status column shows the state as a badge, and a Disable or Enable button stands with the row's other actions, before Delete, carrying the `enable` and `disable` icons of `ui.row_action_icons` that the operator console's row already uses. The button in the status column is gone, and a published copy of the view keeps it until it is published again.
+- **With `platform.outbox`, the relay's turn for an entry of the Platform layer goes where its delivery would go as a job.** It takes `server.queue` and `server.connection`, as it already takes that delivery's tries, while `server.outbox.queue` and `server.outbox.connection` now hold only the entries the Server layer records. A slow endpoint of a subscription no longer holds up the queue a host keeps apart for the outbox, and that queue's waiting time no longer counts the account webhooks. Without `platform.outbox` nothing changes.
+- **A refused signature names what the route asks for.** A `401` from a receiving route or from `VerifySignedRequest` carries `WWW-Authenticate: Signature`, the challenge RFC 9110 asks of every `401`, so a renderer that falls back to a challenge of its own, such as the one of `pushery/http-api-for-laravel` from 0.6.0, no longer tells the sender to send a bearer token. A refusal with another status names none. A receiving route refuses a delivery with `SignedRequestRefused`, the exception a refused call gets, where it called `abort()` before, so an application renders both alike. One that renders nothing of its own answers as before, with the header as the one addition.
+
+  **Upgrade:** with `invalid_status` or `undetermined_status` set to `404`, the refusal of a delivery was a `NotFoundHttpException`. A render callback for that class no longer sees it, one for `SignedRequestRefused` does.
+
+### 🐛 Fixed
+
+- **`GuardedFetch::get()` with `decode: true` returns a body in an encoding curl cannot inflate as it arrived.** curl refuses such a body at its first byte, br on a curl built without brotli or an encoding no curl knows, and the fetch threw: a `ConnectionException` for a status below 400, the exception of the status from 400 on. It now asks for the URL once more without inflating and returns the body with its `Content-Encoding`, as the same fetch without the option does.
+- **The buttons under the subscription form of the WireKit screens wrap on a narrow screen.** Register endpoint, or Save changes with Cancel beside it while a subscription is edited, break onto a second line at 320 pixels, in a long language or under the text spacing of WCAG 1.4.12, instead of running out of the card.
+- **The delivery log migrates and gets its monthly partitions on PostgreSQL with a direct endpoint, whether `webhooks.database.connection` is set or not.** The migration built its first partitions through `webhooks.database.connection`, a second connection beside the one Laravel's migrator runs it on, which is the direct endpoint where the connection has one. That second connection did not see the new table yet and could sign in as a role that owns nothing, so the migration stopped at `relation "webhook_deliveries" does not exist` or at `permission denied for schema public`. It now builds them on the connection it runs on, through `PartitionManager::onConnection()`. `webhooks:partition-maintenance` without `webhooks.database.ddl_connection` takes the direct endpoint of the package connection where it has one, so the next month's partition is created by the role that created the table, where the runtime role would be refused.
+
+### 📚 Documentation
+
+- **The requirements name the versions the package is tested on.** PHP 8.4.27, 8.5.x and 8.6.x, PostgreSQL 18.7 and MySQL 8.4.13, in the README and on the start page of the documentation.
+
 ## [3.35.0] - 2026-11-24
 
 ### ✨ Added
@@ -3865,7 +3889,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.35.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.36.0...HEAD
+[3.36.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.35.0...v3.36.0
 [3.35.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.34.0...v3.35.0
 [3.34.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.33.0...v3.34.0
 [3.33.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.32.0...v3.33.0
