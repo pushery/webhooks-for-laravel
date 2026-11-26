@@ -104,9 +104,9 @@ runs no migrations at all and needs no database.
 
 ## Requirements
 
-- PHP 8.4+ with `ext-curl`, `ext-json`, `ext-sodium`
+- PHP 8.4+ (tested on 8.4.27, 8.5.x and 8.6.x) with `ext-curl`, `ext-json`, `ext-sodium`
 - Laravel 13+
-- PostgreSQL 13+ or MySQL 8.4+ — for the layers that persist
+- PostgreSQL 13+ or MySQL 8.4+ — for the layers that persist, tested on PostgreSQL 18.7 and MySQL 8.4.13
 - A queue worker for outbound delivery
 - `livewire/livewire` and `pushery/wirekit` for the shipped UI screens
 

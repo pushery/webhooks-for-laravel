@@ -1,7 +1,7 @@
-{{-- The tenant's own endpoint list: URL, cached health badge, event-type summary, an
-     active toggle button (aria-pressed) and the per-row test / reveal-secret / edit /
-     delete actions. Always owner-scoped, paginated, with a WireKit empty state. Deletion
-     uses the WireKit alert-dialog (never wire:confirm) and is hidden when disallowed. --}}
+{{-- The tenant's own endpoint list: URL, cached health badge, event-type summary, the
+     active state, and the per-row test / reveal-secret / edit / disable or enable / delete
+     actions. Always owner-scoped, paginated, with a WireKit empty state. Deletion uses the
+     WireKit alert-dialog (never wire:confirm) and is hidden when disallowed. --}}
 {{-- Read once for the whole table rather than per row: a fifty-row page would otherwise ask
      the config repository two hundred and fifty times for an answer that cannot change inside
      one render. An entry set to null draws that action without an icon, and a host that empties
@@ -16,6 +16,8 @@
     'secret' => config('webhooks.ui.row_action_icons.secret'),
     'edit' => config('webhooks.ui.row_action_icons.edit'),
     'transform' => config('webhooks.ui.row_action_icons.transform'),
+    'enable' => config('webhooks.ui.row_action_icons.enable'),
+    'disable' => config('webhooks.ui.row_action_icons.disable'),
     'delete' => config('webhooks.ui.row_action_icons.delete'),
     {{-- A published config from before this key has no entry for it, and there the confirmation
          follows the row action, so one deletion keeps one symbol. A present null still drops it. --}}
@@ -23,7 +25,7 @@
 ])
 {{-- Below `sm` each row stands as a card, through the table's `stack-below`: the column headers leave the
      screen and stay for assistive technology, each value names its column in front of it, and the row
-     actions stand as the card's foot. Five columns and five row actions do not fit beside each other on a
+     actions stand as the card's foot. Five columns and six row actions do not fit beside each other on a
      phone, and the sideways scroll that answered it before put the health badge behind the screen's edge.
      The table writes its roles out, so it stays a table for a screen reader while its rows are cards. --}}
 <div class="wh-portal-list" wire:key="endpoint-list">
@@ -107,24 +109,11 @@
                             <x-wirekit::text size="sm">{{ implode(', ', $endpoint->eventTypeNames()) ?: '—' }}</x-wirekit::text>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td :label="__('webhooks::self-service.table.status')">
-                            {{-- A state the reader can switch, so a tinted fill in both states, told apart by
-                                 the word and by the intent. A filled success block at button height stood out
-                                 as the loudest action on the row, beside health badges of the same green. --}}
-                            <x-wirekit::button
-                                size="sm"
-                                surface="soft"
-                                :intent="$endpoint->is_active ? 'success' : 'neutral'"
-                                wire:click="toggle({{ $endpoint->id }})"
-                                :aria-pressed="$endpoint->is_active ? 'true' : 'false'"
-                                :aria-label="__('webhooks::self-service.a11y.toggle_active', [
-                                    // The visible word is interpolated rather than described,
-                                    // so the accessible name contains it verbatim in all seven
-                                    // languages (WCAG 2.5.3) and cannot drift when one of them
-                                    // is retranslated. Voice control matches what is on screen.
-                                    'state' => $endpoint->is_active ? __('webhooks::self-service.list.active') : __('webhooks::self-service.list.disabled'),
-                                    'url' => $endpoint->url,
-                                ])"
-                            >{{ $endpoint->is_active ? __('webhooks::self-service.list.active') : __('webhooks::self-service.list.disabled') }}</x-wirekit::button>
+                            {{-- The state, told apart by the word and by the intent. The button that switches
+                                 it stands with the row's other actions at the end of the row. --}}
+                            <x-wirekit::badge :intent="$endpoint->is_active ? 'success' : 'neutral'">
+                                {{ $endpoint->is_active ? __('webhooks::self-service.list.active') : __('webhooks::self-service.list.disabled') }}
+                            </x-wirekit::badge>
                         </x-wirekit::table.td>
                         <x-wirekit::table.td align="right">
                             <div class="flex flex-wrap items-center gap-[var(--gap-wk-sm)] sm:justify-end" data-endpoint-actions>
@@ -187,6 +176,29 @@
                                         {{ __('webhooks::self-service.list.transform') }}
                                     </x-wirekit::button>
                                 @endif
+
+                                {{-- Switches the endpoint off or on again, named by what it does next, as the
+                                     operator console's row names it. The visible word is interpolated into the
+                                     accessible name rather than described, so the name contains it verbatim in
+                                     all seven languages (WCAG 2.5.3) and cannot drift when one of them is
+                                     retranslated. Voice control matches what is on screen. --}}
+                                @php($toggleLabel = $endpoint->is_active
+                                    ? __('webhooks::self-service.list.disable')
+                                    : __('webhooks::self-service.list.enable'))
+                                @php($toggleIcon = $endpoint->is_active
+                                    ? ($rowActionIcons['disable'] ?? null)
+                                    : ($rowActionIcons['enable'] ?? null))
+                                <x-wirekit::button
+                                    size="sm"
+                                    surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral"
+                                    wire:click="toggle({{ $endpoint->id }})"
+                                    :aria-label="__('webhooks::self-service.a11y.toggle_active', ['state' => $toggleLabel, 'url' => $endpoint->url])"
+                                >
+                                    @if ($toggleIcon !== null)
+                                        <x-slot:iconLeft><x-wirekit::icon :name="$toggleIcon" size="sm" /></x-slot:iconLeft>
+                                    @endif
+                                    {{ $toggleLabel }}
+                                </x-wirekit::button>
 
                                 @if ($allowDelete)
                                     {{-- focus-return-to, because this is the dialog whose trigger

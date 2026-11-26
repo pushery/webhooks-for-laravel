@@ -49,6 +49,19 @@ final readonly class GuardedFetch
     /** The statuses that send the client on to their `Location`. */
     private const array REDIRECTS = [301, 302, 303, 307, 308];
 
+    /**
+     * The bits of `curl_version()['features']` that say which encodings curl inflates, as libcurl
+     * defines them: `CURL_VERSION_LIBZ`, `CURL_VERSION_BROTLI` and `CURL_VERSION_ZSTD`. Written out,
+     * because PHP defines the last of the three only where it was built against libcurl 7.72 or later.
+     */
+    private const array INFLATING_FEATURES = [
+        'gzip' => 1 << 3,
+        'x-gzip' => 1 << 3,
+        'deflate' => 1 << 3,
+        'br' => 1 << 23,
+        'zstd' => 1 << 26,
+    ];
+
     public function __construct(
         private SsrfGuard $guard,
     ) {}
@@ -156,7 +169,9 @@ final readonly class GuardedFetch
      * gzip, deflate or br, and the request still offers none. The limit then holds the inflated body, so a body
      * that inflates past it ends at the limit as a longer body does. The headers stay as the server sent them,
      * `Content-Encoding` and `Content-Length` included. Whether br is inflated depends on the curl PHP was
-     * built with.
+     * built with. A body in an encoding that curl cannot inflate, br without brotli or one no curl knows,
+     * comes back as it arrived, as it does without `$decode`: curl refuses such a body at its first byte,
+     * and the fetch then asks for it once more without inflating, so the URL is requested twice.
      *
      * @param  int  $maxBytes  the longest body accepted, in bytes
      * @param  array<string, string>  $headers  request headers, such as `Accept`
@@ -182,10 +197,17 @@ final readonly class GuardedFetch
 
         $endpoint = $this->guard->resolveAndPin($url);
         $sink = new LimitedSink($maxBytes, keepHead: $truncate);
+        $encoding = '';
 
         $options = $this->transportOptions($endpoint, $connectTimeout, $timeout, $from, $decode) + [
             'sink' => $sink,
-            'on_headers' => static function (ResponseInterface $response) use ($sink, $truncate, $decode): void {
+            'on_headers' => static function (ResponseInterface $response) use ($sink, $truncate, $decode, &$encoding): void {
+                // Where curl inflates, Guzzle has moved the server's Content-Encoding to X-Encoded-Content-Encoding
+                // by the time the headers arrive here.
+                $encoding = $response->hasHeader('X-Encoded-Content-Encoding')
+                    ? $response->getHeaderLine('X-Encoded-Content-Encoding')
+                    : $response->getHeaderLine('Content-Encoding');
+
                 // A cut transfer ends in an exception, so the sink keeps the status and the headers
                 // of the response its head belongs to.
                 if ($truncate) {
@@ -212,6 +234,10 @@ final readonly class GuardedFetch
                 ->withHeaders($headers)
                 ->get($endpoint->url);
         } catch (Throwable $exception) {
+            if ($decode && ! $this->inflatable($encoding)) {
+                return $this->get($url, $maxBytes, $headers, $connectTimeout, $timeout, $truncate, $from);
+            }
+
             $head = $sink->response();
 
             if ($sink->overflowed() && $head instanceof ResponseInterface) {
@@ -375,6 +401,36 @@ final readonly class GuardedFetch
             scheme: 'http',
             ips: $vetted->ips,
         );
+    }
+
+    /**
+     * Whether the curl PHP runs on inflates every encoding a `Content-Encoding` value names.
+     *
+     * curl knows identity always, gzip and deflate where it was built with zlib, br with brotli and
+     * zstd with zstd, and it refuses any other name once decoding is on. Read from the features of
+     * `curl_version()`, so an encoding this build lacks counts as one no curl knows.
+     *
+     * @param  string  $encoding  the `Content-Encoding` of a response, empty where it names none
+     */
+    private function inflatable(string $encoding): bool
+    {
+        $version = curl_version();
+        $features = is_array($version) ? ($version['features'] ?? 0) : 0;
+        $features = is_int($features) ? $features : 0;
+
+        foreach (explode(',', strtolower($encoding)) as $name) {
+            $name = trim($name);
+
+            if (in_array($name, ['', 'identity', 'none'], true)) {
+                continue;
+            }
+
+            if (! array_key_exists($name, self::INFLATING_FEATURES) || ($features & self::INFLATING_FEATURES[$name]) === 0) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

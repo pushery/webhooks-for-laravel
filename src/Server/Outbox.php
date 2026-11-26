@@ -210,8 +210,15 @@ final readonly class Outbox
         $job = $entry->stream === null
             ? new RelayOutboxJob(null, $entry->message_id, $entry->id)
             : new RelayOutboxJob($entry->stream, null);
-        $job->onQueue($settings->outboxQueue());
-        $job->onConnection($settings->outboxConnection());
+
+        // An entry of the Platform layer carries one of its deliveries, and its turn goes where that
+        // delivery would go as a queued job, as it already takes that delivery's tries. A slow
+        // endpoint of a subscription then holds up no turn of the queue the outbox keeps for itself.
+        // A stream has one address and one key, so its entries all belong to one layer, and the
+        // turn follows the entry that starts it.
+        $platform = is_string($entry->meta['delivery_id'] ?? null);
+        $job->onQueue($platform ? $settings->queue() : $settings->outboxQueue());
+        $job->onConnection($platform ? $settings->connection() : $settings->outboxConnection());
 
         // A turn before the entry is due would find nothing to send, so it waits as long as the entry does.
         if ($delay > 0) {

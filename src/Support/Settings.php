@@ -344,8 +344,9 @@ final class Settings
     }
 
     /**
-     * The queue the relay of the transactional outbox takes its turns on: webhooks.server.outbox.queue,
-     * or the queue of every other delivery of the Server layer when it names none.
+     * The queue the relay of the transactional outbox takes the turns of Server-layer entries on:
+     * webhooks.server.outbox.queue, or the queue of every other delivery of the Server layer when it
+     * names none. The turn of an entry the Platform layer writes takes queue() instead.
      */
     public function outboxQueue(): string
     {
