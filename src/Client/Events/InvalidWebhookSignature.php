@@ -25,6 +25,12 @@ use Pushery\Webhooks\Core\Signing\VerificationStatus;
  * an undetermined verification, with undetermined_status when the host configured one.
  * Never a 500.
  *
+ * `reason` is `replayed` for a signed call that verified and had arrived before, which the
+ * `VerifySignedRequest` middleware refuses with the config's replayed_status, or with
+ * invalid_status when none is set. Its signature held, so its `tenant` is the one the call
+ * proved to come from. A listener that reads `reason` into a {@see VerificationStatus}
+ * uses `tryFrom()`, which answers null for it.
+ *
  * It carries fields, not the request and not the config, and both omissions are
  * correctness requirements rather than preferences — the same rule
  * {@see UnreadableWebhookPayload} states for the same reasons.

@@ -143,6 +143,7 @@ final class WebhookConfig
         private readonly ?SignatureEncoding $signatureEncoding = null,
         private readonly ?string $tenantResolverClass = null,
         private readonly ?string $tenantScopeClass = null,
+        private readonly ?int $replayedStatus = null,
     ) {}
 
     /**
@@ -630,6 +631,18 @@ final class WebhookConfig
         return $this->undeterminedStatus ?? $this->invalidStatus;
     }
 
+    /**
+     * The status for a signed call that arrives a second time, defaulting to invalid_status.
+     *
+     * Only the `VerifySignedRequest` middleware answers with it. A delivery that arrives twice is answered as
+     * received and is not stored again. Unset, a call that arrived before is answered like any other refusal. A host
+     * whose callers should tell such a call from a bad signature sets a status of its own, such as `409`.
+     */
+    public function replayedStatus(): int
+    {
+        return $this->replayedStatus ?? $this->invalidStatus;
+    }
+
     public function profile(): WebhookProfile
     {
         $profile = app()->make($this->profileClass);
@@ -1030,6 +1043,9 @@ final class WebhookConfig
             signatureEncoding: self::resolveSignatureEncoding($name, $entry['signature_encoding'] ?? null, $scheme),
             tenantResolverClass: $tenants,
             tenantScopeClass: $tenantScope,
+            // Null for the reason given at undeterminedStatus above: it says the host did not ask for
+            // the distinction.
+            replayedStatus: is_int($entry['replayed_status'] ?? null) ? $entry['replayed_status'] : null,
         );
     }
 

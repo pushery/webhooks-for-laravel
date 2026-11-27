@@ -705,7 +705,10 @@ return [
     | 'invalid_status'. The signed timestamp is checked against
     | 'tolerance_seconds' for replay protection, and a repeated 'webhook_id' is
     | de-duplicated so an at-least-once sender (including our own Server on retry)
-    | is never processed twice.
+    | is never processed twice. A signed call to a route behind the
+    | VerifySignedRequest middleware is remembered while its signature could
+    | still verify, and the same call a second time is answered with
+    | 'replayed_status'; unset, it stays identical to 'invalid_status'.
     |
     | 'process' is either a single job class (extend
     | Pushery\Webhooks\Client\Jobs\ProcessWebhookJob — it receives the stored call and the
@@ -870,6 +873,11 @@ return [
             //     // choice) to tell the sender to try again instead of to give up — the
             //     // one refusal a retry can actually resolve.
             //     'undetermined_status' => 503,
+            //     // A signed call to a route behind VerifySignedRequest that already
+            //     // arrived while its signature could still verify. Unset, it is
+            //     // answered like a rejected one; 409 tells the caller the call went
+            //     // through before. A delivery never reads it.
+            //     'replayed_status' => 409,
             //     // Three swappable seams, each defaulting to the class shown. 'profile'
             //     // decides which calls are processed and stored at all (filter out the
             //     // noise a producer sends); 'response' decides what the producer gets

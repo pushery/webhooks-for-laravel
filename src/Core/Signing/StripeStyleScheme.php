@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Date;
  * ({@see StandardWebhooksScheme} is). It is also the generic base for
  * {@see StripeScheme}, which pins the real `Stripe-Signature` header.
  */
-readonly class StripeStyleScheme implements AcceptsSignatureHeaders, SignatureScheme
+readonly class StripeStyleScheme implements AcceptsSignatureHeaders, IdentifiesSignedMessages, SignatureScheme
 {
     public const string HEADER = 'Webhook-Signature';
 
@@ -84,6 +84,18 @@ readonly class StripeStyleScheme implements AcceptsSignatureHeaders, SignatureSc
         }
 
         return VerificationResult::invalid();
+    }
+
+    /**
+     * The timestamp of the signature and a digest of the content, the two things it covers. The scheme signs no id, so
+     * two messages with the same content and the same timestamp are one message to it.
+     */
+    public function signedMessageKey(string $signedContent, SignatureHeaders $headers): ?string
+    {
+        $header = $headers->get($this->signatureHeader);
+        $timestamp = $header === null ? null : $this->parse($header)['timestamp'];
+
+        return $timestamp === null ? null : $timestamp.'.'.hash('sha256', $signedContent);
     }
 
     private function hmac(string $toSign, string $secret): string

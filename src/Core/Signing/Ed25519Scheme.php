@@ -35,7 +35,7 @@ use InvalidArgumentException;
  * {@see \sodium_crypto_sign_verify_detached()} is constant-time by construction, so
  * no explicit `hash_equals` is needed here.
  */
-final readonly class Ed25519Scheme implements SignatureScheme
+final readonly class Ed25519Scheme implements IdentifiesSignedMessages, SignatureScheme
 {
     public const string HEADER_ID = StandardWebhooksScheme::HEADER_ID;
 
@@ -122,6 +122,17 @@ final readonly class Ed25519Scheme implements SignatureScheme
         }
 
         return VerificationResult::invalid();
+    }
+
+    /**
+     * The id of the message. The signature covers it together with the timestamp and the content, so a call resent
+     * under another id no longer verifies.
+     */
+    public function signedMessageKey(string $signedContent, SignatureHeaders $headers): ?string
+    {
+        $id = $headers->get($this->idHeader);
+
+        return $id === null || $id === '' ? null : $id;
     }
 
     /**

@@ -26,8 +26,9 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  *         ], $refused->getStatusCode(), ['Content-Type' => 'application/problem+json']));
  *     });
  *
- * `reason` is the verdict {@see InvalidWebhookSignature} announces (`invalid`, `expired`, `malformed` or
- * `undetermined`), or `unverifiable` for a config that cannot verify any call; that case is reported as the
+ * `reason` is the verdict {@see InvalidWebhookSignature} announces (`invalid`, `expired`, `malformed`, `undetermined`
+ * or `replayed`, for a call that verified and had arrived before), or `unverifiable` for a config that cannot verify
+ * any call; that case is reported as the
  * configuration fault it is and carries the {@see WebhookConfigCannotVerify} as its previous exception. Nothing in it
  * comes from the request: on this path the request is unauthenticated input.
  */
@@ -37,6 +38,11 @@ final class SignedRequestRefused extends HttpException
      * The reason of a refusal by a config that cannot verify any call.
      */
     public const string UNVERIFIABLE = 'unverifiable';
+
+    /**
+     * The reason of a refusal of a call whose signature held and which had arrived before.
+     */
+    public const string REPLAYED = 'replayed';
 
     /**
      * The challenge a refusal with `401` names in `WWW-Authenticate`.
@@ -58,6 +64,14 @@ final class SignedRequestRefused extends HttpException
     public static function because(string $configName, VerificationResult $result, int $status): self
     {
         return new self($configName, $result->reason(), $status);
+    }
+
+    /**
+     * A call whose signature held and which had arrived before, answered with the given status.
+     */
+    public static function replayed(string $configName, int $status): self
+    {
+        return new self($configName, self::REPLAYED, $status);
     }
 
     /**
