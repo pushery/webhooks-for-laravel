@@ -21,7 +21,7 @@ use Pushery\Webhooks\Core\Signing\Exceptions\UnusableSigningSecret;
  * Key derivation matches the reference exactly: strip an optional `whsec_`
  * prefix, then base64-decode the remainder to the raw HMAC key bytes.
  */
-final readonly class StandardWebhooksScheme implements SignatureScheme
+final readonly class StandardWebhooksScheme implements IdentifiesSignedMessages, SignatureScheme
 {
     public const string HEADER_ID = 'webhook-id';
 
@@ -116,6 +116,17 @@ final readonly class StandardWebhooksScheme implements SignatureScheme
         }
 
         return VerificationResult::invalid();
+    }
+
+    /**
+     * The id of the message. The signature covers it together with the timestamp and the content, so a call resent
+     * under another id no longer verifies.
+     */
+    public function signedMessageKey(string $signedContent, SignatureHeaders $headers): ?string
+    {
+        $id = $headers->get($this->idHeader);
+
+        return $id === null || $id === '' ? null : $id;
     }
 
     /**

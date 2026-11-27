@@ -6,6 +6,14 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.38.0] - 2026-11-27
+
+### 🔒 Security
+
+- **`VerifySignedRequest` refuses a signed call that arrives a second time.** A call that verified was let through again for as long as its timestamp stayed within the tolerance, so whoever captured it could send it again and reach the route each time. The middleware now remembers a call that verified, in the application's cache, per config and tenant, for twice the tolerance and a minute more, and refuses the same call with the config's `replayed_status`, or its `invalid_status` when none is set. `InvalidWebhookSignature` announces it with `reason` `replayed`, and `SignedRequestRefused::REPLAYED` names it. Under Standard Webhooks and Ed25519 a call is the same when it carries the same `webhook-id`, under Stripe-style signing when it carries the same timestamp, method, target and body. GitHub, plain HMAC and secret-token signing carry no timestamp, so a route behind such a config refuses a repeated call itself. A host's own scheme takes part by implementing `IdentifiesSignedMessages`. A cache that does not answer, or a store that keeps nothing such as `null`, lets the call through.
+
+  **Upgrade:** a client that sends the same signed call twice is refused the second time. `SignsRequests` signs every call and every retry afresh, so a client built on it is not affected. A listener that reads `reason` with `VerificationStatus::from()` meets `replayed`, which that enum does not hold: read it with `tryFrom()`. Set `replayed_status`, for example to `409`, for callers that should tell such a refusal from a bad signature.
+
 ## [3.37.0] - 2026-11-27
 
 ### 🔧 Changed
@@ -3903,7 +3911,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.37.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.38.0...HEAD
+[3.38.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.37.0...v3.38.0
 [3.37.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.36.0...v3.37.0
 [3.36.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.35.0...v3.36.0
 [3.35.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.34.0...v3.35.0
