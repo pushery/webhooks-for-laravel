@@ -73,10 +73,13 @@
                         :label="__('webhooks::management.form.url_label')"
                         :placeholder="__('webhooks::management.form.url_placeholder')"
                         wire:model="url"
+                        required
                         :error="$errors->first('url') ?: null"
                     />
 
-                    <x-wirekit::field :label="__('webhooks::management.form.event_types_legend')" :error="$errors->first('eventTypes') ?: ($errors->first('eventTypes.*') ?: null)">
+                    {{-- Required as a group: WireKit marks the label and has each box say aria-required, never the
+                         browser's own check, which would demand every box. --}}
+                    <x-wirekit::field :label="__('webhooks::management.form.event_types_legend')" required :error="$errors->first('eventTypes') ?: ($errors->first('eventTypes.*') ?: null)">
                         <x-wirekit::stack gap="xs">
                             @forelse ($availableEventTypes as $type)
                                 <x-wirekit::checkbox wire:key="event-type-{{ $type }}" wire:model="eventTypes" value="{{ $type }}" label="{{ $type }}" />

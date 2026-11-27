@@ -29,30 +29,36 @@
      phone, and the sideways scroll that answered it before put the health badge behind the screen's edge.
      The table writes its roles out, so it stays a table for a screen reader while its rows are cards. --}}
 <div class="wh-portal-list" wire:key="endpoint-list">
-    <div class="mb-[var(--space-wk-sm)] flex flex-wrap items-center justify-between gap-[var(--padding-wk-x-md)]">
+    <x-wirekit::card>
+    {{-- The head WireKit asks of each part of a settings page, where a host may embed this panel: an icon, the
+         part's name and a sentence, with the action that adds an endpoint. --}}
+    <x-wirekit::card.header :description="__('webhooks::self-service.list.description')">
+        <x-slot:iconSlot><x-wirekit::icon name="webhook" size="md" /></x-slot:iconSlot>
         <x-wirekit::heading :level="2" size="md">{{ __('webhooks::self-service.list.heading') }}</x-wirekit::heading>
-
-        @if ($this->capReached)
-            <x-wirekit::text size="sm" intent="muted">{{ $this->capNotice }}</x-wirekit::text>
-        @else
-            {{-- The size of the page's other action, "Endpoint health" above, and of the row actions below. --}}
-            <x-wirekit::button size="sm" wire:click="newEndpoint" wire:loading.attr="disabled" wire:target="newEndpoint">
-                <x-slot:iconLeft><x-wirekit::icon name="plus" size="sm" /></x-slot:iconLeft>
-                {{ __('webhooks::self-service.list.new_endpoint') }}
-            </x-wirekit::button>
-        @endif
-    </div>
+        <x-slot:actions>
+            @if ($this->capReached)
+                <x-wirekit::text size="sm" intent="muted">{{ $this->capNotice }}</x-wirekit::text>
+            @else
+                {{-- The size of the page's other action, "Endpoint health" above, and of the row actions below. --}}
+                <x-wirekit::button size="sm" wire:click="newEndpoint" wire:loading.attr="disabled" wire:target="newEndpoint">
+                    <x-slot:iconLeft><x-wirekit::icon name="plus" size="sm" /></x-slot:iconLeft>
+                    {{ __('webhooks::self-service.list.new_endpoint') }}
+                </x-wirekit::button>
+            @endif
+        </x-slot:actions>
+    </x-wirekit::card.header>
 
     @if ($endpoints->isEmpty())
-        {{-- Outlined: this empty state stands on its own in the page body, not inside a
-             card, so it needs its own chrome to read as a placeholder. --}}
-        <x-wirekit::empty-state
-            icon="globe"
-            variant="outline"
-            :title="__('webhooks::self-service.empty.no_endpoints.title')"
-            :description="__('webhooks::self-service.empty.no_endpoints.description')"
-        />
+        {{-- Inside the card, so the card is its frame and it draws none of its own. --}}
+        <x-wirekit::card.body>
+            <x-wirekit::empty-state
+                icon="globe"
+                :title="__('webhooks::self-service.empty.no_endpoints.title')"
+                :description="__('webhooks::self-service.empty.no_endpoints.description')"
+            />
+        </x-wirekit::card.body>
     @else
+        <x-wirekit::card.body :padded="false">
         {{-- The focus target of the delete dialog below. Both halves are needed: without
              tabindex="-1" the table cannot take focus programmatically, and focus-return-to
              then points at an element that refuses it — which behaves exactly like declaring
@@ -265,9 +271,13 @@
                 @endforeach
             </x-wirekit::table.body>
         </x-wirekit::table>
+        </x-wirekit::card.body>
 
-        <div class="mt-[var(--space-wk-sm)]">
-            {{ $endpoints->onEachSide(1)->links() }}
-        </div>
+        @if ($endpoints->hasPages())
+            <x-wirekit::card.body>
+                {{ $endpoints->onEachSide(1)->links() }}
+            </x-wirekit::card.body>
+        @endif
     @endif
+    </x-wirekit::card>
 </div>

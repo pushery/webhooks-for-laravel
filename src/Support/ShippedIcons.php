@@ -39,7 +39,7 @@ final class ShippedIcons
      * beside this class holds the list against `resources/views` in both directions, so a new
      * screen that draws another icon cannot leave the check behind.
      */
-    public const array LITERAL_ALIASES = ['dashboard', 'file-text', 'globe', 'inbox', 'plus', 'search', 'sort-desc'];
+    public const array LITERAL_ALIASES = ['dashboard', 'edit', 'file-text', 'globe', 'inbox', 'key', 'plus', 'search', 'sort-desc', 'webhook'];
 
     /**
      * The container key Blade Icons registers its factory under. A string rather than a class

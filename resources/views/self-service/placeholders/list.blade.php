@@ -14,8 +14,12 @@
      ones whatever this says -- but it takes out the case that is both the worst and the certain
      one.
 
-     200px, within a few pixels of the empty list: the row with the button that adds an endpoint
-     and WireKit's empty state under it. --}}
-<div class="wh-portal-list-placeholder min-h-50" role="status" aria-label="{{ __('webhooks::self-service.a11y.loading_endpoints') }}" wire:key="endpoint-list-placeholder">
-    <x-wirekit::skeleton.table :rows="4" />
+     268px, within a few pixels of the empty list: the head of its card with the heading, the
+     sentence and the button that adds an endpoint, and WireKit's empty state under it. --}}
+<div class="wh-portal-list-placeholder min-h-67" role="status" aria-label="{{ __('webhooks::self-service.a11y.loading_endpoints') }}" wire:key="endpoint-list-placeholder">
+    <x-wirekit::card>
+        <x-wirekit::card.body>
+            <x-wirekit::skeleton.table :rows="4" />
+        </x-wirekit::card.body>
+    </x-wirekit::card>
 </div>

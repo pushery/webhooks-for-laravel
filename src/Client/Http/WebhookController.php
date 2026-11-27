@@ -6,6 +6,7 @@ namespace Pushery\Webhooks\Client\Http;
 
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
+use Pushery\Webhooks\Client\Exceptions\SignedRequestRefused;
 use Pushery\Webhooks\Client\Exceptions\WebhookConfigCannotVerify;
 use Pushery\Webhooks\Client\WebhookConfig;
 use Pushery\Webhooks\Client\WebhookProcessor;
@@ -40,17 +41,20 @@ final class WebhookController
             // The processor's promise — a request that can never be made valid is refused,
             // never answered 5xx — has to hold for the one refusal the processor cannot
             // reach. There is nothing to check the signature against, so there is nothing
-            // a retry could fix, and abort() is deliberately the same call the rejected
-            // signature makes: a producer must not be able to tell the two apart, and a
-            // host reading its own logs must not find two shapes for one event.
+            // a retry could fix, and the refusal is the exception the rejected signature
+            // throws, as VerifySignedRequest throws it for a call: a producer must not be
+            // able to tell the two apart by status, body or challenge, and a host reading its
+            // own logs must not find two shapes for one event.
             //
             // Reported first, and only here: an uncaught one is reported by the framework
-            // through the same report() on the exception, so neither path logs twice.
+            // through the same report() on the exception, so neither path logs twice. The
+            // refusal itself is an HttpException, which the framework renders and does not
+            // report.
             //
             // And guarded, because report() is allowed to throw in three places of Laravel's
             // own making — a reportable exception whose report() fails, a reportable() callback
             // that throws, a logger that cannot be built. Unguarded it would defeat the promise
-            // the paragraph above states: the throw would travel over the abort() and answer a
+            // the paragraph above states: the throw would travel over the refusal and answer a
             // request that can never be made valid with the one status that invites a retry.
             try {
                 report($cannotVerify);
@@ -59,7 +63,7 @@ final class WebhookController
                 // and no job was queued. The refusal below is what the caller is owed.
             }
 
-            abort($cannotVerify->status);
+            throw SignedRequestRefused::unverifiable($cannotVerify);
         }
 
         return new WebhookProcessor($request, $config)->process();

@@ -50,6 +50,17 @@
     </x-wirekit::visually-hidden>
     @if ($secret !== null)
         <x-wirekit::card>
+            {{-- The head WireKit asks of each part of a settings page, where a host may embed this panel: an
+                 icon, the part's name and a sentence, here the notice to store the secret, with the button that
+                 hides it. Level 2 for the reason the form gives: this panel opens above the list, under the
+                 page's h1. The head stands outside the region below, which holds the secret itself. --}}
+            <x-wirekit::card.header :description="__('webhooks::self-service.secret.notice')">
+                <x-slot:iconSlot><x-wirekit::icon name="key" size="md" /></x-slot:iconSlot>
+                <x-wirekit::heading :level="2" size="sm">{{ __('webhooks::self-service.secret.heading') }}</x-wirekit::heading>
+                <x-slot:actions>
+                    <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral" wire:click="hide">{{ __('webhooks::self-service.secret.hide') }}</x-wirekit::button>
+                </x-slot:actions>
+            </x-wirekit::card.header>
             <x-wirekit::card.body>
                 {{-- A plain region, not a live one, and that is the whole point of this line.
                      `role="status"` carries an implicit aria-atomic="true", so around the entire
@@ -68,20 +79,9 @@
                      region above says a secret was revealed, and the one below says the window
                      is closing. Both are small, both are atomic, and neither contains the key. --}}
                 <div class="flex flex-col gap-[var(--space-wk-sm)]" role="region" aria-label="{{ __('webhooks::self-service.secret.region_label') }}">
-                    <div class="flex flex-wrap items-start justify-between gap-[var(--padding-wk-x-md)]">
-                        <x-wirekit::stack gap="none">
-                            {{-- Level 2 for the reason the form gives: this panel opens above the list, under the page's h1. --}}
-                            <x-wirekit::heading :level="2" size="sm">{{ __('webhooks::self-service.secret.heading') }}</x-wirekit::heading>
-                            @if ($this->endpointUrl !== null)
-                                <x-wirekit::text size="sm" intent="muted" class="break-all">{{ $this->endpointUrl }}</x-wirekit::text>
-                            @endif
-                        </x-wirekit::stack>
-                        <x-wirekit::button size="sm" surface="{{ config('webhooks.ui.secondary_surface', 'filled') }}" intent="neutral" wire:click="hide">{{ __('webhooks::self-service.secret.hide') }}</x-wirekit::button>
-                    </div>
-
-                    <x-wirekit::text size="sm" intent="muted">
-                        {{ __('webhooks::self-service.secret.notice') }}
-                    </x-wirekit::text>
+                    @if ($this->endpointUrl !== null)
+                        <x-wirekit::text size="sm" intent="muted" class="break-all">{{ $this->endpointUrl }}</x-wirekit::text>
+                    @endif
 
                     {{-- The countdown runs in an Alpine component on this element. The sentence and
                          the impending-expiry cue are handed over as whole translated strings, so

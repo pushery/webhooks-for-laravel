@@ -14,6 +14,7 @@ return [
 
     'list' => [
         'heading' => 'Jouw endpoints',
+        'description' => 'Elk adres waar je events naartoe worden geleverd.',
         'new_endpoint' => 'Nieuw endpoint',
         'cap_reached' => 'Endpoint-limiet bereikt.',
         'ping' => 'Testen',
@@ -56,6 +57,7 @@ return [
     ],
 
     'form' => [
+        'description' => 'Het adres waar je events naartoe gaan, en welke events het ontvangt.',
         'new_heading' => 'Nieuw endpoint',
         'edit_heading' => 'Endpoint bewerken',
         'name_label' => 'Naam',

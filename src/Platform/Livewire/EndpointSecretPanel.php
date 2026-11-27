@@ -14,6 +14,7 @@ use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Pushery\Webhooks\Events\WebhookSecretRevealed;
+use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Platform\Livewire\Concerns\InteractsWithEndpoints;
 use Pushery\Webhooks\WebhookManager;
 
@@ -23,7 +24,8 @@ use Pushery\Webhooks\WebhookManager;
  * bounded time — secret_reveal_ttl seconds — after which the value is withheld again.
  * The expiry is enforced server-side by the visibleSecret guard, so a stale panel can
  * never keep leaking the secret; an Alpine timer mirrors it by auto-hiding in the
- * browser.
+ * browser. The secrets reach the HTML of a response and never the component's snapshot,
+ * see dehydrate().
  *
  * Both actions re-resolve the endpoint through the owner-scoped query and re-authorize
  * the row-level policy, so a tenant can only ever reveal or rotate a secret it owns.
@@ -48,6 +50,9 @@ final class EndpointSecretPanel extends Component
      * policy; a client-writable endpointId would let the next request act on an id that never
      * went through either. $hidden stays writable: it is the one value here the browser
      * legitimately owns, and it decides nothing but an announcement.
+     *
+     * The two secrets hold a value only within the request that reveals or rotates them, since
+     * dehydrate() empties them before the snapshot is taken.
      */
     #[Locked]
     public ?int $endpointId = null;
@@ -129,18 +134,27 @@ final class EndpointSecretPanel extends Component
     }
 
     /**
-     * Once the reveal window has elapsed, drop the plaintext secrets from the
-     * component state on the very next request. The render guard alone only stops the
-     * value being shown — the raw props would otherwise linger on the server instance
-     * and keep being serialized into the client snapshot; nulling them here retracts
-     * the plaintext entirely rather than merely hiding it.
+     * The secrets read again from the endpoint, for a request inside the reveal window that did
+     * not reveal or rotate them itself. Kept for the rest of that request only.
+     *
+     * @var array{current: ?string, previous: ?string}|null
      */
-    public function hydrate(): void
+    private ?array $stored = null;
+
+    /**
+     * Drop the plaintext secrets before the component is serialized.
+     *
+     * Livewire renders first, then triggers `dehydrate`, and only then takes the snapshot. So a
+     * secret is in the HTML of the response that shows it and in no snapshot at all, the one on
+     * that response included, and no later request of the page carries it back to the server,
+     * where a tool that records request bodies would keep it. The operator console keeps the
+     * secret it shows the same way. A later request inside the reveal window that renders the
+     * panel again reads the secrets from the endpoint once more, see storedSecrets().
+     */
+    public function dehydrate(): void
     {
-        if ($this->isExpired()) {
-            $this->currentSecret = null;
-            $this->previousSecret = null;
-        }
+        $this->currentSecret = null;
+        $this->previousSecret = null;
     }
 
     /**
@@ -160,7 +174,7 @@ final class EndpointSecretPanel extends Component
     #[Computed]
     public function visibleCurrentSecret(): ?string
     {
-        return $this->isExpired() ? null : $this->currentSecret;
+        return $this->secrets()['current'];
     }
 
     /**
@@ -169,7 +183,47 @@ final class EndpointSecretPanel extends Component
     #[Computed]
     public function visiblePreviousSecret(): ?string
     {
-        return $this->isExpired() ? null : $this->previousSecret;
+        return $this->secrets()['previous'];
+    }
+
+    /**
+     * Both secrets while a reveal window is open: the ones this request revealed or rotated, or
+     * else the endpoint's own, read again. Nothing once the window has elapsed, or while no
+     * reveal is in flight.
+     *
+     * @return array{current: ?string, previous: ?string}
+     */
+    private function secrets(): array
+    {
+        if ($this->endpointId === null || $this->expiresAt === null || $this->isExpired()) {
+            return ['current' => null, 'previous' => null];
+        }
+
+        if ($this->currentSecret !== null) {
+            return ['current' => $this->currentSecret, 'previous' => $this->previousSecret];
+        }
+
+        return $this->stored ??= $this->storedSecrets($this->endpointId);
+    }
+
+    /**
+     * The secrets of the endpoint on show, through the owner-scoped query and the policy
+     * reveal() checks, so a later request inside the window hands out no more than the reveal
+     * did. An endpoint deleted since the reveal shows nothing.
+     *
+     * @return array{current: ?string, previous: ?string}
+     */
+    private function storedSecrets(int $id): array
+    {
+        $subscription = $this->scopedQuery()->find($id);
+
+        if (! $subscription instanceof WebhookSubscription) {
+            return ['current' => null, 'previous' => null];
+        }
+
+        $this->authorize('view', $subscription);
+
+        return ['current' => $subscription->secret, 'previous' => $subscription->previous_secret];
     }
 
     /**
