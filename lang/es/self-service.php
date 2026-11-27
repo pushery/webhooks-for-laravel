@@ -14,6 +14,7 @@ return [
 
     'list' => [
         'heading' => 'Tus endpoints',
+        'description' => 'Cada dirección a la que se entregan tus eventos.',
         'new_endpoint' => 'Nuevo endpoint',
         'cap_reached' => 'Límite de endpoints alcanzado.',
         'ping' => 'Probar',
@@ -56,6 +57,7 @@ return [
     ],
 
     'form' => [
+        'description' => 'La dirección a la que van tus eventos y los eventos que recibe.',
         'new_heading' => 'Nuevo endpoint',
         'edit_heading' => 'Editar endpoint',
         'name_label' => 'Nombre',

@@ -46,15 +46,24 @@
              when the panel holds no focusable control, and `$el` is this div now. --}}
         <div x-data="webhooksOpenedPanel" tabindex="-1">
         <x-wirekit::card>
+            {{-- The head WireKit asks of each part of a settings page, where a host may embed this panel: an
+                 icon, the part's name and a sentence. Level 2: the form opens above the endpoint list, directly
+                 under the page's h1 and beside "Your endpoints". An h3 here skipped a level in every heading list. --}}
+            <x-wirekit::card.header :description="__('webhooks::self-service.form.description')">
+                <x-slot:iconSlot>
+                    @if ($endpointId === null)
+                        <x-wirekit::icon name="plus" size="md" />
+                    @else
+                        <x-wirekit::icon name="edit" size="md" />
+                    @endif
+                </x-slot:iconSlot>
+                <x-wirekit::heading :level="2" size="sm">
+                    {{ $endpointId === null ? __('webhooks::self-service.form.new_heading') : __('webhooks::self-service.form.edit_heading') }}
+                </x-wirekit::heading>
+            </x-wirekit::card.header>
             <x-wirekit::card.body>
                 <x-wirekit::form wire:submit="save">
                     <x-wirekit::stack gap="md">
-                        {{-- Level 2: the form opens above the endpoint list, directly under the page's h1 and
-                             beside "Your endpoints". An h3 here skipped a level in every heading list. --}}
-                        <x-wirekit::heading :level="2" size="sm">
-                            {{ $endpointId === null ? __('webhooks::self-service.form.new_heading') : __('webhooks::self-service.form.edit_heading') }}
-                        </x-wirekit::heading>
-
                         <x-wirekit::input
                             :label="__('webhooks::self-service.form.name_label')"
                             :hint="__('webhooks::self-service.form.name_hint')"
@@ -71,7 +80,7 @@
                             :error="$errors->first('url') ?: null"
                         />
 
-                        <x-wirekit::field :label="__('webhooks::self-service.form.event_types_label')" :error="$errors->first('eventTypes') ?: ($errors->first('eventTypes.*') ?: null)">
+                        <x-wirekit::field :label="__('webhooks::self-service.form.event_types_label')" required :error="$errors->first('eventTypes') ?: ($errors->first('eventTypes.*') ?: null)">
                             <x-wirekit::stack gap="xs">
                                 @forelse ($availableEventTypes as $type)
                                     <x-wirekit::checkbox wire:key="event-type-{{ $type }}" wire:model="eventTypes" value="{{ $type }}" label="{{ $type }}" />

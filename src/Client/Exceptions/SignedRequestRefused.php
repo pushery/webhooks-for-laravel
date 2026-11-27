@@ -11,7 +11,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
  * A call to a route of the application's own API that {@see VerifySignedRequest} refused, or a delivery to a receiving
- * route whose signature did not hold.
+ * route whose signature did not hold or whose config cannot verify any delivery.
  *
  * It is an HttpException carrying the status the config answers a refusal with, and no message, so an application that
  * renders nothing of its own answers as `abort()` with that status would: the framework renders an HttpException by its

@@ -6,6 +6,20 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.37.0] - 2026-11-27
+
+### 🔧 Changed
+
+- **The three panels of the self-service portal a host embeds stand each in a card with its head.** The endpoint list, the endpoint form and the secret panel are what a host puts into a screen of its own, often a settings page, and WireKit asks each part of such a page for a card whose head carries an icon, the name of the part and a sentence. The list now stands in a card whose head holds its heading, a sentence and the New endpoint button, and its empty state takes the card as its frame instead of a dashed one of its own. The form and the secret panel carry their heading in the head of their card, the form with a sentence, the secret panel with its notice and the Hide button. The two new sentences come in all seven languages. The placeholder a host sees while the list loads reserves the height of the empty list in its card, so the screen below does not move when the list arrives. The preflight's icon check covers the three icons the heads draw, `webhook`, `key` and `edit`.
+
+### 🐛 Fixed
+
+- **A receiving route whose config cannot verify answers like a refused signature, challenge included.** A `Route::webhooks()` endpoint without a `secret`, a `jwks` url or a `verifier` refused a delivery with `abort()`, so its `401` named no challenge, and a renderer that writes one of its own for a bare `401`, such as the one of `pushery/http-api-for-laravel` from 0.6.0, asked the sender for a bearer token, while a refused signature already named `WWW-Authenticate: Signature`. The refusal is now the `SignedRequestRefused` a refused signature gets, with `reason` `unverifiable` and the configuration fault as its previous exception, so both answer with the same status, body and header.
+
+  **Upgrade:** with `invalid_status` set to `404`, this refusal was a `NotFoundHttpException`. A render callback for that class no longer sees it, one for `SignedRequestRefused` does.
+- **The endpoint form of the operator console marks its address and its event types as required, in both renderings.** It asked for an address and at least one event type and said so only when it refused the save, so a screen reader met the rule after the fact. The address carries `required` and an asterisk beside its label, and each box of the event types says `aria-required`, under a legend or label with the same asterisk. No box carries `required`, since the browser would then demand that box itself. The event types of the self-service form are marked the same way, beside its address, which was marked already.
+- **The signing secret of the self-service panel stays out of the component's snapshot.** Livewire writes the snapshot into the page, and the browser sends it back with every later request of the panel, so a revealed secret traveled in those requests until its window closed, where a tool that records request bodies kept it. The panel now empties both secrets before the snapshot is taken, as the operator console does with the secret it shows: they reach the HTML of the response that shows them and no snapshot. A later request inside the window that renders the panel again reads them from the endpoint once more, through the owner-scoped lookup and the policy a reveal checks, and an endpoint deleted since shows nothing. The public properties `currentSecret` and `previousSecret` stay, and hold a value only within the request that reveals or rotates the secret.
+
 ## [3.36.0] - 2026-11-26
 
 ### 🔧 Changed
@@ -3889,7 +3903,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.36.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.37.0...HEAD
+[3.37.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.36.0...v3.37.0
 [3.36.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.35.0...v3.36.0
 [3.35.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.34.0...v3.35.0
 [3.34.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.33.0...v3.34.0

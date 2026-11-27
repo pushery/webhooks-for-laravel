@@ -57,16 +57,21 @@
         </div>
 
         <div>
-            <label for="wh-url" class="block text-sm font-medium">{{ __('webhooks::management.form.url_label') }}</label>
-            <input id="wh-url" type="url" wire:model="url" placeholder="{{ __('webhooks::management.form.url_placeholder') }}" class="mt-1 block w-full rounded border px-3 py-2" @error('url') aria-invalid="true" aria-describedby="wh-url-error" @enderror>
+            {{-- The asterisk is for the eye. The input says it is required itself, so a screen reader hears it once,
+                 from the control, and not again from the label. --}}
+            <label for="wh-url" class="block text-sm font-medium">{{ __('webhooks::management.form.url_label') }} <span class="text-red-600" aria-hidden="true">*</span></label>
+            <input id="wh-url" type="url" wire:model="url" required placeholder="{{ __('webhooks::management.form.url_placeholder') }}" class="mt-1 block w-full rounded border px-3 py-2" @error('url') aria-invalid="true" aria-describedby="wh-url-error" @enderror>
             @error('url') <p id="wh-url-error" class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
         </div>
 
         <fieldset @error('eventTypes') aria-invalid="true" aria-describedby="wh-event-types-error" @enderror @error('eventTypes.*') aria-invalid="true" aria-describedby="wh-event-types-item-error" @enderror>
-            <legend class="text-sm font-medium">{{ __('webhooks::management.form.event_types_legend') }}</legend>
+            {{-- At least one type is required, and no single box is. Each box says so with aria-required, as WireKit's
+                 checkboxes do inside a required field, and never with `required`: on a checkbox that is the browser's
+                 own check that this very box is ticked, which would stop a save the form takes with any one type. --}}
+            <legend class="text-sm font-medium">{{ __('webhooks::management.form.event_types_legend') }} <span class="text-red-600" aria-hidden="true">*</span></legend>
             @forelse ($availableEventTypes as $type)
                 <label class="flex items-center gap-2" wire:key="event-type-{{ $type }}">
-                    <input type="checkbox" wire:model="eventTypes" value="{{ $type }}"> {{ $type }}
+                    <input type="checkbox" wire:model="eventTypes" value="{{ $type }}" aria-required="true"> {{ $type }}
                 </label>
             @empty
                 {{-- The path travels through the sentence as a placeholder, so a locale can
