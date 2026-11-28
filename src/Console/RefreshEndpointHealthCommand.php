@@ -7,6 +7,7 @@ namespace Pushery\Webhooks\Console;
 use Illuminate\Console\Command;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Platform\Health\EndpointHealth;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 use Throwable;
 
@@ -18,6 +19,7 @@ use Throwable;
  *
  * @internal
  */
+#[AsCommand(name: 'webhooks:refresh-endpoint-health')]
 final class RefreshEndpointHealthCommand extends Command
 {
     protected $signature = 'webhooks:refresh-endpoint-health';

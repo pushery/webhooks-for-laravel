@@ -6,6 +6,18 @@ the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 From 3.16.0 on, a release carries only the sections that have an entry, each heading with its sign, in this order: Breaking, Added, Changed, Performance, Fixed, Security, Deprecated, Removed and Documentation. The releases before it keep the headings they were published with.
 
+## [3.39.0] - 2026-11-28
+
+### ⚡ Performance
+
+- **A start of the console builds none of the package's commands.** Each command class carries `#[AsCommand]` with the name of its signature, so Laravel keeps each in the map of its loader and builds it only when it runs. Before, every start of a host's console built every command of the package through the container, for each run of the schedule, each queue worker and each `artisan` call, whatever ran.
+
+### 🔒 Security
+
+- **A queued handler job keeps the delivery out of the queue.** `ProcessWebhookJob` sets `$shouldBeEncrypted` from `webhooks.client.encrypt_jobs` (`WEBHOOKS_CLIENT_ENCRYPT_JOBS`), on by default, so the queue and `failed_jobs` hold the envelope of a received delivery, its data and its payload, encrypted with the application key. A handler class of the application extends `ProcessWebhookJob` and keeps the encryption.
+
+  **Upgrade:** a worker decrypts with the `APP_KEY` of the application that receives, so both share one key. A job queued before the update is still read. `WEBHOOKS_CLIENT_ENCRYPT_JOBS=false` writes the job as before.
+
 ## [3.38.0] - 2026-11-27
 
 ### 🔒 Security
@@ -3911,7 +3923,8 @@ PostgreSQL-native.
   (`WebhooksUiServiceProvider`, not auto-registered), in two variants: neutral Tailwind
   (`webhooks-ui`) and WireKit-styled (`webhooks-ui-wirekit`).
 
-[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.38.0...HEAD
+[Unreleased]: https://github.com/pushery/webhooks-for-laravel/compare/v3.39.0...HEAD
+[3.39.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.38.0...v3.39.0
 [3.38.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.37.0...v3.38.0
 [3.37.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.36.0...v3.37.0
 [3.36.0]: https://github.com/pushery/webhooks-for-laravel/compare/v3.35.0...v3.36.0

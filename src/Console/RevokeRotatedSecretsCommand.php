@@ -7,6 +7,7 @@ namespace Pushery\Webhooks\Console;
 use Illuminate\Console\Command;
 use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\WebhookManager;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 use Throwable;
 
@@ -21,6 +22,7 @@ use Throwable;
  *
  * @internal
  */
+#[AsCommand(name: 'webhooks:revoke-rotated-secrets')]
 final class RevokeRotatedSecretsCommand extends Command
 {
     protected $signature = 'webhooks:revoke-rotated-secrets';

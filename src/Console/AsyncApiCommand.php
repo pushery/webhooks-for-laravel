@@ -7,6 +7,7 @@ namespace Pushery\Webhooks\Console;
 use Illuminate\Console\Command;
 use Pushery\Webhooks\Platform\AsyncApi\AsyncApiGenerator;
 use Pushery\Webhooks\WebhookManager;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
@@ -20,6 +21,7 @@ use Symfony\Component\Yaml\Yaml;
  *
  * @internal
  */
+#[AsCommand(name: 'webhooks:asyncapi')]
 final class AsyncApiCommand extends Command
 {
     protected $signature = 'webhooks:asyncapi

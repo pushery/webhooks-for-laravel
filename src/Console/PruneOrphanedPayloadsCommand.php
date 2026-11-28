@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Config;
 use Pushery\Webhooks\Support\LocalizedNumber;
 use Pushery\Webhooks\Support\PayloadReclaimer;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 
 /**
@@ -42,6 +43,7 @@ use Symfony\Component\Console\Formatter\OutputFormatter;
  *
  * @internal
  */
+#[AsCommand(name: 'webhooks:prune-orphaned-payloads')]
 final class PruneOrphanedPayloadsCommand extends Command
 {
     protected $signature = 'webhooks:prune-orphaned-payloads

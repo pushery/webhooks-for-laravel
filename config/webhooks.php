@@ -742,6 +742,12 @@ return [
     'client' => [
         'enabled' => EnvFlag::protection(env('WEBHOOKS_CLIENT_ENABLED', false), false),
 
+        // A queued handler job carries the envelope of a delivery, its data and its payload, and that is
+        // where a producer's personal data travels: a customer's name, address and mail. With this on, the
+        // job is encrypted with the application key in the queue while it waits and in `failed_jobs` once
+        // it gives up. A queue worker needs the same APP_KEY as the application that receives.
+        'encrypt_jobs' => EnvFlag::protection(env('WEBHOOKS_CLIENT_ENCRYPT_JOBS', true), true),
+
         // Keep true. A middleware is prepended to the global stack so the exact received
         // bytes of a request to a receiving route are captured before any other middleware can
         // parse or re-encode the body; signature verification then runs over those bytes. A

@@ -10,6 +10,7 @@ use Pushery\Webhooks\Client\InboundMessage;
 use Pushery\Webhooks\Client\Models\WebhookCall;
 use Pushery\Webhooks\Client\Tenancy\TenantScopes;
 use Pushery\Webhooks\Client\WebhookCallStatus;
+use Pushery\Webhooks\Support\EnvFlag;
 use Throwable;
 
 /**
@@ -57,6 +58,14 @@ class ProcessWebhookJob implements ShouldQueue
      */
     private const string TENANT_KEY = '@tenant';
 
+    /**
+     * Whether the queue holds this job encrypted with the application key: in the queue while the
+     * delivery waits for its handler, and in `failed_jobs` once it gives up. Laravel reads it when it
+     * writes the job. The envelope carries the producer's data, so `webhooks.client.encrypt_jobs`
+     * seals it unless an application switches it off.
+     */
+    public bool $shouldBeEncrypted;
+
     public function __construct(
         public WebhookCall $webhookCall,
         public InboundMessage $message,
@@ -64,6 +73,7 @@ class ProcessWebhookJob implements ShouldQueue
         // The property rather than a middleware() method, so a subclass that defines middleware()
         // for its own purposes keeps this one: the queue runs both.
         $this->middleware = [new RecordCallOutcome];
+        $this->shouldBeEncrypted = EnvFlag::protection(config('webhooks.client.encrypt_jobs'), true);
     }
 
     public function handle(): void

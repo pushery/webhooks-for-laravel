@@ -7,6 +7,7 @@ namespace Pushery\Webhooks\Console;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Config;
 use Pushery\Webhooks\Server\Outbox\OutboxRelay;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 
 /**
@@ -20,6 +21,7 @@ use Symfony\Component\Console\Formatter\OutputFormatter;
  *
  * @internal
  */
+#[AsCommand(name: 'webhooks:outbox')]
 final class RelayOutboxCommand extends Command
 {
     protected $signature = 'webhooks:outbox';
