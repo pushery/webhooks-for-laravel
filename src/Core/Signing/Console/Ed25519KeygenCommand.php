@@ -7,6 +7,7 @@ namespace Pushery\Webhooks\Core\Signing\Console;
 use Illuminate\Console\Command;
 use Pushery\Webhooks\Core\Signing\Ed25519Keys;
 use Pushery\Webhooks\Core\Signing\Ed25519Scheme;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
@@ -17,6 +18,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  *
  * @internal
  */
+#[AsCommand(name: 'webhooks:ed25519-keygen')]
 final class Ed25519KeygenCommand extends Command
 {
     protected $signature = 'webhooks:ed25519-keygen';

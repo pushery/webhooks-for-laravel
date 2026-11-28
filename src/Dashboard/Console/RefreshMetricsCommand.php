@@ -12,6 +12,7 @@ use Pushery\Webhooks\Database\Dialect\Dialect;
 use Pushery\Webhooks\Database\Dialect\Sql\RollupRefresh;
 use Pushery\Webhooks\Support\Timestamp;
 use Pushery\Webhooks\Support\WebhookConnection;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 
 /**
@@ -22,6 +23,7 @@ use Symfony\Component\Console\Formatter\OutputFormatter;
  *
  * @internal
  */
+#[AsCommand(name: 'webhooks:refresh-metrics')]
 final class RefreshMetricsCommand extends Command
 {
     protected $signature = 'webhooks:refresh-metrics';

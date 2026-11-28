@@ -218,8 +218,9 @@ final readonly class VerifySignedRequest
     {
         $flat = [];
 
+        // symfony/http-foundation 8.2 types the bag without string keys, though every key is a header name.
         foreach ($request->headers->all() as $name => $values) {
-            $flat[$name] = (string) ($values[0] ?? '');
+            $flat[(string) $name] = (string) ($values[0] ?? '');
         }
 
         return SignatureHeaders::from($flat);

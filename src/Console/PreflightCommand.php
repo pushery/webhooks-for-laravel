@@ -19,6 +19,7 @@ use Pushery\Webhooks\Support\Settings;
 use Pushery\Webhooks\Support\ShippedIcons;
 use Pushery\Webhooks\Support\WebhookConnection;
 use RuntimeException;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 
 /**
@@ -47,6 +48,7 @@ use Symfony\Component\Console\Formatter\OutputFormatter;
  *
  * @internal
  */
+#[AsCommand(name: 'webhooks:preflight')]
 final class PreflightCommand extends Command
 {
     protected $signature = 'webhooks:preflight

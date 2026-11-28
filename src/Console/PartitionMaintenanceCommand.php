@@ -11,6 +11,7 @@ use Pushery\Webhooks\Database\PartitionManager;
 use Pushery\Webhooks\Support\Settings;
 use Pushery\Webhooks\Support\Timestamp;
 use Pushery\Webhooks\Support\WebhookConnection;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 
 /**
@@ -29,6 +30,7 @@ use Symfony\Component\Console\Formatter\OutputFormatter;
  *
  * @internal
  */
+#[AsCommand(name: 'webhooks:partition-maintenance')]
 final class PartitionMaintenanceCommand extends Command
 {
     protected $signature = 'webhooks:partition-maintenance';

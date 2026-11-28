@@ -6,6 +6,7 @@ namespace Pushery\Webhooks\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Config;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -19,6 +20,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  *
  * @internal
  */
+#[AsCommand(name: 'webhooks:egress-ips')]
 final class EgressIpsCommand extends Command
 {
     protected $signature = 'webhooks:egress-ips

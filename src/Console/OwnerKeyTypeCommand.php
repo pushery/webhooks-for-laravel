@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 use Pushery\Webhooks\Database\OwnerKeyConversion;
 use Pushery\Webhooks\Database\OwnerKeyType;
 use Pushery\Webhooks\Support\WebhookConnection;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 
 /**
@@ -24,6 +25,7 @@ use Symfony\Component\Console\Formatter\OutputFormatter;
  *
  * @internal
  */
+#[AsCommand(name: 'webhooks:owner-key-type')]
 final class OwnerKeyTypeCommand extends Command
 {
     protected $signature = 'webhooks:owner-key-type

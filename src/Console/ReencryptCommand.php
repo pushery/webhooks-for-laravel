@@ -15,6 +15,7 @@ use Pushery\Webhooks\Models\WebhookSubscription;
 use Pushery\Webhooks\Server\Data\WebhookDeliveryData;
 use Pushery\Webhooks\Server\Models\WebhookOutboxEntry;
 use Pushery\Webhooks\Support\WebhookConnection;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Formatter\OutputFormatter;
 
 /**
@@ -41,6 +42,7 @@ use Symfony\Component\Console\Formatter\OutputFormatter;
  *
  * @internal
  */
+#[AsCommand(name: 'webhooks:reencrypt')]
 final class ReencryptCommand extends Command
 {
     protected $signature = 'webhooks:reencrypt
